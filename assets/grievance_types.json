@@ -1,0 +1,12 @@
+{
+  "G001": "Account number is not Correct",
+  "G002": "Online Application is pending for Approval",
+  "G003": "Installment not received",
+  "G004": "Transaction Failed",
+  "G005": "Problem in Aadhaar Correction",
+  "G006": "Gender is not correct",
+  "G007": "Payment Related",
+  "G008": "Problem in OTP based e-kyc",
+  "G009": "Problem in bio-metric based e-kyc",
+  "G010": "Problem in Facial based e-kyc"
+}

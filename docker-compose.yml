@@ -1,0 +1,39 @@
+services:
+  app:
+    container_name: sva_app
+    build: .
+    ports:
+      - "8000:8000"
+    expose:
+      - "8000"
+    volumes:
+      - .:/app
+    env_file:
+      - .env  
+    restart: unless-stopped
+    networks:
+      - svanetwork
+
+#   nominatim:
+#     image: mediagis/nominatim:5.1
+#     container_name: nominatim
+#     shm_size: 2g # Recommended: 4GB
+#     mem_limit: 8g # Recommended: 4GB
+#     cpus: 2.0 # Recommended: 4 CPUs
+#     environment:
+#       - PBF_URL=https://download.geofabrik.de/asia/india-latest.osm.pbf
+#       - REPLICATION_URL=https://download.geofabrik.de/asia/india-updates/
+#     volumes:
+#       - nominatim-data:/var/lib/postgresql/16/main
+#     ports:
+#       - "8080:8080"
+#     restart: unless-stopped
+#     networks:
+#       - svanetwork
+
+# volumes:
+#   nominatim-data:
+
+networks:
+  svanetwork:
+    external: true

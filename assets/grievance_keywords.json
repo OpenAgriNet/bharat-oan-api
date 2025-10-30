@@ -1,0 +1,12 @@
+{
+  "G001": ["account", "number", "incorrect", "wrong", "account number", "bank account"],
+  "G002": ["application", "pending", "approval", "waiting", "under review", "not approved"],
+  "G003": ["installment", "payment", "money", "not received", "didn't get", "amount"],
+  "G004": ["transaction", "failed", "error", "unsuccessful", "not processed"],
+  "G005": ["aadhaar", "correction", "wrong aadhaar", "aadhaar number", "aadhar"],
+  "G006": ["gender", "male", "female", "wrong gender"],
+  "G007": ["payment", "money", "credit", "debit", "bank", "financial"],
+  "G008": ["otp", "verification", "kyc", "otp based", "sms", "mobile"],
+  "G009": ["biometric", "fingerprint", "thumb", "biometric kyc", "finger"],
+  "G010": ["facial", "face", "photo", "facial kyc", "camera"]
+}
