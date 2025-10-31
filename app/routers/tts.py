@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Body, Depends
 from fastapi.responses import JSONResponse
 from app.models.requests import TTSRequest
-from helpers.tts import text_to_speech_bhashini, text_to_speech_elevenlabs, remove_urls
+from helpers.tts import text_to_speech_bhashini
 import uuid
 import base64
 from helpers.utils import get_logger
@@ -26,15 +26,11 @@ async def tts(request: TTSRequest = Body(...), current_user: str = Depends(get_c
             request.target_lang, 
             gender='female', 
             sampling_rate=8000
-        )
-        
-    # elif request.service_type == 'eleven_labs':
-    #     text = remove_urls(request.text)
-    #     audio_data = text_to_speech_elevenlabs(text=text)
+        )        
     else:
         return JSONResponse({
             'status': 'error',
-            'message': f'Service type "{request.service_type}" not supported. Available options: bhashini, eleven_labs'
+            'message': f'Service type "{request.service_type}" not supported. Available options: bhashini'
         }, status_code=400)
     
     audio_data = base64.b64encode(audio_data).decode('utf-8')
