@@ -403,12 +403,6 @@ def check_grievance_status(identity_no: str) -> str:
         
         formatted_response.append(f"\nOfficer Response Details:")
         
-        grievance_status = details.get("GrievanceStatus")
-        if grievance_status:
-            formatted_response.append(f"Status: {grievance_status}")
-        else:
-            formatted_response.append("Status: Pending")
-        
         officer_reply = details.get("OfficerReply")
         if officer_reply:
             formatted_response.append(f"Officer Reply: {officer_reply}")
