@@ -129,7 +129,7 @@ class GrievanceRequest(BaseModel):
 
 class GrievanceServiceOutput(BaseModel):
     """Pydantic model for the inner 'd' object in grievance service response"""
-    __type: str = Field(..., alias="__type", description="Type identifier from the service")
+    type_: str = Field(..., alias="__type", description="Type identifier from the service")
     output: str = Field(..., description="Encrypted output data (base64 encoded)")
     
     class Config:
