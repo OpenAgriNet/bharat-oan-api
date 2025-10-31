@@ -7,8 +7,6 @@ pandas
 simplejson
 
 ### for DB
-pg8000
-sqlalchemy
 requests
 
 # LLM
