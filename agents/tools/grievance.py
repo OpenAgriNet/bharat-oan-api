@@ -17,16 +17,12 @@ logger = get_logger(__name__)
 base_url = os.getenv("GRIEVANCE_BASE_URL")
 
 # Load grievance type codes and descriptions from JSON file
-current_dir = os.path.dirname(os.path.abspath(__file__))
-assets_dir = os.path.join(current_dir, '..', '..', 'assets')
-json_path = os.path.join(assets_dir, 'grievance_types.json')
+json_path = 'assets/grievance_types.json'
 
-with open(json_path, 'r', encoding='utf-8') as f:
-    GRIEVANCE_TYPES = json.load(f)
+GRIEVANCE_TYPES = json.load(open(json_path, 'r', encoding='utf-8'))
 
 # Create reverse mapping: description -> code
 GRIEVANCE_DESCRIPTION_TO_CODE = {description: code for code, description in GRIEVANCE_TYPES.items()}
-
 
 def _get_encryption_keys():
     """

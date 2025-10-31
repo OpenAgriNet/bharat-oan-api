@@ -222,51 +222,6 @@ def get_prompt(prompt_file: str, context: Dict = {}, prompt_dir: str = "assets/p
     
     return prompt
 
-def upload_audio_to_s3(audio_base64: str, session_id: str, bucket_name: str = None) -> Dict:
-    """Upload base64 encoded audio to S3.
-    
-    Args:
-        audio_base64 (str): Base64 encoded audio content
-        session_id (str): Session ID for the conversation
-        bucket_name (str, optional): S3 bucket name. Defaults to env variable.
-        
-    Returns:
-        dict: Dictionary containing upload details
-    """
-    try:
-        if not bucket_name:
-            bucket_name = os.getenv('AWS_S3_BUCKET')
-            
-        if not bucket_name:
-            raise ValueError("S3 bucket name not provided")
-            
-        # Decode base64 content
-        audio_content = base64.b64decode(audio_base64)
-        
-        # Generate unique filename with timestamp
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"audio/{session_id}/{timestamp}.wav"
-        
-        # Get S3 client and upload
-        s3_client = get_s3_client()
-        s3_client.put_object(
-            Bucket=bucket_name,
-            Key=filename,
-            Body=audio_content,
-            ContentType='audio/wav'
-        )
-        
-        return {
-            'status': 'success',
-            'bucket': bucket_name,
-            'key': filename,
-            'session_id': session_id
-        }
-        
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.error(f"Error uploading audio to S3: {str(e)}")
-        raise
 
 
 def load_json_data(filename: str) -> List[Dict]:

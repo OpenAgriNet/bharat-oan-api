@@ -65,8 +65,6 @@ langcodes[data]==3.4.0
 # python dotenv
 python-dotenv
 
-# ElevenLabs TTS
-elevenlabs
 markdownify
 
 # Human-friendly formatting
