@@ -16,10 +16,10 @@ suggestions_agent = Agent(
     end_strategy='exhaustive',
     tools=[],
     model_settings=ModelSettings(
-        parallel_tool_calls=True,
+        parallel_tool_calls=False,  
         openai_reasoning_effort='medium',
         temperature=1.0,
         top_p=1.0,
         top_k=0,
-    ) # Prevent multiple tool calls
+    ) 
 )
