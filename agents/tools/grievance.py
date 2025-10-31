@@ -7,7 +7,7 @@ import json
 import os
 import requests
 from helpers.utils import get_logger
-from typing import Dict, Any
+from typing import Dict, Any, Literal
 from pydantic import BaseModel, Field
 from helpers.encryption import hex_to_bytes, encrypt_aes_gcm, decrypt_aes_gcm
 
@@ -24,10 +24,8 @@ json_path = os.path.join(assets_dir, 'grievance_types.json')
 with open(json_path, 'r', encoding='utf-8') as f:
     GRIEVANCE_TYPES = json.load(f)
 
-# Load grievance keywords from JSON file
-keywords_path = os.path.join(assets_dir, 'grievance_keywords.json')
-with open(keywords_path, 'r', encoding='utf-8') as f:
-    GRIEVANCE_KEYWORDS = json.load(f)
+# Create reverse mapping: description -> code
+GRIEVANCE_DESCRIPTION_TO_CODE = {description: code for code, description in GRIEVANCE_TYPES.items()}
 
 
 def _get_encryption_keys():
@@ -127,7 +125,7 @@ class GrievanceRequest(BaseModel):
     """Pydantic model for grievance submission validation"""
     identity_no: str = Field(..., min_length=1, description="Identity number")
     grievance_type: str = Field(..., description="Type of grievance")
-    grievance_description: str = Field(..., min_length=10, description="Description of the grievance")
+    # grievance_description: str = Field(..., min_length=10, description="Description of the grievance")
     
   
 def get_aadhaar_token(identity_no: str) -> str:
@@ -169,7 +167,7 @@ def submit_grievance(
     identity_no: str,
     grievance_type: str,
     grievance_description: str,
-    api_url: str = f"{base_url}/LodgeGrievance"
+    
 ) -> Dict[str, Any]:
     """
     Submit a grievance to the PM-KISAN portal
@@ -178,11 +176,12 @@ def submit_grievance(
         identity_no: Identity number (e.g., "DL214294806")
         grievance_type: Type of grievance (e.g., "G001")
         grievance_description: Description of the grievance
-        api_url: API endpoint URL
     
     Returns:
         Dictionary containing the response from the grievance service
     """
+    api_url = f"{base_url}/LodgeGrievance"
+    
     actual_identity_no, request_type, error_dict = _handle_identity_number(identity_no)
     if error_dict:
         return error_dict
@@ -199,6 +198,8 @@ def submit_grievance(
         "GrievanceType": grievance_type,
         "GrievanceDescription": grievance_description
     }
+
+    logger.info(f"Request data: {request_data}")
     
     response = _encrypt_and_send(request_data, api_url)
     
@@ -230,72 +231,48 @@ def submit_grievance(
     }
 
 
-def _map_grievance_type(farmer_description: str) -> Dict[str, Any] | None:
-    """
-    Internal function to map farmer's grievance description to the most appropriate grievance type
-    
-    Args:
-        farmer_description: Farmer's description of their grievance
-    
-    Returns:
-        Dictionary containing the matched grievance type and confirmation message
-        Returns None if no suitable match is found
-    """
-    logger.info(f"Mapping grievance type for description: {farmer_description}")
-    farmer_desc_lower = farmer_description.lower()
-    
-    # Score each grievance type based on keyword matches
-    scores = {}
-    for code, keywords in GRIEVANCE_KEYWORDS.items():
-        score = 0
-        for keyword in keywords:
-            if keyword in farmer_desc_lower:
-                score += 1
-        scores[code] = score
-    
-    logger.info(f"Grievance type scores: {scores}")
-    best_match = max(scores, key=scores.get)
-    best_score = scores[best_match]
-    
-    logger.info(f"Best match: {best_match} with score: {best_score}")
-    
-    if best_score == 0:
-        logger.info("No suitable grievance type match found (score is 0)")
-        return None
-    
-    logger.info(f"Matched grievance: {best_match} - {GRIEVANCE_TYPES[best_match]}")
-    return {
-        "grievance_code": best_match,
-        "grievance_description": GRIEVANCE_TYPES[best_match],
-    }
-
-
 def create_grievance(
     identity_no: str,
-    grievance_description: str,
+    grievance_type: Literal[
+        "Account number is not Correct",
+        "Online Application is pending for Approval",
+        "Installment not received",
+        "Transaction Failed",
+        "Problem in Aadhaar Correction",
+        "Gender is not correct",
+        "Payment Related",
+        "Problem in OTP based e-kyc",
+        "Problem in bio-metric based e-kyc",
+        "Problem in Facial based e-kyc"
+    ],
+    # grievance_description: str,
 ) -> str:
     """
-    Create and submit a grievance to the PM-KISAN portal
+    Create and submit a grievance to the PM-KISAN portal.
+    
+    You must select the most appropriate grievance_type from the available options below
+    based on the farmer's complaint or issue:
     
     Args:
         identity_no: Identity number (e.g., "PM-KISAN registration number" or Aadhaar number)
-        grievance_description: Description of the grievance
+        grievance_type: The grievance type - select from the list above (use the exact string)
+    
     
     Returns:
         Response about the grievance submission status
     """
     
-    mapping_result = _map_grievance_type(grievance_description)
+    # Map description to code
+    grievance_code = GRIEVANCE_DESCRIPTION_TO_CODE.get(grievance_type)
     
-    if mapping_result is None:
-        return "Please provide more specific details about your grievance so we can help you better."
-    
-    grievance_type = mapping_result["grievance_code"]
+    if not grievance_code:
+        available_types = '", "'.join(GRIEVANCE_DESCRIPTION_TO_CODE.keys())
+        return f'Invalid grievance type: {grievance_type}. Please select from: "{available_types}"'
     
     result = submit_grievance(
         identity_no,
-        grievance_type,
-        grievance_description
+        grievance_code,
+        grievance_type
     )
     
     if result["success"]:
@@ -307,19 +284,19 @@ def create_grievance(
 
 
 def check_grievance_registration_status(
-    identity_no: str,
-    api_url: str = f"{base_url}/GrievanceCheck"
+    identity_no: str
 ) -> Dict[str, Any]:
     """
     Check the grievance status using registration number or Aadhaar number
     
     Args:
         identity_no: Registration number or Aadhaar number (12-digit)
-        api_url: API endpoint URL for grievance check
     
     Returns:
         Dictionary containing the response from the grievance check service
     """
+    api_url = f"{base_url}/GrievanceCheck"
+    
     actual_identity_no, request_type, error_dict = _handle_identity_number(identity_no)
     if error_dict:
         return error_dict
