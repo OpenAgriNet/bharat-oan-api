@@ -7,7 +7,7 @@ import json
 import os
 import requests
 from helpers.utils import get_logger
-from typing import Dict, Any, Literal
+from typing import Dict, Any
 from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
 from helpers.encryption import hex_to_bytes, encrypt_aes_gcm, decrypt_aes_gcm
@@ -22,12 +22,8 @@ json_path = 'assets/grievance_types.json'
 
 GRIEVANCE_MAPPING = json.load(open(json_path, 'r', encoding='utf-8'))
 
-GRIEVANCE_LIST = Literal["ACCOUNT_NUMBER_NOT_CORRECT","ONLINE_APPLICATION_PENDING_FOR_APPROVAL","INSTALLMENT_NOT_RECEIVED", "TRANSACTION_FAILED",
-  "PROBLEM_IN_AADHAAR_CORRECTION", "GENDER_NOT_CORRECT", "PAYMENT_RELATED", "PROBLEM_IN_OTP_BASED_EKYC", "PROBLEM_IN_BIO_METRIC_BASED_EKYC", "PROBLEM_IN_FACIAL_BASED_EKYC"
-]
-
-
-# List of grievance types (Literal codes)
+# Dynamically create list of grievance types from the JSON keys
+GRIEVANCE_LIST = list(GRIEVANCE_MAPPING.keys())
 
 def _get_encryption_keys():
     """
@@ -181,7 +177,7 @@ def get_aadhaar_token(identity_no: str) -> str:
 
 def submit_grievance(
     identity_no: str,
-    grievance_type: GRIEVANCE_LIST,
+    grievance_type: str,
     grievance_description: str,
 ) -> Dict[str, Any]:
     """
@@ -250,7 +246,7 @@ def submit_grievance(
 def create_grievance(
     identity_no: str,
     grievance_description: str,
-    grievance_type: GRIEVANCE_LIST
+    grievance_type: str
 ) -> str:
     """
     Create and submit a grievance to the PM-KISAN portal.
