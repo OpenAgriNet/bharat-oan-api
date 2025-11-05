@@ -1,418 +1,393 @@
 """
-Grievance submission tool for PM-KISAN portal
-Handles encrypted communication with the grievance service API
+PM-KISAN Grievance Tools (create_grievance, check_grievance_status)
+
+- Strongly typed with Pydantic
+- Centralized crypto + transport
+- Clear request builders
+- Safe logging & timeouts
+- DRY formatting for user-facing strings
 """
+
+from __future__ import annotations
 
 import json
 import os
+from typing import Any, Dict, List, Optional, Tuple, Literal
+
 import requests
-from helpers.utils import get_logger
-from typing import Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AnyUrl, ValidationError
 from pydantic_ai import ModelRetry
+from helpers.utils import get_logger
 from helpers.encryption import hex_to_bytes, encrypt_aes_gcm, decrypt_aes_gcm
 
-# Set up logger
 logger = get_logger(__name__)
 
-base_url = os.getenv("GRIEVANCE_BASE_URL")
+# --------------------------------------------------------------------------------------
+# Config / Constants
+# --------------------------------------------------------------------------------------
 
-# Load grievance type codes and descriptions from JSON file
-json_path = 'assets/grievance_types.json'
+GRIEVANCE_BASE_URL = os.getenv("GRIEVANCE_BASE_URL")  # e.g. https://pmkisan.gov.in/api
+GRIEVANCE_TOKEN = os.getenv("GRIEVANCE_TOKEN", "PMK_123456")  # server expects a static token
+KEY_1_HEX = os.getenv("GRIEVANCE_KEY_1")
+KEY_2_HEX = os.getenv("GRIEVANCE_KEY_2")
 
-GRIEVANCE_MAPPING = json.load(open(json_path, 'r', encoding='utf-8'))
-
-# Dynamically create list of grievance types from the JSON keys
-GRIEVANCE_LIST = list(GRIEVANCE_MAPPING.keys())
-
-def _get_encryption_keys():
-    """
-    Get encryption keys from environment variables
-    
-    Returns:
-        Tuple of (key_bytes, iv_bytes)
-    """
-    KEY_1 = os.getenv("GRIEVANCE_KEY_1")
-    KEY_2 = os.getenv("GRIEVANCE_KEY_2")
-    return hex_to_bytes(KEY_1), hex_to_bytes(KEY_2)
+# Mapping file: human-friendly grievance labels -> backend codes
+_GRIEVANCE_JSON_PATH = os.getenv("GRIEVANCE_TYPES_PATH", "assets/grievance_types.json")
 
 
-def _encrypt_and_send(request_data: dict, api_url: str) -> requests.Response:
-    """
-    Encrypt the request data and send POST request to the API
-    
-    Args:
-        request_data: Dictionary of request data
-        api_url: API endpoint URL
-    
-    Returns:
-        Response object from the API
-    """
-    key_bytes, iv_bytes = _get_encryption_keys()
-    
-    json_request = json.dumps(request_data)
-    encrypted_request = encrypt_aes_gcm(json_request, key_bytes, iv_bytes)
-    
-    encrypted_payload = {"EncryptedRequest": encrypted_request}
-    
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-    }
-    
-    response = requests.post(
-        api_url,
-        json=encrypted_payload,
-        headers=headers,
-        timeout=30
-    )
-    
-    return response
+def _load_grievance_mapping(path: str) -> Dict[str, str]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if not isinstance(data, dict):
+                raise ValueError("grievance_types.json must be an object of {label: code}")
+            return {str(k): str(v) for k, v in data.items()}
+    except Exception as e:
+        logger.error(f"Failed to load grievance mapping at '{path}': {e}")
+        return {}
 
 
-def _decrypt_response(encrypted_response: str) -> dict:
-    """
-    Decrypt the encrypted response
-    
-    Args:
-        encrypted_response: Encrypted response string
-    
-    Returns:
-        Decrypted data as dictionary
-    """
-    key_bytes, iv_bytes = _get_encryption_keys()
-    decrypted_response = decrypt_aes_gcm(encrypted_response, key_bytes, iv_bytes)
-    decrypted_data = json.loads(decrypted_response)
-    return decrypted_data
+GRIEVANCE_MAPPING: Dict[str, str] = _load_grievance_mapping(_GRIEVANCE_JSON_PATH)
+GRIEVANCE_TYPES: List[str] = list(GRIEVANCE_MAPPING.keys())
 
 
-def _handle_identity_number(identity_no: str) -> tuple:
-    """
-    Handle identity number - determine if it's Aadhaar or registration number
-    and get token if needed
-    
-    Args:
-        identity_no: Identity number (Aadhaar or registration number)
-    
-    Returns:
-        Tuple of (actual_identity_no, request_type, success_dict)
-        If successful: (identity_no, request_type, None)
-        If failed: (None, None, error_dict)
-    """
-    if identity_no.isdigit() and len(identity_no) == 12:
-        aadhaar_token = get_aadhaar_token(identity_no)
-        
-        if aadhaar_token:
-            return aadhaar_token, "IdentityNo", None
-        else:
-            logger.error(f"Failed to get Aadhaar token")
-            error_dict = {
-                "success": False,
-                "error": "The provided Aadhaar number is not registered with PM-KISAN. Please provide either your Aadhaar number that is registered with PM-KISAN or your PM-KISAN registration number.",
-                "status_code": 400
-            }
-            return None, None, error_dict
-    else:
-        return identity_no, "Reg_No", None
+# --------------------------------------------------------------------------------------
+# Transport + Crypto
+# --------------------------------------------------------------------------------------
+
+class Crypto(BaseModel):
+    key: bytes
+    iv: bytes
+
+    @classmethod
+    def from_env(cls) -> "Crypto":
+        if not KEY_1_HEX or not KEY_2_HEX:
+            raise ModelRetry("Grievance crypto keys not configured. Set GRIEVANCE_KEY_1 and GRIEVANCE_KEY_2.")
+        return cls(key=hex_to_bytes(KEY_1_HEX), iv=hex_to_bytes(KEY_2_HEX))
+
+    def encrypt_payload(self, payload: Dict[str, Any]) -> Dict[str, str]:
+        plaintext = json.dumps(payload, ensure_ascii=False)
+        encrypted = encrypt_aes_gcm(plaintext, self.key, self.iv)
+        return {"EncryptedRequest": encrypted}
+
+    def decrypt_envelope_output(self, encrypted_output: str) -> Dict[str, Any]:
+        plaintext = decrypt_aes_gcm(encrypted_output, self.key, self.iv)
+        return json.loads(plaintext)
 
 
-class GrievanceRequest(BaseModel):
-    """Pydantic model for grievance submission validation"""
-    identity_no: str = Field(..., min_length=1, description="Identity number")
-    grievance_type: str = Field(..., description="Type of grievance")
-    # grievance_description: str = Field(..., min_length=10, description="Description of the grievance")
+class GrievanceClient(BaseModel):
+    base_url: AnyUrl
+    token: str = Field(default=GRIEVANCE_TOKEN)
+    crypto: Crypto
+
+    timeout_connect: int = 20
+    timeout_read: int = 30
+
+    @classmethod
+    def from_env(cls) -> "GrievanceClient":
+        if not GRIEVANCE_BASE_URL:
+            raise ModelRetry("Grievance service base URL not configured. Set GRIEVANCE_BASE_URL.")
+        return cls(base_url=GRIEVANCE_BASE_URL, crypto=Crypto.from_env())
+
+    def _post(self, path: str, body: Dict[str, Any]) -> requests.Response:
+        url = f"{self.base_url.rstrip('/')}/{path.lstrip('/')}"
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        encrypted_body = self.crypto.encrypt_payload(body)
+        return requests.post(url, json=encrypted_body, headers=headers, timeout=(self.timeout_connect, self.timeout_read))
+
+    def post_encrypted(self, path: str, body: Dict[str, Any]) -> "ServiceEnvelope":
+        resp = self._post(path, body)
+        if resp.status_code != 200:
+            logger.error(f"Grievance API {path} -> HTTP {resp.status_code}: {resp.text[:500]}")
+            raise ModelRetry(f"Grievance service unavailable (HTTP {resp.status_code}).")
+        try:
+            env = ServiceEnvelope.model_validate(resp.json())
+        except ValidationError as e:
+            logger.error(f"Invalid grievance envelope for {path}: {e}")
+            raise ModelRetry("Grievance service returned an invalid response envelope.")
+        return env
 
 
-class GrievanceServiceOutput(BaseModel):
-    """Pydantic model for the inner 'd' object in grievance service response"""
-    type_: str = Field(..., alias="__type", description="Type identifier from the service")
-    output: str = Field(..., description="Encrypted output data (base64 encoded)")
-    
+# --------------------------------------------------------------------------------------
+# Service Envelope (encrypted response container)
+# --------------------------------------------------------------------------------------
+
+class EncryptedData(BaseModel):
+    type_: str = Field(..., alias="__type")
+    output: str  # base64 string
+
     class Config:
         populate_by_name = True
 
 
-class GrievanceServiceResponse(BaseModel):
-    """Pydantic model for the complete grievance service response"""
-    d: GrievanceServiceOutput = Field(..., description="Data object containing encrypted response")
-    
-  
-def get_aadhaar_token(identity_no: str) -> str:
-    """
-    Get Aadhaar token for 12-digit identity numbers
-    
-    Args:
-        identity_no: 12-digit Aadhaar number
-    
-    Returns:
-        Aadhaar token string or None if failed
-    """
-    request_data = {
+class ServiceEnvelope(BaseModel):
+    d: EncryptedData
+
+    def decrypt(self, crypto: Crypto) -> Dict[str, Any]:
+        return crypto.decrypt_envelope_output(self.d.output)
+
+
+# --------------------------------------------------------------------------------------
+# Decrypted response schemas
+# --------------------------------------------------------------------------------------
+
+class AadhaarTokenResponse(BaseModel):
+    Responce: str  # service returns "True"/"False" spelled oddly
+    AadhaarToken: Optional[str] = None
+    message: Optional[str] = None
+
+    def ok(self) -> bool:
+        return str(self.Responce).lower() == "true"
+
+
+class GrievanceStatusDetail(BaseModel):
+    Reg_No: Optional[str] = None
+    GrievanceDate: Optional[str] = None
+    GrievanceDescription: Optional[str] = None
+    OfficerReply: Optional[str] = None
+    OfficeReplyDate: Optional[str] = None
+
+    def __str__(self) -> str:
+        lines: List[str] = []
+        if self.Reg_No:
+            lines.append(f"Registration Number: {self.Reg_No}")
+        lines.append("Grievance Details:")
+        if self.GrievanceDate:
+            lines.append(f"  Date: {self.GrievanceDate}")
+        if self.GrievanceDescription:
+            lines.append(f"  Description: {self.GrievanceDescription}")
+        lines.append("Officer Response:")
+        if self.OfficerReply:
+            lines.append(f"  Reply: {self.OfficerReply}")
+            if self.OfficeReplyDate:
+                lines.append(f"  Reply Date: {self.OfficeReplyDate}")
+        else:
+            lines.append("  Reply: Not yet responded")
+        return "\n".join(lines)
+
+
+class GrievanceStatusPayload(BaseModel):
+    Responce: str
+    message: Optional[str] = None
+    details: Optional[List[GrievanceStatusDetail]] = None
+
+    def ok(self) -> bool:
+        return str(self.Responce).lower() == "true"
+
+    def __str__(self) -> str:
+        if not self.ok():
+            return self.message or "No grievances found for this registration number."
+        if not self.details:
+            return "No grievance details available."
+        # Service typically returns a list; use the first record
+        return str(self.details[0])
+
+
+class GenericMessageResponse(BaseModel):
+    Responce: Optional[str] = None
+    message: Optional[str] = None
+
+    def ok(self) -> bool:
+        return str(self.Responce).lower() == "true" if self.Responce is not None else True
+
+    def __str__(self) -> str:
+        if self.message:
+            return self.message
+        return "Success" if self.ok() else "Failed"
+
+
+# --------------------------------------------------------------------------------------
+# Identity helpers
+# --------------------------------------------------------------------------------------
+
+def _is_aadhaar(identity_no: str) -> bool:
+    return identity_no.isdigit() and len(identity_no) == 12
+
+
+def _aadhaar_token(client: GrievanceClient, identity_no: str) -> Optional[str]:
+    body = {
         "Type": "IdentityNo_Details",
-        "TokenNo": "PMK_123456", # STATIC TOKEN
-        "IdentityNo": identity_no
+        "TokenNo": client.token,
+        "IdentityNo": identity_no,
     }
-    
-    token_url = f"{base_url}/GrievanceAadhaarToken"
-    response = _encrypt_and_send(request_data, token_url)
-    
-    if response.status_code != 200:
-        logger.error(f"Aadhaar token request failed with status {response.status_code}: {response.text}")
-        return None
-    
-    # Validate and parse response
-    try:
-        response_data = GrievanceServiceResponse(**response.json())
-        decrypted_data = _decrypt_response(response_data.d.output)
-        
-        if decrypted_data.get("Responce") == "True":
-            return decrypted_data.get("AadhaarToken")
-        return None
-    except Exception as e:
-        logger.error(f"Invalid response from Aadhaar token service: {e}")
-        return None
+    env = client.post_encrypted("/GrievanceAadhaarToken", body)
+    data = AadhaarTokenResponse.model_validate(env.decrypt(client.crypto))
+    if data.ok() and data.AadhaarToken:
+        return data.AadhaarToken
+    logger.warning(f"Aadhaar token lookup failed: {data.message or 'unknown error'}")
+    return None
 
 
-# API: This is the api not the fucntion
-
-def submit_grievance(
-    identity_no: str,
-    grievance_type: str,
-    grievance_description: str,
-) -> Dict[str, Any]:
+def _resolve_identity(client: GrievanceClient, identity_no: str, purpose: Literal["create", "status"]) -> Tuple[str, str]:
     """
-    Submit a grievance to the PM-KISAN portal
-    
-    Args:
-        identity_no (str): Identity number (e.g., "DL214294806")
-        grievance_type (GRIEVANCE_LIST): Type of grievance (e.g., "ACCOUNT_NUMBER_NOT_CORRECT")
-        grievance_description (str): Description of the grievance
-    
-    Returns:
-        Dictionary containing the response from the grievance service 
+    Returns (actual_identity_value, type_field)
+    - For Aadhaar, get token and use Type 'IdentityNo_Details' (create) or 'IdentityNo_Status' (status)
+    - For Reg_No, use Type 'Reg_No_Details' (create) or 'Reg_No_Status' (status)
     """
-    api_url = f"{base_url}/LodgeGrievance"
-    
-    actual_identity_no, request_type, error_dict = _handle_identity_number(identity_no)
-    if error_dict:
-        return error_dict
-    
-    if request_type == "IdentityNo":
-        request_type = "IdentityNo_Details"
-    elif request_type == "Reg_No":
-        request_type = "Reg_No_Details"
-    
-    request_data = {
-        "Type": request_type,
-        "TokenNo": "PMK_123456",
-        "IdentityNo": actual_identity_no,
-        "GrievanceType": grievance_type,
-        "GrievanceDescription": grievance_description
-    }
+    if _is_aadhaar(identity_no):
+        token = _aadhaar_token(client, identity_no)
+        if not token:
+            raise ModelRetry(
+                "The provided Aadhaar number is not registered with PM-KISAN. "
+                "Please provide the Aadhaar number registered with PM-KISAN or your PM-KISAN registration number."
+            )
+        type_map = {"create": "IdentityNo_Details", "status": "IdentityNo_Status"}
+        return token, type_map[purpose]
+    else:
+        type_map = {"create": "Reg_No_Details", "status": "Reg_No_Status"}
+        return identity_no, type_map[purpose]
 
-    logger.info(f"Request data: {request_data}")
-    
-    response = _encrypt_and_send(request_data, api_url)
-    
-    if response.status_code != 200:
-        logger.error(f"Grievance submission failed with status {response.status_code}: {response.text}")
-        return {
-            "success": False,
-            "error": f"HTTP {response.status_code}: {response.text}",
-            "status_code": response.status_code
-        }
-    
-    # Validate and parse response
+
+# --------------------------------------------------------------------------------------
+# Request builders
+# --------------------------------------------------------------------------------------
+
+class CreateGrievanceRequest(BaseModel):
+    Type: str
+    TokenNo: str
+    IdentityNo: str
+    GrievanceType: str
+    GrievanceDescription: str
+
+    @classmethod
+    def build(
+        cls,
+        type_field: str,
+        token_no: str,
+        identity_value: str,
+        grievance_code: str,
+        grievance_description: str,
+    ) -> "CreateGrievanceRequest":
+        return cls(
+            Type=type_field,
+            TokenNo=token_no,
+            IdentityNo=identity_value,
+            GrievanceType=grievance_code,
+            GrievanceDescription=grievance_description,
+        )
+
+
+class StatusRequest(BaseModel):
+    Type: str
+    TokenNo: str
+    IdentityNo: str
+
+    @classmethod
+    def build(cls, type_field: str, token_no: str, identity_value: str) -> "StatusRequest":
+        return cls(Type=type_field, TokenNo=token_no, IdentityNo=identity_value)
+
+
+# --------------------------------------------------------------------------------------
+# Formatters (user-facing strings)
+# --------------------------------------------------------------------------------------
+
+def _format_status(payload: Dict[str, Any]) -> str:
     try:
-        response_data = GrievanceServiceResponse(**response.json())
-        decrypted_data = _decrypt_response(response_data.d.output)
-        
-        return {
-            "success": True,
-            "data": decrypted_data,
-            "raw_encrypted_response": response_data.d.output
-        }
-    except Exception as e:
-        logger.error(f"Invalid response from grievance service: {e}")
-        return {
-            "success": False,
-            "error": f"Invalid response format: {str(e)}"
-        }
+        status = GrievanceStatusPayload.model_validate(payload)
+        return str(status)
+    except ValidationError:
+        # Fallback to generic interpretation
+        msg = payload.get("message")
+        if msg:
+            return msg
+        return "No grievance records found."
 
 
-# Grievance type to be a list from GRIEVANCE_TYPES
+# --------------------------------------------------------------------------------------
+# Exported Tools
+# --------------------------------------------------------------------------------------
 
-
-def create_grievance(
-    identity_no: str,
-    grievance_description: str,
-    grievance_type: str
-) -> str:
+def submit_grievance(identity_no: str, grievance_description: str, grievance_type: str) -> str:
     """
     Create and submit a grievance to the PM-KISAN portal.
-    
-    You must select the most appropriate grievance_type from the available options below
-    based on the farmer's complaint or issue:
-    
-    Args:
-        identity_no (str): Identity number (e.g., "PM-KISAN registration number" or Aadhaar number)
-        grievance_type: The grievance type - select from the list above (use the exact string)
-    
-    
-    Returns:
-        Response about the grievance submission status
-    """
-    
-    # Map description to code
-    grievance_code = GRIEVANCE_MAPPING.get(grievance_type)
-    
-    if not grievance_code:
-        available_types = '", "'.join(GRIEVANCE_MAPPING.keys())
-        raise ModelRetry(f'Invalid grievance type: {grievance_type}. Please select from: "{available_types}"')
-    
-    result = submit_grievance(
-        identity_no,
-        grievance_code,
-        grievance_type
-    )
-    
-    if result["success"]:
-        message = result['data'].get('message', 'Grievance submitted successfully')
-        return message
-    else:
-        logger.error(f"Failed to submit grievance: {result['error']}")
-        return f"Failed to submit grievance: {result['error']}"
 
-
-def check_grievance_registration_status(
-    identity_no: str
-) -> Dict[str, Any]:
-    """
-    Check the grievance status using registration number or Aadhaar number
-    
     Args:
-        identity_no: Registration number or Aadhaar number (12-digit)
-    
+        identity_no: PM-KISAN Registration Number or 12-digit Aadhaar number registered with PM-KISAN.
+        grievance_description: Description of the grievance (plain text, ≥ 10 chars recommended).
+        grievance_type: Human-friendly grievance label. Must be one of the keys in GRIEVANCE_MAPPING.
+
     Returns:
-        Dictionary containing the response from the grievance check service
+        A user-friendly message summarizing submission outcome.
     """
-    api_url = f"{base_url}/GrievanceCheck"
-    
-    actual_identity_no, request_type, error_dict = _handle_identity_number(identity_no)
-    if error_dict:
-        return error_dict
-    
-    request_data = {
-        "Type": request_type,
-        "TokenNo": "PMK_123456",
-        "IdentityNo": actual_identity_no
-    }
-    
-    response = _encrypt_and_send(request_data, api_url)
-    
-    if response.status_code != 200:
-        logger.error(f"Grievance registration status check failed with status {response.status_code}: {response.text}")
-        return {
-            "success": False,
-            "error": f"HTTP {response.status_code}: {response.text}",
-            "status_code": response.status_code
-        }
-    
-    # Validate and parse response
     try:
-        response_data = GrievanceServiceResponse(**response.json())
-        decrypted_data = _decrypt_response(response_data.d.output)
-        
-        return {
-            "success": True,
-            "data": decrypted_data,
-            "raw_encrypted_response": response_data.d.output
-        }
+        if not grievance_type or grievance_type not in GRIEVANCE_MAPPING:
+            choices = '", "'.join(GRIEVANCE_TYPES)
+            raise ModelRetry(f'Invalid grievance type: "{grievance_type}". Please select from: "{choices}".')
+
+        if not grievance_description or len(grievance_description.strip()) < 10:
+            raise ModelRetry("Please provide a brief grievance description (at least ~10 characters).")
+
+        client = GrievanceClient.from_env()
+        identity_value, type_field = _resolve_identity(client, identity_no.strip(), purpose="create")
+
+        body = CreateGrievanceRequest.build(
+            type_field=type_field,
+            token_no=client.token,
+            identity_value=identity_value,
+            grievance_code=GRIEVANCE_MAPPING[grievance_type],
+            grievance_description=grievance_description.strip(),
+        ).model_dump()
+
+        logger.info("Submitting grievance (redacting IdentityNo from logs).")
+        # IMPORTANT: do not log body with IdentityNo in plaintext
+        env = client.post_encrypted("/LodgeGrievance", body)
+        decrypted = env.decrypt(client.crypto)
+
+        # Typical response carries {"message": "..."} and sometimes "Responce"
+        try:
+            msg = GenericMessageResponse.model_validate(decrypted)
+            return str(msg)
+        except ValidationError:
+            # Fallback if schema differs
+            return decrypted.get("message") or "Grievance submitted successfully."
+
+    except requests.Timeout:
+        logger.error("Grievance submission timed out.")
+        return "Grievance submission timed out. Please try again."
+    except requests.RequestException as e:
+        logger.error(f"Grievance submission network error: {e}")
+        return "Unable to reach grievance service. Please try again."
+    except ModelRetry as e:
+        # Bubble up actionable guidance to the agent/user
+        return str(e)
     except Exception as e:
-        logger.error(f"Invalid response from grievance check service: {e}")
-        return {
-            "success": False,
-            "error": f"Invalid response format: {str(e)}"
-        }
+        logger.error(f"Unexpected error in create_grievance: {e}")
+        raise ModelRetry(f"Unexpected error while submitting grievance. {str(e)}")
 
 
-# TOOL: this tool is used in the agent
-def check_grievance_status(identity_no: str) -> str:
+def grievance_status(identity_no: str) -> str:
     """
-    Check the grievance status using registration number or Aadhaar number
-    
+    Check grievance status by PM-KISAN Registration Number or Aadhaar (registered).
+
     Args:
-        identity_no: Registration number or Aadhaar number (12-digit)
-    
-    Returns:
-        Dictionary containing the response from the grievance check service
-    """
-    actual_identity_no, request_type, error_dict = _handle_identity_number(identity_no)
-    if error_dict:
-        return error_dict
-    
-    if request_type == "IdentityNo":
-        request_type = "IdentityNo_Status"
-    elif request_type == "Reg_No":
-        request_type = "Reg_No_Status"
-    
-    request_data = {
-        "Type": request_type,
-        "TokenNo": "PMK_123456",
-        "IdentityNo": actual_identity_no
-    }
-    api_url = f"{base_url}/GrievanceStatusCheck"
-    response = _encrypt_and_send(request_data, api_url)
-    
-    if response.status_code != 200:
-        logger.error(f"Grievance status check failed with status {response.status_code}: {response.text}")
-        return {
-            "success": False,
-            "error": f"HTTP {response.status_code}: {response.text}",
-            "status_code": response.status_code
-        }
-    
-    # Validate and parse response
-    try:
-        response_data = GrievanceServiceResponse(**response.json())
-        decrypted_data = _decrypt_response(response_data.d.output)
-    except Exception as e:
-        logger.error(f"Invalid response from grievance status service: {e}")
-        return {
-            "success": False,
-            "error": f"Invalid response format: {str(e)}"
-        }
-    if decrypted_data.get("Responce") == "True" and "details" in decrypted_data and decrypted_data["details"]:
-        details = decrypted_data["details"][0]  
-        formatted_response = []
-        
-        if details.get("Reg_No"):
-            formatted_response.append(f"Registration Number: {details['Reg_No']}")
-        
-        formatted_response.append(f"\nGrievance Details:")
-        grievance_date = details.get("GrievanceDate", "")
-        if grievance_date:
-            formatted_response.append(f"Date of Grievance: {grievance_date}")
-        
-        if details.get("GrievanceDescription"):
-            formatted_response.append(f"\nGrievance Description: {details['GrievanceDescription']}")
-        
-        formatted_response.append(f"\nOfficer Response Details:")
-        
-        officer_reply = details.get("OfficerReply")
-        if officer_reply:
-            formatted_response.append(f"Officer Reply: {officer_reply}")
-            
-            office_reply_date = details.get("OfficeReplyDate")
-            if office_reply_date:
-                formatted_response.append(f"Reply Date: {office_reply_date}")
-        else:
-            formatted_response.append("Officer Reply: Not yet responded")
-        
-        response_text = "\n".join(formatted_response)
-        
-        return response_text
-    else:
-        error_message = decrypted_data.get("message") or "No grievances found for this registration number."
-        return error_message
+        identity_no: Registration number or 12-digit Aadhaar registered with PM-KISAN.
 
+    Returns:
+        A user-friendly status string (registration number, dates, officer reply, etc.),
+        or an explanatory message if not found yet.
+    """
+    try:
+        client = GrievanceClient.from_env()
+        identity_value, type_field = _resolve_identity(client, identity_no.strip(), purpose="status")
+
+        body = StatusRequest.build(
+            type_field=type_field,
+            token_no=client.token,
+            identity_value=identity_value,
+        ).model_dump()
+
+        env = client.post_encrypted("/GrievanceStatusCheck", body)
+        decrypted = env.decrypt(client.crypto)
+        return _format_status(decrypted)
+
+    except requests.Timeout:
+        logger.error("Grievance status check timed out.")
+        return "Grievance status check timed out. Please try again."
+    except requests.RequestException as e:
+        logger.error(f"Grievance status network error: {e}")
+        return "Unable to reach grievance service. Please try again."
+    except ModelRetry as e:
+        return str(e)
+    except Exception as e:
+        logger.error(f"Unexpected error in check_grievance_status: {e}")
+        raise ModelRetry(f"Unexpected error while checking grievance status. {str(e)}")
