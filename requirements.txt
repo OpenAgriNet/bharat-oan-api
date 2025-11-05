@@ -1,4 +1,7 @@
 ## basic setup packages
+wheel 
+setuptools
+
 httpx_oauth
 Jinja2>=3.1.0  # For template rendering
 
@@ -11,7 +14,7 @@ requests
 
 # LLM
 openai
-pydantic==2.11.4
+pydantic
 tiktoken
 tenacity
 
