@@ -561,7 +561,7 @@ async def check_shc_status(
         ).get_payload()
         
         response = requests.post(
-            os.getenv("BAP_URI").rstrip("/") + "/init",
+            os.getenv("BAP_ENDPOINT").rstrip("/") + "/init",
             json=payload,
             timeout=(10, 15)
         )

@@ -265,7 +265,7 @@ def get_scheme_info(scheme_name: Optional[Literal["kcc", "pmkisan", "pmfby", "sh
         scheme_name_str = scheme_name or ""
         payload = SchemeRequest(scheme_name=scheme_name_str).get_payload()
         response = requests.post(
-            os.getenv("BAP_URI").rstrip("/") + "/search",
+            os.getenv("BAP_ENDPOINT").rstrip("/") + "/search",
             json=payload,
             timeout=(20, 30)
         )
