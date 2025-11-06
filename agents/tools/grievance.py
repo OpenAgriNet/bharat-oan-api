@@ -26,6 +26,7 @@ logger = get_logger(__name__)
 # Config / Constants
 # --------------------------------------------------------------------------------------
 
+# TODO: Integrate this with OpenAgriNet network
 GRIEVANCE_BASE_URL = os.getenv("GRIEVANCE_BASE_URL")  # e.g. https://pmkisan.gov.in/api
 GRIEVANCE_TOKEN = os.getenv("GRIEVANCE_TOKEN", "PMK_123456")  # server expects a static token
 KEY_1_HEX = os.getenv("GRIEVANCE_KEY_1")

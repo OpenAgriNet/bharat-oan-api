@@ -438,7 +438,7 @@ def check_pmfby_status(
         ).get_payload()
         
         response = requests.post(
-            os.getenv("BAP_INIT_ENDPOINT"),
+            os.getenv("BAP_URI").rstrip("/") + "/init",
             json=payload,
             timeout=(10, 15)
         )

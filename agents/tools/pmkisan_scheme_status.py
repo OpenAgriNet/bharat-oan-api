@@ -444,7 +444,7 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
         
         
         response = requests.post(
-            os.getenv("BAP_INIT_ENDPOINT"),
+            os.getenv("BAP_URI").rstrip("/") + "/init",
             json=payload,
             timeout=(10, 15)
         )
@@ -495,7 +495,7 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
                                       ).get_payload()
         
         response = requests.post(
-            os.getenv("BAP_STATUS_ENDPOINT"),
+            os.getenv("BAP_URI").rstrip("/") + "/status",
             json=payload,
             timeout=(10, 15)
         )
