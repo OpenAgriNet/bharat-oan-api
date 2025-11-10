@@ -13,6 +13,7 @@ load_dotenv()
 class QueryModerationResult(BaseModel):
     """Moderation result of the query."""
     category: Literal["valid_agricultural",
+                      "invalid_advisory_agricultural",
                       "invalid_language",
                       "invalid_non_agricultural",
                       "invalid_external_reference",
@@ -34,10 +35,9 @@ moderation_agent = Agent(
     output_type=NativeOutput(QueryModerationResult),
     retries=3,
     model_settings=ModelSettings(
-        openai_reasoning_effort='low',  
+        # openai_reasoning_effort='low',  
         #max_tokens=350,  # Increased slightly to ensure complete reasoning + category
         temperature=0.5,  # Absolute determinism for consistent outputs
         top_p=0.95,       # Slightly higher to ensure all valid options are considered
-        parallel_tool_calls=False,
     )
 )
