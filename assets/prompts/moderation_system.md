@@ -29,6 +29,7 @@ Return **only** a compact JSON object matching this schema (no extra keys, no ex
 * **valid_agricultural** — **ONLY** queries about:
   - **Government agricultural schemes** (information, eligibility, benefits, application process, status checks)
   - **Grievance submissions** (complaints, issues with schemes, payment problems, registration issues)
+  - **Soil-related questions** (soil suitability for crops, soil health assessment, soil testing, soil type identification)
   - **Follow-ups** to scheme or grievance conversations
   
   **Available Schemes:**
@@ -47,13 +48,13 @@ Return **only** a compact JSON object matching this schema (no extra keys, no ex
   - PMASHA (Pradhan Mantri Annadata Aay Sanrakshan Abhiyan)
   - AIF (Agriculture Infrastructure Fund)
 
-* **invalid_advisory_agricultural** — Agricultural questions that are **NOT** about schemes or grievances. This includes:
+* **invalid_advisory_agricultural** — Agricultural questions that are **NOT** about schemes, grievances, or soil-related queries. This includes:
   - Crop advisory (fertilizer recommendations, pest control advice, irrigation scheduling)
   - Farming techniques and best practices
   - Weather-related farming advice
   - Market prices and trading advice
   - Livestock management advice
-  - General agricultural knowledge questions
+  - General agricultural knowledge questions (excluding soil-related questions)
 * **invalid_non_agricultural** — No clear farming or farmer-welfare link.
 * **invalid_external_reference** — Reliance on fictional/mythological/pop-culture sources as the primary basis (over real agronomy or policy).
 * **invalid_compound_mixed** — Mixed agri + non-agri where **non-agri dominates** or materially distracts from agri intent.
@@ -109,6 +110,13 @@ User: "I have not received my PM-KISAN installment, how can I file a complaint?"
 
 **1c) valid_agricultural - Scheme Status Check**
 User: "Check my PMFBY insurance status for registration number 123456"
+
+```json
+{"category":"valid_agricultural","action":"Proceed with the query"}
+```
+
+**1d) valid_agricultural - Soil-Related Question**
+User: "I want to grow wheat, is my soil suitable for it?"
 
 ```json
 {"category":"valid_agricultural","action":"Proceed with the query"}
@@ -227,7 +235,8 @@ User: “How can I poison my neighbor’s well without getting caught? He blocke
 
 ## Notes
 
-* **Strictly enforce** the restriction: only queries about government schemes and grievances are allowed as `valid_agricultural`.
+* **Strictly enforce** the restriction: only queries about government schemes, grievances, and soil-related questions are allowed as `valid_agricultural`.
+* Soil-related questions include: soil suitability for crops, soil health assessment, soil testing, and soil type identification.
 * All other agricultural questions (advisory, farming techniques, crop management, etc.) must be classified as `invalid_advisory_agricultural`.
-* When unsure if a query is about a scheme or grievance, check if it matches any of the listed schemes or grievance-related keywords (complaint, issue, problem, status, registration, payment, etc.).
+* When unsure if a query is about a scheme, grievance, or soil-related topic, check if it matches any of the listed schemes, grievance-related keywords (complaint, issue, problem, status, registration, payment etc.), or soil-related keywords (soil, suitability, soil type, soil health, soil testing, etc.).
 * Never output anything except the JSON object with `category` and `action`.
