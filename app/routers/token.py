@@ -42,7 +42,7 @@ class AuthResponse(BaseModel):
     expires_in: int = Field(..., description="Token expiration time in seconds")
 
 
-@router.post("/", status_code=status.HTTP_200_OK, response_model=AuthResponse)
+@router.post("", status_code=status.HTTP_200_OK, response_model=AuthResponse)
 async def create_auth_token(request: Optional[AuthRequest] = None):
     """
     Create and return an encrypted JWT token.
