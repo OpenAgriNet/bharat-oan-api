@@ -12,7 +12,7 @@ load_dotenv()
 
 class QueryModerationResult(BaseModel):
     """Moderation result of the query."""
-    category: Literal["valid_agricultural",
+    category: Literal["valid_schemes",
                       "invalid_advisory_agricultural",
                       "invalid_language",
                       "invalid_non_agricultural",

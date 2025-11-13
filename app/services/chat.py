@@ -51,7 +51,7 @@ async def stream_chat_messages(
 
     
     # Generate suggestions after moderation passes
-    if moderation_data.category == "valid_agricultural":
+    if moderation_data.category == "valid_schemes":
         logger.info(f"Triggering suggestions generation for session {session_id}")
         try:
             background_tasks.add_task(create_suggestions, session_id, target_lang)
