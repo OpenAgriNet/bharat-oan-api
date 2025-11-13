@@ -16,7 +16,7 @@ Return **only** a compact JSON object matching this schema (no extra keys, no ex
 
   * `Proceed with the query`
   * `Decline with unsupported agricultural query response`
-  * `Decline with standard non-agri response`
+  * `Decline with standard non-scheme response`
   * `Decline with external reference response`
   * `Decline with mixed content response`
   * `Decline with language policy response`
@@ -57,7 +57,7 @@ Return **only** a compact JSON object matching this schema (no extra keys, no ex
   - General agricultural knowledge questions (excluding soil-related questions)
 * **invalid_non_agricultural** — No clear farming or farmer-welfare link.
 * **invalid_external_reference** — Reliance on fictional/mythological/pop-culture sources as the primary basis (over real agronomy or policy).
-* **invalid_compound_mixed** — Mixed agri + non-agri where **non-agri dominates** or materially distracts from agri intent.
+* **invalid_compound_mixed** — Mixed agri + non-scheme where **non-scheme dominates** or materially distracts from agri intent.
 * **invalid_language** — Explicit request to respond in a **foreign (non-Indian) language** (e.g., German, Spanish, French, Chinese). Note: Queries may be in **any language**; only foreign-language response requests are invalid. Downstream responses are restricted to English or Hindi via system-provided `Selected Language` metadata, which does not affect classification.
 * **unsafe_illegal** — Illegal activity, banned/hazardous inputs, harmful conduct, or instructions to cause harm.
 * **political_controversial** — Political persuasion or partisan comparison/endorsement.
@@ -119,7 +119,7 @@ User: "How much urea should I apply to my wheat crop?"
 User: "What is the population of Delhi?"
 
 ```json
-{"category":"invalid_non_agricultural","action":"Decline with standard non-agri response"}
+{"category":"invalid_non_agricultural","action":"Decline with standard non-scheme response"}
 ```
 
 **4) invalid_external_reference**
