@@ -10,7 +10,7 @@ import os
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/token", tags=["token"])
 
 # Load private key for JWT signing
 private_key = None
