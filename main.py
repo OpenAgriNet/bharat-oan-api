@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 load_dotenv()
 
 # Import all routers
-from app.routers import chat, transcribe, suggestions, tts, health, file
+from app.routers import chat, transcribe, suggestions, tts, health, file, auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,4 +56,5 @@ app.include_router(transcribe.router, prefix=settings.api_prefix)
 app.include_router(suggestions.router, prefix=settings.api_prefix)
 app.include_router(tts.router, prefix=settings.api_prefix)
 app.include_router(health.router, prefix=settings.api_prefix)
-app.include_router(file.router, prefix=settings.api_prefix) 
+app.include_router(file.router, prefix=settings.api_prefix)
+app.include_router(auth.router, prefix=settings.api_prefix) 
