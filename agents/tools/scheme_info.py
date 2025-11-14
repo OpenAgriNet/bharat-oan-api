@@ -204,7 +204,7 @@ class SchemeRequest(BaseModel):
         
         return {
             "context": {
-                "domain": "schemes:oan",
+                "domain": "schemes:vistaar",
                 "action": "search",
                 "version": "1.1.0",
                 "bap_id": os.getenv("BAP_ID"),
@@ -213,7 +213,16 @@ class SchemeRequest(BaseModel):
                 "bpp_uri": os.getenv("BPP_URI"),
                 "message_id": str(uuid.uuid4()),
                 "transaction_id": str(uuid.uuid4()),
-                "timestamp": now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                "timestamp": now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "ttl": "PT10M",
+                "location": {
+                    "country": {
+                        "code": "IND"
+                    },
+                    "city": {
+                        "code": "*"
+                    }
+                }
             },
             "message": {
                 "intent": {
