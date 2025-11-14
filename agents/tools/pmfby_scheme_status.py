@@ -258,6 +258,10 @@ class Context(BaseModel):
     bpp_uri: Optional[AnyHttpUrl] = None
     country: Optional[str] = None
     city: Optional[str] = None
+    location: Optional[Dict[str, Any]] = None
+
+    class Config:
+        extra = "allow"
 
 class ResponseItem(BaseModel):
     context: Context
@@ -359,7 +363,16 @@ class PMfbyStatusRequest(BaseModel):
                 "bpp_uri": os.getenv("BPP_URI"),
                 "transaction_id": str(uuid.uuid4()),
                 "message_id": str(uuid.uuid4()),
-                "timestamp": now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                "timestamp": now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "ttl": "PT10M",
+                "location": {
+                    "country": {
+                        "code": "IND"
+                    },
+                    "city": {
+                        "code": "*"
+                    }
+                }
             },
             "message": {
                 "order": {
