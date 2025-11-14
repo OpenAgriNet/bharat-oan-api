@@ -94,7 +94,10 @@ class GrievanceClient(BaseModel):
         url = f"{str(self.base_url).rstrip('/')}/{path.lstrip('/')}"
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         encrypted_body = self.crypto.encrypt_payload(body)
-        return requests.post(url, json=encrypted_body, headers=headers, timeout=(self.timeout_connect, self.timeout_read))
+        logger.info(f"Grievance API request: {url} | body: {json.dumps(encrypted_body)}")
+        resp = requests.post(url, json=encrypted_body, headers=headers, timeout=(self.timeout_connect, self.timeout_read))
+        logger.info(f"Grievance API response: {url} | status: {resp.status_code} | body: {resp.text[:500]}")
+        return resp
 
     def post_encrypted(self, path: str, body: Dict[str, Any]) -> "ServiceEnvelope":
         resp = self._post(path, body)
@@ -304,7 +307,7 @@ def submit_grievance(identity_no: str, grievance_description: str, grievance_typ
 
     Args:
         identity_no: PM-KISAN Registration Number (11-character alphanumeric string) or 12-digit Aadhaar number registered with PM-KISAN.
-        grievance_description: Description of the grievance (plain text, ≥ 10 chars recommended).
+        grievance_description: Description of the grievance (plain text).
         grievance_type: Human-friendly grievance label. Must be one of the keys in GRIEVANCE_MAPPING.
 
     Returns:
@@ -316,7 +319,7 @@ def submit_grievance(identity_no: str, grievance_description: str, grievance_typ
             raise ModelRetry(f'Invalid grievance type: "{grievance_type}". Please select from: "{choices}".')
 
         if not grievance_description or len(grievance_description.strip()) < 10:
-            raise ModelRetry("Please provide a brief grievance description (at least ~10 characters).")
+            raise ModelRetry("Please provide a brief grievance description.")
 
         client = GrievanceClient.from_env()
         identity_value, type_field = _resolve_identity(client, identity_no.strip(), purpose="create")
