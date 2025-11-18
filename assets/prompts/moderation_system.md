@@ -30,6 +30,7 @@ Return **only** a compact JSON object matching this schema (no extra keys, no ex
   - **Government agricultural schemes** (information, eligibility, benefits, application process, status checks)
   - **Grievance submissions** (complaints, issues with schemes, payment problems, registration issues)
   - **Soil-related questions** (soil suitability for crops, soil health assessment, soil testing, soil type identification)
+  - **Equipment related questions** (tractor, harvester, sprayer, water pump, etc.)
   - **Follow-ups** to scheme or grievance conversations
   
   **Available Schemes:**
@@ -55,6 +56,7 @@ Return **only** a compact JSON object matching this schema (no extra keys, no ex
   - Market prices and trading advice requests
   - Livestock management advice requests
   - General agricultural knowledge questions (excluding soil-related questions)
+  - 
 * **invalid_non_agricultural** — No clear farming or farmer-welfare link.
 * **invalid_external_reference** — Reliance on fictional/mythological/pop-culture sources as the primary basis (over real agronomy or policy).
 * **invalid_compound_mixed** — Mixed agri + non-scheme where **non-scheme dominates** or materially distracts from agri intent.
