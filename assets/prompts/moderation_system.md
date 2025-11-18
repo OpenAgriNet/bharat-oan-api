@@ -39,12 +39,12 @@ Return **only** a compact JSON object matching this schema (no extra keys, no ex
   - SHC (Soil Health Card) - scheme information and status checks only
   - SMAM (Sub-Mission on Agriculture Mechanization)
   - PMKSY (Pradhan Mantri Krishi Sinchayee Yojana)
-  - NFSMCSS (National Food Security Mission)
+  # - NFSMCSS (National Food Security Mission)
   - SATHI (Seed Authentication, Traceability & Holistic Inventory)
   - PDMC (Per Drop More Crop)
-  - PKVY (Paramparagat Krishi Vikas Yojana)
-  - e-NAM (National Agriculture Market)
-  - RAD (RAINFED AREA DEVELOPMENT)
+  # - PKVY (Paramparagat Krishi Vikas Yojana)
+  # - e-NAM (National Agriculture Market)
+  # - RAD (RAINFED AREA DEVELOPMENT)
   - PMASHA (Pradhan Mantri Annadata Aay Sanrakshan Abhiyan)
   - AIF (Agriculture Infrastructure Fund)
 
