@@ -5,4 +5,4 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-logfire.configure(scrubbing=False)
+logfire.configure(scrubbing=False,environment=os.getenv("ENVIRONMENT"))
