@@ -136,5 +136,10 @@ def detect_audio_language_bhashini(audio_base64: str):
     response_json = response.json()
     detected_language_code = response_json['pipelineResponse'][0]['output'][0]['langPrediction'][0]['langCode']
 
-    # NOTE: Keeping only English and Hindi for now
-    return 'en' if detected_language_code == 'en' else 'hi'
+    # Support English, Hindi, and Marathi
+    if detected_language_code == 'en':
+        return 'en'
+    elif detected_language_code == 'mr':
+        return 'mr'
+    else:
+        return 'hi'  # Default to Hindi for other languages

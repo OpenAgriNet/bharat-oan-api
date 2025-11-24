@@ -9,7 +9,7 @@ __pycache__/
 # Google Cloud
 *credentials.json
 *jwt_public_key.pem
-*jwt_private_key.pem
+*private_key.pem
 *.tar
 split_on_silence.py
 # C extensions
