@@ -4,7 +4,7 @@ Tasks for sending telemetry data.
 import os
 from dotenv import load_dotenv
 from typing import Dict
-import requests
+import httpx
 from fastapi import BackgroundTasks
 from helpers.utils import get_logger
 
@@ -33,19 +33,20 @@ async def send_telemetry(telemetry_data: Dict) -> Dict:
     }
 
     try:
-        response = requests.post(
-            TELEMETRY_API_URL,
-            headers=headers,
-            json=telemetry_data,
-            timeout=(30, 60)
-        )
-        
-        result = {
-            "status_code": response.status_code,
-            "response": response.json() if response.status_code == 200 else response.text
-        }
-        logger.info(f"Telemetry sent successfully: {result}")
-        return result
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                TELEMETRY_API_URL,
+                headers=headers,
+                json=telemetry_data,
+                timeout=httpx.Timeout(30.0, read=60.0)
+            )
+            
+            result = {
+                "status_code": response.status_code,
+                "response": response.json() if response.status_code == 200 else response.text
+            }
+            logger.info(f"Telemetry sent successfully: {result}")
+            return result
         
     except Exception as e:
         logger.error(f"Error sending telemetry: {str(e)}")

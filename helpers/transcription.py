@@ -1,6 +1,6 @@
 import os
 import base64
-import requests
+import httpx
 import json
 from dotenv import load_dotenv
 # from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
@@ -95,7 +95,7 @@ def transcribe_bhashini(audio_base64: str, source_lang='hi'):
             ]
         }
     }    
-    response = requests.post(url, headers=headers, data=json.dumps(data))
+    response = httpx.post(url, headers=headers, content=json.dumps(data))
     response.raise_for_status()
     response_json = response.json()
     return response_json['pipelineResponse'][0]['output'][0]['source']
@@ -131,7 +131,7 @@ def detect_audio_language_bhashini(audio_base64: str):
         }
     }
 
-    response = requests.post(url, headers=headers, json=data)
+    response = httpx.post(url, headers=headers, json=data)
     response.raise_for_status()
     response_json = response.json()
     detected_language_code = response_json['pipelineResponse'][0]['output'][0]['langPrediction'][0]['langCode']

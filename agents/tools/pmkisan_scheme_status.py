@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from helpers.utils import get_logger
-import requests
+import httpx
 from pydantic import BaseModel, AnyHttpUrl, Field
 from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
@@ -443,10 +443,10 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
         ).get_payload()
         
         
-        response = requests.post(
+        response = httpx.post(
             os.getenv("BAP_ENDPOINT").rstrip("/") + "/init",
             json=payload,
-            timeout=(10, 15)
+            timeout=httpx.Timeout(10.0, read=15.0)
         )
         
         if response.status_code != 200:
@@ -456,11 +456,11 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
         scheme_response = SchemeInitResponse.model_validate(response.json())
         return str(scheme_response)
                 
-    except requests.Timeout as e:
+    except httpx.TimeoutException as e:
         logger.error(f"Scheme init API request timed out: {str(e)}")
         return "Scheme init request timed out. Please try again later."
     
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"Scheme init API request failed: {e}")
         return f"Scheme init request failed: {str(e)}"
     
@@ -494,10 +494,10 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
                                       registration_number=reg_no,
                                       ).get_payload()
         
-        response = requests.post(
+        response = httpx.post(
             os.getenv("BAP_URI").rstrip("/") + "/status",
             json=payload,
-            timeout=(10, 15)
+            timeout=httpx.Timeout(10.0, read=15.0)
         )
         
         if response.status_code != 200:
@@ -507,11 +507,11 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
         scheme_response = SchemeStatusResponse.model_validate(response.json())
         return str(scheme_response)
                 
-    except requests.Timeout as e:
+    except httpx.TimeoutException as e:
         logger.error(f"Scheme status API request timed out: {str(e)}")
         return "Scheme status request timed out. Please try again later."
     
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"Scheme status API request failed: {e}")
         return f"Scheme status request failed: {str(e)}"
     

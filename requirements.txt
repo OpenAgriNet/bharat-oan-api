@@ -10,7 +10,7 @@ pandas
 simplejson
 
 ### for DB
-requests
+# requests  # Replaced with httpx
 
 # LLM
 openai

@@ -1,7 +1,7 @@
 import os
 import re
 import base64
-import requests
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -38,7 +38,7 @@ def text_to_speech_bhashini(text, source_lang='hi', gender='female', sampling_ra
             ]
         }
     }
-    response = requests.post(url, headers=headers, json=data)
+    response = httpx.post(url, headers=headers, json=data)
     assert response.status_code == 200, f"Error: {response.status_code} {response.text}"
     response_json = response.json()
 
