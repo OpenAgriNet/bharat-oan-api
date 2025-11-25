@@ -7,7 +7,7 @@ Translation Class
 import os
 import re
 import json
-import requests
+import httpx
 from dotenv import load_dotenv
 from google.cloud import translate_v2 as translate
 from google.oauth2 import service_account
@@ -345,7 +345,7 @@ class BhashiniTranslator(BaseTranslator):
     """Translator implementation using the Bhashini API."""
     def __init__(self, source_lang='en', target_lang='hi', batch_size=4, term_pairs=None):
         super().__init__(source_lang, target_lang, batch_size, term_pairs)
-        self.session = requests.Session()
+        self.client = httpx.Client()
         self.api_key = os.getenv("MEITY_API_KEY_VALUE")
         self.base_url = 'https://dhruva-api.bhashini.gov.in/services/inference/pipeline'
 
@@ -373,7 +373,7 @@ class BhashiniTranslator(BaseTranslator):
                 "input": [{"source": text} for text in texts]
             }
         }
-        response = self.session.post(self.base_url, headers=headers, json=data, timeout=(10, 30))
+        response = self.client.post(self.base_url, headers=headers, json=data, timeout=httpx.Timeout(10.0, read=30.0))
 
         if response.status_code != 200:
             raise Exception(f"Error: {response.status_code} {response.text}")
