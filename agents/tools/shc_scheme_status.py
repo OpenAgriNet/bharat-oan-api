@@ -420,10 +420,10 @@ class SHCStatusRequest(BaseModel):
     
     Args:
         phone_number (str): Phone number registered with the scheme (required)
-        cycle (str): Cycle year 2023-24
+        cycle (str): Cycle year in format YYYY-YY (e.g., "2023-24", "2024-25") (required)
     """
     phone_number: str  # Required field, no default
-    cycle: str = "2023-24"  
+    cycle: str  # Required field, no default  
     
     def validate_phone_number(self) -> None:
         """Validate and format the phone number before using it."""
@@ -541,7 +541,7 @@ async def cache_html_and_replace_urls(response_data: SHCStatusResponse, phone_nu
 
 async def check_shc_status(
     phone_number: str,
-    cycle: str = "2023-24"
+    cycle: str
 ) -> str:
     """Check soil health card status.
     
@@ -549,7 +549,7 @@ async def check_shc_status(
     
     Args:
         phone_number (str): Phone number registered with the scheme
-        cycle (str): Cycle year for which status is requested, defaults to `2023-24`
+        cycle (str): Cycle year for which status is requested (e.g., "2023-24", "2024-25"). You must ask the user for the cycle year if not provided. Do not mention the format specification to the user - ask naturally for the cycle year.
     
     Returns:
         str: Detailed soil health card information
