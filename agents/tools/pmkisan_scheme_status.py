@@ -1,4 +1,5 @@
 import uuid
+import json
 from datetime import datetime, timezone
 from helpers.utils import get_logger
 import httpx
@@ -167,7 +168,7 @@ class SchemeInitRequest(BaseModel):
         Returns:
             Dict[str, Any]: The dictionary representation of the SchemeInitRequest object
         """
-        now = datetime.today()
+        now = datetime.now(timezone.utc)
         
         return {
             "context": {
@@ -180,7 +181,7 @@ class SchemeInitRequest(BaseModel):
                 "bpp_uri": os.getenv("BPP_URI"),
                 "transaction_id": self.transaction_id,
                 "message_id": str(uuid.uuid4()),
-                "timestamp": now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "timestamp": now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
                 "ttl": "PT10M",
                 "location": {
                     "country": {
@@ -407,7 +408,7 @@ class SchemeStatusRequest(BaseModel):
         Returns:
             Dict[str, Any]: The dictionary representation of the SchemeStatusRequest object
         """
-        now = datetime.today()
+        now = datetime.now(timezone.utc)
         
         return {
             "context": {
@@ -420,7 +421,15 @@ class SchemeStatusRequest(BaseModel):
                 "bpp_uri": os.getenv("BPP_URI"),
                 "transaction_id": self.transaction_id,
                 "message_id": str(uuid.uuid4()),
-                "timestamp": now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                "timestamp": now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "location": {
+                    "country": {
+                        "code": "IND"
+                    },
+                    "city": {
+                        "code": "*"
+                    }
+                }
             },
             "message": {
                 "order_id": self.otp
@@ -444,13 +453,15 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
     try:
         # Get session_id from context
         session_id = ctx.deps.session_id
-        
+        transaction_id = generate_transaction_id(session_id, reg_no)
+        logger.info(f"Transaction ID: {transaction_id}")
         payload = SchemeInitRequest(
             registration_number=reg_no,
-            transaction_id=generate_transaction_id(session_id, reg_no) 
+            transaction_id=transaction_id 
             # NOTE: Adding registration number as well - in case a person checks status for multiple farmers
         ).get_payload()
         
+        logger.debug(f"PM Kisan init request payload: {json.dumps(payload, indent=2)}")
         
         response = httpx.post(
             os.getenv("BAP_ENDPOINT").rstrip("/") + "/init",
@@ -461,9 +472,21 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
         if response.status_code != 200:
             logger.error(f"Scheme init API returned status code {response.status_code}")
             return f"Scheme init service unavailable. Status code: {response.status_code}"
-            
-        scheme_response = SchemeInitResponse.model_validate(response.json())
-        return str(scheme_response)
+        
+        # Check if response body is empty
+        response_text = response.text.strip()
+        if not response_text:
+            logger.error("Scheme init API returned empty response")
+            return "Scheme init service returned empty response. Please try again later."
+        
+        try:
+            response_json = response.json()
+            logger.debug(f"PM Kisan init response: {json.dumps(response_json, indent=2)}")
+            scheme_response = SchemeInitResponse.model_validate(response_json)
+            return str(scheme_response)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response from scheme init API: {e}. Response text: {response_text[:200]}")
+            return f"Invalid response from scheme init service. Please try again later."
                 
     except httpx.TimeoutException as e:
         logger.error(f"Scheme init API request timed out: {str(e)}")
@@ -498,13 +521,17 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
             raise ModelRetry("Invalid OTP format. Please provide a 4-digit OTP received via SMS.")
         # Get session_id from context
         session_id = ctx.deps.session_id
-        payload = SchemeStatusRequest(transaction_id=generate_transaction_id(session_id, reg_no),
+        transaction_id = generate_transaction_id(session_id, reg_no)
+        logger.info(f"Transaction ID: {transaction_id}")
+        payload = SchemeStatusRequest(transaction_id=transaction_id,
                                       otp=otp,  
                                       registration_number=reg_no,
                                       ).get_payload()
         
+        logger.debug(f"PM Kisan status request payload: {json.dumps(payload, indent=2)}")
+        
         response = httpx.post(
-            os.getenv("BAP_URI").rstrip("/") + "/status",
+            os.getenv("BAP_ENDPOINT").rstrip("/") + "/status",
             json=payload,
             timeout=httpx.Timeout(10.0, read=15.0)
         )
@@ -512,9 +539,21 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
         if response.status_code != 200:
             logger.error(f"Scheme status API returned status code {response.status_code}")
             return f"Scheme status service unavailable. Status code: {response.status_code}"
-            
-        scheme_response = SchemeStatusResponse.model_validate(response.json())
-        return str(scheme_response)
+        
+        # Check if response body is empty
+        response_text = response.text.strip()
+        if not response_text:
+            logger.error("Scheme status API returned empty response")
+            return "Scheme status service returned empty response. Please try again later."
+        
+        try:
+            response_json = response.json()
+            logger.debug(f"PM Kisan status response: {json.dumps(response_json, indent=2)}")
+            scheme_response = SchemeStatusResponse.model_validate(response_json)
+            return str(scheme_response)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response from scheme status API: {e}. Response text: {response_text[:200]}")
+            return f"Invalid response from scheme status service. Please try again later."
                 
     except httpx.TimeoutException as e:
         logger.error(f"Scheme status API request timed out: {str(e)}")
