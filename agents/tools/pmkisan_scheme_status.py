@@ -461,8 +461,6 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
             # NOTE: Adding registration number as well - in case a person checks status for multiple farmers
         ).get_payload()
         
-        logger.debug(f"PM Kisan init request payload: {json.dumps(payload, indent=2)}")
-        
         response = httpx.post(
             os.getenv("BAP_ENDPOINT").rstrip("/") + "/init",
             json=payload,
@@ -481,7 +479,6 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
         
         try:
             response_json = response.json()
-            logger.debug(f"PM Kisan init response: {json.dumps(response_json, indent=2)}")
             scheme_response = SchemeInitResponse.model_validate(response_json)
             return str(scheme_response)
         except json.JSONDecodeError as e:
@@ -528,8 +525,6 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
                                       registration_number=reg_no,
                                       ).get_payload()
         
-        logger.debug(f"PM Kisan status request payload: {json.dumps(payload, indent=2)}")
-        
         response = httpx.post(
             os.getenv("BAP_ENDPOINT").rstrip("/") + "/status",
             json=payload,
@@ -548,7 +543,6 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
         
         try:
             response_json = response.json()
-            logger.debug(f"PM Kisan status response: {json.dumps(response_json, indent=2)}")
             scheme_response = SchemeStatusResponse.model_validate(response_json)
             return str(scheme_response)
         except json.JSONDecodeError as e:
