@@ -180,7 +180,16 @@ class SchemeInitRequest(BaseModel):
                 "bpp_uri": os.getenv("BPP_URI"),
                 "transaction_id": self.transaction_id,
                 "message_id": str(uuid.uuid4()),
-                "timestamp": now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                "timestamp": now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "ttl": "PT10M",
+                "location": {
+                    "country": {
+                        "code": "IND"
+                    },
+                    "city": {
+                        "code": "*"
+                    }
+                }
             },
             "message": {
                 "order": {
@@ -196,7 +205,7 @@ class SchemeInitRequest(BaseModel):
                         {
                             "customer": {
                                 "person": {
-                                    "name": "",
+                                    "name": "Customer Name",
                                     "tags": [
                                         {
                                             "display": True,
