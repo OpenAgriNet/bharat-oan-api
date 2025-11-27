@@ -14,7 +14,7 @@ import json
 import os
 from typing import Any, Dict, List, Optional, Tuple, Literal
 
-import requests
+import httpx
 from pydantic import BaseModel, Field, AnyUrl, ValidationError
 from pydantic_ai import ModelRetry
 from helpers.utils import get_logger
@@ -90,12 +90,12 @@ class GrievanceClient(BaseModel):
             raise ModelRetry("Grievance service base URL not configured. Set GRIEVANCE_BASE_URL.")
         return cls(base_url=GRIEVANCE_BASE_URL, crypto=Crypto.from_env())
 
-    def _post(self, path: str, body: Dict[str, Any]) -> requests.Response:
+    def _post(self, path: str, body: Dict[str, Any]) -> httpx.Response:
         url = f"{str(self.base_url).rstrip('/')}/{path.lstrip('/')}"
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         encrypted_body = self.crypto.encrypt_payload(body)
         logger.info(f"Grievance API request: {url} | body: {json.dumps(encrypted_body)}")
-        resp = requests.post(url, json=encrypted_body, headers=headers, timeout=(self.timeout_connect, self.timeout_read))
+        resp = httpx.post(url, json=encrypted_body, headers=headers, timeout=httpx.Timeout(self.timeout_connect, read=self.timeout_read))
         logger.info(f"Grievance API response: {url} | status: {resp.status_code} | body: {resp.text[:500]}")
         return resp
 
@@ -344,10 +344,10 @@ def submit_grievance(identity_no: str, grievance_description: str, grievance_typ
             # Fallback if schema differs
             return decrypted.get("message") or "Grievance submitted successfully."
 
-    except requests.Timeout:
+    except httpx.TimeoutException:
         logger.error("Grievance submission timed out.")
         return "Grievance submission timed out. Please try again."
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"Grievance submission network error: {e}")
         return "Unable to reach grievance service. Please try again."
     except ModelRetry as e:
@@ -383,10 +383,10 @@ def grievance_status(identity_no: str) -> str:
         decrypted = env.decrypt(client.crypto)
         return _format_status(decrypted)
 
-    except requests.Timeout:
+    except httpx.TimeoutException:
         logger.error("Grievance status check timed out.")
         return "Grievance status check timed out. Please try again."
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"Grievance status network error: {e}")
         return "Unable to reach grievance service. Please try again."
     except ModelRetry as e:

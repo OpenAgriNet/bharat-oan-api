@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from helpers.utils import get_logger
-import requests
+import httpx
 from pydantic import BaseModel, AnyHttpUrl
 from typing import List, Optional, Dict, Any, Literal, ClassVar
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
@@ -450,10 +450,10 @@ def check_pmfby_status(
             phone_number=phone_number
         ).get_payload()
         
-        response = requests.post(
+        response = httpx.post(
             os.getenv("BAP_ENDPOINT").rstrip("/") + "/init",
             json=payload,
-            timeout=(10, 15)
+            timeout=httpx.Timeout(10.0, read=15.0)
         )
         
         if response.status_code != 200:
@@ -463,11 +463,11 @@ def check_pmfby_status(
         scheme_response = StatusResponse.model_validate(response.json())
         return str(scheme_response)
                 
-    except requests.Timeout as e:
+    except httpx.TimeoutException as e:
         logger.error(f"PFMBY status API request timed out: {str(e)}")
         return "PFMBY status request timed out. Please try again later."
     
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"PFMBY status API request failed: {e}")
         return f"PFMBY status request failed: {str(e)}"
     

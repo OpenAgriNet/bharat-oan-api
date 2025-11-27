@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from helpers.utils import get_logger
-import requests
+import httpx
 from pydantic import BaseModel, AnyHttpUrl, Field
 from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
@@ -263,10 +263,10 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "smam
         # Convert None to empty string for the API request
         scheme_name_str = scheme_name or ""
         payload = SchemeRequest(scheme_name=scheme_name_str).get_payload()
-        response = requests.post(
+        response = httpx.post(
             os.getenv("BAP_ENDPOINT").rstrip("/") + "/search",
             json=payload,
-            timeout=(20, 30)
+            timeout=httpx.Timeout(20.0, read=30.0)
         )
         
         if response.status_code != 200:
@@ -276,11 +276,11 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "smam
         scheme_response = SchemeResponse.model_validate(response.json())
         return str(scheme_response)
                 
-    except requests.Timeout as e:
+    except httpx.TimeoutException as e:
         logger.error(f"Scheme API request timed out: {str(e)}")
         return "Scheme request timed out. Please try again later."
     
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"Scheme API request failed: {e}")
         return f"Scheme request failed: {str(e)}"
     

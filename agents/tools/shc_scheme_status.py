@@ -5,7 +5,7 @@ import base64
 import hashlib
 from datetime import datetime, timezone
 from helpers.utils import get_logger
-import requests
+import httpx
 from pydantic import BaseModel, AnyHttpUrl
 from typing import List, Optional, Dict, Any, Literal
 from app.core.cache import cache
@@ -420,10 +420,10 @@ class SHCStatusRequest(BaseModel):
     
     Args:
         phone_number (str): Phone number registered with the scheme (required)
-        cycle (str): Cycle year 2023-24
+        cycle (str): Cycle year in format YYYY-YY (e.g., "2023-24", "2024-25") (required)
     """
     phone_number: str  # Required field, no default
-    cycle: str = "2023-24"  
+    cycle: str  # Required field, no default  
     
     def validate_phone_number(self) -> None:
         """Validate and format the phone number before using it."""
@@ -541,7 +541,7 @@ async def cache_html_and_replace_urls(response_data: SHCStatusResponse, phone_nu
 
 async def check_shc_status(
     phone_number: str,
-    cycle: str = "2023-24"
+    cycle: str
 ) -> str:
     """Check soil health card status.
     
@@ -549,7 +549,7 @@ async def check_shc_status(
     
     Args:
         phone_number (str): Phone number registered with the scheme
-        cycle (str): Cycle year for which status is requested, defaults to `2023-24`
+        cycle (str): Cycle year for which status is requested (e.g., "2023-24", "2024-25"). You must ask the user for the cycle year if not provided. Do not mention the format specification to the user - ask naturally for the cycle year.
     
     Returns:
         str: Detailed soil health card information
@@ -560,27 +560,28 @@ async def check_shc_status(
             phone_number=phone_number
         ).get_payload()
         
-        response = requests.post(
-            os.getenv("BAP_ENDPOINT").rstrip("/") + "/init",
-            json=payload,
-            timeout=(10, 15)
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                os.getenv("BAP_ENDPOINT").rstrip("/") + "/init",
+                json=payload,
+                timeout=httpx.Timeout(10.0, read=15.0)
+            )
         
-        if response.status_code != 200:
-            logger.error(f"Soil health card status API returned status code {response.status_code}")
-            return f"Soil health card status service unavailable. Status code: {response.status_code}"
-        
-        scheme_response = SHCStatusResponse.model_validate(response.json())
-        
-        # Cache HTML content and replace URLs
-        modified_response = await cache_html_and_replace_urls(scheme_response, phone_number, cycle)
-        return str(modified_response)
+            if response.status_code != 200:
+                logger.error(f"Soil health card status API returned status code {response.status_code}")
+                return f"Soil health card status service unavailable. Status code: {response.status_code}"
+            
+            scheme_response = SHCStatusResponse.model_validate(response.json())
+            
+            # Cache HTML content and replace URLs
+            modified_response = await cache_html_and_replace_urls(scheme_response, phone_number, cycle)
+            return str(modified_response)
                 
-    except requests.Timeout as e:
+    except httpx.TimeoutException as e:
         logger.error(f"Soil health card status API request timed out: {str(e)}")
         return "Soil health card status request timed out. Please try again later."
     
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"Soil health card status API request failed: {e}")
         return f"Soil health card status request failed: {str(e)}"
     
