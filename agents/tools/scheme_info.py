@@ -240,34 +240,24 @@ class SchemeRequest(BaseModel):
             }
         }
 
-def get_scheme_info(scheme_name: Optional[Literal["kcc", "pmkisan", "pmfby", "shc", "smam", "pmksy", "sathi", "pdmc", "pmasha", "aif"]] = None) -> str:
-    """Retrieve detailed information about government agricultural schemes.
-    
-    This tool fetches comprehensive scheme data including benefits, eligibility criteria, 
-    application process, and other relevant details for agricultural schemes. Use this 
-    tool whenever users inquire about specific schemes or need general scheme information.
+def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "smam", "pmksy", "sathi", "pdmc", "pmasha", "aif"]) -> str:
+    """Retrieve detailed information about government agricultural schemes. This tool fetches comprehensive scheme data including benefits, eligibility criteria, application process, and other relevant details for agricultural schemes. Use this tool whenever users inquire about specific schemes or need general scheme information.
 
     Args:
-        scheme_name (Optional[str]): Name of the scheme to retrieve. Options:
+        scheme_name (str): Name of the scheme to retrieve. Options:
             - "kcc": Kisan Credit Card scheme
             - "pmkisan": Pradhan Mantri Kisan Samman Nidhi scheme  
             - "pmfby": Pradhan Mantri Fasal Bima Yojana scheme
             - "shc": Soil Health Card scheme
             - "smam": Sub-Mission on Agriculture Mechanization
             - "pmksy": The Pradhan Mantri Krishi Sinchayee Yojana
-            # - "nfsmcss": National Food Security Mission
             - "sathi": Seed Authentication, Traceability & Holistic Inventory
             - "pdmc": Per Drop More Crop scheme
-            # - "pkvy": Paramparagat Krishi Vikas Yojana
-            # - "e-nam": National Agriculture Market
-            # - "rad": RAINFED AREA DEVELOPMENT
             - "pmasha": Pradhan Mantri Annadata Aay Sanrakshan Abhiyan
             - "aif": Agriculture Infrastructure Fund
-            - None: Retrieve all available schemes
 
     Returns:
-        str: Formatted scheme data including introduction, benefits, eligibility, 
-             application process, and other relevant information.
+        str: Formatted scheme data including introduction, benefits, eligibility, application process, and other relevant information.
     """
     try:
         # Convert None to empty string for the API request

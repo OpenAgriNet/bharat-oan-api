@@ -6,6 +6,7 @@ __pycache__/
 .DS_Store
 *.pid
 *.mapbox_cache
+notebooks/
 # Google Cloud
 *credentials.json
 *jwt_public_key.pem

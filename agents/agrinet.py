@@ -17,13 +17,13 @@ agrinet_agent = Agent(
     tools=TOOLS,
     end_strategy='exhaustive',
     model_settings=ModelSettings(
-        temperature=1.0,
-        max_tokens=10240,
-        top_p=1.0,
-        top_k=0,
+        # temperature=1.0,
+        # max_tokens=10240,
+        # top_p=1.0,
+        # top_k=0,
         parallel_tool_calls=True,  
-        openai_reasoning_effort='medium',  
-        openai_send_reasoning_ids=False,
+        # openai_reasoning_effort='medium',  
+        # openai_send_reasoning_ids=False,
    )
 )
 

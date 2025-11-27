@@ -302,16 +302,15 @@ def _format_status(payload: Dict[str, Any]) -> str:
 # --------------------------------------------------------------------------------------
 
 def submit_grievance(identity_no: str, grievance_description: str, grievance_type: str) -> str:
-    """
-    Create and submit a grievance to the PM-KISAN portal.
+    """Create and submit a grievance to the PM-KISAN portal.
 
     Args:
-        identity_no: PM-KISAN Registration Number (11-character alphanumeric string) or 12-digit Aadhaar number registered with PM-KISAN.
-        grievance_description: Description of the grievance (plain text).
-        grievance_type: Human-friendly grievance label. Must be one of the keys in GRIEVANCE_MAPPING.
+        identity_no (str): PM-KISAN Registration Number (11-character alphanumeric string) or 12-digit Aadhaar number registered with PM-KISAN.
+        grievance_description (str): Description of the grievance (plain text).
+        grievance_type (str): Human-friendly grievance label. Must be one of the keys in GRIEVANCE_MAPPING.
 
     Returns:
-        A user-friendly message summarizing submission outcome.
+        str: A user-friendly message summarizing submission outcome.
     """
     try:
         if not grievance_type or grievance_type not in GRIEVANCE_MAPPING:
