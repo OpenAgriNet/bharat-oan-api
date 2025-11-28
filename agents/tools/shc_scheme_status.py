@@ -416,14 +416,9 @@ def format_phone_number(phone: str) -> str:
         raise ValueError("Invalid phone number format. Please provide a 10-digit Indian mobile number.")
 
 class SHCStatusRequest(BaseModel):
-    """SHCStatusRequest model for checking soil health card status.
-    
-    Args:
-        phone_number (str): Phone number registered with the scheme (required)
-        cycle (str): Cycle year in format YYYY-YY (e.g., "2023-24", "2024-25") (required)
-    """
-    phone_number: str  # Required field, no default
-    cycle: str  # Required field, no default  
+    """SHCStatusRequest model for checking soil health card status."""
+    phone_number: str
+    cycle: str  
     
     def validate_phone_number(self) -> None:
         """Validate and format the phone number before using it."""
@@ -547,16 +542,24 @@ async def check_shc_status(
     
     Use this tool to check soil health card status for a farmer.
     
+    IMPORTANT: You MUST ALWAYS ask the user for the cycle year before calling this function. 
+    NEVER use default values or assume a cycle year. If the user has not provided the cycle year, 
+    you must ask them: "Which year would you like to check the soil health card status for?"
+    
     Args:
         phone_number (str): Phone number registered with the scheme
-        cycle (str): Cycle year for which status is requested (e.g., "2023-24", "2024-25"). You must ask the user for the cycle year if not provided. Do not mention the format specification to the user - ask naturally for the cycle year.
+        cycle (str): Cycle year for which status is requested (e.g., "2023-24", "2024-25"). 
+                     MUST be obtained from the user - never use defaults.
     
     Returns:
         str: Detailed soil health card information
     """
+    if not cycle or not cycle.strip():
+        raise ValueError("Cycle year is required. Please ask the user for the cycle year.")
+    
     try:
         payload = SHCStatusRequest(
-            cycle=cycle,
+            cycle=cycle.strip(),
             phone_number=phone_number
         ).get_payload()
         
