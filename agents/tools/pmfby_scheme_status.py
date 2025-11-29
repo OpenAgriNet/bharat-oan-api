@@ -330,17 +330,17 @@ class PMfbyStatusRequest(BaseModel):
     """PMfbyStatusRequest model for checking PFMBY scheme status.
     
     Args:
-        inquiry_type (str): Type of inquiry - 'policy_status' or 'claim_status'
-        year (str): Year for which status is requested
-        season (str): Season for which status is requested:
+        inquiry_type (str): Type of inquiry - 'policy_status' or 'claim_status' (required)
+        year (str): Year for which status is requested (required)
+        season (str): Season for which status is requested (required):
             - "Kharif" - Kharif season
             - "Rabi" - Rabi season
             - "Summer" - Summer season
         phone_number (str): Phone number registered with the scheme (required)
     """
-    inquiry_type: Literal["policy_status", "claim_status"] = "policy_status"
-    year: str = "2023" 
-    season: Literal["Kharif", "Rabi", "Summer"] = "Rabi" 
+    inquiry_type: Literal["policy_status", "claim_status"]  # Required field, no default
+    year: str  # Required field, no default
+    season: Literal["Kharif", "Rabi", "Summer"]  # Required field, no default
     phone_number: str  # Required field, no default
     
     def get_payload(self) -> Dict[str, Any]:
@@ -350,7 +350,9 @@ class PMfbyStatusRequest(BaseModel):
         Returns:
             Dict[str, Any]: The dictionary representation of the PMfbyStatusRequest object
         """
-        now = datetime.today()
+        now = datetime.now(timezone.utc)
+        # Convert to Unix timestamp (seconds since epoch) as string
+        unix_timestamp = str(int(now.timestamp()))
         
         return {
             "context": {
@@ -363,7 +365,7 @@ class PMfbyStatusRequest(BaseModel):
                 "bpp_uri": os.getenv("BPP_URI"),
                 "transaction_id": str(uuid.uuid4()),
                 "message_id": str(uuid.uuid4()),
-                "timestamp": now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "timestamp": unix_timestamp,
                 "ttl": "PT10M",
                 "location": {
                     "country": {
@@ -425,19 +427,20 @@ class PMfbyStatusRequest(BaseModel):
 
 def check_pmfby_status(
     phone_number: str,
-    inquiry_type: Literal["policy_status", "claim_status"] = "policy_status",
-    year: str = "2023", 
-    season: Literal["Kharif", "Rabi", "Summer"] = "Rabi"  
+    inquiry_type: Literal["policy_status", "claim_status"],
+    year: str,
+    season: Literal["Kharif", "Rabi", "Summer"]
 ) -> str:
     """Check PFMBY scheme status (policy or claim).
     
     Use this tool to check either policy status or claim status for a farmer's PFMBY scheme.
+    You must ask the user for inquiry_type, year, season, and phone_number if not provided.
     
     Args:
-        phone_number (str): Phone number registered with the scheme
-        inquiry_type (str): Type of inquiry - 'policy_status' or 'claim_status'
-        year (str): Year for which status is requested, defaults to `2023`
-        season (str): Season for which status is requested, defaults to `Rabi`
+        phone_number (str): Phone number registered with the scheme (required)
+        inquiry_type (str): Type of inquiry - 'policy_status' or 'claim_status' (required). You must ask the user which type of inquiry they want.
+        year (str): Year for which status is requested (required). You must ask the user for the year.
+        season (str): Season for which status is requested (required). You must ask the user for the season (Kharif, Rabi, or Summer).
     
     Returns:
         str: Detailed scheme status information based on the inquiry type
