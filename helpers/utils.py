@@ -17,10 +17,10 @@ import pytz
 load_dotenv()
 
 
+# TODO: For mistral the tokenizer is different, will need to replace tiktoken with this: https://github.com/mistralai/mistral-common
+
+
 ENCODER = tiktoken.get_encoding(os.getenv("TIKTOKEN_ENCODING", "cl100k_base"))
-
-
-
 
 def get_today_date_str() -> str:
     """Get today's date as a string in the format Monday, 23rd May 2025."""
@@ -211,27 +211,3 @@ def get_prompt(prompt_file: str, context: Dict = {}, prompt_dir: str = "assets/p
     prompt = template.render(**context) if context else template.render()
     
     return prompt
-
-
-
-def load_json_data(filename: str) -> List[Dict]:
-    """Load JSON data from assets directory.
-    
-    Args:
-        filename (str): Name of the JSON file in the assets directory
-        
-    Returns:
-        List[Dict]: List of dictionaries loaded from the JSON file
-    """
-    try:
-        file_path = os.path.join(os.path.dirname(__file__), "..", "assets", filename)
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        logger = get_logger(__name__)
-        logger.error(f"JSON file not found: {filename}")
-        return []
-    except json.JSONDecodeError as e:
-        logger = get_logger(__name__)
-        logger.error(f"Error parsing JSON file {filename}: {e}")
-        return []

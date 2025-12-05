@@ -15,29 +15,36 @@ TOOLS = [
     Tool(
         get_scheme_info,
         takes_ctx=False,
+        strict=False,
     ),
     Tool(
         initiate_pm_kisan_status_check,
         takes_ctx=True,
+        strict=False,
     ),
     Tool(
         check_pm_kisan_status_with_otp,
         takes_ctx=True,
+        strict=False,
     ),
     Tool(
         check_pmfby_status,
         takes_ctx=False,
+        strict=False,
     ),
     Tool(
         check_shc_status,
         takes_ctx=False,
+        strict=False,
     ),
     Tool(
         submit_grievance,
         takes_ctx=False,
+        strict=False,
     ),
     Tool(
         grievance_status,
         takes_ctx=False,
+        strict=False,
     ),
 ]
