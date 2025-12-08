@@ -16,19 +16,21 @@ async def transcribe(request: TranscribeRequest = Body(...), current_user: str =
     session_id = request.session_id or str(uuid.uuid4())
     
     if request.service_type == 'bhashini':
-        lang_code = request.lang_code
-        transcription = transcribe_bhashini(request.audio_content, lang_code)
-        # Override lang_code in response to match the requested language
-        lang_code = request.lang_code  # Force the response to use the requested language code
+        # Use the lang_code directly from request - never modify it
+        transcription = transcribe_bhashini(request.audio_content, request.lang_code)
+        # Always use request.lang_code in response for bhashini
+        response_lang_code = request.lang_code
     elif request.service_type == 'whisper':
-        lang_code, transcription = transcribe_whisper(request.audio_content)
+        detected_lang_code, transcription = transcribe_whisper(request.audio_content)
+        # For whisper, use detected language or fallback to request lang_code if provided
+        response_lang_code = request.lang_code if request.lang_code else detected_lang_code
     else:
         return JSONResponse({'status': 'error', 'message': 'Invalid service type'}, status_code=400)
     
     response_payload = {
         'status': 'success',
         'text': transcription,
-        'lang_code': lang_code,  
+        'lang_code': response_lang_code,  # Directly use the determined lang_code
         'session_id': session_id
     }
     
