@@ -8,7 +8,8 @@ from contextlib import asynccontextmanager
 load_dotenv()
 
 # Import all routers
-from app.routers import chat, transcribe, suggestions, tts, health, file, token
+from app.routers import chat, transcribe, tts, health, file, token
+# from app.routers import suggestions  # Commented out: suggestion agent disabled
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -53,7 +54,7 @@ async def root():
 # Include all routers with API prefix from settings
 app.include_router(chat.router, prefix=settings.api_prefix)
 app.include_router(transcribe.router, prefix=settings.api_prefix)
-app.include_router(suggestions.router, prefix=settings.api_prefix)
+# app.include_router(suggestions.router, prefix=settings.api_prefix)  # Commented out: suggestion agent disabled
 app.include_router(tts.router, prefix=settings.api_prefix)
 app.include_router(health.router, prefix=settings.api_prefix)
 app.include_router(file.router, prefix=settings.api_prefix)

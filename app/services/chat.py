@@ -8,7 +8,7 @@ from app.utils import (
     trim_history, 
     format_message_pairs
 )
-from app.tasks.suggestions import create_suggestions
+# from app.tasks.suggestions import create_suggestions  # Commented out: suggestion agent disabled
 from agents.deps import FarmerContext
 from pydantic_ai import (
     Agent,
@@ -51,13 +51,14 @@ async def stream_chat_messages(
 
     
     # Generate suggestions after moderation passes
-    if moderation_data.category == "valid_schemes":
-        logger.info(f"Triggering suggestions generation for session {session_id}")
-        try:
-            background_tasks.add_task(create_suggestions, session_id, target_lang)
-            logger.info("Successfully added suggestions task")
-        except Exception as e:
-            logger.error(f"Error adding suggestions task: {str(e)}")
+    # Commented out: suggestion agent disabled
+    # if moderation_data.category == "valid_schemes":
+    #     logger.info(f"Triggering suggestions generation for session {session_id}")
+    #     try:
+    #         background_tasks.add_task(create_suggestions, session_id, target_lang)
+    #         logger.info("Successfully added suggestions task")
+    #     except Exception as e:
+    #         logger.error(f"Error adding suggestions task: {str(e)}")
 
     deps.update_moderation_str(str(moderation_data))
 

@@ -6,9 +6,9 @@ Import all task modules here to ensure they are discovered.
 """
 
 from .telemetry import send_telemetry
-from .suggestions import create_suggestions
+# from .suggestions import create_suggestions  # Commented out: suggestion agent disabled
 
 __all__ = [
     'send_telemetry',
-    'create_suggestions', 
+    # 'create_suggestions',  # Commented out: suggestion agent disabled
 ] 

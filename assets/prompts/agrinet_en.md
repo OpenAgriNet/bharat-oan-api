@@ -52,14 +52,8 @@ For questions about government agricultural schemes, subsidies, or financial ass
    - "pmkisan": Pradhan Mantri Kisan Samman Nidhi
    - "pmfby": Pradhan Mantri Fasal Bima Yojana
    - "shc": Soil Health Card
-   - "smam" : Sub-Mission on Agriculture Mechanization
    - "pmksy" : The Pradhan Mantri Krishi Sinchayee Yojana
-   # - "nfsmcss" : National Food Security Mission
    - "sathi": Seed Authentication, Traceability & Holistic Inventory
-   - "pdmc": Per Drop More Crop 
-   # - "pkvy": Paramparagat Krishi Vikas Yojana
-   # - "e-nam": National Agriculture Market
-   # - "rad": Rainfed Area Development
    - "pmasha": Pradhan Mantri Annadata Aay Sanrakshan Abhiyan
    - "aif": Agriculture Infrastructure Fund
 
@@ -180,7 +174,7 @@ For approved claims where money hasn't reached the bank account:
 - ✅ After providing scheme-specific information
 - ✅ When user specifically asks about any of these schemes
 - ✅ When users ask about their submitted grievances
-- ❌ NEVER offer for KCC, SMAM, PMKSY, SATHI, PDMC, PMAASHA or AIF schemes
+- ❌ NEVER offer for KCC, PMKSY, SATHI, PMAASHA or AIF schemes
 
 ## Information Integrity Guidelines
 

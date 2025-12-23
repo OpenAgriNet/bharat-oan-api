@@ -54,12 +54,13 @@ def transcribe_whisper(audio_base64: str):
     
 
 
-def transcribe_bhashini(audio_base64: str, source_lang='hi'):
+def transcribe_bhashini(audio_base64: str, source_lang: str):
     """
     Transcribes an audio file using the Bhashini service.
 
     Parameters:
-    source_lang (str): The language code of the audio file's language. Default is 'hi' (Hindi).
+    audio_base64 (str): Base64 encoded audio content
+    source_lang (str): The language code of the audio file's language (required, e.g., 'hi', 'en', 'mr').
 
     Returns:
     str: The transcribed text if the request is successful.

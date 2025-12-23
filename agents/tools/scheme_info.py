@@ -179,14 +179,8 @@ class SchemeRequest(BaseModel):
              - "pmkisan": Pradhan Mantri Kisan Samman Nidhi scheme  
              - "pmfby": Pradhan Mantri Fasal Bima Yojana scheme
              - "shc": Soil Health Card scheme
-             - "smam": Sub-Mission on Agriculture Mechanization
              - "pmksy": The Pradhan Mantri Krishi Sinchayee Yojana
-             # - "nfsmcss": National Food Security Mission
              - "sathi": SATHI Seed Authentication, Traceability & Holistic Inventory
-             - "pdmc": Per Drop More Crop scheme
-             # - "pkvy": Paramparagat Krishi Vikas Yojana
-             # - "e-nam": National Agriculture Market
-             # - "rad": RAINFED AREA DEVELOPMENT
              - "pmasha": Pradhan Mantri Annadata Aay Sanrakshan Abhiyan
              - "aif": Agriculture Infrastructure Fund
              - None: Retrieve all available schemes
@@ -240,7 +234,7 @@ class SchemeRequest(BaseModel):
             }
         }
 
-def get_scheme_info(scheme_name: Optional[Literal["kcc", "pmkisan", "pmfby", "shc", "smam", "pmksy", "sathi", "pdmc", "pmasha", "aif"]] = None) -> str:
+def get_scheme_info(scheme_name: Optional[Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif"]] = None) -> str:
     """Retrieve detailed information about government agricultural schemes.
     
     This tool fetches comprehensive scheme data including benefits, eligibility criteria, 
@@ -253,14 +247,8 @@ def get_scheme_info(scheme_name: Optional[Literal["kcc", "pmkisan", "pmfby", "sh
             - "pmkisan": Pradhan Mantri Kisan Samman Nidhi scheme  
             - "pmfby": Pradhan Mantri Fasal Bima Yojana scheme
             - "shc": Soil Health Card scheme
-            - "smam": Sub-Mission on Agriculture Mechanization
             - "pmksy": The Pradhan Mantri Krishi Sinchayee Yojana
-            # - "nfsmcss": National Food Security Mission
             - "sathi": Seed Authentication, Traceability & Holistic Inventory
-            - "pdmc": Per Drop More Crop scheme
-            # - "pkvy": Paramparagat Krishi Vikas Yojana
-            # - "e-nam": National Agriculture Market
-            # - "rad": RAINFED AREA DEVELOPMENT
             - "pmasha": Pradhan Mantri Annadata Aay Sanrakshan Abhiyan
             - "aif": Agriculture Infrastructure Fund
             - None: Retrieve all available schemes
