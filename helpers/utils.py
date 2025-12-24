@@ -13,12 +13,9 @@ from datetime import datetime
 import simplejson as json
 from jinja2 import Environment, FileSystemLoader
 import pytz
+from copy import deepcopy
 
 load_dotenv()
-
-
-# TODO: For mistral the tokenizer is different, will need to replace tiktoken with this: https://github.com/mistralai/mistral-common
-
 
 ENCODER = tiktoken.get_encoding(os.getenv("TIKTOKEN_ENCODING", "cl100k_base"))
 
@@ -211,3 +208,107 @@ def get_prompt(prompt_file: str, context: Dict = {}, prompt_dir: str = "assets/p
     prompt = template.render(**context) if context else template.render()
     
     return prompt
+
+
+# Grouped conversation history trimming functions
+
+def group_convos(history: List) -> List[List]:
+    """Group messages into conversations. A new conversation starts at each user message.
+    
+    Args:
+        history: List of ModelMessage objects
+        
+    Returns:
+        List of conversation groups, where each group is a list of messages
+    """
+    convos = []
+    current = []
+
+    for msg in history:
+        has_user = any(getattr(p, "part_kind", "") == "user-prompt" for p in msg.parts)
+
+        if has_user and current:
+            # close previous convo
+            convos.append(current)
+            current = [msg]
+        else:
+            current.append(msg)
+
+    if current:
+        convos.append(current)
+
+    return convos
+
+
+def convo_token_usage(convo: List) -> int:
+    """Calculate token usage for a conversation by summing usage from response messages.
+    
+    Args:
+        convo: List of ModelMessage objects representing a conversation
+        
+    Returns:
+        Total token count for the conversation
+    """
+    tokens = 0
+    for msg in convo:
+        if getattr(msg, "kind", "") == "response" and getattr(msg, "usage", None):
+            tokens += msg.usage.total_tokens
+    return tokens
+
+
+def trim_history(
+    history: List,
+    max_tokens: int = 28_000,
+) -> List:
+    """Trim message history using grouped conversations approach.
+    
+    Groups messages into conversations (starting at each user message),
+    calculates token usage per conversation from response messages,
+    and keeps the first conversation plus as many recent conversations
+    as fit within the token limit.
+    
+    Args:
+        history: List of ModelMessage objects
+        max_tokens: Maximum number of tokens to keep (default: 28,000)
+        
+    Returns:
+        Trimmed list of ModelMessage objects
+    """
+    if not history:
+        return []
+
+    convos = group_convos(history)
+    if not convos:
+        return []
+
+    # Build list of (messages, tokens)
+    convo_infos = []
+    for convo in convos:
+        tokens = convo_token_usage(convo)
+        convo_infos.append({"messages": convo, "tokens": tokens})
+
+    # Always keep convo 0 (system + first interaction)
+    first = convo_infos[0]
+    rest = convo_infos[1:]
+
+    total_tokens = first["tokens"]
+    selected = []
+
+    # Walk from newest convo backwards
+    for info in reversed(rest):
+        if total_tokens + info["tokens"] <= max_tokens:
+            selected.insert(0, info)  # maintain chronological order
+            total_tokens += info["tokens"]
+        else:
+            break
+
+    final_convos = [first] + selected
+
+    trimmed: List = []
+    for info in final_convos:
+        trimmed.extend(info["messages"])
+
+    logger = get_logger(__name__)
+    logger.info(f"Trimmed history: {total_tokens} tokens (max: {max_tokens})")
+
+    return trimmed
