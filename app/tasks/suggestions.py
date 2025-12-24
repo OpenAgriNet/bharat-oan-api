@@ -22,9 +22,7 @@ async def create_suggestions(session_id: str, target_lang: str = 'mr'):
         # Get message history
         raw_history = await _get_message_history(session_id)
         history     = trim_history(raw_history,
-                          60_000,
-                          include_tool_calls=False,
-                          include_system_prompts=False
+                          60_000
                           )
         message_pairs = "\n\n".join(format_message_pairs(history, 3))
 
