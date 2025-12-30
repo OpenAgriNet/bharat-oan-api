@@ -24,7 +24,7 @@ if LLM_PROVIDER == 'openai':
 # GPT-OSS Models
 
 if LLM_PROVIDER == 'vllm':
-    if LLM_MODEL_NAME in ['gpt-oss-20b', 'gpt-oss-120b']:
+    if LLM_MODEL_NAME in ['gpt-oss-20b', 'gpt-oss-120b','mistral-small']:
        LLM_MODEL = OpenAIChatModel(
         LLM_MODEL_NAME,
         provider=OpenAIProvider(

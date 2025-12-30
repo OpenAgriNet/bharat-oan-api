@@ -13,13 +13,14 @@ agrinet_agent = Agent(
     instrument=True,
     output_type=str,
     deps_type=FarmerContext,
-    retries=3,
+    retries=1,
     tools=TOOLS,
     end_strategy='exhaustive',
     model_settings=ModelSettings(
         # temperature=1.0,
         # max_tokens=10240,
         # top_p=1.0,
+        
         # top_k=0,
         parallel_tool_calls=True,  
         # openai_reasoning_effort='medium',  

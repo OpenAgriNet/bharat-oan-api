@@ -1,4 +1,3 @@
-from typing import AsyncGenerator
 from fastapi import BackgroundTasks
 from agents.agrinet import agrinet_agent
 from agents.moderation import moderation_agent
@@ -10,19 +9,10 @@ from app.utils import (
 )
 # from app.tasks.suggestions import create_suggestions  # Commented out: suggestion agent disabled
 from agents.deps import FarmerContext
-from pydantic_ai import (
-    Agent,
-    FinalResultEvent,
-    PartDeltaEvent,
-    PartStartEvent,
-    TextPartDelta,
-    ThinkingPartDelta,
-)
-from pydantic_ai.messages import TextPart, ThinkingPart
 
 logger = get_logger(__name__)
 
-async def stream_chat_messages(
+async def get_chat_response(
     query: str,
     session_id: str,
     source_lang: str,
@@ -30,8 +20,8 @@ async def stream_chat_messages(
     user_id: str,
     history: list,
     background_tasks: BackgroundTasks
-) -> AsyncGenerator[str, None]:
-    """Async generator for streaming chat messages."""
+) -> str:
+    """Get direct chat response (non-streaming)."""
     # Generate a unique content ID for this query
     content_id = f"query_{session_id}_{len(history)//2 + 1}"
        
@@ -73,47 +63,24 @@ async def stream_chat_messages(
     
     logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
 
-    async with agrinet_agent.iter(user_prompt=user_message, message_history=trimmed_history, deps=deps) as agent_run:
-        async for node in agent_run:
-            if Agent.is_user_prompt_node(node):
-                logger.info(f"User prompt node: {node.user_prompt}")
-                continue
-            elif Agent.is_model_request_node(node):
-                async with node.stream(agent_run.ctx) as response_stream:
-                    final_result_found = False
-                    
-                    async for event in response_stream:
-                        if isinstance(event, PartStartEvent):
-                            if isinstance(event.part, ThinkingPart):
-                                logger.info("Reasoning part started (not streamed to user)")
-                            elif isinstance(event.part, TextPart):
-                                # logger.info(f"Text part started: {event.part.content}")
-                                pass
-                        elif isinstance(event, PartDeltaEvent):
-                            if isinstance(event.delta, ThinkingPartDelta):
-                                # Don't stream reasoning to user - just log it
-                                # logger.debug(f"Reasoning delta: {event.delta.content_delta}")
-                                pass
-                            elif isinstance(event.delta, TextPartDelta):
-                                # Only yield text deltas after FinalResultEvent
-                                if final_result_found and event.delta.content_delta:
-                                    yield event.delta.content_delta
-                        elif isinstance(event, FinalResultEvent):
-                            logger.info("[Result] The model started producing a final result")
-                            final_result_found = True
-                            # Don't break - continue to collect text deltas
-            elif Agent.is_call_tools_node(node):
-                logger.info("Tool execution node")
-                continue
-            elif Agent.is_end_node(node):
-                logger.info(f"End node reached: {node.data.output}")
-                break
-
-    # Get the result and new messages after streaming completes
-    new_messages = agent_run.result.new_messages() if agent_run and agent_run.result else []
-    logger.info(f"Streaming complete for session {session_id}")
+    # Run agent and get direct response
+    logger.info(f"Running agrinet agent for session {session_id}")
+    agent_run = await agrinet_agent.run(
+        user_prompt=user_message,
+        message_history=trimmed_history,
+        deps=deps
+    )
     
-    # Post-processing happens AFTER streaming is complete
+    # Get the result and new messages
+    # For output_type=str, the result is in agent_run.data
+    response_text = agent_run.data if agent_run and hasattr(agent_run, 'data') else ""
+    if not response_text and agent_run and hasattr(agent_run, 'output'):
+        response_text = str(agent_run.output) if agent_run.output else ""
+    
+    new_messages = agent_run.new_messages() if agent_run else []
+    logger.info(f"Agent run complete for session {session_id}, response length: {len(response_text)}")
+    
+    # Post-processing
     messages = [
         *history,
         *new_messages
@@ -121,3 +88,6 @@ async def stream_chat_messages(
 
     logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
     await update_message_history(session_id, messages)
+    
+    # Return the response
+    return response_text
