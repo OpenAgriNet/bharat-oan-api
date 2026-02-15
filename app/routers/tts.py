@@ -22,24 +22,32 @@ async def tts(
 ):
     """Convert text to speech using the specified service."""
     session_id = request.session_id or str(uuid.uuid4())
-    
+
+    logger.info(
+        "TTS input | target_lang=%s session_id=%s text_length=%s",
+        request.target_lang, session_id, len(request.text)
+    )
+
     if request.service_type != 'bhashini':
         return JSONResponse({
             'status': 'error',
             'message': f'Service type "{request.service_type}" not supported. Available options: bhashini'
         }, status_code=400)
-    
+
     start_time = time.time()
     success, status_code, error_code, error_message = False, 500, None, None
-    
+
     try:
         audio_data = base64.b64encode(text_to_speech_bhashini(
             request.text, request.target_lang, gender='female', sampling_rate=8000
         )).decode('utf-8')
-        
         success, status_code = True, 200
     except Exception as e:
         error_code, error_message = type(e).__name__, str(e)
+        logger.error(
+            "TTS failed | session_id=%s target_lang=%s error=%s message=%s",
+            session_id, request.target_lang, error_code, error_message[:500]
+        )
         raise
     finally:
         latency_ms = (time.time() - start_time) * 1000
@@ -56,12 +64,13 @@ async def tts(
             uid=current_user
         )
         telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
-        qid = request.qid or f"tts_{session_id}"
-        logger.debug(f"TTS Telemetry - Session: {session_id}, Success: {success}, Latency: {latency_ms:.2f}ms, QID: {qid}, Language: {request.target_lang}")
-        logger.debug(f"TTS Telemetry payload: {telemetry_data}")
         background_tasks.add_task(send_telemetry, telemetry_data)
-     
-       
+
+    logger.info(
+        "TTS output | session_id=%s status=success audio_base64_len=%s latency_ms=%.2f",
+        session_id, len(audio_data) if audio_data else 0, latency_ms
+    )
+
     return JSONResponse({
         'status': 'success',
         'audio_data': audio_data,

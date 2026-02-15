@@ -21,17 +21,22 @@ async def transcribe(
 ):
     """Transcribe audio content using the specified service."""
     session_id = request.session_id or str(uuid.uuid4())
-    
+
+    logger.info(
+        "Transcribe input | service_type=%s lang_code=%s session_id=%s audio_content_len=%s",
+        request.service_type, request.lang_code, session_id, len(request.audio_content)
+    )
+
     if request.service_type not in ['bhashini', 'whisper']:
         return JSONResponse({
             'status': 'error',
             'message': 'Invalid service type'
         }, status_code=400)
-    
+
     start_time = time.time()
     success, status_code, error_code, error_message = False, 500, None, None
     transcription, response_lang_code = None, None
-    
+
     try:
         if request.service_type == 'bhashini':
             transcription = transcribe_bhashini(request.audio_content, request.lang_code)
@@ -41,6 +46,10 @@ async def transcribe(
         success, status_code = True, 200
     except Exception as e:
         error_code, error_message = type(e).__name__, str(e)
+        logger.error(
+            "Transcribe failed | session_id=%s service_type=%s error=%s message=%s",
+            session_id, request.service_type, error_code, error_message[:500]
+        )
         raise
     finally:
         latency_ms = (time.time() - start_time) * 1000
@@ -57,12 +66,13 @@ async def transcribe(
             uid=current_user
         )
         telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
-        qid = request.qid or f"asr_{session_id}"
-        lang = request.lang_code if request.service_type == 'bhashini' else 'auto'
-        logger.debug(f"ASR Telemetry - Session: {session_id}, Success: {success}, Latency: {latency_ms:.2f}ms, QID: {qid}, Language: {lang}")
-        logger.debug(f"ASR Telemetry payload: {telemetry_data}")
         background_tasks.add_task(send_telemetry, telemetry_data)
-    
+
+    logger.info(
+        "Transcribe output | session_id=%s status=success result_length=%s latency_ms=%.2f",
+        session_id, len(transcription) if transcription else 0, latency_ms
+    )
+
     return JSONResponse({
         'status': 'success',
         'text': transcription,
