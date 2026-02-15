@@ -48,7 +48,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             }
         )
         
-        logger.debug("Successfully decoded token")
+        logger.info("Successfully decoded token")
         mobile = decoded_token.get('mobile')
         if mobile is None:
             logger.warning("No mobile number found in token")
