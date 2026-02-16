@@ -11,8 +11,9 @@ from tenacity import (
     retry_if_exception,
     retry_if_result
 )
-from typing import Dict
+from typing import Dict, Any
 from langcodes import Language
+import copy
 from openai import OpenAI
 from io import BytesIO
 
@@ -29,7 +30,7 @@ def get_bhashini_client():
     if _bhashini_client is None:
         _bhashini_client = httpx.Client(
             timeout=httpx.Timeout(
-                connect=30.0,
+                connect=60.0,
                 read=120.0,
                 write=60.0,
                 pool=10.0
@@ -82,6 +83,22 @@ def is_retryable_status(exception):
         # Retry on 500, 502, 503, 504, 429
         return exception.status_code in [500, 502, 503, 504, 429]
     return False
+
+
+def _payload_for_log(data: Dict[str, Any], audio_content_key: str = "audioContent") -> Dict[str, Any]:
+    """Build a copy of the request payload safe for logging (large base64 replaced by placeholder)."""
+    out = copy.deepcopy(data)
+    if "inputData" in out and "audio" in out["inputData"]:
+        for item in out["inputData"]["audio"]:
+            if audio_content_key in item and isinstance(item[audio_content_key], str):
+                n = len(item[audio_content_key])
+                item[audio_content_key] = f"<base64 len={n}>"
+    return out
+
+
+def _curl_escape_single_quoted(payload_str: str) -> str:
+    """Escape payload for use inside single-quoted bash -d argument (' -> '\\'')."""
+    return payload_str.replace("'", "'\\''")
 
 
 @retry(
@@ -140,13 +157,19 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
         "Transcribe Bhashini input | source_lang=%s audio_base64_len=%s",
         source_lang, len(audio_base64)
     )
-    curl_redacted = (
-        "curl -X POST '%s' -H 'Authorization: ***' -H 'Content-Type: application/json' "
-        "-d '<payload>'"
-    ) % url
+    payload_for_log = _payload_for_log(data)
+    logger.info(
+        "Transcribe Bhashini request payload | serviceId=%s payload=%s",
+        service_id, json.dumps(payload_for_log, ensure_ascii=False)
+    )
+    payload_str = json.dumps(data, ensure_ascii=False)
+    payload_escaped = _curl_escape_single_quoted(payload_str)
+    curl = (
+        "curl -X POST '%s' -H 'Authorization: <MEITY_API_KEY_VALUE>' -H 'Content-Type: application/json' -d '%s'"
+    ) % (url, payload_escaped)
     logger.info(
         "Transcribe Bhashini external API | serviceId=%s curl=%s",
-        service_id, curl_redacted
+        service_id, curl
     )
 
     client = get_bhashini_client()
@@ -156,8 +179,8 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
 
         if response.status_code != 200:
             logger.error(
-                "Transcribe Bhashini failed | status_code=%s serviceId=%s response=%s",
-                response.status_code, service_id, response.text[:500]
+                "Transcribe Bhashini failed | status_code=%s serviceId=%s response=%s curl=%s",
+                response.status_code, service_id, response.text[:500], curl
             )
             raise BhashiniAPIError(
                 status_code=response.status_code,
@@ -173,16 +196,24 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
         )
         return result
 
+    except BhashiniAPIError:
+        raise
     except httpx.HTTPStatusError as e:
         logger.error(
-            "Transcribe Bhashini HTTP error | status_code=%s serviceId=%s message=%s",
-            e.response.status_code, service_id, (e.response.text or str(e))[:500]
+            "Transcribe Bhashini HTTP error | status_code=%s serviceId=%s message=%s curl=%s",
+            e.response.status_code, service_id, (e.response.text or str(e))[:500], curl
         )
         raise BhashiniAPIError(
             status_code=e.response.status_code,
             message=str(e),
             response_body=e.response.text
         )
+    except Exception as e:
+        logger.error(
+            "Transcribe Bhashini error | serviceId=%s error=%s message=%s curl=%s",
+            service_id, type(e).__name__, str(e)[:1000], curl
+        )
+        raise
 
 
 # Unused: not referenced anywhere in the codebase.
