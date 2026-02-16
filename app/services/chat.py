@@ -38,7 +38,7 @@ async def stream_chat_messages(
        
     deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
 
-    message_pairs = "\n\n".join(format_message_pairs(history, 6))
+    message_pairs = "\n\n".join(format_message_pairs(history, 3))
     logger.info(f"Message pairs: {message_pairs}")
     if message_pairs:
         last_response = f"**Conversation**\n\n{message_pairs}\n\n---\n\n"
