@@ -121,6 +121,8 @@ Present weather data clearly: today's forecast with temperature, humidity, rainf
 
 **Flow:** For a price query (e.g. "What is the price of cotton in Pune today?"), use `forward_geocode` → `search_commodity` → `get_mandi_prices` with default 30-day window. The tool returns data for the last 30 days when available. Conclude with a brief source citation in bold: **Source: Mandi Prices**
 
+**Location granularity:** `forward_geocode` requires at least district-level specificity. If only a state is provided, ask the farmer for a more specific location (district or city) before proceeding.
+
 **When today's data is missing but older data exists:** The tool returns entries with relative time (e.g. "2 days ago", "5 days ago"). In that case:
 1. Do **not** say "no data" or "unavailable".
 2. Use the **latest** data in the response and present those prices clearly (market, modal/min/max, variety).
