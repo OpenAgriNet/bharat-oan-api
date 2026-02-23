@@ -117,8 +117,9 @@ class Tag(BaseModel):
                TagItem1
                TagItem2
         """
+        group_name = self.descriptor.name or self.descriptor.code or "Details"
         items_str = "\n      ".join(str(tag_item) for tag_item in self.list)
-        return items_str
+        return f"{group_name}:\n      {items_str}"
 
 # -----------------------
 # Stop & Fulfillment
@@ -331,7 +332,7 @@ class WeatherRequest(BaseModel):
                 "intent": {
                     "category": {
                         "descriptor": {
-                            "name": "Weather-Forecast",
+                            "name": "Weather-Forecast-Mausamgram",
                             "code": "WFC"
                         }
                     },
