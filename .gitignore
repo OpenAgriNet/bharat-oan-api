@@ -198,3 +198,6 @@ cython_debug/
 
 # JMeter
 jmeter/
+
+# Synthetic data output
+synthetic/output/
