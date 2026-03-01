@@ -34,8 +34,8 @@ moderation_agent = Agent(
     output_type=QueryModerationResult,
     retries=2,
     model_settings=ModelSettings(
-        temperature=0.1,
-        max_tokens=128,
+        # temperature=0.1,
+        # max_tokens=128,
         timeout=5  # NOTE: Added timeout to avoid infinite loops
     )
 )

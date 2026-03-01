@@ -1,6 +1,6 @@
 import os
 from pydantic_ai.providers.anthropic import AnthropicProvider
-from pydantic_ai.models.openai import OpenAIResponsesModel 
+from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
 from dotenv import load_dotenv
@@ -13,11 +13,11 @@ LLM_PROVIDER    = os.getenv('LLM_PROVIDER', 'openai').lower()
 LLM_MODEL_NAME = os.getenv('LLM_MODEL_NAME')
 
 if LLM_PROVIDER == 'vllm':
-    LLM_MODEL = OpenAIResponsesModel(
+    LLM_MODEL = OpenAIChatModel(
         LLM_MODEL_NAME,
         provider=OpenAIProvider(
-            base_url=os.getenv('INFERENCE_ENDPOINT_URL'), 
-            api_key=os.getenv('INFERENCE_API_KEY'),  
+            base_url=os.getenv('VLLM_BASE_URL'), 
+            api_key="not-required",
         ),
     )
 

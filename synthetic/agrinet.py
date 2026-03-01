@@ -4,6 +4,7 @@ from synthetic.models import LLM_MODEL
 from synthetic.tools import TOOLS
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.models.anthropic import AnthropicModelSettings
+from pydantic_ai.models.openai import OpenAIChatModelSettings
 from synthetic.deps import FarmerContext
 
 # SYNTHETIC AGRINET AGENT
@@ -17,15 +18,18 @@ agrinet_agent = Agent(
     retries=3,
     tools=TOOLS,
     end_strategy='exhaustive',
-    model_settings=AnthropicModelSettings(
-        max_tokens=8192,
+    model_settings=OpenAIChatModelSettings(
         parallel_tool_calls=True,
-        # openai_reasoning_effort='high',
-        # openai_reasoning_summary='detailed'
-        anthropic_thinking={'type':'adaptive'},
-        anthropic_effort='high',
+    ),
+#     model_settings=AnthropicModelSettings(
+#         max_tokens=8192,
+#         parallel_tool_calls=True,
+#         # openai_reasoning_effort='high',
+#         # openai_reasoning_summary='detailed'
+#         anthropic_thinking={'type':'adaptive'},
+#         anthropic_effort='high',
 
-   )
+#    )
 )
 
 @agrinet_agent.system_prompt

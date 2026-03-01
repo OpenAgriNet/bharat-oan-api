@@ -3,7 +3,9 @@ Data pools for synthetic conversation generation.
 Indian names, locations, mandi names, crop price ranges, weather ranges, soil health ranges.
 """
 
+import json
 import random
+from pathlib import Path
 from typing import Tuple
 
 # ─── Failure Simulation ──────────────────────────────────────────────────────────
@@ -300,72 +302,43 @@ OFFICER_REPLIES = [
 ]
 
 
-# ─── Scenario Definitions ──────────────────────────────────────────────────────
+# ─── Scenario Definitions (loaded from assets/scenarios.json) ─────────────────
 
-SCENARIOS: list[dict] = [
-    {
-        "id": "weather",
-        "description_en": "Ask about the weather forecast for your area for the next few days. You want to plan your farming activities.",
-        "description_hi": "अपने क्षेत्र के अगले कुछ दिनों के मौसम का हाल पूछें। आप अपनी खेती की गतिविधियों की योजना बनाना चाहते हैं।",
-    },
-    {
-        "id": "mandi_prices",
-        "description_en": "Ask about current mandi prices for one of your crops near your location.",
-        "description_hi": "अपनी फसल की मंडी भाव के बारे में पूछें।",
-    },
-    {
-        "id": "scheme_info",
-        "description_en": "Ask about a government agricultural scheme (PM-KISAN, PMFBY, SHC, KCC, or any other). Ask what it is, who is eligible, and how to apply.",
-        "description_hi": "किसी सरकारी कृषि योजना के बारे में पूछें। यह क्या है, कौन पात्र है, और कैसे आवेदन करें।",
-    },
-    {
-        "id": "pmkisan_status",
-        "description_en": "Check your PM-KISAN benefit status. Provide your registration number when asked, and use OTP 1234 when prompted.",
-        "description_hi": "अपनी पीएम-किसान लाभ स्थिति जांचें। पंजीकरण संख्या दें और OTP 1234 का उपयोग करें।",
-    },
-    {
-        "id": "pmfby_status",
-        "description_en": "Check your PMFBY crop insurance status. Provide your phone number when asked, and use OTP 123456 when prompted. Mention the season and year.",
-        "description_hi": "अपनी पीएमएफबीवाई फसल बीमा स्थिति जांचें। फोन नंबर दें और OTP 123456 का उपयोग करें।",
-    },
-    {
-        "id": "shc_status",
-        "description_en": "Check your Soil Health Card status. Provide your phone number and ask about the latest cycle.",
-        "description_hi": "अपनी मिट्टी स्वास्थ्य कार्ड की स्थिति जांचें। अपना फोन नंबर दें।",
-    },
-    {
-        "id": "grievance_submit",
-        "description_en": "You have a problem with your PM-KISAN payment — either you haven't received the installment or your bank account details are wrong. Submit a grievance.",
-        "description_hi": "आपकी पीएम-किसान भुगतान में समस्या है। शिकायत दर्ज करें।",
-    },
-    {
-        "id": "grievance_status",
-        "description_en": "You previously submitted a grievance about your PM-KISAN payment. Check the status using your registration number.",
-        "description_hi": "आपने पहले अपनी पीएम-किसान भुगतान के बारे में शिकायत दर्ज की थी। स्थिति जांचें।",
-    },
-    {
-        "id": "crop_advisory",
-        "description_en": "Ask for advice about growing one of your crops — best practices, irrigation schedule, or fertilizer recommendations.",
-        "description_hi": "अपनी फसल उगाने के बारे में सलाह मांगें — सर्वोत्तम प्रथाएं, सिंचाई, या उर्वरक।",
-    },
-    {
-        "id": "pest_disease",
-        "description_en": "You noticed some pest or disease problem on your crop. Describe the symptoms and ask for identification and treatment.",
-        "description_hi": "आपने अपनी फसल पर कोई कीट या रोग की समस्या देखी है। लक्षण बताएं और उपचार पूछें।",
-    },
-    {
-        "id": "video_search",
-        "description_en": "Ask for videos related to farming techniques, crop management, or any agricultural topic.",
-        "description_hi": "खेती की तकनीक या फसल प्रबंधन से संबंधित वीडियो मांगें।",
-    },
-    {
-        "id": "multi_tool",
-        "description_en": "You want to know the weather AND mandi prices for your crop. Start with weather and then ask about prices in the same conversation.",
-        "description_hi": "आप मौसम और अपनी फसल के मंडी भाव दोनों जानना चाहते हैं।",
-    },
-    {
-        "id": "term_lookup",
-        "description_en": "Ask about the meaning of an agricultural term you heard — like 'NPK', 'MSP', 'drip irrigation', or a Hindi farming term.",
-        "description_hi": "किसी कृषि शब्द का अर्थ पूछें जैसे 'एनपीके', 'एमएसपी', या 'ड्रिप सिंचाई'।",
-    },
+_ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
+
+
+def load_scenarios(path: Path | None = None) -> list[dict]:
+    """Load scenario definitions from the JSON file."""
+    path = path or _ASSETS_DIR / "scenarios.json"
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+SCENARIOS: list[dict] = load_scenarios()
+
+ADVERSARIAL_SCENARIO_IDS = {s["id"] for s in SCENARIOS if s["id"].startswith("adversarial_")}
+
+
+# ─── Farmer Crops (common crops a farmer would grow) ─────────────────────────
+
+FARMER_CROPS = [
+    "Wheat", "Paddy", "Rice", "Maize", "Jowar", "Bajra", "Cotton",
+    "Soybean", "Groundnut", "Mustard", "Sugarcane", "Onion", "Potato",
+    "Tomato", "Chili", "Garlic", "Ginger", "Turmeric", "Gram", "Lentil",
+    "Sunflower", "Barley", "Ragi", "Banana", "Mango", "Orange", "Apple",
 ]
+
+
+# ─── Mood & Language Weights ─────────────────────────────────────────────────
+
+MOOD_WEIGHTS = {
+    "normal": 0.85,
+    "frustrated": 0.10,
+    "adversarial": 0.05,
+}
+
+LANGUAGE_WEIGHTS = {
+    "en": 0.25,
+    "hi": 0.45,
+    "hinglish": 0.30,
+}

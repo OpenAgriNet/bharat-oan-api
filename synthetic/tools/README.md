@@ -8,8 +8,6 @@
     - search_documents
     - search_videos
     - search_pests_diseases
-- weather.py
-    - weather_forecast
 - maps.py
     - forward_geocode
     - reverse_geocode
@@ -22,7 +20,6 @@
     - weather_forecast
 - mandi.py
     - get_mandi_prices
-
 
 
 ### Tools with multi-step, conversation dependent mock data
