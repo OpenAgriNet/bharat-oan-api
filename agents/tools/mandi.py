@@ -10,7 +10,7 @@ import humanize
 import httpx
 import pytz
 from dateutil import parser as dateutil_parser
-from app.config import get_default_httpx_timeout
+from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, AnyHttpUrl, Field
 from typing import List, Optional, Dict, Any
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
@@ -423,7 +423,7 @@ async def get_mandi_prices(
         response = httpx.post(
             search_url,
             json=payload,
-            timeout=get_default_httpx_timeout()
+            timeout=DEFAULT_HTTP_TIMEOUT
         )
         if response.status_code != 200:
             logger.error(

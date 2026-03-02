@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from helpers.utils import get_logger
 import httpx
-from app.config import get_default_httpx_timeout
+from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, AnyHttpUrl, Field
 from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
@@ -268,7 +268,7 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
         response = httpx.post(
             os.getenv("BAP_ENDPOINT").rstrip("/") + "/search",
             json=payload,
-            timeout=get_default_httpx_timeout()
+            timeout=DEFAULT_HTTP_TIMEOUT
         )
         logger.info(f"SchemeResponse: {response.json()}")
         

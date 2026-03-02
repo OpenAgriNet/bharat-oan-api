@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from helpers.utils import get_logger, get_today_date_str
 import httpx
-from app.config import get_default_httpx_timeout
+from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, AnyHttpUrl, Field
 from typing import List, Optional, Dict, Any, Tuple
 from dateutil import parser
@@ -373,7 +373,7 @@ async def weather_forecast(latitude: float, longitude: float) -> str:
         response = httpx.post(
             search_url,
             json=payload,
-            timeout=get_default_httpx_timeout()
+            timeout=DEFAULT_HTTP_TIMEOUT
         )
         if response.status_code != 200:
             logger.error(

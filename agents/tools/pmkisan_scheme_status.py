@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from helpers.utils import get_logger
 import httpx
-from app.config import get_default_httpx_timeout
+from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, AnyHttpUrl, Field
 from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
@@ -469,7 +469,7 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
         response = httpx.post(
             endpoint,
             json=payload,
-            timeout=get_default_httpx_timeout()
+            timeout=DEFAULT_HTTP_TIMEOUT
         )
         
         logger.info(f"[PM KISAN INIT] Response Status: {response.status_code}")
@@ -541,7 +541,7 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
         response = httpx.post(
             endpoint,
             json=payload,
-            timeout=get_default_httpx_timeout()
+            timeout=DEFAULT_HTTP_TIMEOUT
         )
         
         logger.info(f"[PM KISAN STATUS] Response Status: {response.status_code}")

@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from helpers.utils import get_logger
 import httpx
-from app.config import get_default_httpx_timeout
+from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, AnyHttpUrl
 from typing import List, Optional, Dict, Any, Literal, ClassVar
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
@@ -496,7 +496,7 @@ def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: st
         response = httpx.post(
             endpoint,
             json=payload,
-            timeout=get_default_httpx_timeout()
+            timeout=DEFAULT_HTTP_TIMEOUT
         )
         
         logger.info(f"[PMFBY INIT] Response Status: {response.status_code}")
@@ -591,7 +591,7 @@ def check_pmfby_status_with_otp(
         response = httpx.post(
             endpoint,
             json=payload,
-            timeout=get_default_httpx_timeout()
+            timeout=DEFAULT_HTTP_TIMEOUT
         )
         
         logger.info(f"[PMFBY STATUS] Response Status: {response.status_code}")
