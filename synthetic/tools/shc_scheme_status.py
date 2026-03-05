@@ -112,13 +112,17 @@ async def check_shc_status(
 
     testing_date = (today - timedelta(days=random.randint(30, 365))).strftime("%B %d, %Y")
 
-    # ── Farmer and plot info ──────────────────────────────────────────────
-    name = random_name()
-    loc = random.choice(LOCATIONS)
+    # ── Farmer and plot info (use profile from context) ─────────────────
+    name = ctx.deps.farmer_name or random_name()
+    loc = {
+        "state": ctx.deps.farmer_state,
+        "district": ctx.deps.farmer_district,
+        "village": ctx.deps.farmer_village,
+    } if ctx.deps.farmer_state else random.choice(LOCATIONS)
     last4 = phone_number[-4:] if len(phone_number) >= 4 else phone_number
     masked_phone = f"+91******{last4}"
 
-    area = round(random.uniform(0.2, 5.0), 3)
+    area = round(ctx.deps.farmer_land_acres, 3) if ctx.deps.farmer_land_acres else round(random.uniform(0.2, 5.0), 3)
     soil_type = random.choice(SHC_SOIL_TYPES)
 
     # ── Soil parameters ───────────────────────────────────────────────────

@@ -7,7 +7,7 @@ from pydantic_ai import Tool
 # Real tools (copied from agents/tools/ — self-contained to avoid agents/ import chain)
 from synthetic.tools.commodity import search_commodity
 from synthetic.tools.terms import search_terms
-from synthetic.tools.search import search_documents, search_videos, search_pests_diseases
+from synthetic.tools.search import search_documents, search_pests_diseases
 from synthetic.tools.maps import reverse_geocode, forward_geocode
 
 # Mock tools (randomized data for synthetic conversations)
@@ -67,11 +67,6 @@ TOOLS = [
     ),
     Tool(
         search_documents,
-        takes_ctx=False,
-        strict=False,
-    ),
-    Tool(
-        search_videos,
         takes_ctx=False,
         strict=False,
     ),

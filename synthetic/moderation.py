@@ -1,10 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Literal
-from pydantic_ai import Agent
+from pydantic_ai import Agent, PromptedOutput
 from helpers.utils import get_prompt
 from dotenv import load_dotenv
 from pydantic_ai.models import ModelSettings
-from synthetic.models import LLM_MODEL
+from synthetic.models import LLM_MODERATION_MODEL, ENABLE_INSTRUMENTATION
 
 # TODO: Add tools from tools/scheme.py
 load_dotenv()
@@ -27,15 +27,15 @@ class QueryModerationResult(BaseModel):
         return f"**Moderation Compliance:** {self.action} ({category_str})"
 
 moderation_agent = Agent(
-    model=LLM_MODEL,
+    model=LLM_MODERATION_MODEL,
     name="Moderation Agent",
-    system_prompt=get_prompt('moderation_system'),
-    instrument=True,
-    output_type=QueryModerationResult,
-    retries=2,
+    instructions=get_prompt('moderation_system'),
+    instrument=False,
+    output_type=PromptedOutput(QueryModerationResult),
+    retries=3,
     model_settings=ModelSettings(
-        # temperature=0.1,
-        # max_tokens=128,
-        timeout=5  # NOTE: Added timeout to avoid infinite loops
-    )
+        temperature=0.0,
+        top_p=1.0,
+        openai_reasoning_effort='low',
+    )    
 )

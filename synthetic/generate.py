@@ -21,8 +21,9 @@ from uuid import uuid4
 from pydantic import BaseModel
 
 from synthetic.agrinet import agrinet_agent
-from synthetic.deps import FarmerContext
-from synthetic.models import LLM_MODEL_NAME
+from synthetic.deps import FarmerContext, build_moderation_input
+from synthetic.mock_data import TARGET_LANGUAGE_WEIGHTS, SAME_LANGUAGE_PROBABILITY, LANGUAGE_SWITCH_PROBABILITY
+from synthetic.models import LLM_AGRINET_MODEL_NAME
 from synthetic.moderation import moderation_agent
 from synthetic.user import (
     EndConversation,
@@ -36,9 +37,6 @@ from synthetic.user import (
 # Data models
 # ---------------------------------------------------------------------------
 
-LANGUAGE_WEIGHTS = {"hi": 0.8, "en": 0.1, "hinglish": 0.1}
-
-
 class ConversationEnv(BaseModel):
     """Randomized environment configuration for a single conversation."""
 
@@ -49,6 +47,13 @@ class ConversationEnv(BaseModel):
     user_model_settings: dict
     agrinet_model: str
     agrinet_model_settings: dict
+
+
+class LanguageSwitch(BaseModel):
+    """Records a mid-conversation target language switch."""
+    turn: int
+    from_lang: str
+    to_lang: str
 
 
 class ConversationRecord(BaseModel):
@@ -62,6 +67,7 @@ class ConversationRecord(BaseModel):
     turn_count: int
     completed: bool
     error: str | None = None
+    language_switches: list[LanguageSwitch] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -69,20 +75,21 @@ class ConversationRecord(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def generate_random_environment() -> ConversationEnv:
+def generate_random_environment(target_language: str | None = None) -> ConversationEnv:
     """Build a randomized ConversationEnv."""
-    langs, weights = zip(*LANGUAGE_WEIGHTS.items())
-    target_language = random.choices(langs, weights=weights, k=1)[0]
+    if target_language is None:
+        langs, weights = zip(*TARGET_LANGUAGE_WEIGHTS.items())
+        target_language = random.choices(langs, weights=weights, k=1)[0]
 
     return ConversationEnv(
         today_date=datetime.now() + timedelta(days=random.randint(0, 365)),
         target_language=target_language,
         session_id=str(uuid4()),
-        user_model=LLM_MODEL_NAME,
+        user_model=LLM_AGRINET_MODEL_NAME,
         user_model_settings=dict(user_agent.model_settings)
         if user_agent.model_settings
         else {},
-        agrinet_model=LLM_MODEL_NAME,
+        agrinet_model=LLM_AGRINET_MODEL_NAME,
         agrinet_model_settings=dict(agrinet_agent.model_settings)
         if agrinet_agent.model_settings
         else {},
@@ -94,18 +101,46 @@ def generate_random_environment() -> ConversationEnv:
 # ---------------------------------------------------------------------------
 
 
+def _pick_language_switch(current_lang: str, max_turns: int) -> tuple[int, str] | None:
+    """Decide whether this conversation has a language switch.
+
+    Returns (switch_turn, new_lang) or None.
+    """
+    if random.random() >= LANGUAGE_SWITCH_PROBABILITY:
+        return None
+    # Pick a switch turn (not the first or last turn)
+    switch_turn = random.randint(2, max(2, max_turns - 1))
+    # Pick a different target language
+    candidates = {k: v for k, v in TARGET_LANGUAGE_WEIGHTS.items() if k != current_lang}
+    langs, weights = zip(*candidates.items())
+    new_lang = random.choices(langs, weights=weights, k=1)[0]
+    return switch_turn, new_lang
+
+
 async def run_conversation(
     env: ConversationEnv,
     profile: FarmerProfile,
-    max_turns: int = 10,
+    max_turns: int = 25,
 ) -> ConversationRecord:
     """Run a multi-turn conversation between the user and agrinet agents."""
 
+    current_target_lang = env.target_language
+    language_switches: list[LanguageSwitch] = []
+    planned_switch = _pick_language_switch(current_target_lang, max_turns)
+
     farmer_ctx = FarmerContext(
         query="",
-        lang_code=env.target_language,
+        lang_code=current_target_lang,
         session_id=env.session_id,
         today_date=env.today_date,
+        farmer_name=profile.name,
+        farmer_phone=profile.phone,
+        farmer_aadhaar=profile.aadhaar,
+        farmer_state=profile.state,
+        farmer_district=profile.district,
+        farmer_village=profile.village,
+        farmer_crops=profile.crops,
+        farmer_land_acres=profile.land_acres,
     )
 
     # First turn — user agent speaks first
@@ -122,24 +157,41 @@ async def run_conversation(
     for _ in range(max_turns):
         turn_count += 1
 
+        # Check for language switch at this turn
+        if planned_switch and turn_count == planned_switch[0]:
+            old_lang = current_target_lang
+            current_target_lang = planned_switch[1]
+            language_switches.append(LanguageSwitch(
+                turn=turn_count, from_lang=old_lang, to_lang=current_target_lang,
+            ))
+
         # Extract user text
         user_output = user_result.output
         if isinstance(user_output, EndConversation):
             completed = True
             break
 
-        user_text: str = user_output
+        user_text = user_output
 
-        # Moderate the user message
-        mod_result = await moderation_agent.run(user_text)
+        # Moderate the user message (with last 3 QA pairs for context)
+        mod_input = build_moderation_input(user_text, agrinet_history, limit=3)
+        mod_result = await moderation_agent.run(mod_input)
 
         # Rebuild FarmerContext with the new query + moderation
         farmer_ctx = FarmerContext(
             query=user_text,
-            lang_code=env.target_language,
+            lang_code=current_target_lang,
             session_id=env.session_id,
             today_date=env.today_date,
             moderation_str=str(mod_result.output),
+            farmer_name=profile.name,
+            farmer_phone=profile.phone,
+            farmer_aadhaar=profile.aadhaar,
+            farmer_state=profile.state,
+            farmer_district=profile.district,
+            farmer_village=profile.village,
+            farmer_crops=profile.crops,
+            farmer_land_acres=profile.land_acres,
         )
 
         # Run agrinet agent
@@ -168,6 +220,7 @@ async def run_conversation(
         user_messages_json=user_result.all_messages_json(),
         turn_count=turn_count,
         completed=completed,
+        language_switches=language_switches or None,
     )
 
 
@@ -180,23 +233,21 @@ async def generate_batch(
     n: int,
     max_parallel: int = 5,
     output_dir: str = "data/synthetic",
-    max_turns: int = 10,
+    max_turns: int = 25,
 ) -> Path:
     """Generate a batch of n synthetic conversations and write to JSONL."""
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = output_path / f"conversations_{timestamp}.jsonl"
-
     semaphore = asyncio.Semaphore(max_parallel)
-    write_lock = asyncio.Lock()
 
     async def _run_one(index: int) -> None:
         async with semaphore:
             env = generate_random_environment()
-            profile = generate_random_profile(language=env.target_language)
+            # 90% of the time, user language matches target language
+            user_lang = env.target_language if random.random() < SAME_LANGUAGE_PROBABILITY else None
+            profile = generate_random_profile(language=user_lang)
             scenario_id = profile.scenario.get("id", "unknown")
 
             try:
@@ -213,9 +264,10 @@ async def generate_batch(
                     error=traceback.format_exc(),
                 )
 
-            async with write_lock:
-                with open(output_file, "a") as f:
-                    f.write(record.model_dump_json() + "\n")
+            # One file per conversation
+            conv_file = output_path / f"{env.session_id}.jsonl"
+            with open(conv_file, "w") as f:
+                f.write(record.model_dump_json() + "\n")
 
             print(
                 f"[{index + 1}/{n}] session={record.session_id} "
@@ -227,8 +279,8 @@ async def generate_batch(
     tasks = [asyncio.create_task(_run_one(i)) for i in range(n)]
     await asyncio.gather(*tasks)
 
-    print(f"\nWrote {n} conversations to {output_file}")
-    return output_file
+    print(f"\nWrote {n} conversations to {output_path}/")
+    return output_path
 
 
 # ---------------------------------------------------------------------------
@@ -243,7 +295,7 @@ def main() -> None:
     parser.add_argument(
         "-n",
         type=int,
-        default=10,
+        default=25,
         help="Number of conversations to generate (default: 10)",
     )
     parser.add_argument(
@@ -255,7 +307,7 @@ def main() -> None:
     parser.add_argument(
         "--max-turns",
         type=int,
-        default=10,
+        default=25,
         help="Maximum turns per conversation (default: 10)",
     )
     parser.add_argument(

@@ -66,9 +66,8 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
     if should_fail():
         return "PM-KISAN status service is temporarily unavailable. Please try again later."
 
-    # Generate random beneficiary status
-    names = ["Ramesh Kumar", "Suresh Yadav", "Anita Devi", "Mohan Singh", "Geeta Patel", "Vijay Sharma"]
-    farmer_name = random.choice(names)
+    # Use farmer profile from context, fall back to random
+    farmer_name = ctx.deps.farmer_name or "Ramesh Kumar"
 
     # Random installment status
     total_installments = random.randint(8, 18)
@@ -80,11 +79,22 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
     status = random.choice(["Active", "Active", "Active", "Payment Pending", "Aadhaar Verification Required"])
 
     lines: List[str] = []
+    # Mask phone/aadhaar from profile or generate random masks
+    if ctx.deps.farmer_phone:
+        masked_phone = f"XXXXXX{ctx.deps.farmer_phone[-4:]}"
+    else:
+        masked_phone = f"XXXXXX{random.randint(1000, 9999)}"
+
+    if ctx.deps.farmer_aadhaar:
+        masked_aadhaar = f"XXXXXXXX{ctx.deps.farmer_aadhaar[-4:]}"
+    else:
+        masked_aadhaar = _random_masked_aadhaar()
+
     lines.append(f"Customer: {farmer_name}")
-    lines.append(f"Phone: XXXXXX{random.randint(1000, 9999)}")
+    lines.append(f"Phone: {masked_phone}")
     lines.append(f"Status: **{status}**")
     lines.append(f"Registration Number: {reg_no}")
-    lines.append(f"Aadhaar: {_random_masked_aadhaar()}")
+    lines.append(f"Aadhaar: {masked_aadhaar}")
     lines.append(f"")
     lines.append(f"**Payment Details:**")
     lines.append(f"Total Installments Received: {last_installment}")

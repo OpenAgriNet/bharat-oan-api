@@ -13,7 +13,6 @@ from synthetic.user.profile import FarmerProfile
 
 class EndConversation(BaseModel):
     """Returned by the user agent when the conversation is complete."""
-    message: str
 
 
 async def check_otp(ctx: RunContext[FarmerProfile], scheme: Literal['pmkisan', 'pmfby']) -> str:

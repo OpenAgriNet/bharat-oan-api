@@ -1,9 +1,9 @@
 from pydantic_ai import Agent, RunContext
 from helpers.utils import get_prompt
-from synthetic.models import LLM_MODEL
+from synthetic.models import LLM_MODEL, ENABLE_INSTRUMENTATION
 from synthetic.tools import TOOLS
 from pydantic_ai.settings import ModelSettings
-from pydantic_ai.models.anthropic import AnthropicModelSettings
+#from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.openai import OpenAIChatModelSettings
 from synthetic.deps import FarmerContext
 
@@ -12,27 +12,28 @@ from synthetic.deps import FarmerContext
 agrinet_agent = Agent(
     model=LLM_MODEL,
     name="Vistaar Agent",
-    instrument=True,
+    instrument=ENABLE_INSTRUMENTATION,
     output_type=str,
     deps_type=FarmerContext,
     retries=3,
     tools=TOOLS,
     end_strategy='exhaustive',
+    # model_settings=OpenAIChatModelSettings(
+    #     parallel_tool_calls=True,
+    # ),
     model_settings=OpenAIChatModelSettings(
-        parallel_tool_calls=True,
-    ),
-#     model_settings=AnthropicModelSettings(
-#         max_tokens=8192,
-#         parallel_tool_calls=True,
-#         # openai_reasoning_effort='high',
-#         # openai_reasoning_summary='detailed'
-#         anthropic_thinking={'type':'adaptive'},
-#         anthropic_effort='high',
-
-#    )
+        temperature=0.6,
+        top_p=0.95,
+        presence_penalty=1.5,
+        extra_body={
+            "top_k": 20,
+            "min_p": 0.0,
+            "chat_template_kwargs": {"enable_thinking": True}
+            },
+   )
 )
 
-@agrinet_agent.system_prompt
+@agrinet_agent.system_prompt(dynamic=True)
 def get_system_prompt(ctx: RunContext[FarmerContext]):
     """Get the system prompt for the agrinet agent."""
     deps = ctx.deps

@@ -4,9 +4,35 @@ Indian names, locations, mandi names, crop price ranges, weather ranges, soil he
 """
 
 import json
+import os
 import random
+import string
 from pathlib import Path
 from typing import Tuple
+from urllib.parse import urlparse
+
+import requests
+from dotenv import load_dotenv
+from faker import Faker
+
+load_dotenv()
+
+fake = Faker("en_IN")
+
+# ─── Photon Geocoder Config ──────────────────────────────────────────────────
+
+_photon_url = os.getenv("PHOTON_HOST", "http://10.128.188.15:2322")
+_parsed = urlparse(_photon_url)
+_PHOTON_HOST = _parsed.hostname or "10.128.188.15"
+_PHOTON_PORT = _parsed.port or 2322
+_PHOTON_API = f"http://{_PHOTON_HOST}:{_PHOTON_PORT}/api"
+
+_INDIA_BBOX = "68.0,6.0,98.0,36.0"
+
+_QUERY_SEEDS = list(string.ascii_lowercase) + [
+    "pur", "garh", "nagar", "bad", "ganj", "pura", "wadi", "palli",
+    "khera", "patti", "kalan", "khurd", "basti", "tola", "gaon",
+]
 
 # ─── Failure Simulation ──────────────────────────────────────────────────────────
 
@@ -18,82 +44,242 @@ def should_fail() -> bool:
     return random.random() < MOCK_FAILURE_RATE
 
 
-# ─── Indian Names ───────────────────────────────────────────────────────────────
-
-MALE_FIRST_NAMES = [
-    "Ramesh", "Suresh", "Mahesh", "Rajesh", "Dinesh", "Mukesh", "Rakesh",
-    "Anil", "Sunil", "Vijay", "Sanjay", "Ajay", "Ravi", "Mohan", "Sohan",
-    "Gopal", "Kishan", "Bhagwan", "Shankar", "Manoj", "Pramod", "Vinod",
-    "Ashok", "Deepak", "Prakash", "Ganesh", "Balram", "Hari", "Shyam",
-    "Ram", "Lakshman", "Bharat", "Arjun", "Karan", "Devendra", "Narendra",
-    "Jagdish", "Satish", "Girish", "Umesh", "Kamlesh", "Yogesh",
-]
-
-FEMALE_FIRST_NAMES = [
-    "Sunita", "Anita", "Savita", "Kavita", "Mamta", "Rekha", "Sushma",
-    "Kamla", "Geeta", "Seema", "Neema", "Radha", "Sita", "Lakshmi",
-    "Parvati", "Durga", "Meena", "Pushpa", "Saroj", "Usha",
-]
-
-LAST_NAMES = [
-    "Kumar", "Sharma", "Verma", "Singh", "Yadav", "Patel", "Reddy",
-    "Gupta", "Joshi", "Tiwari", "Mishra", "Pandey", "Dubey", "Chauhan",
-    "Rajput", "Thakur", "Patil", "Jadhav", "Deshmukh", "Kulkarni",
-    "Naik", "Nair", "Pillai", "Rathore", "Meena", "Gowda", "Swamy",
-    "Choudhary", "Mandal", "Das", "Mahto", "Sahu", "Dehri",
-]
+# ─── Indian Names (via Faker en_IN) ─────────────────────────────────────────────
 
 
 def random_name() -> str:
-    first = random.choice(MALE_FIRST_NAMES + FEMALE_FIRST_NAMES)
-    last = random.choice(LAST_NAMES)
-    return f"{first} {last}"
+    return fake.name()
 
 
 # ─── Indian Locations (state, district, village, lat, lon) ──────────────────────
 
 LOCATIONS: list[dict] = [
-    {"state": "Madhya Pradesh", "district": "Indore", "village": "Mhow", "lat": 22.55, "lon": 75.76},
-    {"state": "Madhya Pradesh", "district": "Bhopal", "village": "Berasia", "lat": 23.63, "lon": 77.43},
-    {"state": "Madhya Pradesh", "district": "Sagar", "village": "Khurai", "lat": 24.04, "lon": 78.33},
-    {"state": "Madhya Pradesh", "district": "Ujjain", "village": "Nagda", "lat": 23.45, "lon": 75.42},
-    {"state": "Uttar Pradesh", "district": "Lucknow", "village": "Malihabad", "lat": 26.92, "lon": 80.71},
-    {"state": "Uttar Pradesh", "district": "Varanasi", "village": "Ramnagar", "lat": 25.27, "lon": 83.03},
-    {"state": "Uttar Pradesh", "district": "Agra", "village": "Fatehabad", "lat": 27.10, "lon": 78.02},
-    {"state": "Uttar Pradesh", "district": "Kanpur", "village": "Bilhaur", "lat": 26.87, "lon": 80.06},
-    {"state": "Rajasthan", "district": "Jaipur", "village": "Chomu", "lat": 27.17, "lon": 75.72},
-    {"state": "Rajasthan", "district": "Jodhpur", "village": "Osian", "lat": 26.73, "lon": 72.91},
-    {"state": "Rajasthan", "district": "Kota", "village": "Sangod", "lat": 24.93, "lon": 76.28},
-    {"state": "Maharashtra", "district": "Pune", "village": "Junnar", "lat": 19.21, "lon": 73.88},
-    {"state": "Maharashtra", "district": "Nagpur", "village": "Kamptee", "lat": 21.22, "lon": 79.20},
-    {"state": "Maharashtra", "district": "Nashik", "village": "Sinnar", "lat": 19.85, "lon": 73.99},
-    {"state": "Maharashtra", "district": "Latur", "village": "Udgir", "lat": 18.39, "lon": 77.12},
-    {"state": "Gujarat", "district": "Ahmedabad", "village": "Dholka", "lat": 22.72, "lon": 72.44},
-    {"state": "Gujarat", "district": "Rajkot", "village": "Gondal", "lat": 21.96, "lon": 70.80},
-    {"state": "Gujarat", "district": "Surat", "village": "Bardoli", "lat": 21.12, "lon": 73.11},
-    {"state": "Punjab", "district": "Ludhiana", "village": "Jagraon", "lat": 30.79, "lon": 75.47},
-    {"state": "Punjab", "district": "Amritsar", "village": "Ajnala", "lat": 31.84, "lon": 74.76},
-    {"state": "Punjab", "district": "Patiala", "village": "Rajpura", "lat": 30.48, "lon": 76.59},
-    {"state": "Haryana", "district": "Karnal", "village": "Gharaunda", "lat": 29.54, "lon": 76.97},
-    {"state": "Haryana", "district": "Hisar", "village": "Hansi", "lat": 29.10, "lon": 75.97},
-    {"state": "Bihar", "district": "Patna", "village": "Danapur", "lat": 25.64, "lon": 85.05},
-    {"state": "Bihar", "district": "Muzaffarpur", "village": "Sahebganj", "lat": 26.12, "lon": 85.39},
-    {"state": "Karnataka", "district": "Bengaluru Rural", "village": "Devanahalli", "lat": 13.25, "lon": 77.71},
-    {"state": "Karnataka", "district": "Mysuru", "village": "Nanjangud", "lat": 12.12, "lon": 76.68},
-    {"state": "Karnataka", "district": "Belgaum", "village": "Gokak", "lat": 16.17, "lon": 74.82},
-    {"state": "Tamil Nadu", "district": "Coimbatore", "village": "Pollachi", "lat": 10.66, "lon": 77.01},
-    {"state": "Tamil Nadu", "district": "Thanjavur", "village": "Kumbakonam", "lat": 10.96, "lon": 79.39},
-    {"state": "Andhra Pradesh", "district": "Guntur", "village": "Tenali", "lat": 16.24, "lon": 80.64},
-    {"state": "Andhra Pradesh", "district": "Krishna", "village": "Machilipatnam", "lat": 16.19, "lon": 81.14},
-    {"state": "Telangana", "district": "Warangal", "village": "Jangaon", "lat": 17.73, "lon": 79.15},
-    {"state": "Telangana", "district": "Karimnagar", "village": "Huzurabad", "lat": 18.40, "lon": 79.40},
-    {"state": "West Bengal", "district": "Burdwan", "village": "Memari", "lat": 23.20, "lon": 88.11},
-    {"state": "Odisha", "district": "Cuttack", "village": "Banki", "lat": 20.38, "lon": 85.53},
-    {"state": "Chhattisgarh", "district": "Raipur", "village": "Abhanpur", "lat": 21.15, "lon": 81.73},
-    {"state": "Jharkhand", "district": "Ranchi", "village": "Kanke", "lat": 23.42, "lon": 85.32},
-    {"state": "Assam", "district": "Kamrup", "village": "Mirza", "lat": 26.10, "lon": 91.57},
-    {"state": "Kerala", "district": "Thrissur", "village": "Chalakudy", "lat": 10.31, "lon": 76.33},
+    # Madhya Pradesh
+    {"state": "Madhya Pradesh", "district": "Indore", "village": "Mhow"},
+    {"state": "Madhya Pradesh", "district": "Bhopal", "village": "Berasia"},
+    {"state": "Madhya Pradesh", "district": "Sagar", "village": "Khurai"},
+    {"state": "Madhya Pradesh", "district": "Ujjain", "village": "Nagda"},
+    {"state": "Madhya Pradesh", "district": "Jabalpur", "village": "Sihora"},
+    {"state": "Madhya Pradesh", "district": "Gwalior", "village": "Dabra"},
+    {"state": "Madhya Pradesh", "district": "Rewa", "village": "Mauganj"},
+    {"state": "Madhya Pradesh", "district": "Dewas", "village": "Sonkatch"},
+    {"state": "Madhya Pradesh", "district": "Hoshangabad", "village": "Seoni Malwa"},
+    {"state": "Madhya Pradesh", "district": "Chhindwara", "village": "Pandhurna"},
+    # Uttar Pradesh
+    {"state": "Uttar Pradesh", "district": "Lucknow", "village": "Malihabad"},
+    {"state": "Uttar Pradesh", "district": "Varanasi", "village": "Ramnagar"},
+    {"state": "Uttar Pradesh", "district": "Agra", "village": "Fatehabad"},
+    {"state": "Uttar Pradesh", "district": "Kanpur", "village": "Bilhaur"},
+    {"state": "Uttar Pradesh", "district": "Allahabad", "village": "Phulpur"},
+    {"state": "Uttar Pradesh", "district": "Meerut", "village": "Sardhana"},
+    {"state": "Uttar Pradesh", "district": "Gorakhpur", "village": "Campierganj"},
+    {"state": "Uttar Pradesh", "district": "Bareilly", "village": "Faridpur"},
+    {"state": "Uttar Pradesh", "district": "Moradabad", "village": "Thakurdwara"},
+    {"state": "Uttar Pradesh", "district": "Jhansi", "village": "Moth"},
+    {"state": "Uttar Pradesh", "district": "Sultanpur", "village": "Kadipur"},
+    {"state": "Uttar Pradesh", "district": "Pratapgarh", "village": "Kunda"},
+    {"state": "Uttar Pradesh", "district": "Azamgarh", "village": "Phulpur"},
+    {"state": "Uttar Pradesh", "district": "Mathura", "village": "Chhata"},
+    # Rajasthan
+    {"state": "Rajasthan", "district": "Jaipur", "village": "Chomu"},
+    {"state": "Rajasthan", "district": "Jodhpur", "village": "Osian"},
+    {"state": "Rajasthan", "district": "Kota", "village": "Sangod"},
+    {"state": "Rajasthan", "district": "Udaipur", "village": "Salumber"},
+    {"state": "Rajasthan", "district": "Ajmer", "village": "Kishangarh"},
+    {"state": "Rajasthan", "district": "Bikaner", "village": "Nokha"},
+    {"state": "Rajasthan", "district": "Alwar", "village": "Behror"},
+    {"state": "Rajasthan", "district": "Sikar", "village": "Lachhmangarh"},
+    {"state": "Rajasthan", "district": "Nagaur", "village": "Degana"},
+    {"state": "Rajasthan", "district": "Bhilwara", "village": "Mandal"},
+    # Maharashtra
+    {"state": "Maharashtra", "district": "Pune", "village": "Junnar"},
+    {"state": "Maharashtra", "district": "Nagpur", "village": "Kamptee"},
+    {"state": "Maharashtra", "district": "Nashik", "village": "Sinnar"},
+    {"state": "Maharashtra", "district": "Latur", "village": "Udgir"},
+    {"state": "Maharashtra", "district": "Aurangabad", "village": "Paithan"},
+    {"state": "Maharashtra", "district": "Solapur", "village": "Pandharpur"},
+    {"state": "Maharashtra", "district": "Kolhapur", "village": "Hatkanangle"},
+    {"state": "Maharashtra", "district": "Satara", "village": "Wai"},
+    {"state": "Maharashtra", "district": "Sangli", "village": "Miraj"},
+    {"state": "Maharashtra", "district": "Ahmednagar", "village": "Shrirampur"},
+    {"state": "Maharashtra", "district": "Jalgaon", "village": "Chopda"},
+    {"state": "Maharashtra", "district": "Beed", "village": "Georai"},
+    {"state": "Maharashtra", "district": "Osmanabad", "village": "Tuljapur"},
+    {"state": "Maharashtra", "district": "Yavatmal", "village": "Pusad"},
+    # Gujarat
+    {"state": "Gujarat", "district": "Ahmedabad", "village": "Dholka"},
+    {"state": "Gujarat", "district": "Rajkot", "village": "Gondal"},
+    {"state": "Gujarat", "district": "Surat", "village": "Bardoli"},
+    {"state": "Gujarat", "district": "Vadodara", "village": "Padra"},
+    {"state": "Gujarat", "district": "Junagadh", "village": "Visavadar"},
+    {"state": "Gujarat", "district": "Bhavnagar", "village": "Palitana"},
+    {"state": "Gujarat", "district": "Mehsana", "village": "Visnagar"},
+    {"state": "Gujarat", "district": "Banaskantha", "village": "Deesa"},
+    {"state": "Gujarat", "district": "Kutch", "village": "Mundra"},
+    # Punjab
+    {"state": "Punjab", "district": "Ludhiana", "village": "Jagraon"},
+    {"state": "Punjab", "district": "Amritsar", "village": "Ajnala"},
+    {"state": "Punjab", "district": "Patiala", "village": "Rajpura"},
+    {"state": "Punjab", "district": "Bathinda", "village": "Rampura Phul"},
+    {"state": "Punjab", "district": "Sangrur", "village": "Malerkotla"},
+    {"state": "Punjab", "district": "Jalandhar", "village": "Nakodar"},
+    {"state": "Punjab", "district": "Ferozepur", "village": "Zira"},
+    {"state": "Punjab", "district": "Moga", "village": "Baghapurana"},
+    {"state": "Punjab", "district": "Mansa", "village": "Budhlada"},
+    # Haryana
+    {"state": "Haryana", "district": "Karnal", "village": "Gharaunda"},
+    {"state": "Haryana", "district": "Hisar", "village": "Hansi"},
+    {"state": "Haryana", "district": "Sirsa", "village": "Dabwali"},
+    {"state": "Haryana", "district": "Rohtak", "village": "Meham"},
+    {"state": "Haryana", "district": "Sonipat", "village": "Gohana"},
+    {"state": "Haryana", "district": "Ambala", "village": "Barara"},
+    {"state": "Haryana", "district": "Kurukshetra", "village": "Pehowa"},
+    {"state": "Haryana", "district": "Jhajjar", "village": "Bahadurgarh"},
+    {"state": "Haryana", "district": "Fatehabad", "village": "Ratia"},
+    {"state": "Haryana", "district": "Jind", "village": "Narwana"},
+    # Bihar
+    {"state": "Bihar", "district": "Patna", "village": "Danapur"},
+    {"state": "Bihar", "district": "Muzaffarpur", "village": "Sahebganj"},
+    {"state": "Bihar", "district": "Bhagalpur", "village": "Kahalgaon"},
+    {"state": "Bihar", "district": "Gaya", "village": "Tekari"},
+    {"state": "Bihar", "district": "Darbhanga", "village": "Benipur"},
+    {"state": "Bihar", "district": "Purnia", "village": "Baisi"},
+    {"state": "Bihar", "district": "Vaishali", "village": "Hajipur"},
+    {"state": "Bihar", "district": "Samastipur", "village": "Rosera"},
+    {"state": "Bihar", "district": "Begusarai", "village": "Teghra"},
+    {"state": "Bihar", "district": "Nalanda", "village": "Hilsa"},
+    # Karnataka
+    {"state": "Karnataka", "district": "Bengaluru Rural", "village": "Devanahalli"},
+    {"state": "Karnataka", "district": "Mysuru", "village": "Nanjangud"},
+    {"state": "Karnataka", "district": "Belgaum", "village": "Gokak"},
+    {"state": "Karnataka", "district": "Dharwad", "village": "Navalgund"},
+    {"state": "Karnataka", "district": "Haveri", "village": "Ranebennur"},
+    {"state": "Karnataka", "district": "Shimoga", "village": "Bhadravathi"},
+    {"state": "Karnataka", "district": "Raichur", "village": "Sindhanur"},
+    {"state": "Karnataka", "district": "Bellary", "village": "Hospet"},
+    {"state": "Karnataka", "district": "Tumkur", "village": "Tiptur"},
+    {"state": "Karnataka", "district": "Hassan", "village": "Channarayapatna"},
+    {"state": "Karnataka", "district": "Mandya", "village": "Pandavapura"},
+    # Tamil Nadu
+    {"state": "Tamil Nadu", "district": "Coimbatore", "village": "Pollachi"},
+    {"state": "Tamil Nadu", "district": "Thanjavur", "village": "Kumbakonam"},
+    {"state": "Tamil Nadu", "district": "Madurai", "village": "Melur"},
+    {"state": "Tamil Nadu", "district": "Salem", "village": "Attur"},
+    {"state": "Tamil Nadu", "district": "Erode", "village": "Bhavani"},
+    {"state": "Tamil Nadu", "district": "Tirunelveli", "village": "Ambasamudram"},
+    {"state": "Tamil Nadu", "district": "Dindigul", "village": "Palani"},
+    {"state": "Tamil Nadu", "district": "Villupuram", "village": "Tindivanam"},
+    {"state": "Tamil Nadu", "district": "Tiruvannamalai", "village": "Polur"},
+    {"state": "Tamil Nadu", "district": "Nagapattinam", "village": "Sirkali"},
+    # Andhra Pradesh
+    {"state": "Andhra Pradesh", "district": "Guntur", "village": "Tenali"},
+    {"state": "Andhra Pradesh", "district": "Krishna", "village": "Machilipatnam"},
+    {"state": "Andhra Pradesh", "district": "East Godavari", "village": "Amalapuram"},
+    {"state": "Andhra Pradesh", "district": "West Godavari", "village": "Narsapuram"},
+    {"state": "Andhra Pradesh", "district": "Kurnool", "village": "Nandyal"},
+    {"state": "Andhra Pradesh", "district": "Anantapur", "village": "Dharmavaram"},
+    {"state": "Andhra Pradesh", "district": "Chittoor", "village": "Madanapalle"},
+    {"state": "Andhra Pradesh", "district": "Prakasam", "village": "Markapur"},
+    # Telangana
+    {"state": "Telangana", "district": "Warangal", "village": "Jangaon"},
+    {"state": "Telangana", "district": "Karimnagar", "village": "Huzurabad"},
+    {"state": "Telangana", "district": "Nizamabad", "village": "Bodhan"},
+    {"state": "Telangana", "district": "Khammam", "village": "Kothagudem"},
+    {"state": "Telangana", "district": "Nalgonda", "village": "Miryalaguda"},
+    {"state": "Telangana", "district": "Mahabubnagar", "village": "Jadcherla"},
+    {"state": "Telangana", "district": "Medak", "village": "Siddipet"},
+    # West Bengal
+    {"state": "West Bengal", "district": "Burdwan", "village": "Memari"},
+    {"state": "West Bengal", "district": "Hooghly", "village": "Arambagh"},
+    {"state": "West Bengal", "district": "Murshidabad", "village": "Berhampore"},
+    {"state": "West Bengal", "district": "Nadia", "village": "Ranaghat"},
+    {"state": "West Bengal", "district": "Birbhum", "village": "Rampurhat"},
+    {"state": "West Bengal", "district": "Bankura", "village": "Bishnupur"},
+    {"state": "West Bengal", "district": "Midnapore West", "village": "Kharagpur"},
+    # Odisha
+    {"state": "Odisha", "district": "Cuttack", "village": "Banki"},
+    {"state": "Odisha", "district": "Ganjam", "village": "Berhampur"},
+    {"state": "Odisha", "district": "Balasore", "village": "Jaleswar"},
+    {"state": "Odisha", "district": "Sambalpur", "village": "Kuchinda"},
+    {"state": "Odisha", "district": "Mayurbhanj", "village": "Rairangpur"},
+    {"state": "Odisha", "district": "Puri", "village": "Nimapara"},
+    # Chhattisgarh
+    {"state": "Chhattisgarh", "district": "Raipur", "village": "Abhanpur"},
+    {"state": "Chhattisgarh", "district": "Durg", "village": "Patan"},
+    {"state": "Chhattisgarh", "district": "Bilaspur", "village": "Takhatpur"},
+    {"state": "Chhattisgarh", "district": "Rajnandgaon", "village": "Dongargarh"},
+    {"state": "Chhattisgarh", "district": "Korba", "village": "Katghora"},
+    # Jharkhand
+    {"state": "Jharkhand", "district": "Ranchi", "village": "Kanke"},
+    {"state": "Jharkhand", "district": "Dhanbad", "village": "Tundi"},
+    {"state": "Jharkhand", "district": "Hazaribagh", "village": "Barhi"},
+    {"state": "Jharkhand", "district": "Giridih", "village": "Deori"},
+    {"state": "Jharkhand", "district": "Dumka", "village": "Saraiyahat"},
+    # Assam
+    {"state": "Assam", "district": "Kamrup", "village": "Mirza"},
+    {"state": "Assam", "district": "Nagaon", "village": "Hojai"},
+    {"state": "Assam", "district": "Sonitpur", "village": "Dhekiajuli"},
+    {"state": "Assam", "district": "Dibrugarh", "village": "Naharkatia"},
+    {"state": "Assam", "district": "Jorhat", "village": "Titabar"},
+    # Kerala
+    {"state": "Kerala", "district": "Thrissur", "village": "Chalakudy"},
+    {"state": "Kerala", "district": "Palakkad", "village": "Chittur"},
+    {"state": "Kerala", "district": "Wayanad", "village": "Sulthan Bathery"},
+    {"state": "Kerala", "district": "Idukki", "village": "Thodupuzha"},
+    {"state": "Kerala", "district": "Ernakulam", "village": "Perumbavoor"},
+    # Uttarakhand
+    {"state": "Uttarakhand", "district": "Dehradun", "village": "Vikas Nagar"},
+    {"state": "Uttarakhand", "district": "Haridwar", "village": "Laksar"},
+    {"state": "Uttarakhand", "district": "Udham Singh Nagar", "village": "Jaspur"},
+    {"state": "Uttarakhand", "district": "Nainital", "village": "Haldwani"},
+    # Himachal Pradesh
+    {"state": "Himachal Pradesh", "district": "Kangra", "village": "Palampur"},
+    {"state": "Himachal Pradesh", "district": "Mandi", "village": "Sundernagar"},
+    {"state": "Himachal Pradesh", "district": "Shimla", "village": "Theog"},
+    {"state": "Himachal Pradesh", "district": "Kullu", "village": "Banjar"},
+    # Jammu & Kashmir
+    {"state": "Jammu and Kashmir", "district": "Anantnag", "village": "Bijbehara"},
+    {"state": "Jammu and Kashmir", "district": "Baramulla", "village": "Sopore"},
+    {"state": "Jammu and Kashmir", "district": "Jammu", "village": "Akhnoor"},
 ]
+
+
+def get_random_location() -> dict:
+    """Fetch a random Indian village from Photon geocoder API.
+
+    Queries Photon with a random seed, picks a random village from results.
+    Falls back to the hardcoded LOCATIONS list if the API call fails.
+    """
+    query = random.choice(_QUERY_SEEDS)
+    try:
+        resp = requests.get(_PHOTON_API, params={
+            "q": query,
+            "osm_tag": "place:village",
+            "limit": 100,
+            "bbox": _INDIA_BBOX,
+            "lang": "en",
+        }, timeout=5)
+        resp.raise_for_status()
+        features = resp.json().get("features", [])
+
+        # Filter to valid Indian villages with name, state, and district
+        valid = []
+        for f in features:
+            props = f.get("properties", {})
+            name = props.get("name")
+            state = props.get("state")
+            district = props.get("county") or props.get("city")
+            country = props.get("country", "")
+            if name and state and district and "India" in country:
+                valid.append({"state": state, "district": district, "village": name})
+
+        if valid:
+            return random.choice(valid)
+    except Exception:
+        pass
+
+    # Fallback to hardcoded list
+    return random.choice(LOCATIONS)
 
 
 # ─── Mandi Names ───────────────────────────────────────────────────────────────
@@ -322,23 +508,68 @@ ADVERSARIAL_SCENARIO_IDS = {s["id"] for s in SCENARIOS if s["id"].startswith("ad
 # ─── Farmer Crops (common crops a farmer would grow) ─────────────────────────
 
 FARMER_CROPS = [
-    "Wheat", "Paddy", "Rice", "Maize", "Jowar", "Bajra", "Cotton",
-    "Soybean", "Groundnut", "Mustard", "Sugarcane", "Onion", "Potato",
-    "Tomato", "Chili", "Garlic", "Ginger", "Turmeric", "Gram", "Lentil",
-    "Sunflower", "Barley", "Ragi", "Banana", "Mango", "Orange", "Apple",
+    # Cereals & millets
+    "Wheat", "Paddy", "Rice", "Maize", "Jowar", "Bajra", "Barley", "Ragi",
+    "Foxtail Millet", "Kodo Millet", "Little Millet", "Barnyard Millet",
+    # Pulses
+    "Gram", "Lentil", "Red Gram", "Black Gram", "Green Gram",
+    "Cowpea", "Kidney Beans", "Field Pea",
+    # Oilseeds
+    "Groundnut", "Mustard", "Soybean", "Sunflower", "Sesamum",
+    "Castor Seed", "Linseed", "Niger Seed",
+    # Cash crops
+    "Cotton", "Sugarcane", "Jute", "Tobacco", "Coffee", "Tea", "Rubber",
+    # Spices
+    "Chili", "Turmeric", "Ginger", "Garlic", "Coriander", "Cumin",
+    "Black pepper", "Cardamom", "Cloves", "Fenugreek",
+    # Vegetables
+    "Onion", "Potato", "Tomato", "Brinjal", "Cauliflower", "Cabbage",
+    "Capsicum", "Bitter gourd", "Bottle gourd", "Ridge Gourd",
+    "Pumpkin", "Cucumber", "Carrot", "Radish", "Beetroot",
+    "Green Peas", "Beans", "Ladies Finger", "Spinach", "Drumstick",
+    # Fruits
+    "Banana", "Mango", "Orange", "Apple", "Papaya", "Guava",
+    "Pomegranate", "Grapes", "Litchi", "Watermelon", "Coconut",
+    "Pineapple", "Custard Apple", "Chikoo", "Jackfruit", "Lemon",
 ]
 
 
 # ─── Mood & Language Weights ─────────────────────────────────────────────────
 
 MOOD_WEIGHTS = {
-    "normal": 0.85,
-    "frustrated": 0.10,
-    "adversarial": 0.05,
+    "normal": 0.6,
+    "frustrated": 0.3,
+    "adversarial": 0.1,
 }
 
 LANGUAGE_WEIGHTS = {
-    "en": 0.25,
-    "hi": 0.45,
-    "hinglish": 0.30,
+    "hi": 0.55,
+    "en": 0.15,
+    "ta": 0.04,   # Tamil
+    "te": 0.04,   # Telugu
+    "bn": 0.04,   # Bengali
+    "mr": 0.04,   # Marathi
+    "gu": 0.03,   # Gujarati
+    "kn": 0.03,   # Kannada
+    "pa": 0.03,   # Punjabi
+    "or": 0.02,   # Odia
+    "ml": 0.02,   # Malayalam
+    "as": 0.01,   # Assamese
+}
+
+LATIN_SCRIPT_PROBABILITY = 0.05
+SAME_LANGUAGE_PROBABILITY = 0.90
+LANGUAGE_SWITCH_PROBABILITY = 0.015  # ~1.5% of conversations switch target language mid-conversation
+
+TARGET_LANGUAGE_WEIGHTS = {
+    "hi": 0.25,
+    "bn": 0.10,   # Bengali
+    "te": 0.10,   # Telugu
+    "mr": 0.10,   # Marathi
+    "ta": 0.09,   # Tamil
+    "gu": 0.08,   # Gujarati
+    "kn": 0.08,   # Kannada
+    "ml": 0.07,   # Malayalam
+    "en": 0.07,
+    "as": 0.06,   # Assamese
 }

@@ -1,4 +1,8 @@
 # Byte-compiled / optimized / DLL files
+.next/
+viewer/.next/
+viewer/out/
+data/synthetic/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -7,6 +11,7 @@ __pycache__/
 *.pid
 *.mapbox_cache
 # Google Cloud
+data/hf_dataset/*
 *credentials.json
 *jwt_public_key.pem
 *private_key.pem
@@ -201,3 +206,6 @@ jmeter/
 
 # Synthetic data output
 synthetic/output/
+
+# Translation script checkpoints
+scripts/.checkpoints/

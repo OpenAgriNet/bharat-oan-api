@@ -75,10 +75,14 @@ def check_pmfby_status_with_otp(
     if should_fail():
         return "PMFBY status service is temporarily unavailable. Please try again later."
 
-    crop = random.choice(PMFBY_CROPS)
+    # Use farmer profile from context where available
+    if ctx.deps.farmer_crops:
+        crop = random.choice(ctx.deps.farmer_crops)
+    else:
+        crop = random.choice(PMFBY_CROPS)
+    area = round(ctx.deps.farmer_land_acres, 2) if ctx.deps.farmer_land_acres else round(random.uniform(0.5, 10.0), 2)
     sum_insured = random.randint(30000, 200000)
     premium = round(sum_insured * random.uniform(0.015, 0.05))
-    area = round(random.uniform(0.5, 10.0), 2)
 
     lines: List[str] = []
 
