@@ -54,7 +54,7 @@ async def stream_chat_messages(
     root_span_ctx = (
         langfuse.start_as_current_observation(
             as_type="generation",
-            name="bharat-vistar-chat-agent",
+            name="BharatVistar-AGENTS",
             input={"query": query, "session_id": session_id_safe},
         )
         if langfuse
