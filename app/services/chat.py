@@ -94,11 +94,15 @@ async def stream_chat_messages(
     }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 4025315 (version-1 with langfuse fix)
     logger.info(f"Telemetry data: {telemetry_data}")
     try:
         result = await send_telemetry(telemetry_data)
         logger.info(f"Telemetry result: {result}")
     except Exception as e:
+<<<<<<< HEAD
         logger.error(f"Failed to send telemetry: {e}")
 =======
     root_span_ctx = (
@@ -236,3 +240,6 @@ async def stream_chat_messages(
             logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
             await update_message_history(session_id, messages)
 >>>>>>> 873e131 (fix(chat): update observation name for langfuse integration)
+=======
+        logger.error(f"Failed to send telemetry: {e}")
+>>>>>>> 4025315 (version-1 with langfuse fix)
