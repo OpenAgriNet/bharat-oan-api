@@ -49,13 +49,12 @@ async def stream_chat_messages(
         "target_lang": (target_lang or "unknown").lower()[:200],
         "user_id": (user_id or "anonymous")[:200],
     }
-    langfuse_tags = ["oan-chat"]
 
     root_span_ctx = (
         langfuse.start_as_current_observation(
-            as_type="generation",
+            as_type="span",
             name="BharatVistar-AGENTS",
-            input={"query": query, "session_id": session_id_safe},
+            input=query,
         )
         if langfuse
         else nullcontext()
@@ -66,7 +65,6 @@ async def stream_chat_messages(
             user_id=(user_id or "anonymous")[:200],
             session_id=session_id_safe,
             metadata=langfuse_metadata,
-            tags=langfuse_tags,
             version="1.0",
         )
         if propagate_attributes
@@ -75,7 +73,6 @@ async def stream_chat_messages(
 
     with root_span_ctx as root_span:
         with propagate_ctx:
-            # Generate a unique content ID for this query
             content_id = f"query_{session_id}_{len(history)//2 + 1}"
 
             deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
@@ -87,10 +84,21 @@ async def stream_chat_messages(
             else:
                 last_response = ""
 
-            user_message    = f"{last_response}{deps.get_user_message()}"
-            moderation_run  = await moderation_agent.run(user_message)
+            user_message   = f"{last_response}{deps.get_user_message()}"
+            moderation_run = await moderation_agent.run(user_message)
             moderation_data = moderation_run.output
             logger.info(f"Moderation data: {moderation_data}")
+
+            # Set tags once, after moderation, directly on the trace
+            if root_span is not None:
+                try:
+                    root_span.update_trace(tags=[
+                        moderation_data.category,
+                        f"source_lang:{source_lang}",
+                        f"target_lang:{target_lang}",
+                    ])
+                except Exception as e:
+                    logger.warning(f"Failed to update trace tags: {e}")
 
             # Generate suggestions after moderation passes
             # Commented out: suggestion agent disabled
@@ -105,7 +113,6 @@ async def stream_chat_messages(
             deps.update_moderation_str(str(moderation_data))
 
             # Include conversation in the user message so the agent always sees prior context
-            # (in addition to message_history). This reinforces conversation awareness.
             user_message = f"{last_response}{deps.get_user_message()}"
 
             # Run the main agent
@@ -135,7 +142,6 @@ async def stream_chat_messages(
                     if isinstance(event.delta, ThinkingPartDelta):
                         pass  # Don't stream reasoning to user
                     elif isinstance(event.delta, TextPartDelta):
-                        # Only yield text deltas after FinalResultEvent
                         if final_result_found and event.delta.content_delta:
                             yield event.delta.content_delta
 
@@ -179,9 +185,9 @@ async def stream_chat_messages(
             # Close root span with the final response
             if root_span is not None:
                 try:
-                    root_span.update(output={"response": final_output})
+                    root_span.update(output=final_output)
                 except Exception as e:
                     logger.warning(f"Failed to update root span output: {e}")
 
             logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
-            await update_message_history(session_id, messages)
+            await update_message_history(session_id, messages)  
