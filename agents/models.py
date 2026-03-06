@@ -1,6 +1,10 @@
 import os
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.models.gemini import GeminiModel
+from pydantic_ai.providers.google_gla import GoogleGLAProvider
+from pydantic_ai.models.groq import GroqModel
+from pydantic_ai.providers.groq import GroqProvider
 from dotenv import load_dotenv
 from openai import AsyncAzureOpenAI
 
@@ -19,11 +23,25 @@ if LLM_PROVIDER == 'vllm':
             api_key=os.getenv('INFERENCE_API_KEY'),  
         ),
     )
+elif LLM_PROVIDER == 'gemini':
+    LLM_MODEL = GeminiModel(
+        LLM_MODEL_NAME,
+        provider=GoogleGLAProvider(
+            api_key=os.getenv('GEMINI_API_KEY'),
+        ),
+    )
 elif LLM_PROVIDER == 'openai':
     LLM_MODEL = OpenAIModel(
         LLM_MODEL_NAME,
         provider=OpenAIProvider(
             api_key=os.getenv('OPENAI_API_KEY'),
+        ),
+    )
+elif LLM_PROVIDER == 'groq':
+    LLM_MODEL = GroqModel(
+        LLM_MODEL_NAME,
+        provider=GroqProvider(
+            api_key=os.getenv('GROQ_API_KEY'),
         ),
     )
 elif LLM_PROVIDER == 'azure-openai':
@@ -52,4 +70,4 @@ elif LLM_PROVIDER == 'azure-openai':
         provider=OpenAIProvider(openai_client=azure_client),
     )
 else:
-    raise ValueError(f"Invalid LLM_PROVIDER: {LLM_PROVIDER}. Must be one of: 'vllm', 'openai', 'azure-openai'")
+    raise ValueError(f"Invalid LLM_PROVIDER: {LLM_PROVIDER}. Must be one of: 'vllm', 'openai', 'gemini', 'groq', 'azure-openai'")
