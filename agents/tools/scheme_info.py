@@ -281,15 +281,18 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
                 
     except httpx.TimeoutException as e:
         logger.error(f"Scheme API request timed out: {str(e)}")
+        raise ModelRetry(str(e))
         return "Scheme request timed out. Please try again later."
     
     except httpx.RequestError as e:
         logger.error(f"Scheme API request failed: {e}")
+        raise ModelRetry(str(e))
         return f"Scheme request failed: {str(e)}"
     
     except UnexpectedModelBehavior as e:
         logger.warning("Scheme request exceeded retry limit")
+        raise ModelRetry(str(e))
         return "Scheme data is temporarily unavailable. Please try again later."
     except Exception as e:
         logger.error(f"Error getting scheme data: {e}")
-        raise ModelRetry(f"Unexpected error in scheme request. {str(e)}") 
+        raise ModelRetry(str(e)) 

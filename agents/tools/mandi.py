@@ -438,15 +438,18 @@ async def get_mandi_prices(
         mandi_response = MandiResponse.model_validate(data)
         return str(mandi_response)
 
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as e:
         logger.error("Mandi API request timed out")
+        raise ModelRetry(str(e))
         return "Mandi price request timed out. Please try again."
     except httpx.RequestError as e:
         logger.error(f"Mandi API request failed: {e}")
+        raise ModelRetry(str(e))
         return f"Mandi price request failed: {str(e)}"
     except UnexpectedModelBehavior as e:
         logger.warning("Mandi request exceeded retry limit")
+        raise ModelRetry(str(e))
         return "Mandi price data is temporarily unavailable. Please try again later."
     except Exception as e:
         logger.error(f"Error getting mandi prices: {e}")
-        raise ModelRetry(f"Unexpected error in mandi price request. {str(e)}")
+        raise ModelRetry(str(e))

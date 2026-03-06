@@ -388,15 +388,18 @@ async def weather_forecast(latitude: float, longitude: float) -> str:
         weather_response = WeatherResponse.model_validate(data)
         return str(weather_response)
                 
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as e:
         logger.error("Weather API request timed out")
+        raise ModelRetry(str(e))
         return "Weather request timed out. Please try again."
     except httpx.RequestError as e:
         logger.error(f"Weather API request failed: {e}")
+        raise ModelRetry(str(e))
         return f"Weather request failed: {str(e)}"
     except UnexpectedModelBehavior as e:
         logger.warning("Weather request exceeded retry limit")
+        raise ModelRetry(str(e))
         return "Weather data is temporarily unavailable. Please try again later."
     except Exception as e:
         logger.error(f"Error getting weather forecast: {e}")
-        raise ModelRetry(f"Unexpected error in weather forecast. {str(e)}")
+        raise ModelRetry(str(e))

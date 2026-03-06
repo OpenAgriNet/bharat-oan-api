@@ -275,3 +275,12 @@ def trim_history(
     logger.info(f"Trimmed history: {total_tokens} tokens (max: {max_tokens})")
 
     return trimmed
+
+
+def extract_final_text(messages: List[ModelMessage]) -> str:
+    """Return the last TextPart content from a message list."""
+    for msg in reversed(messages):
+        for part in getattr(msg, "parts", []):
+            if getattr(part, "part_kind", "") == "text":
+                return part.content
+    return ""

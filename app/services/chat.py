@@ -1,5 +1,8 @@
+import time
 from typing import AsyncGenerator
+
 from fastapi import BackgroundTasks
+
 from agents.agrinet import agrinet_agent
 from agents.moderation import moderation_agent
 from helpers.utils import get_logger
@@ -8,11 +11,14 @@ from app.utils import (
     trim_history,
     format_message_pairs,
     filter_thinking_from_history,
+    extract_final_text,
 )
-# from app.tasks.suggestions import create_suggestions  # Commented out: suggestion agent disabled
+from app.tasks.telemetry import send_telemetry
+from app.tasks.tool_tracker import ToolUsageTracker
 from agents.deps import FarmerContext
 
 logger = get_logger(__name__)
+
 
 async def stream_chat_messages(
     query: str,
@@ -21,64 +27,75 @@ async def stream_chat_messages(
     target_lang: str,
     user_id: str,
     history: list,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
 ) -> AsyncGenerator[str, None]:
-    """Async generator for streaming chat messages."""
-    # Generate a unique content ID for this query
-    content_id = f"query_{session_id}_{len(history)//2 + 1}"
-       
+    """Async generator that streams the agrinet agent response to the caller."""
+
+    start_time = time.time()
+
     deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
 
+    # Build conversation context prefix
     message_pairs = "\n\n".join(format_message_pairs(history, 3))
     logger.info(f"Message pairs: {message_pairs}")
-    if message_pairs:
-        last_response = f"**Conversation**\n\n{message_pairs}\n\n---\n\n"
-    else:
-        last_response = ""
-    
-    user_message    = f"{last_response}{deps.get_user_message()}"
+    last_response = (
+        f"**Conversation**\n\n{message_pairs}\n\n---\n\n"
+        if message_pairs
+        else ""
+    )
+
+    user_message = f"{last_response}{deps.get_user_message()}"
+
     moderation_run  = await moderation_agent.run(user_message)
     moderation_data = moderation_run.output
     logger.info(f"Moderation data: {moderation_data}")
-
-
     deps.update_moderation_str(str(moderation_data))
 
-    # Include conversation in the user message so the agent always sees prior context
-    # (in addition to message_history). This reinforces conversation awareness.
+    # Rebuild user_message after moderation context is injected into deps
     user_message = f"{last_response}{deps.get_user_message()}"
 
-    # Run the main agent
-    trimmed_history = trim_history(
-        history,
-        max_tokens=64_000
-    )
-    
+    trimmed_history = trim_history(history, max_tokens=64_000)
     logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
-
-    # Strip ThinkingPart from history so pydantic-ai doesn't wrap them
-    # back into <think> tags when sending to vLLM (prevents "Unknown role"
-    # errors and avoids leaking reasoning into the conversation context).
     trimmed_history = filter_thinking_from_history(trimmed_history)
 
-    result = await agrinet_agent.run(
+    # Stream the agent response, tracking tool usage via ToolUsageTracker
+    tracker = ToolUsageTracker()
+
+    async for event in agrinet_agent.run_stream_events(
         user_prompt=deps.get_user_message(),
         message_history=trimmed_history,
         deps=deps,
-    )
+    ):
+        delta = tracker.process_event(event)
+        if delta:
+            yield delta
 
-    new_messages = result.new_messages()
-    logger.info(f"Agent run complete for session {session_id}")
+    logger.info(f"Streaming complete for session {session_id}")
 
-    yield result.output
-
-    # Post-processing happens AFTER streaming is complete.
-    # Strip thinking parts before persisting so they don't accumulate
-    # in the cache and get sent back to vLLM on subsequent turns.
-    if not new_messages:
-        new_messages = []
-    clean_new_messages = filter_thinking_from_history(list(new_messages))
+    # Post-processing
+    clean_new_messages = filter_thinking_from_history(list(tracker.new_messages or []))
     messages = [*history, *clean_new_messages]
+    final_output = extract_final_text(clean_new_messages)
 
     logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
     await update_message_history(session_id, messages)
+
+    total_latency = time.time() - start_time
+    telemetry_data = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "query": query,
+        "responce": final_output,
+        "source_lang": source_lang,
+        "target_lang": target_lang,
+        "tool_usage": tracker.as_list(),
+        "moderation_category": moderation_data.category,
+        "total_latency_seconds": total_latency,
+    }
+
+    logger.info(f"Telemetry data: {telemetry_data}")
+    try:
+        result = await send_telemetry(telemetry_data)
+        logger.info(f"Telemetry result: {result}")
+    except Exception as e:
+        logger.error(f"Failed to send telemetry: {e}")

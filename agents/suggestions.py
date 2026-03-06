@@ -17,7 +17,6 @@ suggestions_agent = Agent(
     tools=[],
     model_settings=ModelSettings(
         parallel_tool_calls=False,  
-        openai_reasoning_effort='medium',
         temperature=1.0,
         top_p=1.0,
         top_k=0,

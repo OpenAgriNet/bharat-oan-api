@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Optional
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import serialization
 from app.config import settings
 from helpers.utils import get_logger
@@ -64,7 +64,7 @@ async def create_auth_token(request: Optional[AuthRequest] = None):
         metadata = request.metadata if request and request.metadata else ""
         
         # Create JWT payload
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         exp = now + timedelta(minutes=15)
         
         payload = {

@@ -94,7 +94,7 @@ async def search_documents(
             return "> Search Results for `" + query + "`\n\n" + document_string
     except Exception as e:
         logger.error(f"Error searching documents: {e} for query: {query}")
-        raise ModelRetry(f"Error searching documents, please try again")
+        raise ModelRetry(str(e))
 
 
 async def search_videos(
@@ -144,7 +144,7 @@ async def search_videos(
         
     except Exception as e:
         logger.error(f"Error searching documents: {e} for query: {query}")
-        raise ModelRetry(f"Error searching documents, please try again")
+        raise ModelRetry(str(e))
 
 
 async def search_pests_diseases(
@@ -201,4 +201,4 @@ async def search_pests_diseases(
             return "> Pests & Diseases Search Results for `" + query + "`\n\n" + document_string
     except Exception as e:
         logger.error(f"Error searching pests and diseases: {e} for query: {query}")
-        raise ModelRetry(f"Error searching pests and diseases, please try again")
+        raise ModelRetry(str(e))
