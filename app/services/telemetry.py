@@ -1,10 +1,9 @@
-import logging
+from helpers.utils import get_logger
 import os
 from dotenv import load_dotenv
 from pydantic_ai import Agent
-
 load_dotenv()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def telemetry_init() -> bool:
