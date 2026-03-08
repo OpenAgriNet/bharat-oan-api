@@ -2,6 +2,14 @@
 __pycache__/
 *.py[cod]
 *$py.class
+data/*
+.next/
+viewer/.next/
+viewer/out/
+arena/.next/
+arena/out/
+data/synthetic/
+arena/node_modules/
 *.DS_Store
 .DS_Store
 *.pid
@@ -198,3 +206,4 @@ cython_debug/
 
 # JMeter
 jmeter/
+.next/trace

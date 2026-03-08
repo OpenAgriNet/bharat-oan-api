@@ -1,9 +1,9 @@
 import os
 from pydantic_ai import Agent, RunContext
-from helpers.utils import get_prompt, get_today_date_str
+from helpers.utils import get_prompt, get_today_date_str, get_crop_season
 from agents.models import LLM_MODEL
 from agents.tools import TOOLS
-from pydantic_ai.settings import ModelSettings
+from pydantic_ai.models.openai import OpenAIChatModelSettings
 from agents.deps import FarmerContext
 
 
@@ -16,15 +16,18 @@ agrinet_agent = Agent(
     retries=3,
     tools=TOOLS,
     end_strategy='exhaustive',
-    model_settings=ModelSettings(
-        max_tokens=8192,
+    model_settings=OpenAIChatModelSettings(
+        temperature=0.7,
+        top_p=0.95,
+        max_tokens=4096,
+        timeout=120,
         parallel_tool_calls=True,
-   )
+    )
 )
 
-@agrinet_agent.instructions
-def get_instructions(ctx: RunContext[FarmerContext]):
-    """Get the instructions for the agrinet agent."""
+@agrinet_agent.system_prompt(dynamic=True)
+def get_system_prompt(ctx: RunContext[FarmerContext]):
+    """Get the system prompt for the agrinet agent."""
     deps = ctx.deps
     lang_code = deps.lang_code if deps.lang_code else 'en'
-    return get_prompt(f'agrinet_{lang_code}', context={'today_date': get_today_date_str()})
+    return get_prompt(f'agrinet_{lang_code}', context={'today_date': get_today_date_str(), 'crop_season': get_crop_season()})
