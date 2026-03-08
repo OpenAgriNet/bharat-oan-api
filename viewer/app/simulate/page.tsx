@@ -516,7 +516,7 @@ export default function SimulatePage() {
                 )}
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                {profile.scenario.description_en}
+                {profile.scenario.description}
               </p>
             </CardContent>
           </Card>

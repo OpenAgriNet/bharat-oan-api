@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import traceback
 from datetime import datetime
@@ -14,10 +15,18 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from pydantic_ai.exceptions import ModelHTTPError
+
+logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "synthetic"
 
 app = FastAPI(title="Synthetic Conversation Viewer API")
+
+# ---------------------------------------------------------------------------
+# Arena: in-memory session store
+# ---------------------------------------------------------------------------
+arena_sessions: dict[str, dict] = {}
 
 app.add_middleware(
     CORSMiddleware,
@@ -422,3 +431,141 @@ async def simulate(req: SimulateRequest, request: Request):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Arena endpoints — side-by-side model comparison
+# ---------------------------------------------------------------------------
+
+ARENA_MAX_RETRIES = 3
+
+
+async def _run_agent_with_retry(agent, *, user_prompt, deps, message_history, max_retries=ARENA_MAX_RETRIES):
+    """Run an agent with retries on transient model HTTP errors (e.g. vLLM 400s
+    caused by malformed tool-call headers during sampling)."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            return await agent.run(
+                user_prompt=user_prompt,
+                deps=deps,
+                message_history=message_history,
+            )
+        except ModelHTTPError as exc:
+            if exc.status_code == 400 and attempt < max_retries:
+                logger.warning("Model returned 400 (attempt %d/%d), retrying: %s", attempt, max_retries, exc)
+                continue
+            raise
+
+
+class ArenaStartRequest(BaseModel):
+    lang_code: str = "hi"
+
+
+class ArenaChatRequest(BaseModel):
+    session_id: str
+    message: str
+    mode: str = "both"  # "both", "baseline", "candidate"
+
+
+@app.post("/api/arena/start")
+async def arena_start(req: ArenaStartRequest):
+    """Create an arena session for side-by-side comparison."""
+    from synthetic.models import LLM_AGRINET_MODEL_NAME, LLM_AGRINET_CANDIDATE_MODEL_NAME
+
+    import uuid
+    session_id = str(uuid.uuid4())
+    arena_sessions[session_id] = {
+        "lang_code": req.lang_code,
+        "today_date": datetime.now(),
+        "history_a": [],
+        "history_b": [],
+    }
+    return {
+        "session_id": session_id,
+        "baseline_model": LLM_AGRINET_MODEL_NAME,
+        "candidate_model": LLM_AGRINET_CANDIDATE_MODEL_NAME,
+    }
+
+
+@app.post("/api/arena/chat")
+async def arena_chat(req: ArenaChatRequest):
+    """Send a message and get responses from both models."""
+    from synthetic.agrinet import agrinet_agent, agrinet_candidate_agent
+    from synthetic.deps import FarmerContext, build_moderation_input, strip_thinking
+    from synthetic.moderation import moderation_agent
+
+    session = arena_sessions.get(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Arena session not found.")
+
+    run_baseline = req.mode in ("both", "baseline")
+    run_candidate = req.mode in ("both", "candidate")
+
+    if run_candidate and agrinet_candidate_agent is None:
+        raise HTTPException(status_code=503, detail="Candidate model not configured.")
+
+    # Run moderation on the user message (use baseline history for context)
+    hist_for_mod = session["history_a"] if run_baseline else session["history_b"]
+    mod_input = build_moderation_input(req.message, hist_for_mod, limit=3)
+    mod_result = await moderation_agent.run(mod_input)
+
+    farmer_ctx = FarmerContext(
+        query=req.message,
+        lang_code=session["lang_code"],
+        session_id=req.session_id,
+        today_date=session["today_date"],
+        moderation_str=str(mod_result.output),
+    )
+
+    user_prompt = farmer_ctx.get_user_message()
+
+    # Build tasks based on mode
+    tasks = []
+    if run_baseline:
+        tasks.append(_run_agent_with_retry(
+            agrinet_agent,
+            user_prompt=user_prompt,
+            deps=farmer_ctx,
+            message_history=strip_thinking(session["history_a"]),
+        ))
+    if run_candidate:
+        tasks.append(_run_agent_with_retry(
+            agrinet_candidate_agent,
+            user_prompt=user_prompt,
+            deps=farmer_ctx,
+            message_history=strip_thinking(session["history_b"]),
+        ))
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Map results back
+    result_a = results[0] if run_baseline else None
+    result_b = results[1] if (run_baseline and run_candidate) else (results[0] if run_candidate else None)
+
+    def _extract_tool_calls(result):
+        tool_calls = []
+        for msg in result.new_messages():
+            for part in msg.parts:
+                if part.part_kind == "tool-call":
+                    tool_calls.append({
+                        "tool_name": part.tool_name,
+                        "args": part.args if isinstance(part.args, str) else json.dumps(part.args),
+                    })
+        return tool_calls
+
+    def _build_response(result, history_key):
+        if result is None:
+            return None
+        if isinstance(result, BaseException):
+            return {"text": None, "error": str(result), "tool_calls": []}
+        session[history_key] = result.all_messages()
+        return {
+            "text": result.output,
+            "error": None,
+            "tool_calls": _extract_tool_calls(result),
+        }
+
+    return {
+        "baseline": _build_response(result_a, "history_a"),
+        "candidate": _build_response(result_b, "history_b"),
+    }

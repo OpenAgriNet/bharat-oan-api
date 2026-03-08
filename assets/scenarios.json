@@ -2528,5 +2528,270 @@
     "id": "grievance_response_unsatisfactory",
     "category": "grievance",
     "description": "You got a response to your grievance but it just says 'noted' with no actual action taken. How to escalate further?"
+  },
+  {
+    "id": "crop_advisory_dairy_feed",
+    "category": "crop_advisory",
+    "description": "You keep 5 dairy cows along with growing {crop}. What fodder crops should you grow on part of your {land_acres} acres?"
+  },
+  {
+    "id": "crop_advisory_fodder_management",
+    "category": "crop_advisory",
+    "description": "You need year-round green fodder for your cattle in {district}. What rotation of fodder crops to grow?"
+  },
+  {
+    "id": "crop_advisory_silage_making",
+    "category": "crop_advisory",
+    "description": "You have excess {crop} residue after harvest. Can you make silage for cattle feed? How?"
+  },
+  {
+    "id": "crop_advisory_goat_farming",
+    "category": "crop_advisory",
+    "description": "You want to start goat farming alongside {crop} cultivation on {land_acres} acres. What breed and what feed?"
+  },
+  {
+    "id": "crop_advisory_poultry_backyard",
+    "category": "crop_advisory",
+    "description": "You want to start backyard poultry in {village} along with growing {crop}. How many birds and what setup?"
+  },
+  {
+    "id": "crop_advisory_fish_rice",
+    "category": "crop_advisory",
+    "description": "You grow paddy on {land_acres} acres in {district}. Can you do fish farming in the rice paddies? How?"
+  },
+  {
+    "id": "crop_advisory_bee_keeping",
+    "category": "crop_advisory",
+    "description": "You heard beekeeping can increase {crop} yield through pollination and also give honey. How to start in {district}?"
+  },
+  {
+    "id": "crop_advisory_mushroom_farming",
+    "category": "crop_advisory",
+    "description": "You want to grow mushrooms using {crop} straw as substrate. Is this possible? How to start in {village}?"
+  },
+  {
+    "id": "crop_advisory_vermicompost_setup",
+    "category": "crop_advisory",
+    "description": "You want to set up a vermicompost unit using {crop} waste and cow dung on your farm in {village}. How to start?"
+  },
+  {
+    "id": "crop_advisory_integrated_farming",
+    "category": "crop_advisory",
+    "description": "You have {land_acres} acres in {district}. You want to do integrated farming — {crop} plus dairy plus poultry. How to plan this?"
+  },
+  {
+    "id": "crop_advisory_cattle_disease_prevention",
+    "category": "crop_advisory",
+    "description": "Your cattle in {village} need vaccination. What are the important vaccines and when to give them?"
+  },
+  {
+    "id": "crop_advisory_milk_production",
+    "category": "crop_advisory",
+    "description": "Your cows are giving less milk than expected. What feed and management changes can increase milk yield?"
+  },
+  {
+    "id": "pest_disease_foot_mouth",
+    "category": "pest_disease",
+    "description": "Your cattle in {village} have blisters on mouth and feet. Is this Foot and Mouth Disease? What to do urgently?"
+  },
+  {
+    "id": "pest_disease_lumpy_skin",
+    "category": "pest_disease",
+    "description": "Cows in {district} are getting lumpy skin disease. Your cow has bumps on skin. How to prevent and treat?"
+  },
+  {
+    "id": "pest_disease_mastitis",
+    "category": "pest_disease",
+    "description": "Your cow's milk has turned watery and udder is swollen. Is this mastitis? How to treat in {village}?"
+  },
+  {
+    "id": "pest_disease_poultry_bird_flu",
+    "category": "pest_disease",
+    "description": "Some chickens in {village} are dying suddenly. Is it bird flu? What precautions to take?"
+  },
+  {
+    "id": "pest_disease_goat_ppr",
+    "category": "pest_disease",
+    "description": "Your goats have runny nose, mouth sores, and diarrhea. Is this PPR disease? What treatment?"
+  },
+  {
+    "id": "pest_disease_tick_infestation",
+    "category": "pest_disease",
+    "description": "Your cattle have heavy tick infestation in {district}. What treatment to apply? Are there dips available?"
+  },
+  {
+    "id": "pest_disease_bloat_cattle",
+    "category": "pest_disease",
+    "description": "Your cow ate too much green fodder and stomach is bloated. This seems like bloat — what to do immediately?"
+  },
+  {
+    "id": "pest_disease_aflatoxin_feed",
+    "category": "pest_disease",
+    "description": "Stored {crop} grain has fungal growth. Is it safe to feed to cattle? What is aflatoxin risk?"
+  },
+  {
+    "id": "pest_disease_fall_armyworm",
+    "category": "pest_disease",
+    "description": "Fall armyworm is destroying {crop} in {district}. Larvae are eating leaves and bore into stem. How to control?"
+  },
+  {
+    "id": "pest_disease_late_blight",
+    "category": "pest_disease",
+    "description": "Dark water-soaked spots on {crop} leaves and stems during rainy season in {district}. Is this late blight?"
+  },
+  {
+    "id": "pest_disease_powdery_mildew",
+    "category": "pest_disease",
+    "description": "White powdery coating on {crop} leaves in {district}. Is this powdery mildew? What fungicide to spray?"
+  },
+  {
+    "id": "pest_disease_bacterial_wilt",
+    "category": "pest_disease",
+    "description": "{crop} plants are wilting suddenly even though soil is moist. Is this bacterial wilt? Can it be saved?"
+  },
+  {
+    "id": "scheme_dairy_entrepreneurship",
+    "category": "scheme",
+    "description": "You want to set up a small dairy unit with 10 cows in {district}. Is there a government scheme for dairy entrepreneurship?"
+  },
+  {
+    "id": "scheme_goat_sheep_rearing",
+    "category": "scheme",
+    "description": "You want to start goat rearing in {village}. Any subsidy or scheme for goat/sheep farming in {state}?"
+  },
+  {
+    "id": "scheme_poultry_subsidy",
+    "category": "scheme",
+    "description": "You want to start a poultry farm near {village}. Is there government subsidy for poultry units?"
+  },
+  {
+    "id": "scheme_naip_livestock",
+    "category": "scheme",
+    "description": "Ask about the National Livestock Mission. Are there benefits for a farmer with cattle and {crop} in {district}?"
+  },
+  {
+    "id": "scheme_animal_husbandry_infra",
+    "category": "scheme",
+    "description": "You want to build a cattle shed and buy milking machine. Any infrastructure scheme for animal husbandry in {state}?"
+  },
+  {
+    "id": "scheme_fodder_development",
+    "category": "scheme",
+    "description": "You need fodder for cattle but land is limited to {land_acres} acres. Any scheme for fodder seed distribution or development?"
+  },
+  {
+    "id": "multi_tool_livestock_scheme_location",
+    "category": "multi_tool",
+    "description": "You want to start dairy farming. Ask about schemes, then find the nearest veterinary hospital from {village}."
+  },
+  {
+    "id": "multi_tool_weather_pest_spray",
+    "category": "multi_tool",
+    "description": "{crop} has pest attack in {district}. Ask about treatment, then check weather for a dry day to spray."
+  },
+  {
+    "id": "multi_tool_shc_fertilizer_mandi",
+    "category": "multi_tool",
+    "description": "Check SHC for soil nutrient status, get fertilizer advice for {crop}, then check mandi price to see if the investment is worth it."
+  },
+  {
+    "id": "multi_tool_pmfby_weather_damage",
+    "category": "multi_tool",
+    "description": "Check weather forecast for {district} — storm coming. Then check your PMFBY policy status for {crop}. Use check_otp when OTP arrives."
+  },
+  {
+    "id": "multi_tool_crop_plan_full_cycle",
+    "category": "multi_tool",
+    "description": "You want to plan the full cycle: check SHC, get {crop} advisory, check weather for sowing window in {district}."
+  },
+  {
+    "id": "seasonal_planning_livestock_fodder",
+    "category": "seasonal_planning",
+    "description": "You have cattle and grow {crop}. Plan fodder availability for the lean summer months in {district}."
+  },
+  {
+    "id": "seasonal_planning_crop_calendar",
+    "category": "seasonal_planning",
+    "description": "Give a month-by-month crop calendar for {crop} in {district} — when to sow, fertilize, spray, and harvest."
+  },
+  {
+    "id": "seasonal_planning_water_management",
+    "category": "seasonal_planning",
+    "description": "Water is scarce in {district} during summer. How to plan irrigation for {crop} on {land_acres} acres?"
+  },
+  {
+    "id": "seasonal_planning_income_diversification",
+    "category": "seasonal_planning",
+    "description": "You only earn from {crop}. What other activities can you do on {land_acres} acres in {district} to earn year-round?"
+  },
+  {
+    "id": "commodity_info_livestock_products",
+    "category": "commodity_info",
+    "description": "You sell milk and ghee from your dairy. Is there a commodity code for dairy products?"
+  },
+  {
+    "id": "commodity_info_honey",
+    "category": "commodity_info",
+    "description": "You produce honey from beekeeping alongside {crop}. Search for honey commodity code."
+  },
+  {
+    "id": "commodity_info_spice_search",
+    "category": "commodity_info",
+    "description": "You grow a spice crop in {district}. Search for it — you only know the local name."
+  },
+  {
+    "id": "commodity_info_fodder_crop",
+    "category": "commodity_info",
+    "description": "You grow napier grass and berseem as fodder crops. Are these listed as commodities? Search."
+  },
+  {
+    "id": "location_veterinary_hospital",
+    "category": "location",
+    "description": "Your cow is sick in {village}. Where is the nearest veterinary hospital or clinic in {district}?"
+  },
+  {
+    "id": "location_milk_collection_center",
+    "category": "location",
+    "description": "Where is the nearest milk collection center from {village}? You want to sell milk daily."
+  },
+  {
+    "id": "location_fertilizer_depot",
+    "category": "location",
+    "description": "Where can you buy subsidized fertilizer for {crop} near {village}? Any government depot?"
+  },
+  {
+    "id": "location_agricultural_office",
+    "category": "location",
+    "description": "Where is the District Agriculture Office in {district}? You need to submit documents for a scheme."
+  },
+  {
+    "id": "weather_livestock_heat_stress",
+    "category": "weather",
+    "description": "Temperature is very high in {district}. Your cattle are stressed. Check forecast — how many more hot days?"
+  },
+  {
+    "id": "weather_spray_window",
+    "category": "weather",
+    "description": "You need to spray pesticide on {crop}. Need a dry window with no rain for 6 hours. Check forecast for {district}."
+  },
+  {
+    "id": "weather_frost_alert",
+    "category": "weather",
+    "description": "Will there be frost tonight in {district}? Your {crop} seedlings are vulnerable. Check minimum temperature."
+  },
+  {
+    "id": "mandi_milk_rate",
+    "category": "mandi",
+    "description": "What is the current milk procurement rate in {district}? You sell to the local dairy cooperative."
+  },
+  {
+    "id": "mandi_vegetable_glut",
+    "category": "mandi",
+    "description": "Everyone grew tomatoes this season in {district}. Prices crashed. Check current mandi rates."
+  },
+  {
+    "id": "mandi_quality_grading",
+    "category": "mandi",
+    "description": "The mandi agent is giving you low price for {crop} saying quality is poor. What are the official grading standards?"
   }
 ]

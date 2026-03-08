@@ -2,8 +2,11 @@
 .next/
 viewer/.next/
 viewer/out/
+arena/.next/
+arena/out/
 data/synthetic/
 __pycache__/
+arena/node_modules/
 *.py[cod]
 *$py.class
 *.DS_Store

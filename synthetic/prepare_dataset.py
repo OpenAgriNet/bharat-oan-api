@@ -2,8 +2,8 @@
 Collect valid synthetic conversations and prepare a Hugging Face dataset.
 
 Reads all JSONL files from the synthetic data directory, filters out errored
-conversations, converts pydantic-ai message histories into a clean chat format,
-and saves as a HF Dataset (Parquet + dataset card).
+conversations, converts pydantic-ai message histories into OpenAI chat
+completions format (with an added `thinking` field), and saves as a HF Dataset.
 
 Usage:
     python -m synthetic.prepare_dataset [--data-dir data/synthetic] [--output-dir data/hf_dataset]
@@ -18,70 +18,101 @@ from datasets import Dataset, Features, Value
 
 DATA_DIR = Path("data/synthetic")
 OUTPUT_DIR = Path("data/hf_dataset")
+HF_REPO = "kenpath/bh-synthetic-v1"
 
-# ── pydantic-ai part_kind → role mapping ────────────────────────────────
-ROLE_MAP = {
-    "user-prompt": "user",
-    "text": "assistant",
-    "tool-call": "tool_call",
-    "tool-return": "tool_result",
-    "thinking": "thinking",
-}
+
+# ── OpenAI chat completions format conversion ───────────────────────────
+
+
+def _flush_assistant(thinking_buf: list[str], tool_calls_buf: list[dict], messages: list[dict]):
+    """Emit a pending assistant message from buffered thinking/tool_calls, then clear buffers."""
+    if not thinking_buf and not tool_calls_buf:
+        return
+    msg: dict = {"role": "assistant"}
+    if thinking_buf:
+        msg["thinking"] = "\n\n".join(thinking_buf)
+    if tool_calls_buf:
+        msg["tool_calls"] = list(tool_calls_buf)
+    messages.append(msg)
+    thinking_buf.clear()
+    tool_calls_buf.clear()
 
 
 def _extract_messages(raw_messages_json: str) -> list[dict]:
-    """Convert pydantic-ai message history JSON into a flat chat message list.
+    """Convert pydantic-ai message history JSON into OpenAI chat completions format.
 
-    Each output dict has keys: role, content, and optionally tool_name /
-    tool_call_id / tool_args for tool interactions.
+    Produces messages with standard OpenAI roles (developer, user, assistant, tool)
+    plus an extra `thinking` field on assistant messages when chain-of-thought is present.
 
-    Filters out:
-    - retry-prompt messages (pydantic-ai internal retries)
-    - empty thinking parts (model produced thinking without text)
-    - empty text parts (no actual content)
+    Grouping logic:
+      - Consecutive thinking parts are merged into one `thinking` string.
+      - Consecutive tool-call parts are collected into one `tool_calls` array.
+      - A tool-return or text part flushes the pending assistant buffer first.
+
+    Filters out: retry-prompt, empty thinking/text parts.
     """
     raw_messages = json.loads(raw_messages_json)
     messages: list[dict] = []
+    thinking_buf: list[str] = []
+    tool_calls_buf: list[dict] = []
 
     for msg in raw_messages:
         for part in msg.get("parts", []):
             kind = part.get("part_kind", "")
 
-            # Skip retry-prompts (internal pydantic-ai retries)
-            if kind == "retry-prompt":
+            if kind in ("retry-prompt", "system-prompt"):
                 continue
 
-            role = ROLE_MAP.get(kind)
-            if role is None:
-                continue
+            if kind == "user-prompt":
+                _flush_assistant(thinking_buf, tool_calls_buf, messages)
+                content = str(part.get("content", "")).strip()
+                if content:
+                    messages.append({"role": "user", "content": content})
 
-            # Skip empty thinking or text parts
-            if kind in ("thinking", "text") and not str(part.get("content", "")).strip():
-                continue
+            elif kind == "thinking":
+                content = str(part.get("content", "")).strip()
+                if content:
+                    thinking_buf.append(content)
 
-            entry: dict = {"role": role}
+            elif kind == "tool-call":
+                tool_name = part.get("tool_name", "")
+                tool_call_id = part.get("tool_call_id", "")
+                args = part.get("args", {})
+                args_str = args if isinstance(args, str) else json.dumps(args, ensure_ascii=False)
+                tool_calls_buf.append({
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {
+                        "name": tool_name,
+                        "arguments": args_str,
+                    },
+                })
 
-            if kind == "tool-call":
-                entry["content"] = ""
-                entry["tool_name"] = part.get("tool_name", "")
-                entry["tool_call_id"] = part.get("tool_call_id", "")
-                entry["tool_args"] = (
-                    part["args"]
-                    if isinstance(part.get("args"), str)
-                    else json.dumps(part.get("args", {}), ensure_ascii=False)
-                )
             elif kind == "tool-return":
-                entry["content"] = str(part.get("content", ""))
-                entry["tool_name"] = part.get("tool_name", "")
-                entry["tool_call_id"] = part.get("tool_call_id", "")
-                entry["tool_args"] = ""
-            else:
-                entry["content"] = str(part.get("content", ""))
-                entry["tool_name"] = ""
-                entry["tool_call_id"] = ""
-                entry["tool_args"] = ""
+                _flush_assistant(thinking_buf, tool_calls_buf, messages)
+                tool_name = part.get("tool_name", "")
+                tool_call_id = part.get("tool_call_id", "")
+                content = str(part.get("content", ""))
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "name": tool_name,
+                    "content": content,
+                })
 
-            messages.append(entry)
+            elif kind == "text":
+                content = str(part.get("content", "")).strip()
+                if content:
+                    assistant_msg: dict = {"role": "assistant"}
+                    if thinking_buf:
+                        assistant_msg["thinking"] = "\n\n".join(thinking_buf)
+                        thinking_buf.clear()
+                    tool_calls_buf.clear()
+                    assistant_msg["content"] = content
+                    messages.append(assistant_msg)
+
+    # Flush any remaining buffered thinking/tool_calls
+    _flush_assistant(thinking_buf, tool_calls_buf, messages)
 
     return messages
 
@@ -191,6 +222,11 @@ def main():
     parquet_path = output_dir / "data.parquet"
     ds.to_parquet(str(parquet_path))
     print(f"Parquet saved to {parquet_path}")
+
+    # Push to Hugging Face Hub
+    print(f"\nPushing to HF Hub: {HF_REPO} ...")
+    ds.push_to_hub(HF_REPO)
+    print(f"Pushed to https://huggingface.co/datasets/{HF_REPO}")
 
 
 if __name__ == "__main__":

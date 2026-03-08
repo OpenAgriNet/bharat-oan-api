@@ -49,7 +49,7 @@ export function ConversationHeader({ record }: ConversationHeaderProps) {
           </Badge>
         </CardTitle>
         <CardDescription>
-          {profile.scenario.description_en}
+          {profile.scenario.description}
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -537,9 +537,9 @@ FARMER_CROPS = [
 # ─── Mood & Language Weights ─────────────────────────────────────────────────
 
 MOOD_WEIGHTS = {
-    "normal": 0.6,
-    "frustrated": 0.3,
-    "adversarial": 0.1,
+    "normal": 0.75,
+    "frustrated": 0.23,
+    "adversarial": 0.02,
 }
 
 LANGUAGE_WEIGHTS = {

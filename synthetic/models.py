@@ -30,3 +30,15 @@ LLM_MODERATION_MODEL = OpenAIChatModel(
         api_key="not-required",
     ),
 )
+
+# Candidate model for arena comparison
+VLLM_AGRINET_CANDIDATE_MODEL_URL = os.getenv('VLLM_AGRINET_CANDIDATE_MODEL_URL')
+LLM_AGRINET_CANDIDATE_MODEL_NAME = os.getenv('LLM_AGRINET_CANDIDATE_MODEL_NAME')
+
+LLM_CANDIDATE_MODEL = OpenAIChatModel(
+    LLM_AGRINET_CANDIDATE_MODEL_NAME,
+    provider=OpenAIProvider(
+        base_url=VLLM_AGRINET_CANDIDATE_MODEL_URL,
+        api_key="not-required",
+    ),
+) if VLLM_AGRINET_CANDIDATE_MODEL_URL else None

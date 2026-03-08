@@ -1,9 +1,11 @@
 from copy import deepcopy
+from dataclasses import replace
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
 from langcodes import Language
 from datetime import datetime
+from pydantic_ai.messages import ModelResponse, ThinkingPart
 from helpers.utils import get_crop_season
 
 
@@ -140,6 +142,22 @@ def format_message_pairs(history: list, limit: int = None) -> List[str]:
             f"**Assistant Message**:\n{assistant_part.content}"
         )
     return formatted
+
+
+def strip_thinking(history: list) -> list:
+    """Remove ThinkingPart from ModelResponse messages so thinking traces
+    are not sent back to the model on subsequent turns.
+
+    Returns a new list; the original is not mutated.
+    """
+    cleaned = []
+    for msg in history:
+        if isinstance(msg, ModelResponse):
+            filtered = [p for p in msg.parts if not isinstance(p, ThinkingPart)]
+            cleaned.append(replace(msg, parts=filtered) if filtered != list(msg.parts) else msg)
+        else:
+            cleaned.append(msg)
+    return cleaned
 
 
 def build_moderation_input(user_text: str, agrinet_history: list, limit: int = 3) -> str:
