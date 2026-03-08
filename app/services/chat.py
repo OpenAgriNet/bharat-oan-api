@@ -11,15 +11,6 @@ from app.utils import (
 )
 # from app.tasks.suggestions import create_suggestions  # Commented out: suggestion agent disabled
 from agents.deps import FarmerContext
-from pydantic_ai import (
-    AgentRunResultEvent,
-    FinalResultEvent,
-    PartDeltaEvent,
-    PartStartEvent,
-    TextPartDelta,
-    ThinkingPartDelta,
-)
-from pydantic_ai.messages import TextPart, ThinkingPart
 
 logger = get_logger(__name__)
 
@@ -50,16 +41,6 @@ async def stream_chat_messages(
     moderation_data = moderation_run.output
     logger.info(f"Moderation data: {moderation_data}")
 
-    
-    # Generate suggestions after moderation passes
-    # Commented out: suggestion agent disabled
-    # if moderation_data.category == "valid_agricultural":
-    #     logger.info(f"Triggering suggestions generation for session {session_id}")
-    #     try:
-    #         background_tasks.add_task(create_suggestions, session_id, target_lang)
-    #         logger.info("Successfully added suggestions task")
-    #     except Exception as e:
-    #         logger.error(f"Error adding suggestions task: {str(e)}")
 
     deps.update_moderation_str(str(moderation_data))
 
@@ -80,43 +61,16 @@ async def stream_chat_messages(
     # errors and avoids leaking reasoning into the conversation context).
     trimmed_history = filter_thinking_from_history(trimmed_history)
 
-    new_messages = None
-    final_result_found = False
-
-    async for event in agrinet_agent.run_stream_events(
+    result = await agrinet_agent.run(
         user_prompt=deps.get_user_message(),
         message_history=trimmed_history,
-        deps=deps
-    ):
-        kind = getattr(event, 'event_kind', '')
+        deps=deps,
+    )
 
-        if kind == 'part_start':
-            if isinstance(event.part, ThinkingPart):
-                logger.info("Reasoning part started (not streamed to user)")
+    new_messages = result.new_messages()
+    logger.info(f"Agent run complete for session {session_id}")
 
-        elif kind == 'part_delta':
-            if isinstance(event.delta, ThinkingPartDelta):
-                pass  # Don't stream reasoning to user
-            elif isinstance(event.delta, TextPartDelta):
-                # Only yield text deltas after FinalResultEvent
-                if final_result_found and event.delta.content_delta:
-                    yield event.delta.content_delta
-
-        elif kind == 'final_result':
-            logger.info("[Result] The model started producing a final result")
-            final_result_found = True
-
-        elif kind == 'function_tool_call':
-            logger.info(f"Tool call: {event.part.tool_name}")
-
-        elif kind == 'function_tool_result':
-            logger.info("Tool result received")
-            final_result_found = False  # Reset for next model turn
-
-        elif kind == 'agent_run_result':
-            new_messages = event.result.new_messages()
-
-    logger.info(f"Streaming complete for session {session_id}")
+    yield result.output
 
     # Post-processing happens AFTER streaming is complete.
     # Strip thinking parts before persisting so they don't accumulate
