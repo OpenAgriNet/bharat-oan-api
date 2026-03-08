@@ -23,19 +23,26 @@ from synthetic.deps import FarmerContext
 # )
 
 # Nemotron
-_AGRINET_MODEL_SETTINGS = OpenAIChatModelSettings(
-    temperature=0.6,
-    top_p=0.95,
-    # presence_penalty=0.0,
-    timeout=120,
-    extra_body={
-        # "top_k": 20,
-        # "min_p": 0.0,
-        # "repetition_penalty": 1.0,
-        "chat_template_kwargs": {"enable_thinking": True}
-    },
-)
+# _AGRINET_MODEL_SETTINGS = OpenAIChatModelSettings(
+#     temperature=0.6,
+#     top_p=0.95,
+#     # presence_penalty=0.0,
+#     timeout=120,
+#     extra_body={
+#         # "top_k": 20,
+#         # "min_p": 0.0,
+#         # "repetition_penalty": 1.0,
+#         "chat_template_kwargs": {"enable_thinking": True}
+#     },
+# )
 
+# Magistarl
+_AGRINET_MODEL_SETTINGS = OpenAIChatModelSettings(
+    temperature=0.7,
+    top_p=0.95,
+    timeout=120,
+    max_tokens=4096,
+)
 
 # GPT-OSS
 # _AGRINET_MODEL_SETTINGS = OpenAIChatModelSettings(
@@ -67,10 +74,12 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
     """Get the system prompt for the agrinet agent."""
     deps = ctx.deps
     lang_code = deps.lang_code if deps.lang_code else 'en'
-    return get_prompt(f'agrinet_{lang_code}', context={
+    prompt = get_prompt(f'agrinet_{lang_code}', context={
         'today_date': deps.get_today_date_str(),
         'crop_season': deps.crop_season,
     })
+#    prompt += """\n\nFirst draft your thinking process (inner monologue) encapsulated in [THINK] and [/THINK] tags."""
+    return prompt
 
 # CANDIDATE AGRINET AGENT (for arena comparison)
 

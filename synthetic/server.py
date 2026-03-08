@@ -75,7 +75,7 @@ async def list_files():
     return files
 
 
-def _summarize_record(r: dict, filename: str) -> dict:
+def _summarize_record(r: dict, filename: str, modified: float | None = None) -> dict:
     """Build a conversation summary from a record."""
     profile = r.get("profile", {})
     env = r.get("env", {})
@@ -94,6 +94,7 @@ def _summarize_record(r: dict, filename: str) -> dict:
         "has_error": r.get("error") is not None and r.get("error") != "",
         "mood": profile.get("mood", ""),
         "verbosity": profile.get("verbosity", ""),
+        "modified": modified,
     }
 
 
@@ -101,8 +102,10 @@ def _summarize_record(r: dict, filename: str) -> dict:
 async def list_conversations(file: str = Query(None, description="JSONL filename (optional — omit to list all)")):
     """List conversation summaries. If file is given, reads that file; otherwise lists all files."""
     if file:
+        filepath = _validate_filename(file)
+        mtime = filepath.stat().st_mtime
         records = _read_records(file)
-        return [_summarize_record(r, file) for r in records]
+        return [_summarize_record(r, file, modified=mtime) for r in records]
 
     # List all conversations across all files
     if not DATA_DIR.exists():
@@ -110,12 +113,13 @@ async def list_conversations(file: str = Query(None, description="JSONL filename
     summaries = []
     for p in sorted(DATA_DIR.glob("*.jsonl"), key=lambda x: x.stat().st_mtime, reverse=True):
         try:
+            mtime = p.stat().st_mtime
             with open(p) as f:
                 for line in f:
                     line = line.strip()
                     if line:
                         r = json.loads(line)
-                        summaries.append(_summarize_record(r, p.name))
+                        summaries.append(_summarize_record(r, p.name, modified=mtime))
         except Exception:
             continue
     return summaries

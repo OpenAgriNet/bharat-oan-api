@@ -60,7 +60,8 @@ type SortKey =
   | "turn_count"
   | "completed"
   | "mood"
-  | "verbosity";
+  | "verbosity"
+  | "modified";
 
 type SortDir = "asc" | "desc";
 
@@ -79,8 +80,8 @@ export function ConversationList({
   const [deleting, setDeleting] = useState<string | null>(null);
 
   // Sorting
-  const [sortKey, setSortKey] = useState<SortKey>("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortKey, setSortKey] = useState<SortKey>("modified");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   // Filtering
   const [filterLang, setFilterLang] = useState<string>("all");
@@ -172,6 +173,10 @@ export function ConversationList({
         case "verbosity":
           aVal = a.verbosity ?? "";
           bVal = b.verbosity ?? "";
+          break;
+        case "modified":
+          aVal = a.modified ?? 0;
+          bVal = b.modified ?? 0;
           break;
       }
 
@@ -368,6 +373,7 @@ export function ConversationList({
                 Turns
               </SortableHead>
               <SortableHead col="completed">Status</SortableHead>
+              <SortableHead col="modified">Created</SortableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -402,6 +408,16 @@ export function ConversationList({
                     completed={c.completed}
                     hasError={c.has_error}
                   />
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                  {c.modified
+                    ? new Date(c.modified * 1000).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "—"}
                 </TableCell>
                 <TableCell>
                   <Button
