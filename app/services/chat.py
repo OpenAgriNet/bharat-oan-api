@@ -51,7 +51,7 @@ async def stream_chat_messages(
     # Run the main agent
     trimmed_history = trim_history(
         history,
-        max_tokens=40_000
+        max_tokens=64_000
     )
     
     logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
