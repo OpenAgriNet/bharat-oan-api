@@ -1,4 +1,3 @@
-from contextlib import nullcontext
 from typing import AsyncGenerator
 from fastapi import BackgroundTasks
 from agents.agrinet import agrinet_agent
@@ -21,8 +20,10 @@ from pydantic_ai import (
     ThinkingPartDelta,
 )
 from pydantic_ai.messages import TextPart, ThinkingPart
+from app.services.observability_service import ObservabilityService
 
 logger = get_logger(__name__)
+observability = ObservabilityService()
 
 try:
     from langfuse import get_client, propagate_attributes
@@ -86,19 +87,10 @@ async def stream_chat_messages(
 
             user_message   = f"{last_response}{deps.get_user_message()}"
             moderation_run = await moderation_agent.run(user_message)
+            moderation_usage = moderation_run.usage() if moderation_run else {}
+            logger.info(f"Moderation usage: {moderation_usage}") 
             moderation_data = moderation_run.output
             logger.info(f"Moderation data: {moderation_data}")
-
-            # Set tags once, after moderation, directly on the trace
-            if root_span is not None:
-                try:
-                    root_span.update_trace(tags=[
-                        moderation_data.category,
-                        f"source_lang:{source_lang}",
-                        f"target_lang:{target_lang}",
-                    ])
-                except Exception as e:
-                    logger.warning(f"Failed to update trace tags: {e}")
 
             # Generate suggestions after moderation passes
             # Commented out: suggestion agent disabled
@@ -126,6 +118,8 @@ async def stream_chat_messages(
 
             new_messages = None
             final_result_found = False
+            agrinet_tools = []
+            agrinet_result_obj = None
 
             async for event in agrinet_agent.run_stream_events(
                 user_prompt=deps.get_user_message(),
@@ -140,7 +134,7 @@ async def stream_chat_messages(
 
                 elif kind == 'part_delta':
                     if isinstance(event.delta, ThinkingPartDelta):
-                        pass  # Don't stream reasoning to user
+                        pass  # Collected from new_messages after stream
                     elif isinstance(event.delta, TextPartDelta):
                         if final_result_found and event.delta.content_delta:
                             yield event.delta.content_delta
@@ -150,13 +144,20 @@ async def stream_chat_messages(
                     final_result_found = True
 
                 elif kind == 'function_tool_call':
-                    logger.info(f"Tool call: {event.part.tool_name}")
+                    tool_name = event.part.tool_name
+                    logger.info(f"Tool call: {tool_name}")
+                    if tool_name not in ('final_result', 'json'):
+                        agrinet_tools.append({
+                            'tool_name': tool_name,
+                            'args': getattr(event.part, 'args', None),
+                        })
 
                 elif kind == 'function_tool_result':
                     logger.info("Tool result received")
                     final_result_found = False  # Reset for next model turn
 
                 elif kind == 'agent_run_result':
+                    agrinet_result_obj = event.result
                     new_messages = event.result.new_messages()
 
             logger.info(f"Streaming complete for session {session_id}")
@@ -166,6 +167,9 @@ async def stream_chat_messages(
             # ------------------------------------------------------------------
             if not new_messages:
                 new_messages = []
+
+            # Extract agrinet thinking from new_messages before filtering
+            
 
             # Strip thinking parts before persisting so they don't accumulate
             # in the cache and get sent back to vLLM on subsequent turns.
@@ -182,12 +186,39 @@ async def stream_chat_messages(
                 if final_output:
                     break
 
-            # Close root span with the final response
+            # Close root span with the final response and set tags (tool names now available)
             if root_span is not None:
+                tool_tags = [f"tool:{t['tool_name']}" for t in agrinet_tools]
                 try:
                     root_span.update(output=final_output)
+                    root_span.update_trace(tags=[
+                        moderation_data.category,
+                        f"source_lang:{source_lang}",
+                        f"target_lang:{target_lang}",
+                        *tool_tags
+                    ])
                 except Exception as e:
                     logger.warning(f"Failed to update root span output: {e}")
+
+            # Build and log telemetry dict
+          
+            agrinet_usage = agrinet_result_obj.usage() if agrinet_result_obj else None
+
+            mod_in = getattr(moderation_usage, 'input_tokens', 0) or 0
+            mod_out = getattr(moderation_usage, 'output_tokens', 0) or 0
+            agri_in = (getattr(agrinet_usage, 'input_tokens', 0) or 0) if agrinet_usage else 0
+            agri_out = (getattr(agrinet_usage, 'output_tokens', 0) or 0) if agrinet_usage else 0
+
+            telemetry_data = {
+                "session_id": session_id,
+                "user_id": user_id,
+                "total_input_tokens": mod_in + agri_in,
+                "total_output_tokens": mod_out + agri_out,
+                "tools_used": [t['tool_name'] for t in agrinet_tools],
+            }
+
+            await observability.log_telemetry(telemetry_data)
+            await observability.send_telemetry(telemetry_data)
 
             logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
             await update_message_history(session_id, messages)  
