@@ -21,15 +21,10 @@ from pydantic_ai import (
     ThinkingPartDelta,
 )
 from pydantic_ai.messages import TextPart, ThinkingPart
-
+from langfuse import get_client as _langfuse_get_client
+from langfuse import propagate_attributes
 logger = get_logger(__name__)
 
-try:
-    from langfuse import get_client, propagate_attributes
-    langfuse = get_client()
-except ImportError:
-    langfuse = None
-    propagate_attributes = None
 
 
 async def stream_chat_messages(
@@ -42,6 +37,12 @@ async def stream_chat_messages(
     background_tasks: BackgroundTasks
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
+
+    langfuse = None
+    try:
+        langfuse = _langfuse_get_client()
+    except Exception as e:
+        logger.warning(f"Langfuse client initialization failed, tracing disabled: {e}")
 
     session_id_safe = (session_id or "")[:200]
     langfuse_metadata = {
