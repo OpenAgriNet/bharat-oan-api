@@ -1,3 +1,4 @@
+import time
 from typing import AsyncGenerator
 from fastapi import BackgroundTasks
 from agents.agrinet import agrinet_agent
@@ -44,6 +45,7 @@ async def stream_chat_messages(
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
 
+    start_time = time.time()
     session_id_safe = (session_id or "")[:200]
     langfuse_metadata = {
         "source_lang": (source_lang or "unknown").lower()[:200],
@@ -208,6 +210,9 @@ async def stream_chat_messages(
             mod_out = getattr(moderation_usage, 'output_tokens', 0) or 0
             agri_in = (getattr(agrinet_usage, 'input_tokens', 0) or 0) if agrinet_usage else 0
             agri_out = (getattr(agrinet_usage, 'output_tokens', 0) or 0) if agrinet_usage else 0
+            logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
+            await update_message_history(session_id, messages)  
+            total_latency = time.time() - start_time
 
             telemetry_data = {
                 "session_id": session_id,
@@ -215,10 +220,10 @@ async def stream_chat_messages(
                 "total_input_tokens": mod_in + agri_in,
                 "total_output_tokens": mod_out + agri_out,
                 "tools_used": [t['tool_name'] for t in agrinet_tools],
+                "total_latency_seconds": total_latency
             }
 
             await observability.log_telemetry(telemetry_data)
             await observability.send_telemetry(telemetry_data)
 
-            logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
-            await update_message_history(session_id, messages)  
+           
