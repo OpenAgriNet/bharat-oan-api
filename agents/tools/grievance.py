@@ -15,11 +15,12 @@ import os
 from typing import Any, Dict, List, Optional, Tuple, Literal
 
 import httpx
-from app.config import get_default_httpx_timeout
+from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, Field, AnyUrl, ValidationError
 from pydantic_ai import ModelRetry
 from helpers.utils import get_logger
 from helpers.encryption import hex_to_bytes, encrypt_aes_gcm, decrypt_aes_gcm
+from langfuse.decorators import observe
 
 logger = get_logger(__name__)
 
@@ -93,7 +94,7 @@ class GrievanceClient(BaseModel):
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         encrypted_body = self.crypto.encrypt_payload(body)
         logger.info(f"Grievance API request: {url} | body: {json.dumps(encrypted_body)}")
-        timeout = get_default_httpx_timeout()
+        timeout = DEFAULT_HTTP_TIMEOUT
         resp = httpx.post(url, json=encrypted_body, headers=headers, timeout=timeout)
         logger.info(f"Grievance API response: {url} | status: {resp.status_code} | body: {resp.text[:500]}")
         return resp
@@ -300,6 +301,7 @@ def _format_status(payload: Dict[str, Any]) -> str:
 # Exported Tools
 # --------------------------------------------------------------------------------------
 
+@observe(name="tool:submit_grievance")
 def submit_grievance(identity_no: str, grievance_description: str, grievance_type: str) -> str:
     """
     Create and submit a grievance to the PM-KISAN portal.
@@ -358,6 +360,7 @@ def submit_grievance(identity_no: str, grievance_description: str, grievance_typ
         raise ModelRetry(f"Unexpected error while submitting grievance. {str(e)}")
 
 
+@observe(name="tool:grievance_status")
 def grievance_status(identity_no: str) -> str:
     """
     Check grievance status by PM-KISAN Registration Number or Aadhaar (registered).

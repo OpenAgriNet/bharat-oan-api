@@ -6,7 +6,7 @@ import hashlib
 from datetime import datetime, timezone
 from helpers.utils import get_logger
 import httpx
-from app.config import get_default_httpx_timeout
+from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, AnyHttpUrl
 from typing import List, Optional, Dict, Any, Literal
 from app.core.cache import cache
@@ -14,6 +14,8 @@ from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
 from helpers.inject_pdf_header import inject
 from markdownify import MarkdownConverter
+from langfuse.decorators import observe
+
 load_dotenv()
 
 
@@ -540,6 +542,7 @@ async def cache_html_and_replace_urls(response_data: SHCStatusResponse, phone_nu
 # Functions
 # -----------------------
 
+@observe(name="tool:check_shc_status")
 async def check_shc_status(
     phone_number: str,
     cycle: str
@@ -565,7 +568,7 @@ async def check_shc_status(
             response = await client.post(
                 os.getenv("BAP_ENDPOINT").rstrip("/") + "/init",
                 json=payload,
-                timeout=get_default_httpx_timeout()
+                timeout=DEFAULT_HTTP_TIMEOUT
             )
         
             if response.status_code != 200:
