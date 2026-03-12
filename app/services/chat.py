@@ -1,3 +1,4 @@
+import os
 from typing import AsyncGenerator
 from fastapi import BackgroundTasks
 from agents.agrinet import agrinet_agent
@@ -9,10 +10,16 @@ from app.utils import (
     format_message_pairs,
     filter_thinking_from_history,
 )
-# from app.tasks.suggestions import create_suggestions  # Commented out: suggestion agent disabled
 from agents.deps import FarmerContext
+from langfuse.decorators import observe, langfuse_context
+from langfuse import Langfuse
 
 logger = get_logger(__name__)
+langfuse = Langfuse()
+
+AGRINET_MODEL_NAME = os.getenv("LLM_AGRINET_MODEL_NAME", "agrinet-model")
+MODERATION_MODEL_NAME = os.getenv("LLM_MODERATION_MODEL_NAME", "moderation-model")
+
 
 async def stream_chat_messages(
     query: str,
@@ -24,9 +31,8 @@ async def stream_chat_messages(
     background_tasks: BackgroundTasks
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
-    # Generate a unique content ID for this query
     content_id = f"query_{session_id}_{len(history)//2 + 1}"
-       
+
     deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
 
     message_pairs = "\n\n".join(format_message_pairs(history, 3))
@@ -35,36 +41,30 @@ async def stream_chat_messages(
         last_response = f"**Conversation**\n\n{message_pairs}\n\n---\n\n"
     else:
         last_response = ""
-    
-    user_message    = f"{last_response}{deps.get_user_message()}"
-    moderation_run  = await moderation_agent.run(user_message)
-    moderation_data = moderation_run.output
-    logger.info(f"Moderation data: {moderation_data}")
 
-
-    deps.update_moderation_str(str(moderation_data))
-
-    # Include conversation in the user message so the agent always sees prior context
-    # (in addition to message_history). This reinforces conversation awareness.
     user_message = f"{last_response}{deps.get_user_message()}"
 
-    # Run the main agent
-    trimmed_history = trim_history(
-        history,
-        max_tokens=64_000
-    )
-    
-    logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
+    # Run moderation with tracing
+    moderation_data = await _run_moderation(user_message, session_id)
+    logger.info(f"Moderation data: {moderation_data}")
+    deps.update_moderation_str(str(moderation_data))
 
-    # Strip ThinkingPart from history so pydantic-ai doesn't wrap them
-    # back into <think> tags when sending to vLLM (prevents "Unknown role"
-    # errors and avoids leaking reasoning into the conversation context).
+    user_message = f"{last_response}{deps.get_user_message()}"
+
+    # Trim and clean history
+    trimmed_history = trim_history(history, max_tokens=64_000)
+    logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
     trimmed_history = filter_thinking_from_history(trimmed_history)
 
-    result = await agrinet_agent.run(
-        user_prompt=deps.get_user_message(),
-        message_history=trimmed_history,
+    # Run main agent with tracing
+    result = await _run_agrinet(
+        user_message=deps.get_user_message(),
+        trimmed_history=trimmed_history,
         deps=deps,
+        session_id=session_id,
+        user_id=user_id,
+        query=query,
+        moderation_category=moderation_data.category,
     )
 
     new_messages = result.new_messages()
@@ -72,9 +72,7 @@ async def stream_chat_messages(
 
     yield result.output
 
-    # Post-processing happens AFTER streaming is complete.
-    # Strip thinking parts before persisting so they don't accumulate
-    # in the cache and get sent back to vLLM on subsequent turns.
+    # Post-processing after streaming complete
     if not new_messages:
         new_messages = []
     clean_new_messages = filter_thinking_from_history(list(new_messages))
@@ -82,3 +80,75 @@ async def stream_chat_messages(
 
     logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
     await update_message_history(session_id, messages)
+
+    langfuse.flush()
+
+
+@observe(name="moderation", as_type="generation")
+async def _run_moderation(user_message: str, session_id: str):
+    """Run moderation agent and trace it in Langfuse."""
+    langfuse_context.update_current_trace(
+        session_id=session_id,
+        input=user_message,
+    )
+    langfuse_context.update_current_observation(
+        input=user_message,
+        metadata={"session_id": session_id}
+    )
+    run = await moderation_agent.run(user_message)
+
+    usage_data = run.usage()
+    langfuse_context.update_current_observation(
+        output=str(run.output),
+        model=MODERATION_MODEL_NAME,
+        usage={
+            "input": usage_data.request_tokens or 0,
+            "output": usage_data.response_tokens or 0,
+            "unit": "TOKENS",
+        }
+    )
+    langfuse_context.update_current_trace(
+        output=str(run.output),
+    )
+    return run.output
+
+
+@observe(name="chat", as_type="generation")
+async def _run_agrinet(
+    user_message: str,
+    trimmed_history: list,
+    deps: FarmerContext,
+    session_id: str,
+    user_id: str,
+    query: str,
+    moderation_category: str,
+):
+    """Run main agrinet agent and trace it in Langfuse."""
+    langfuse_context.update_current_trace(
+        session_id=session_id,
+        user_id=user_id,
+        input=query,
+        tags=[moderation_category],
+    )
+    langfuse_context.update_current_observation(input=user_message)
+
+    result = await agrinet_agent.run(
+        user_prompt=user_message,
+        message_history=trimmed_history,
+        deps=deps,
+    )
+
+    usage_data = result.usage()
+    langfuse_context.update_current_observation(
+        output=result.output,
+        model=AGRINET_MODEL_NAME,
+        usage={
+            "input": usage_data.request_tokens or 0,
+            "output": usage_data.response_tokens or 0,
+            "unit": "TOKENS",
+        }
+    )
+    langfuse_context.update_current_trace(
+        output=result.output,
+    )
+    return result

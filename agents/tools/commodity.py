@@ -1,6 +1,7 @@
 import json
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
+from langfuse.decorators import observe
 
 # Load commodity codes from JSON
 _raw = json.load(open('assets/commodity_codes.json', 'r', encoding='utf-8'))
@@ -31,6 +32,8 @@ class CommoditySearchResult(BaseModel):
 COMMODITY_ENTRIES: list[CommodityEntry] = [CommodityEntry(**e) for e in _raw]
 
 
+
+@observe(name="tool:search_commodity")
 async def search_commodity(
     query: str,
     max_results: int = 5,
