@@ -21,63 +21,61 @@ with open(public_key_path, 'rb') as key_file:
     public_key = serialization.load_pem_public_key(key_file.read())
 logger.info(f"Successfully loaded JWT Public Key from: {public_key_path}")
 
-async def get_current_user(token: str = None): # Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme)):
     """
     FastAPI dependency to get current authenticated user from JWT token.
-    Commented out for local testing.
+    Always validates the JWT; no environment-based bypass.
     """
-    return "919326442484" # Dummy mobile for local testing
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     
-    # credentials_exception = HTTPException(
-    #     status_code=status.HTTP_401_UNAUTHORIZED,
-    #     detail="Could not validate credentials",
-    #     headers={"WWW-Authenticate": "Bearer"},
-    # )
-    
-    # if public_key is None:
-    #     logger.error("JWT Public Key is not loaded, cannot verify tokens.")
-    #     raise credentials_exception
+    if public_key is None:
+        logger.error("JWT Public Key is not loaded, cannot verify tokens.")
+        raise credentials_exception
         
-    # try:
-    #     decoded_token = jwt.decode(
-    #         token,
-    #         public_key,
-    #         algorithms=[settings.jwt_algorithm],
-    #         options={
-    #             "verify_signature": True,
-    #             "verify_aud": False,
-    #             "verify_iss": False
-    #         }
-    #     )
+    try:
+        decoded_token = jwt.decode(
+            token,
+            public_key,
+            algorithms=[settings.jwt_algorithm],
+            options={
+                "verify_signature": True,
+                "verify_aud": False,
+                "verify_iss": False
+            }
+        )
         
-    #     logger.info("Successfully decoded token")
-    #     mobile = decoded_token.get('mobile')
-    #     if mobile is None:
-    #         logger.warning("No mobile number found in token")
-    #         # raise credentials_exception
+        logger.info("Successfully decoded token")
+        mobile = decoded_token.get('mobile')
+        if mobile is None:
+            logger.warning("No mobile number found in token")
+#            raise credentials_exception
             
-    #     return mobile
+        return mobile
         
-    # except jwt.ExpiredSignatureError:
-    #     logger.warning("Token has expired")
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail="Token has expired",
-    #         headers={"WWW-Authenticate": "Bearer"},
-    #     )
+    except jwt.ExpiredSignatureError:
+        logger.warning("Token has expired")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    # except jwt.InvalidTokenError as e:
-    #     logger.warning(f"Invalid token error: {str(e)}")
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail=f"Invalid token: {str(e)}",
-    #         headers={"WWW-Authenticate": "Bearer"},
-    #     )
+    except jwt.InvalidTokenError as e:
+        logger.warning(f"Invalid token error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    # except Exception as e:
-    #     logger.error(f"Unexpected error during token verification: {str(e)}")
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail="Token verification failed",
-    #         headers={"WWW-Authenticate": "Bearer"},
-    #     )
+    except Exception as e:
+        logger.error(f"Unexpected error during token verification: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token verification failed",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
