@@ -17,17 +17,17 @@ logger = get_logger(__name__)
 # Basic Models (Shared)
 # -----------------------
 
-def generate_transaction_id(session_id: str, reg_no: str) -> str:
+def generate_transaction_id(session_id: str, identifier: str) -> str:
     """Common function to generate a transaction ID for the scheme status check.
     
     Args:
         session_id (str): Session ID to use as transaction ID
-        reg_no (str): Registration number for the scheme
+        identifier (str): Registration number or phone number for the scheme
     
     Returns:
         str: A unique transaction ID
     """
-    return str(uuid.uuid5(uuid.NAMESPACE_DNS, (session_id + reg_no)))
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, (session_id + identifier)))
 
 class Descriptor(BaseModel):
     code: Optional[str] = None
@@ -157,10 +157,11 @@ class SchemeInitRequest(BaseModel):
     Args:
         registration_number (str): Registration number for the scheme
         transaction_id (str): Session ID to use as transaction ID
+        phone_number (str): Farmer's registered mobile number (optional)
     """
     transaction_id: str
     registration_number: str
-    phone_number: str = "" # TODO: Add phone number
+    phone_number: str = ""
     
     def get_payload(self) -> Dict[str, Any]:
         """
@@ -435,32 +436,40 @@ class SchemeStatusRequest(BaseModel):
             "message": {
                 "order_id": self.otp,
                 "registration_number": self.registration_number,
+                "phone_number": self.phone_number,
             }
         }
 
 # -----------------------
 # Functions
 # -----------------------
-def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) -> str:
+def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str = "", phone_number: str = "") -> str:
     """Initiate PM Kisan status check by sending OTP to farmer's mobile.
     
     Use this tool to initiate the process to check the status of a farmer's scheme benefit by sending an OTP to their registered mobile number.
+    The farmer can provide either their PM Kisan registration number OR their registered phone number.
 
     Args:
-        reg_no (str): PM Kisan registration number, usually a 11 digit string such (2 digit state code + 9 digit unique number)
+        reg_no (str): PM Kisan registration number, usually an 11-digit string (2 digit state code + 9 digit unique number). Leave empty if phone_number is provided.
+        phone_number (str): Farmer's registered mobile number (10 digits). Leave empty if reg_no is provided.
 
     Returns:
         str: Response from the scheme status check service
     """
+    if not reg_no and not phone_number:
+        return "Please provide either a PM Kisan registration number or a registered phone number to check the status."
+
     try:
         # Get session_id from context
         session_id = ctx.deps.session_id
-        transaction_id = generate_transaction_id(session_id, reg_no)
+        # Use whichever identifier is available for the transaction ID
+        identifier = reg_no or phone_number
+        transaction_id = generate_transaction_id(session_id, identifier)
         logger.info(f"Transaction ID: {transaction_id}")
         payload = SchemeInitRequest(
             registration_number=reg_no,
-            transaction_id=transaction_id 
-            # NOTE: Adding registration number as well - in case a person checks status for multiple farmers
+            transaction_id=transaction_id,
+            phone_number=phone_number
         ).get_payload()
         
         endpoint = os.getenv("BAP_ENDPOINT").rstrip("/") + "/init"
@@ -509,18 +518,23 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
         logger.error(f"Error in scheme init: {e}")
         raise ModelRetry(f"Unexpected error in scheme init request. {str(e)}")
 
-def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg_no: str) -> str:
+def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg_no: str = "", phone_number: str = "") -> str:
     """Check PM Kisan status using OTP after initiating the OTP check.
      
     Use this tool to check the status of a farmer's PM Kisan benefit using the OTP received via SMS after calling initiate_pm_kisan_status_check.
+    The farmer can provide either their PM Kisan registration number OR their registered phone number.
  
     Args:
         otp (str): A 4 digit OTP received via SMS
-        reg_no (str): PM Kisan registration number, usually a 11 digit string such (2 digit state code + 9 digit unique number)
+        reg_no (str): PM Kisan registration number, usually an 11-digit string (2 digit state code + 9 digit unique number). Leave empty if phone_number is provided.
+        phone_number (str): Farmer's registered mobile number (10 digits). Leave empty if reg_no is provided.
  
     Returns:
         str: Detailed scheme status information including beneficiary details, payment status, and any issues or next steps
     """
+    if not reg_no and not phone_number:
+        return "Please provide either a PM Kisan registration number or a registered phone number to check the status."
+
     try:
         # Validate OTP format - must be exactly 4 digits
         otp_clean = str(otp).strip()
@@ -528,11 +542,14 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
             raise ModelRetry("Invalid OTP format. Please provide a 4-digit OTP received via SMS.")
         # Get session_id from context
         session_id = ctx.deps.session_id
-        transaction_id = generate_transaction_id(session_id, reg_no)
+        # Use whichever identifier is available for the transaction ID (must match what was used in init)
+        identifier = reg_no or phone_number
+        transaction_id = generate_transaction_id(session_id, identifier)
         logger.info(f"Transaction ID: {transaction_id}")
         payload = SchemeStatusRequest(transaction_id=transaction_id,
                                       otp=otp_clean,
                                       registration_number=reg_no,
+                                      phone_number=phone_number,
                                       ).get_payload()
         
         endpoint = os.getenv("BAP_ENDPOINT").rstrip("/") + "/status"
