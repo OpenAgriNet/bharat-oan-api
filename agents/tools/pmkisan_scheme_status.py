@@ -433,7 +433,8 @@ class SchemeStatusRequest(BaseModel):
                 }
             },
             "message": {
-                "order_id": self.otp
+                "order_id": self.otp,
+                "registration_number": self.registration_number,
             }
         }
 
