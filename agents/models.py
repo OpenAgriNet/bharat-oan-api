@@ -2,29 +2,29 @@ import os
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from dotenv import load_dotenv
-from openai import AsyncAzureOpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI  # ← native openai
 
 load_dotenv()
 
-
-# Get configurations from environment variables
-LLM_PROVIDER    = os.getenv('LLM_PROVIDER', 'openai').lower()
+LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'openai').lower()
 LLM_MODEL_NAME = os.getenv('LLM_MODEL_NAME')
 
 if LLM_PROVIDER == 'vllm':
+    vllm_client = AsyncOpenAI(
+        base_url=os.getenv('INFERENCE_ENDPOINT_URL'), 
+        api_key=os.getenv('INFERENCE_API_KEY') or 'vllm',
+    )
     LLM_MODEL = OpenAIModel(
         LLM_MODEL_NAME,
-        provider=OpenAIProvider(
-            base_url=os.getenv('INFERENCE_ENDPOINT_URL'), 
-            api_key=os.getenv('INFERENCE_API_KEY'),  
-        ),
+        provider=OpenAIProvider(openai_client=vllm_client),
     )
 elif LLM_PROVIDER == 'openai':
+    openai_client = AsyncOpenAI(
+        api_key=os.getenv('OPENAI_API_KEY'),
+    )
     LLM_MODEL = OpenAIModel(
         LLM_MODEL_NAME,
-        provider=OpenAIProvider(
-            api_key=os.getenv('OPENAI_API_KEY'),
-        ),
+        provider=OpenAIProvider(openai_client=openai_client),
     )
 elif LLM_PROVIDER == 'azure-openai':
     azure_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')

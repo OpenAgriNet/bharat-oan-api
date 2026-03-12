@@ -1,9 +1,10 @@
+import os
 from typing import AsyncGenerator
 from fastapi import BackgroundTasks
 from agents.agrinet import agrinet_agent
 from agents.moderation import moderation_agent
 from helpers.utils import get_logger
-from helpers import langfuse_helper  # ensures env vars are set
+from helpers import langfuse_helper
 from app.utils import (
     update_message_history,
     trim_history,
@@ -16,6 +17,8 @@ from langfuse import Langfuse
 
 logger = get_logger(__name__)
 langfuse = Langfuse()
+
+MODEL_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
 
 async def stream_chat_messages(
@@ -73,19 +76,36 @@ async def stream_chat_messages(
     langfuse.flush()
 
 
-@observe(name="moderation")
+@observe(name="moderation", as_type="generation")
 async def _run_moderation(user_message: str, session_id: str):
     """Run moderation agent and trace it in Langfuse."""
+    langfuse_context.update_current_trace(
+        session_id=session_id,
+        input=user_message,              # ← fixes null input on trace
+    )
     langfuse_context.update_current_observation(
         input=user_message,
         metadata={"session_id": session_id}
     )
     run = await moderation_agent.run(user_message)
-    langfuse_context.update_current_observation(output=str(run.output))
+
+    usage_data = run.usage()
+    langfuse_context.update_current_observation(
+        output=str(run.output),
+        model=MODEL_NAME,
+        usage={
+            "input": usage_data.request_tokens or 0,
+            "output": usage_data.response_tokens or 0,
+            "unit": "TOKENS",
+        }
+    )
+    langfuse_context.update_current_trace(
+        output=str(run.output),          
+    )
     return run.output
 
 
-@observe(name="chat")
+@observe(name="chat", as_type="generation")
 async def _run_agrinet(
     user_message: str,
     trimmed_history: list,
@@ -110,7 +130,17 @@ async def _run_agrinet(
         deps=deps,
     )
 
-    langfuse_context.update_current_observation(output=result.output)
-    langfuse_context.update_current_trace(output=result.output)
+    usage_data = result.usage()
+    langfuse_context.update_current_observation(
+        output=result.output,
+        model=MODEL_NAME,
+        usage={
+            "input": usage_data.request_tokens or 0,
+            "output": usage_data.response_tokens or 0,
+            "unit": "TOKENS",
+        }
+    )
+    langfuse_context.update_current_trace(
+        output=result.output,            
+    )
     return result
-
