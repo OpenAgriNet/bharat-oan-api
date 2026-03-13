@@ -12,15 +12,14 @@ from app.utils import (
 )
 from agents.deps import FarmerContext
 from langfuse.decorators import observe, langfuse_context
-from langfuse import Langfuse
 
 logger = get_logger(__name__)
-langfuse = Langfuse()
 
 AGRINET_MODEL_NAME = os.getenv("LLM_AGRINET_MODEL_NAME", "agrinet-model")
 MODERATION_MODEL_NAME = os.getenv("LLM_MODERATION_MODEL_NAME", "moderation-model")
 
 
+@observe(name="development")
 async def stream_chat_messages(
     query: str,
     session_id: str,
@@ -33,6 +32,11 @@ async def stream_chat_messages(
     """Async generator for streaming chat messages."""
     content_id = f"query_{session_id}_{len(history)//2 + 1}"
 
+    langfuse_context.update_current_trace(
+        session_id=session_id,
+        user_id=user_id,
+        metadata={"query": query, "source_lang": source_lang, "target_lang": target_lang}
+    )
     deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
 
     message_pairs = "\n\n".join(format_message_pairs(history, 3))
@@ -81,7 +85,7 @@ async def stream_chat_messages(
     logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
     await update_message_history(session_id, messages)
 
-    langfuse.flush()
+    langfuse_context.flush()
 
 
 @observe(name="moderation", as_type="generation")
