@@ -456,6 +456,10 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str =
     Returns:
         str: Response from the scheme status check service
     """
+    # Format registration number: uppercase and strip all spaces
+    if reg_no:
+        reg_no = reg_no.upper().replace(" ", "")
+
     if not reg_no and not phone_number:
         return "Please provide either a PM Kisan registration number or a registered phone number to check the status."
 
@@ -532,6 +536,10 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
     Returns:
         str: Detailed scheme status information including beneficiary details, payment status, and any issues or next steps
     """
+    # Format registration number: uppercase and strip all spaces
+    if reg_no:
+        reg_no = reg_no.upper().replace(" ", "")
+
     if not reg_no and not phone_number:
         return "Please provide either a PM Kisan registration number or a registered phone number to check the status."
 
