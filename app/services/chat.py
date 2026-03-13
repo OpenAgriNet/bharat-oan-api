@@ -1,4 +1,5 @@
 import time
+from contextlib import nullcontext
 from typing import AsyncGenerator
 from fastapi import BackgroundTasks
 from agents.agrinet import agrinet_agent
@@ -20,7 +21,7 @@ from pydantic_ai import (
     TextPartDelta,
     ThinkingPartDelta,
 )
-from pydantic_ai.messages import TextPart, ThinkingPart
+from pydantic_ai.messages import TextPart, ThinkingPart, RetryPromptPart
 from app.services.observability_service import ObservabilityService
 
 logger = get_logger(__name__)
@@ -55,7 +56,7 @@ async def stream_chat_messages(
 
     root_span_ctx = (
         langfuse.start_as_current_observation(
-            as_type="span",
+            as_type="agent",
             name="BharatVistar-AGENTS",
             input=query,
         )
@@ -88,11 +89,41 @@ async def stream_chat_messages(
                 last_response = ""
 
             user_message   = f"{last_response}{deps.get_user_message()}"
-            moderation_run = await moderation_agent.run(user_message)
-            moderation_usage = moderation_run.usage() if moderation_run else {}
-            logger.info(f"Moderation usage: {moderation_usage}") 
-            moderation_data = moderation_run.output
-            logger.info(f"Moderation data: {moderation_data}")
+
+            moderation_span_ctx = (
+                langfuse.start_as_current_observation(
+                    as_type="span",
+                    name="moderation-agent",
+                    input=user_message,
+                )
+                if langfuse
+                else nullcontext()
+            )
+
+            with moderation_span_ctx as moderation_span:
+                moderation_run = await moderation_agent.run(user_message)
+                moderation_usage = moderation_run.usage() if moderation_run else {}
+                logger.info(f"Moderation usage: {moderation_usage}")
+                moderation_data = moderation_run.output
+                logger.info(f"Moderation data: {moderation_data}")
+
+                if moderation_span is not None:
+                    try:
+                        usage_dict = (
+                            {
+                                "input": getattr(moderation_usage, "request_tokens", None),
+                                "output": getattr(moderation_usage, "response_tokens", None),
+                                "total": getattr(moderation_usage, "total_tokens", None),
+                            }
+                            if moderation_usage
+                            else None
+                        )
+                        moderation_span.update(
+                            output=moderation_data.model_dump() if hasattr(moderation_data, "model_dump") else str(moderation_data),
+                            metadata={"usage": usage_dict},
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to update moderation span: {e}")
 
             # Generate suggestions after moderation passes
             # Commented out: suggestion agent disabled
@@ -123,46 +154,107 @@ async def stream_chat_messages(
             agrinet_tools = []
             agrinet_result_obj = None
 
-            async for event in agrinet_agent.run_stream_events(
-                user_prompt=deps.get_user_message(),
-                message_history=trimmed_history,
-                deps=deps
-            ):
-                kind = getattr(event, 'event_kind', '')
+            agrinet_span_ctx = (
+                langfuse.start_as_current_observation(
+                    as_type="span",
+                    name="agrinet-agent",
+                    input=deps.get_user_message(),
+                )
+                if langfuse
+                else nullcontext()
+            )
 
-                if kind == 'part_start':
-                    if isinstance(event.part, ThinkingPart):
-                        logger.info("Reasoning part started (not streamed to user)")
+            with agrinet_span_ctx as agrinet_span:
+                async for event in agrinet_agent.run_stream_events(
+                    user_prompt=deps.get_user_message(),
+                    message_history=trimmed_history,
+                    deps=deps
+                ):
+                    kind = getattr(event, 'event_kind', '')
 
-                elif kind == 'part_delta':
-                    if isinstance(event.delta, ThinkingPartDelta):
-                        pass  # Collected from new_messages after stream
-                    elif isinstance(event.delta, TextPartDelta):
-                        if final_result_found and event.delta.content_delta:
-                            yield event.delta.content_delta
+                    if kind == 'part_start':
+                        if isinstance(event.part, ThinkingPart):
+                            logger.info("Reasoning part started (not streamed to user)")
 
-                elif kind == 'final_result':
-                    logger.info("[Result] The model started producing a final result")
-                    final_result_found = True
+                    elif kind == 'part_delta':
+                        if isinstance(event.delta, ThinkingPartDelta):
+                            pass  # Collected from new_messages after stream
+                        elif isinstance(event.delta, TextPartDelta):
+                            if final_result_found and event.delta.content_delta:
+                                yield event.delta.content_delta
 
-                elif kind == 'function_tool_call':
-                    tool_name = event.part.tool_name
-                    logger.info(f"Tool call: {tool_name}")
-                    if tool_name not in ('final_result', 'json'):
-                        agrinet_tools.append({
-                            'tool_name': tool_name,
-                            'args': getattr(event.part, 'args', None),
-                        })
+                    elif kind == 'final_result':
+                        logger.info("[Result] The model started producing a final result")
+                        final_result_found = True
 
-                elif kind == 'function_tool_result':
-                    logger.info("Tool result received")
-                    final_result_found = False  # Reset for next model turn
+                    elif kind == 'function_tool_call':
+                        tool_name = event.part.tool_name
+                        tool_call_id = getattr(event.part, 'tool_call_id', None)
+                        logger.info(f"Tool call: {tool_name} (id={tool_call_id})")
+                        if tool_name not in ('final_result', 'json'):
+                            agrinet_tools.append({
+                                'tool_name': tool_name,
+                                'args': getattr(event.part, 'args', None),
+                                'tool_call_id': tool_call_id,
+                                'status': 'pending',
+                                'result': None,
+                                'error': None,
+                            })
 
-                elif kind == 'agent_run_result':
-                    agrinet_result_obj = event.result
-                    new_messages = event.result.new_messages()
+                    elif kind == 'function_tool_result':
+                        result_part = getattr(event, 'result', None)
+                        tool_call_id = getattr(result_part, 'tool_call_id', None)
+                        tool_name_result = getattr(result_part, 'tool_name', 'unknown')
+                        content = getattr(result_part, 'content', None)
+                        is_error = isinstance(result_part, RetryPromptPart)
+                        logger.info(
+                            f"Tool result: {tool_name_result} (id={tool_call_id}) "
+                            f"status={'error' if is_error else 'success'}"
+                        )
+                        for tool in agrinet_tools:
+                            if tool.get('tool_call_id') == tool_call_id:
+                                if is_error:
+                                    tool['status'] = 'error'
+                                    tool['error'] = str(content)[:1000] if content is not None else None
+                                else:
+                                    tool['status'] = 'success'
+                                    tool['result'] = str(content)[:1000] if content is not None else None
+                                break
+                        final_result_found = False  # Reset for next model turn
 
-            logger.info(f"Streaming complete for session {session_id}")
+                    elif kind == 'agent_run_result':
+                        agrinet_result_obj = event.result
+                        new_messages = event.result.new_messages()
+
+                logger.info(f"Streaming complete for session {session_id}")
+
+                # Update agrinet span with output and usage
+                if agrinet_span is not None:
+                    try:
+                        agrinet_usage = agrinet_result_obj.usage() if agrinet_result_obj else None
+                        usage_dict = (
+                            {
+                                "input": getattr(agrinet_usage, "request_tokens", None),
+                                "output": getattr(agrinet_usage, "response_tokens", None),
+                                "total": getattr(agrinet_usage, "total_tokens", None),
+                            }
+                            if agrinet_usage
+                            else None
+                        )
+                        agrinet_output = ""
+                        for msg in reversed(list(new_messages or [])):
+                            for part in getattr(msg, "parts", []):
+                                if isinstance(part, TextPart):
+                                    agrinet_output = part.content
+                                    break
+                            if agrinet_output:
+                                break
+                        agrinet_span.update(
+                            output=agrinet_output,
+                            metadata={"usage": usage_dict},
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to update agrinet span: {e}")
 
             # ------------------------------------------------------------------
             # Post-processing — runs AFTER streaming is complete
@@ -203,27 +295,28 @@ async def stream_chat_messages(
                     logger.warning(f"Failed to update root span output: {e}")
 
             # Build and log telemetry dict
-          
-            agrinet_usage = agrinet_result_obj.usage() if agrinet_result_obj else None
-
-            mod_in = getattr(moderation_usage, 'input_tokens', 0) or 0
-            mod_out = getattr(moderation_usage, 'output_tokens', 0) or 0
-            agri_in = (getattr(agrinet_usage, 'input_tokens', 0) or 0) if agrinet_usage else 0
-            agri_out = (getattr(agrinet_usage, 'output_tokens', 0) or 0) if agrinet_usage else 0
             logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
             await update_message_history(session_id, messages)  
             total_latency = time.time() - start_time
+            tool_telemetry = [
+                {
+                    "tool_name": t["tool_name"],
+                    "args": t.get("args"),
+                    "status": t.get("status", "unknown"),
+                    "result": t.get("result"),
+                    "error": t.get("error"),
+                }
+                for t in agrinet_tools
+            ]
 
             telemetry_data = {
                 "session_id": session_id,
                 "user_id": user_id,
-                "total_input_tokens": mod_in + agri_in,
-                "total_output_tokens": mod_out + agri_out,
-                "tools_used": [t['tool_name'] for t in agrinet_tools],
+                "tool_usage": tool_telemetry,
+                "moderation_category": moderation_data.category,
                 "total_latency_seconds": total_latency
             }
-
             await observability.log_telemetry(telemetry_data)
-            await observability.send_telemetry(telemetry_data)
+            # await observability.send_telemetry(telemetry_data)
 
            
