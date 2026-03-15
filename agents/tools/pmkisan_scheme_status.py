@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext   
+import re
 import os
 
 logger = get_logger(__name__)
@@ -171,6 +172,10 @@ class SchemeInitRequest(BaseModel):
             Dict[str, Any]: The dictionary representation of the SchemeInitRequest object
         """
         now = datetime.now(timezone.utc)
+        timestamp_str = str(int(now.timestamp()))
+        
+        # Use whichever identifier is provided; registration_number is the field name in payload for both
+        identifier = self.registration_number or self.phone_number
         
         return {
             "context": {
@@ -183,7 +188,7 @@ class SchemeInitRequest(BaseModel):
                 "bpp_uri": os.getenv("BPP_URI"),
                 "transaction_id": self.transaction_id,
                 "message_id": str(uuid.uuid4()),
-                "timestamp": now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "timestamp": timestamp_str,
                 "ttl": "PT10M",
                 "location": {
                     "country": {
@@ -222,7 +227,7 @@ class SchemeInitRequest(BaseModel):
                                                         "name": "Registration Number",
                                                         "code": "reg-number"
                                                     },
-                                                    "value": self.registration_number,
+                                                    "value": identifier,
                                                     "display": True
                                                 }
                                             ]
@@ -230,7 +235,7 @@ class SchemeInitRequest(BaseModel):
                                     ]
                                 },
                                 "contact": {
-                                    "phone": self.phone_number
+                                    "phone": ""
                                 }
                             }
                         }
@@ -411,6 +416,10 @@ class SchemeStatusRequest(BaseModel):
             Dict[str, Any]: The dictionary representation of the SchemeStatusRequest object
         """
         now = datetime.now(timezone.utc)
+        timestamp_str = str(int(now.timestamp()))
+        
+        # Use whichever identifier is provided; registration_number is the field name in payload for both
+        identifier = self.registration_number or self.phone_number
         
         return {
             "context": {
@@ -423,7 +432,7 @@ class SchemeStatusRequest(BaseModel):
                 "bpp_uri": os.getenv("BPP_URI"),
                 "transaction_id": self.transaction_id,
                 "message_id": str(uuid.uuid4()),
-                "timestamp": now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "timestamp": timestamp_str,
                 "location": {
                     "country": {
                         "code": "IND"
@@ -435,8 +444,8 @@ class SchemeStatusRequest(BaseModel):
             },
             "message": {
                 "order_id": self.otp,
-                "registration_number": self.registration_number,
-                "phone_number": self.phone_number,
+                "registration_number": identifier,
+                "phone_number": "",
             }
         }
 
@@ -456,12 +465,19 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str =
     Returns:
         str: Response from the scheme status check service
     """
-    # Format registration number: uppercase and strip all spaces
-    if reg_no:
-        reg_no = reg_no.upper().replace(" ", "")
-
-    if not reg_no and not phone_number:
+    # Normalize inputs: strip spaces, uppercase, and ensure correct field based on format
+    input_val = (reg_no or phone_number).strip().upper().replace(" ", "")
+    
+    if not input_val:
         return "Please provide either a PM Kisan registration number or a registered phone number to check the status."
+
+    # Regex to detect 10-digit phone numbers
+    if re.fullmatch(r'\d{10}', input_val):
+        reg_no = ""
+        phone_number = input_val
+    else:
+        reg_no = input_val
+        phone_number = ""
 
     try:
         # Get session_id from context
@@ -525,7 +541,7 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str =
 def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg_no: str = "", phone_number: str = "") -> str:
     """Check PM Kisan status using OTP after initiating the OTP check.
      
-    Use this tool to check the status of a farmer's PM Kisan benefit using the OTP received via SMS after calling initiate_pm_kisan_status_check.
+    Use this tool to check the status of a farmer's benefit using the OTP received via SMS after calling initiate_pm_kisan_status_check.
     The farmer can provide either their PM Kisan registration number OR their registered phone number.
  
     Args:
@@ -536,12 +552,19 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
     Returns:
         str: Detailed scheme status information including beneficiary details, payment status, and any issues or next steps
     """
-    # Format registration number: uppercase and strip all spaces
-    if reg_no:
-        reg_no = reg_no.upper().replace(" ", "")
-
-    if not reg_no and not phone_number:
+    # Normalize inputs: strip spaces, uppercase, and ensure correct field based on format
+    input_val = (reg_no or phone_number).strip().upper().replace(" ", "")
+    
+    if not input_val:
         return "Please provide either a PM Kisan registration number or a registered phone number to check the status."
+
+    # Regex to detect 10-digit phone numbers
+    if re.fullmatch(r'\d{10}', input_val):
+        reg_no = ""
+        phone_number = input_val
+    else:
+        reg_no = input_val
+        phone_number = ""
 
     try:
         # Validate OTP format - must be exactly 4 digits
