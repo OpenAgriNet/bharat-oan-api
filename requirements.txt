@@ -77,3 +77,6 @@ markdownify
 humanize
 
 pycryptodome
+
+# langfuse
+langfuse 

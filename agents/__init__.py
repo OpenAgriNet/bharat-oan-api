@@ -1,8 +1,5 @@
-import os
-import logfire
 from dotenv import load_dotenv
-
 load_dotenv()
-
-
-logfire.configure(scrubbing=False,environment=os.getenv("ENVIRONMENT"))
+from app.services.telemetry import telemetry_init
+# Initialise Langfuse and instrument agents at module load
+telemetry_init()
