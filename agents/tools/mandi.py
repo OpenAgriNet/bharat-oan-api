@@ -417,7 +417,7 @@ async def get_mandi_prices(
         bap_endpoint = os.getenv("BAP_ENDPOINT")
         if not bap_endpoint:
             logger.error("BAP_ENDPOINT is not set")
-            return "Mandi service configuration error. BAP_ENDPOINT is not set."
+            raise ModelRetry("Mandi service configuration error. BAP_ENDPOINT is not set.")
         search_url = bap_endpoint.rstrip("/") + "/search"
         logger.info(f"Mandi API search URL: {search_url}")
         response = httpx.post(
@@ -432,21 +432,25 @@ async def get_mandi_prices(
                 search_url,
                 response.text[:500] if response.text else "(empty)",
             )
-            return "Mandi service unavailable. Please try again later."
+            raise ModelRetry("Mandi service unavailable. Please try again later.")
         logger.info("Mandi API response OK")
         data = response.json()
         mandi_response = MandiResponse.model_validate(data)
         return str(mandi_response)
 
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as e:
         logger.error("Mandi API request timed out")
+        raise ModelRetry(str(e))
         return "Mandi price request timed out. Please try again."
     except httpx.RequestError as e:
         logger.error(f"Mandi API request failed: {e}")
-        return f"Mandi price request failed: {str(e)}"
+        raise ModelRetry(str(e))
+        return "Mandi price request failed. Please try again later."
     except UnexpectedModelBehavior as e:
         logger.warning("Mandi request exceeded retry limit")
+        raise ModelRetry(str(e))
         return "Mandi price data is temporarily unavailable. Please try again later."
     except Exception as e:
         logger.error(f"Error getting mandi prices: {e}")
-        raise ModelRetry(f"Unexpected error in mandi price request. {str(e)}")
+        raise ModelRetry(str(e))
+        return "Unexpected error in mandi price request. Please try again later."

@@ -222,12 +222,12 @@ class Provider(BaseModel):
 # Catalog
 # -----------------------
 class Catalog(BaseModel):
-    descriptor: Descriptor
+    descriptor: Optional[Descriptor] = None
     providers: List[Provider]
 
     def __str__(self) -> str:
         lines = []
-        lines.append(f"Catalog: {self.descriptor.name or 'N/A'}")
+        lines.append(f"Catalog: {self.descriptor.name if self.descriptor else 'N/A'}")
         if self.providers:
             lines.append("Providers:")
             for provider in self.providers:
@@ -367,7 +367,7 @@ async def weather_forecast(latitude: float, longitude: float) -> str:
         bap_endpoint = os.getenv("BAP_ENDPOINT")
         if not bap_endpoint:
             logger.error("BAP_ENDPOINT is not set")
-            return "Weather service configuration error. BAP_ENDPOINT is not set."
+            raise ModelRetry("Weather service configuration error. BAP_ENDPOINT is not set.")
         search_url = bap_endpoint.rstrip("/") + "/search"
         logger.info(f"Weather API search URL: {search_url}")
         response = httpx.post(
@@ -382,21 +382,25 @@ async def weather_forecast(latitude: float, longitude: float) -> str:
                 search_url,
                 response.text[:500] if response.text else "(empty)",
             )
-            return "Weather service unavailable. Please try again later."
+            raise ModelRetry("Weather service unavailable. Please try again later.")
         logger.info("Weather API response OK")
         data = response.json()
         weather_response = WeatherResponse.model_validate(data)
         return str(weather_response)
                 
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as e:
         logger.error("Weather API request timed out")
+        raise ModelRetry(str(e))
         return "Weather request timed out. Please try again."
     except httpx.RequestError as e:
         logger.error(f"Weather API request failed: {e}")
-        return f"Weather request failed: {str(e)}"
+        raise ModelRetry(str(e))
+        return "Weather request failed. Please try again later."
     except UnexpectedModelBehavior as e:
         logger.warning("Weather request exceeded retry limit")
+        raise ModelRetry(str(e))
         return "Weather data is temporarily unavailable. Please try again later."
     except Exception as e:
         logger.error(f"Error getting weather forecast: {e}")
-        raise ModelRetry(f"Unexpected error in weather forecast. {str(e)}")
+        raise ModelRetry(str(e))
+        return "Unexpected error in weather forecast. Please try again later."

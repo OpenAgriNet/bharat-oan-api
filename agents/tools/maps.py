@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from typing import Optional, Any
 from urllib.parse import urlparse
 from pydantic import BaseModel, field_validator
+from pydantic_ai import ModelRetry
 from helpers.utils import get_logger
 
 logger = get_logger(__name__)
@@ -18,10 +19,17 @@ photon_url = os.getenv("PHOTON_HOST")
 parsed = urlparse(photon_url)
 PHOTON_HOST = parsed.hostname or "10.128.188.19"
 PHOTON_PORT = parsed.port or 2322
-PHOTON_BASE_URL = f"http://{PHOTON_HOST}:{PHOTON_PORT}"
+# PHOTON_BASE_URL = f"http://{PHOTON_HOST}:{PHOTON_PORT}"
+PHOTON_BASE_URL = photon_url
+
 
 # Shared async client for connection reuse
-_http_client = httpx.AsyncClient(base_url=PHOTON_BASE_URL, timeout=10.0)
+# User-Agent is required — nginx proxies in front of Photon return 403 without it
+_http_client = httpx.AsyncClient(
+    base_url=PHOTON_BASE_URL,
+    timeout=10.0,
+    headers={"User-Agent": "bharat-oan-api/1.0"},
+)
 
 logger.info(f"Using Photon geocoder at {PHOTON_HOST}:{PHOTON_PORT}")
 
@@ -123,18 +131,23 @@ async def forward_geocode(place_name: str) -> str:
         status = e.response.status_code
         if status == 400:
             logger.warning(f"Photon bad request for '{place_name}': {e.response.text}")
+            raise ModelRetry(str(e))
             return f"Invalid geocoding request for '{place_name}'. Please check the place name and try again."
         else:
             logger.error(f"Photon server error ({status}) for '{place_name}': {e.response.text}")
+            raise ModelRetry(str(e))
             return f"Unable to find location for '{place_name}'. Geocoding service returned an error. Please try again later."
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as e:
         logger.error(f"Photon timeout for '{place_name}'")
+        raise ModelRetry(str(e))
         return f"Unable to find location for '{place_name}'. The geocoding service timed out. Please try again later."
-    except httpx.ConnectError:
+    except httpx.ConnectError as e:
         logger.error(f"Photon connection error for '{place_name}'")
+        raise ModelRetry(str(e))
         return f"Unable to find location for '{place_name}'. Could not connect to the geocoding service."
     except Exception as e:
         logger.error(f"Unexpected error during forward geocoding for '{place_name}': {e}")
+        raise ModelRetry(str(e))
         return f"Unable to find location for '{place_name}'. Please try again later."
 
 

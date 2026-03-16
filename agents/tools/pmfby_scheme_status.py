@@ -504,7 +504,7 @@ def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: st
         
         if response.status_code != 200:
             logger.error(f"PMFBY init API returned status code {response.status_code}")
-            return f"PMFBY init service unavailable. Status code: {response.status_code}"
+            raise ModelRetry(f"PMFBY init service unavailable. Status code: {response.status_code}")
         
         response_text = response.text.strip()
         if not response_text:
@@ -525,15 +525,18 @@ def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: st
                 
     except httpx.TimeoutException as e:
         logger.error(f"PMFBY init API request timed out: {str(e)}")
+        raise ModelRetry(str(e))
         return "PMFBY init request timed out. Please try again later."
     
     except httpx.RequestError as e:
         logger.error(f"PMFBY init API request failed: {e}")
-        return f"PMFBY init request failed: {str(e)}"
+        raise ModelRetry(str(e))
+        return "PMFBY init request failed. Please try again later."
     
     except Exception as e:
         logger.error(f"Error in PMFBY init: {e}")
-        raise ModelRetry(f"Unexpected error in PMFBY init request. {str(e)}")
+        raise ModelRetry(str(e))
+        return "Unexpected error in PMFBY init request. Please try again later."
 
 
 def check_pmfby_status_with_otp(
@@ -599,11 +602,11 @@ def check_pmfby_status_with_otp(
         
         if response.status_code != 200:
             logger.error(f"PMFBY status API returned status code {response.status_code}")
-            return f"PMFBY status service unavailable. Status code: {response.status_code}"
+            raise ModelRetry(f"PMFBY status service unavailable. Status code: {response.status_code}")
         
         response_text = response.text.strip()
         if not response_text:
-            return "PMFBY status service returned empty response. Please try again later."
+            raise ModelRetry("PMFBY status service returned empty response. Please try again later.")
         
         try:
             response_json = response.json()
@@ -614,16 +617,20 @@ def check_pmfby_status_with_otp(
             return str(scheme_response)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON from PMFBY status API: {e}")
+            raise ModelRetry(str(e))
             return "Invalid response from PMFBY status service. Please try again later."
                 
     except httpx.TimeoutException as e:
         logger.error(f"PMFBY status API request timed out: {str(e)}")
+        raise ModelRetry(str(e))
         return "PMFBY status request timed out. Please try again later."
     
     except httpx.RequestError as e:
         logger.error(f"PMFBY status API request failed: {e}")
-        return f"PMFBY status request failed: {str(e)}"
+        raise ModelRetry(str(e))
+        return "PMFBY status request failed. Please try again later."
     
     except Exception as e:
         logger.error(f"Error in PMFBY status: {e}")
-        raise ModelRetry(f"Unexpected error in PMFBY status request. {str(e)}")
+        raise ModelRetry(str(e))
+        return "Unexpected error in PMFBY status request. Please try again later."

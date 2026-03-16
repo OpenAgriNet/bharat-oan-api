@@ -477,13 +477,13 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
         
         if response.status_code != 200:
             logger.error(f"Scheme init API returned status code {response.status_code}")
-            return f"Scheme init service unavailable. Status code: {response.status_code}"
+            raise ModelRetry(f"Scheme init service unavailable. Status code: {response.status_code}")
         
         # Check if response body is empty
         response_text = response.text.strip()
         if not response_text:
             logger.error("Scheme init API returned empty response")
-            return "Scheme init service returned empty response. Please try again later."
+            raise ModelRetry("Scheme init service returned empty response. Please try again later.")
         
         try:
             response_json = response.json()
@@ -491,22 +491,27 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
             return str(scheme_response)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response from scheme init API: {e}. Response text: {response_text[:200]}")
-            return f"Invalid response from scheme init service. Please try again later."
+            raise ModelRetry(str(e))
+            return "Invalid response from scheme init service. Please try again later."
                 
     except httpx.TimeoutException as e:
         logger.error(f"Scheme init API request timed out: {str(e)}")
+        raise ModelRetry(str(e))
         return "Scheme init request timed out. Please try again later."
     
     except httpx.RequestError as e:
         logger.error(f"Scheme init API request failed: {e}")
-        return f"Scheme init request failed: {str(e)}"
+        raise ModelRetry(str(e))
+        return "Scheme init request failed. Please try again later."
     
     except UnexpectedModelBehavior as e:
         logger.warning("Scheme init request exceeded retry limit")
+        raise ModelRetry(str(e))
         return "Scheme init service is temporarily unavailable. Please try again later."
     except Exception as e:
         logger.error(f"Error in scheme init: {e}")
-        raise ModelRetry(f"Unexpected error in scheme init request. {str(e)}")
+        raise ModelRetry(str(e))
+        return "Unexpected error in scheme init request. Please try again later."
 
 def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg_no: str) -> str:
     """Check PM Kisan status using OTP after initiating the OTP check.
@@ -549,13 +554,13 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
         
         if response.status_code != 200:
             logger.error(f"Scheme status API returned status code {response.status_code}")
-            return f"Scheme status service unavailable. Status code: {response.status_code}"
+            raise ModelRetry(f"Scheme status service unavailable. Status code: {response.status_code}")
         
         # Check if response body is empty
         response_text = response.text.strip()
         if not response_text:
             logger.error("Scheme status API returned empty response")
-            return "Scheme status service returned empty response. Please try again later."
+            raise ModelRetry("Scheme status service returned empty response. Please try again later.")
         
         try:
             response_json = response.json()
@@ -563,19 +568,24 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
             return str(scheme_response)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response from scheme status API: {e}. Response text: {response_text[:200]}")
-            return f"Invalid response from scheme status service. Please try again later."
+            raise ModelRetry(str(e))
+            return "Invalid response from scheme status service. Please try again later."
                 
     except httpx.TimeoutException as e:
         logger.error(f"Scheme status API request timed out: {str(e)}")
+        raise ModelRetry(str(e))
         return "Scheme status request timed out. Please try again later."
     
     except httpx.RequestError as e:
         logger.error(f"Scheme status API request failed: {e}")
-        return f"Scheme status request failed: {str(e)}"
+        raise ModelRetry(str(e))
+        return "Scheme status request failed. Please try again later."
     
     except UnexpectedModelBehavior as e:
         logger.warning("Scheme status request exceeded retry limit")
+        raise ModelRetry(str(e))
         return "Scheme status service is temporarily unavailable. Please try again later."
     except Exception as e:
         logger.error(f"Error in scheme status: {e}")
-        raise ModelRetry(f"Unexpected error in scheme status request. {str(e)}") 
+        raise ModelRetry(str(e))
+        return "Unexpected error in scheme status request. Please try again later."

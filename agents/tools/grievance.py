@@ -344,18 +344,20 @@ def submit_grievance(identity_no: str, grievance_description: str, grievance_typ
             # Fallback if schema differs
             return decrypted.get("message") or "Grievance submitted successfully."
 
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as e:
         logger.error("Grievance submission timed out.")
+        raise ModelRetry(str(e))
         return "Grievance submission timed out. Please try again."
     except httpx.RequestError as e:
         logger.error(f"Grievance submission network error: {e}")
+        raise ModelRetry(str(e))
         return "Unable to reach grievance service. Please try again."
-    except ModelRetry as e:
-        # Bubble up actionable guidance to the agent/user
-        return str(e)
+    except ModelRetry:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in create_grievance: {e}")
-        raise ModelRetry(f"Unexpected error while submitting grievance. {str(e)}")
+        raise ModelRetry(str(e))
+        return "Unexpected error while submitting grievance. Please try again later."
 
 
 def grievance_status(identity_no: str) -> str:
@@ -383,14 +385,17 @@ def grievance_status(identity_no: str) -> str:
         decrypted = env.decrypt(client.crypto)
         return _format_status(decrypted)
 
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as e:
         logger.error("Grievance status check timed out.")
+        raise ModelRetry(str(e))
         return "Grievance status check timed out. Please try again."
     except httpx.RequestError as e:
         logger.error(f"Grievance status network error: {e}")
+        raise ModelRetry(str(e))
         return "Unable to reach grievance service. Please try again."
-    except ModelRetry as e:
-        return str(e)
+    except ModelRetry:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in check_grievance_status: {e}")
-        raise ModelRetry(f"Unexpected error while checking grievance status. {str(e)}")
+        raise ModelRetry(str(e))
+        return "Unexpected error while checking grievance status. Please try again later."

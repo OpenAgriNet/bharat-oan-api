@@ -204,6 +204,21 @@ def format_message_pairs(history: List[ModelMessage], limit: int = None) -> List
     return formatted_messages
 
 
+def build_conversation_prefix(history: List[ModelMessage], limit: int = 3) -> str:
+    """Build a compact conversation context block from recent history."""
+    pairs = "\n\n".join(format_message_pairs(history, limit))
+    return f"**Conversation**\n\n{pairs}\n\n---\n\n" if pairs else ""
+
+
+def extract_last_text_from_messages(messages: List[ModelMessage]) -> str:
+    """Return the most recent text-part content from a message list."""
+    for msg in reversed(messages):
+        for part in getattr(msg, "parts", []):
+            if getattr(part, "part_kind", "") == "text":
+                return getattr(part, "content", "")
+    return ""
+
+
 ### Second method to trim history
 
 def group_convos(history: List[ModelMessage]):
