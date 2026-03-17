@@ -36,5 +36,5 @@ moderation_agent = Agent(
         temperature=0.0,
         top_p=1.0,
         timeout=5,
+        openai_reasoning_effort='low',
     ))
-    
