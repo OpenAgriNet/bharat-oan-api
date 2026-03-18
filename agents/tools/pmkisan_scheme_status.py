@@ -495,18 +495,21 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
                 
     except httpx.TimeoutException as e:
         logger.error(f"Scheme init API request timed out: {str(e)}")
+        raise ModelRetry(str(e))
         return "Scheme init request timed out. Please try again later."
     
     except httpx.RequestError as e:
         logger.error(f"Scheme init API request failed: {e}")
+        raise ModelRetry(str(e))
         return f"Scheme init request failed: {str(e)}"
     
     except UnexpectedModelBehavior as e:
         logger.warning("Scheme init request exceeded retry limit")
+        raise ModelRetry(str(e))
         return "Scheme init service is temporarily unavailable. Please try again later."
     except Exception as e:
         logger.error(f"Error in scheme init: {e}")
-        raise ModelRetry(f"Unexpected error in scheme init request. {str(e)}")
+        raise ModelRetry(str(e))
 
 def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg_no: str) -> str:
     """Check PM Kisan status using OTP after initiating the OTP check.
@@ -567,15 +570,18 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
                 
     except httpx.TimeoutException as e:
         logger.error(f"Scheme status API request timed out: {str(e)}")
+        raise ModelRetry(str(e))
         return "Scheme status request timed out. Please try again later."
     
     except httpx.RequestError as e:
         logger.error(f"Scheme status API request failed: {e}")
+        raise ModelRetry(str(e))
         return f"Scheme status request failed: {str(e)}"
     
     except UnexpectedModelBehavior as e:
         logger.warning("Scheme status request exceeded retry limit")
+        raise ModelRetry(str(e))
         return "Scheme status service is temporarily unavailable. Please try again later."
     except Exception as e:
         logger.error(f"Error in scheme status: {e}")
-        raise ModelRetry(f"Unexpected error in scheme status request. {str(e)}") 
+        raise ModelRetry(str(e)) 

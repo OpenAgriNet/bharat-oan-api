@@ -275,3 +275,6 @@ def trim_history(
     logger.info(f"Trimmed history: {total_tokens} tokens (max: {max_tokens})")
 
     return trimmed
+
+
+

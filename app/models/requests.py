@@ -7,6 +7,7 @@ class ChatRequest(BaseModel):
     source_lang: str = Field('hi', description="Source language code")
     target_lang: str = Field('hi', description="Target language code")
     user_id: str = Field('anonymous', description="User identifier")
+    qid: Optional[str] = Field(None, description="Question ID for tracking specific queries")
 
 class TranscribeRequest(BaseModel):
     audio_content: str = Field(..., description="Base64 encoded audio content")

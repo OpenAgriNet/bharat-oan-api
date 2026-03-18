@@ -1,6 +1,8 @@
 import json
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
+from pydantic_ai import ModelRetry
+
 
 # Load commodity codes from JSON
 _raw = json.load(open('assets/commodity_codes.json', 'r', encoding='utf-8'))
@@ -87,4 +89,5 @@ async def search_commodity(
         rows = "\n".join(str(m) for m in matches)
         return f"{header}\n{rows}"
     else:
+        raise ModelRetry(f"No commodity matches found for `{query}`", retryable=False)
         return f"No commodity matches found for `{query}`"

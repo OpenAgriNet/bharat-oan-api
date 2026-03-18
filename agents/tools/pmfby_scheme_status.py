@@ -525,15 +525,17 @@ def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: st
                 
     except httpx.TimeoutException as e:
         logger.error(f"PMFBY init API request timed out: {str(e)}")
+        raise ModelRetry(str(e))
         return "PMFBY init request timed out. Please try again later."
     
     except httpx.RequestError as e:
         logger.error(f"PMFBY init API request failed: {e}")
+        raise ModelRetry(str(e))
         return f"PMFBY init request failed: {str(e)}"
     
     except Exception as e:
         logger.error(f"Error in PMFBY init: {e}")
-        raise ModelRetry(f"Unexpected error in PMFBY init request. {str(e)}")
+        raise ModelRetry(str(e))
 
 
 def check_pmfby_status_with_otp(
@@ -618,12 +620,14 @@ def check_pmfby_status_with_otp(
                 
     except httpx.TimeoutException as e:
         logger.error(f"PMFBY status API request timed out: {str(e)}")
+        raise ModelRetry(str(e))
         return "PMFBY status request timed out. Please try again later."
     
     except httpx.RequestError as e:
         logger.error(f"PMFBY status API request failed: {e}")
+        raise ModelRetry(str(e))
         return f"PMFBY status request failed: {str(e)}"
     
     except Exception as e:
         logger.error(f"Error in PMFBY status: {e}")
-        raise ModelRetry(f"Unexpected error in PMFBY status request. {str(e)}")
+        raise ModelRetry(str(e))

@@ -38,4 +38,3 @@ moderation_agent = Agent(
         timeout=5,
         openai_reasoning_effort='low',
     ))
-

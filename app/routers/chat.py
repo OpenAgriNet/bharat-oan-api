@@ -22,7 +22,8 @@ async def chat_endpoint(
     Requires JWT authentication.
     """
     session_id = request.session_id or str(uuid.uuid4())
-    
+    qid = request.qid or str(uuid.uuid4())
+
     logger.info(
         f"Chat request received - session_id: {session_id}, user_id: {request.user_id}, "
         f"authenticated_user: {current_user}, source_lang: {request.source_lang}, "
@@ -36,6 +37,7 @@ async def chat_endpoint(
         stream_chat_messages(
             query=request.query,
             session_id=session_id,
+            qid=qid,
             source_lang=request.source_lang,
             target_lang=request.target_lang,
             user_id=request.user_id,
