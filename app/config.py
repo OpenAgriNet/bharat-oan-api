@@ -111,4 +111,8 @@ settings = Settings()
 
 def get_default_httpx_timeout() -> httpx.Timeout:
     """Default timeout for outbound API calls. Connect from DEFAULT_API_TIMEOUT, read from DEFAULT_API_READ_TIMEOUT (read > connect)."""
-    return httpx.Timeout(settings.default_api_timeout, read=settings.default_api_read_timeout) 
+    return httpx.Timeout(settings.default_api_timeout, read=settings.default_api_read_timeout)
+
+
+# Backward compatibility for modules importing the previous constant.
+DEFAULT_HTTP_TIMEOUT = get_default_httpx_timeout()
