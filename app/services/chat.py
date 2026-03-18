@@ -11,7 +11,6 @@ from app.utils import (
     trim_history,
     format_message_pairs,
     filter_thinking_from_history,
-    extract_final_text,
 )
 from app.tasks.telemetry import send_telemetry
 from app.tasks.tool_tracker import ToolUsageTracker
@@ -23,6 +22,7 @@ logger = get_logger(__name__)
 async def stream_chat_messages(
     query: str,
     session_id: str,
+    qid: str,
     source_lang: str,
     target_lang: str,
     user_id: str,
@@ -75,7 +75,6 @@ async def stream_chat_messages(
     # Post-processing
     clean_new_messages = filter_thinking_from_history(list(tracker.new_messages or []))
     messages = [*history, *clean_new_messages]
-    final_output = extract_final_text(clean_new_messages)
 
     logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
     await update_message_history(session_id, messages)
@@ -84,10 +83,7 @@ async def stream_chat_messages(
     telemetry_data = {
         "session_id": session_id,
         "user_id": user_id,
-        "query": query,
-        "responce": final_output,
-        "source_lang": source_lang,
-        "target_lang": target_lang,
+        "qid": qid,
         "tool_usage": tracker.as_list(),
         "moderation_category": moderation_data.category,
         "total_latency_seconds": total_latency,

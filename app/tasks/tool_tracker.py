@@ -5,7 +5,7 @@ from typing import Optional
 import time
 
 from pydantic_ai import TextPartDelta
-from pydantic_ai.messages import TextPart, ThinkingPart, RetryPromptPart
+from pydantic_ai.messages import ThinkingPart, RetryPromptPart
 
 from helpers.utils import get_logger
 
@@ -27,17 +27,19 @@ class ToolCall:
         self.duration_ms = round((time.monotonic() - self.started_at) * 1000, 1)
         if is_error:
             self.status = "error"
-            self.error = str(content)[:1000] if content is not None else None
+            self.error = str(content) if content is not None else None
+            self.result = None
         else:
             self.status = "success"
-            self.result = str(content)[:500] if content is not None else None
+            self.result = str(content)[:80] + "..." if content is not None else None
+            self.error = None
 
     def to_dict(self) -> dict:
         return {
             "tool_name": self.tool_name,
             "args":      self.args,
             "status":    self.status,
-            "result":    (self.result[:50] + "...") if self.result else None,
+            "result":    self.result,
             "error":     self.error,
             "duration_ms": self.duration_ms,
         }
@@ -63,7 +65,7 @@ class ToolUsageTracker:
 
     def on_call(self, tool_name: str, tool_call_id: str, args=None):
         """Call when function_tool_call event fires."""
-        if tool_name in ("final_result", "json"):
+        if tool_name in ("final_result", "json"):   
             return
         tc = ToolCall(tool_name=tool_name, tool_call_id=tool_call_id, args=args)
         self._calls[tool_call_id] = tc
