@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "RS256"
     jwt_public_key_path: str = os.getenv("JWT_PUBLIC_KEY_PATH", "jwt_public_key.pem")
     jwt_private_key_path: Optional[str] = os.getenv("JWT_PRIVATE_KEY_PATH")
+    jwt_expiry_minutes: int = int(os.getenv("JWT_EXPIRY_MINUTES", "15"))
+
+    # API Key Auth Configuration
+    api_key_auth_token: Optional[str] = os.getenv("API_KEY_AUTH_TOKEN")
+
+    # Play Integrity Auth Configuration
+    play_integrity_package_name: Optional[str] = os.getenv("PLAY_INTEGRITY_PACKAGE_NAME")
+    play_integrity_service_account_file: Optional[str] = os.getenv("PLAY_INTEGRITY_SERVICE_ACCOUNT_FILE")
+    play_integrity_freshness_seconds: int = int(os.getenv("PLAY_INTEGRITY_FRESHNESS_SECONDS", "120"))
+    play_integrity_default_name: str = os.getenv("PLAY_INTEGRITY_DEFAULT_NAME", "android_user")
+    play_integrity_default_role: str = os.getenv("PLAY_INTEGRITY_DEFAULT_ROLE", "public")
+    play_integrity_default_metadata: str = os.getenv("PLAY_INTEGRITY_DEFAULT_METADATA", "")
 
     # Worker Settings
     uvicorn_workers: int = os.cpu_count() or 1
