@@ -64,7 +64,7 @@ class AuthResponse(BaseModel):
 
 class StaticAuthResponse(BaseModel):
     token: str = Field(..., description="JWT token")
-    expires_in: Optional[int] = Field(None, description="Token expiration time in seconds; null for non-expiring tokens")
+    expires_in: Optional[int] = Field(None, description="Token expiration time in seconds")
 
 
 class PlayIntegrityAuthRequest(BaseModel):
@@ -304,7 +304,7 @@ async def create_auth_token(request: Optional[AuthRequest] = None):
 
         # Create JWT payload
         now = datetime.utcnow()
-        exp = now + timedelta(minutes=15)
+        exp = now + timedelta(minutes=settings.jwt_expiry_minutes)
 
         payload = {
             "mobile": mobile,
@@ -345,7 +345,7 @@ async def create_auth_token_with_api_key(
     api_key: str = Header(..., alias="X-API-Key", description="Client API key"),
 ):
     """
-    Validate static API key from env and issue non-expiring JWT.
+    Validate static API key from env and issue expiring JWT.
     """
     configured_api_key = settings.api_key_auth_token
     if not configured_api_key:
@@ -361,8 +361,8 @@ async def create_auth_token_with_api_key(
         )
 
     token, expires_in = _issue_jwt_token(
-        expires_minutes=None,
-        include_issued_at=False,
+        expires_minutes=settings.jwt_expiry_minutes,
+        include_issued_at=True,
     )
     return StaticAuthResponse(token=token, expires_in=expires_in)
 
@@ -382,7 +382,7 @@ async def create_auth_token_with_play_integrity(request: PlayIntegrityAuthReques
         name=settings.play_integrity_default_name,
         role=settings.play_integrity_default_role,
         metadata=settings.play_integrity_default_metadata,
-        expires_minutes=15,
+        expires_minutes=settings.jwt_expiry_minutes,
     )
     if expires_in is None:
         raise HTTPException(
