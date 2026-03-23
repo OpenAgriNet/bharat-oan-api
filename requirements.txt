@@ -55,6 +55,7 @@ rapidfuzz  # Fuzzy string matching
 # Cloud Services
 boto3  # AWS SDK
 google-cloud-translate  # Google Cloud Translation API
+google-auth  # OAuth2 service account credentials (Play Integrity verification)
 
 # Authentication and Security
 PyJWT
