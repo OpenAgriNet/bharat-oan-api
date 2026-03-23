@@ -10,6 +10,7 @@ from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 import os
+from langfuse.decorators import observe
 
 logger = get_logger(__name__)
 
@@ -468,6 +469,8 @@ class PMfbyStatusWithOtpRequest(BaseModel):
 # Functions
 # -----------------------
 
+
+@observe(name="tool:initiate_pmfby_status_check")
 def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: str) -> str:
     """Initiate PMFBY status check by sending OTP to farmer's mobile.
     
@@ -536,6 +539,8 @@ def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: st
         raise ModelRetry(f"Unexpected error in PMFBY init request. {str(e)}")
 
 
+
+@observe(name="tool:check_pmfby_status_with_otp")
 def check_pmfby_status_with_otp(
     ctx: RunContext[FarmerContext],
     otp: str,

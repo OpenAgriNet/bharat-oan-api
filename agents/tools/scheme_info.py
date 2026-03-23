@@ -7,6 +7,7 @@ from pydantic import BaseModel, AnyHttpUrl, Field
 from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 import os
+from langfuse.decorators import observe
 
 logger = get_logger(__name__)
 
@@ -236,6 +237,8 @@ class SchemeRequest(BaseModel):
             }
         }
 
+
+@observe(name="tool:get_scheme_info")
 def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc"]) -> str:
     """Retrieve detailed information about government agricultural schemes.
     

@@ -81,6 +81,10 @@ class Settings(BaseSettings):
     meity_api_key_value: Optional[str] = None
     logfire_token: Optional[str] = None
     bhashini_api_key: str = ""
+    langfuse_public_key: Optional[str] = None
+    langfuse_secret_key: Optional[str] = None
+    langfuse_host: Optional[str] = None
+    langfuse_tracing_environment: str = "development"
     eleven_labs_api_key: str = ""
     inference_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
