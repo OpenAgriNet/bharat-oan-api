@@ -125,14 +125,16 @@ def _issue_jwt_token(
 
 
 def _resolve_service_account_path(client_code: Optional[str] = None) -> Path:
-    # Try client-specific service account file first (if configured)
-    if client_code and settings.play_integrity_service_account_base_path:
-        candidate = f"{settings.play_integrity_service_account_base_path}{client_code}.json"
-        configured_path = Path(candidate)
-        resolved = configured_path if configured_path.is_absolute() else settings.base_dir / configured_path
+    # If client_code is provided, use client-specific file path
+    if client_code:
+        # Use the same base directory and pattern as default file
+        base_path = Path(settings.play_integrity_service_account_file).parent if settings.play_integrity_service_account_file else Path("secrets")
+        client_file = f"play-integrity-service-account-{client_code}.json"
+        candidate = base_path / client_file
+        resolved = candidate if candidate.is_absolute() else settings.base_dir / candidate
         if resolved.exists():
             return resolved
-        logger.warning("Client-specific Play Integrity service account not found: %s", str(resolved))
+        logger.warning("Client-specific Play Integrity service account not found: %s, falling back to default", str(resolved))
 
     # Fall back to default service account file
     if not settings.play_integrity_service_account_file:
@@ -189,8 +191,25 @@ async def _get_play_integrity_access_token(client_code: Optional[str] = None) ->
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Play Integrity service account file not found: {service_account_path}"
                 )
-            _play_integrity_credentials[client_key] = service_account.Credentials.from_service_account_file(
-                str(service_account_path),
+            
+            # Load JSON and replace private_key from env if client_code is provided
+            import json
+            with open(service_account_path, 'r') as f:
+                service_account_info = json.load(f)
+            
+            # If client_code exists, try to load private key from environment variable
+            if client_code:
+                normalized = client_code.strip().upper().replace('-', '_')
+                env_key = f"{settings.play_integrity_private_key_prefix}{normalized}"
+                private_key_from_env = os.getenv(env_key)
+                
+                if private_key_from_env:
+                    # Replace the private_key in JSON with env value
+                    service_account_info['private_key'] = private_key_from_env
+                    logger.info(f"Loaded private key for {client_code} from env var {env_key}")
+            
+            _play_integrity_credentials[client_key] = service_account.Credentials.from_service_account_info(
+                service_account_info,
                 scopes=[PLAY_INTEGRITY_SCOPE],
             )
 
