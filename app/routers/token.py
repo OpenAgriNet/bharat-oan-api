@@ -1,5 +1,6 @@
 import asyncio
 import hmac
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/token", tags=["token"])
 PLAY_INTEGRITY_SCOPE = "https://www.googleapis.com/auth/playintegrity"
 PLAY_INTEGRITY_DECODE_URL_TEMPLATE = "https://playintegrity.googleapis.com/v1/{package_name}:decodeIntegrityToken"
 _MAX_FUTURE_SKEW_MS = 10_000
-_play_integrity_credentials = None
+_play_integrity_credentials: Dict[str, Any] = {}
 _play_integrity_credentials_lock = asyncio.Lock()
 
 
@@ -71,6 +72,11 @@ class PlayIntegrityAuthRequest(BaseModel):
     integrity_token: str = Field(..., description="Play Integrity token generated on device")
     nonce: str = Field(..., description="Nonce used when requesting Play Integrity token")
     mobile: Optional[str] = Field(None, description="Mobile number")
+    client_code: Optional[str] = Field(None, description="Client code for selecting per-client config")
+
+
+class ApiKeyAuthRequest(BaseModel):
+    client_code: Optional[str] = Field(None, description="Client code for selecting per-client API key")
 
 
 def _issue_jwt_token(
@@ -118,7 +124,17 @@ def _issue_jwt_token(
         )
 
 
-def _resolve_service_account_path() -> Path:
+def _resolve_service_account_path(client_code: Optional[str] = None) -> Path:
+    # Try client-specific service account file first (if configured)
+    if client_code and settings.play_integrity_service_account_base_path:
+        candidate = f"{settings.play_integrity_service_account_base_path}{client_code}.json"
+        configured_path = Path(candidate)
+        resolved = configured_path if configured_path.is_absolute() else settings.base_dir / configured_path
+        if resolved.exists():
+            return resolved
+        logger.warning("Client-specific Play Integrity service account not found: %s", str(resolved))
+
+    # Fall back to default service account file
     if not settings.play_integrity_service_account_file:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -128,43 +144,73 @@ def _resolve_service_account_path() -> Path:
     return configured_path if configured_path.is_absolute() else settings.base_dir / configured_path
 
 
-async def _get_play_integrity_access_token() -> str:
+def _resolve_play_integrity_package_name(client_code: Optional[str] = None) -> str:
+    if client_code:
+        normalized = client_code.strip().upper().replace('-', '_')
+        env_key = f"{settings.play_integrity_package_name_prefix}{normalized}"
+        package_name = os.getenv(env_key)
+        if package_name:
+            return package_name
+
+    if not settings.play_integrity_package_name:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Play Integrity package name is not configured."
+        )
+    return settings.play_integrity_package_name
+
+
+def _resolve_api_key(client_code: Optional[str] = None) -> str:
+    if client_code:
+        normalized = client_code.strip().upper().replace('-', '_')
+        env_key = f"{settings.api_key_auth_token_prefix}{normalized}"
+        client_key = os.getenv(env_key)
+        if client_key:
+            return client_key
+
+    if not settings.api_key_auth_token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="API_KEY_AUTH_TOKEN is not configured."
+        )
+    return settings.api_key_auth_token
+
+
+async def _get_play_integrity_access_token(client_code: Optional[str] = None) -> str:
     global _play_integrity_credentials
 
+    client_key = client_code or "default"
+
     async with _play_integrity_credentials_lock:
-        if _play_integrity_credentials is None:
-            service_account_path = _resolve_service_account_path()
+        if client_key not in _play_integrity_credentials:
+            service_account_path = _resolve_service_account_path(client_code)
             if not service_account_path.exists():
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Play Integrity service account file not found: {service_account_path}"
                 )
-            _play_integrity_credentials = service_account.Credentials.from_service_account_file(
+            _play_integrity_credentials[client_key] = service_account.Credentials.from_service_account_file(
                 str(service_account_path),
                 scopes=[PLAY_INTEGRITY_SCOPE],
             )
 
-        if not _play_integrity_credentials.valid or not _play_integrity_credentials.token:
-            await asyncio.to_thread(_play_integrity_credentials.refresh, GoogleAuthRequest())
+        credentials = _play_integrity_credentials[client_key]
+        if not credentials.valid or not credentials.token:
+            await asyncio.to_thread(credentials.refresh, GoogleAuthRequest())
 
-        if not _play_integrity_credentials.token:
+        if not credentials.token:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unable to fetch access token for Play Integrity API."
             )
 
-        return _play_integrity_credentials.token
+        return credentials.token
 
 
-async def _decode_play_integrity_token(integrity_token: str) -> Dict[str, Any]:
-    if not settings.play_integrity_package_name:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="PLAY_INTEGRITY_PACKAGE_NAME is not configured."
-        )
-
-    access_token = await _get_play_integrity_access_token()
-    url = PLAY_INTEGRITY_DECODE_URL_TEMPLATE.format(package_name=settings.play_integrity_package_name)
+async def _decode_play_integrity_token(integrity_token: str, client_code: Optional[str] = None) -> Dict[str, Any]:
+    package_name = _resolve_play_integrity_package_name(client_code)
+    access_token = await _get_play_integrity_access_token(client_code)
+    url = PLAY_INTEGRITY_DECODE_URL_TEMPLATE.format(package_name=package_name)
     headers = {"Authorization": f"Bearer {access_token}"}
     payload = {"integrity_token": integrity_token}
 
@@ -342,19 +388,15 @@ async def create_auth_token(request: Optional[AuthRequest] = None):
 
 @router.post("/api-key", status_code=status.HTTP_200_OK, response_model=StaticAuthResponse)
 async def create_auth_token_with_api_key(
+    request: Optional[ApiKeyAuthRequest] = None,
     api_key: str = Header(..., alias="X-API-Key", description="Client API key"),
 ):
     """
     Validate static API key from env and issue expiring JWT.
     """
-    configured_api_key = settings.api_key_auth_token
-    if not configured_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="API_KEY_AUTH_TOKEN is not configured."
-        )
+    resolved_api_key = _resolve_api_key(request.client_code if request else None)
 
-    if not hmac.compare_digest(api_key, configured_api_key):
+    if not hmac.compare_digest(api_key, resolved_api_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key."
@@ -372,7 +414,7 @@ async def create_auth_token_with_play_integrity(request: PlayIntegrityAuthReques
     """
     Validate Google Play Integrity verdict and issue JWT.
     """
-    token_payload = await _decode_play_integrity_token(request.integrity_token)
+    token_payload = await _decode_play_integrity_token(request.integrity_token, request.client_code)
     _validate_play_integrity_payload(token_payload, request.nonce)
     await _ensure_nonce_not_reused(request.nonce)
 
