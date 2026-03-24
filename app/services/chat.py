@@ -12,6 +12,7 @@ from app.utils import (
     format_message_pairs,
     filter_thinking_from_history,
 )
+from helpers.telemetry import create_tool_metrics_event, TelemetryRequest
 from app.tasks.telemetry import send_telemetry
 from app.tasks.tool_tracker import ToolUsageTracker
 from agents.deps import FarmerContext
@@ -80,18 +81,20 @@ async def stream_chat_messages(
     await update_message_history(session_id, messages)
 
     total_latency = time.time() - start_time
-    telemetry_data = {
-        "session_id": session_id,
-        "user_id": user_id,
-        "qid": qid,
-        "tool_usage": tracker.as_list(),
-        "moderation_category": moderation_data.category,
-        "total_latency_seconds": total_latency,
-    }
+    
+    telemetry_event = create_tool_metrics_event(
+        session_id=session_id,
+        user_id=user_id,
+        qid=qid,
+        tool_usage=tracker.as_list(),
+        total_latency_seconds=total_latency,
+        moderation_category=moderation_data.category,
+    )
+    telemetry_payload = TelemetryRequest(events=[telemetry_event]).model_dump()
 
-    logger.info(f"Telemetry data: {telemetry_data}")
+    logger.info(f"Telemetry payload: {telemetry_payload}")
     try:
-        result = await send_telemetry(telemetry_data)
+        result = await send_telemetry(telemetry_payload)
         logger.info(f"Telemetry result: {result}")
     except Exception as e:
         logger.error(f"Failed to send telemetry: {e}")

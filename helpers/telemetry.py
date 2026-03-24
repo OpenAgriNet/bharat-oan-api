@@ -17,6 +17,7 @@ class EventType(str, Enum):
     OE_MEDIA = "OE_MEDIA"
     OE_TRANSLATION = "OE_TRANSLATION"
     OE_MODERATION = "OE_MODERATION"
+    OE_TOOL_USAGE = "OE_TOOL_USAGE"
 
 
 
@@ -42,6 +43,7 @@ class Target(BaseModel):
     questionsDetails: Optional[Dict[str, Any]] = None
     ttsResponseDetails: Optional[Dict[str, Any]] = None
     asrResponseDetails: Optional[Dict[str, Any]] = None
+    llmTelemetryDetails: Optional[Dict[str, Any]] = None
 
 
 class BaseEventData(BaseModel):
@@ -609,6 +611,51 @@ def create_asr_event(
         pdata_ver=pdata_ver,
         gdata_id=gdata_id,
         gdata_ver=gdata_ver,
+        timestamp=timestamp
+    )
+
+def create_tool_metrics_event(
+    session_id: str,
+    user_id: str,
+    qid: str,
+    tool_usage: list,
+    total_latency_seconds: float,
+    moderation_category: str,
+    channel: str = "BharatVistaar",
+    timestamp: Optional[int] = None,
+) -> TelemetryEvent:
+    """Creates a tool metrics event to send to the telemetry processor."""
+    
+    # We wrap the data in the specific 'llmTelemetryDetails' target block
+    target = Target(
+        id="oan_agent",
+        ver="v1.0",
+        type="AGENT_EXECUTION",
+        parent={"id": "llm", "type": "internal_service"},
+        # You can define a new detail block or embed inside questionsDetails
+        llmTelemetryDetails={
+            "session_id": session_id,
+            "qid": qid,
+            "user_id": user_id,
+            "tool_usage": tool_usage,
+            "moderation_category": moderation_category,
+            "total_latency_seconds": total_latency_seconds,
+            "ets": timestamp or int(time.time() * 1000)
+        }
+    )
+
+    return create_event(
+        event_type=EventType.OE_TOOL_USAGE,
+        event_data=ItemResponseEks(
+            target=target,
+            qid=qid,
+            type="LLM_TELEMETRY",
+            state="",
+        ),
+        uid=user_id,
+        sid=session_id,
+        channel=channel,
+        did="system",
         timestamp=timestamp
     )
 # TODO: Directly call the task isntead of this
