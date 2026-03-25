@@ -31,7 +31,7 @@ class ToolCall:
             self.result = None
         else:
             self.status = "success"
-            self.result = str(content)[:80] + "..." if content is not None else None
+            self.result = str(content)
             self.error = None
 
     def to_dict(self) -> dict:
