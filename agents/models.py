@@ -3,7 +3,8 @@ from pydantic_ai.models.openai import OpenAIChatModel, OpenAIModel, OpenAIRespon
 from pydantic_ai.providers.openai import OpenAIProvider
 from dotenv import load_dotenv
 from openai import AsyncAzureOpenAI
-
+from pydantic_ai.models.gemini import GeminiModel
+from pydantic_ai.providers.google_gla import GoogleGLAProvider
 load_dotenv()
 
 
@@ -39,6 +40,19 @@ elif LLM_PROVIDER == 'openai':
             api_key=os.getenv('OPENAI_API_KEY'),
         ),
     )
+elif LLM_PROVIDER == 'gemini':
+    AGRINET_MODEL = GeminiModel(
+        os.getenv('LLM_AGRINET_MODEL_NAME','agrinet-model'),
+        provider=GoogleGLAProvider(
+            api_key=os.getenv('GOOGLE_API_KEY'),
+        ),
+    )
+    MODERATION_MODEL = GeminiModel(
+        os.getenv('LLM_MODERATION_MODEL_NAME','moderation-model'),
+        provider=GoogleGLAProvider(
+            api_key=os.getenv('GOOGLE_API_KEY'),
+        ),
+    )    
 elif LLM_PROVIDER == 'azure-openai':
     azure_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
     azure_api_key = os.getenv('AZURE_OPENAI_API_KEY')
