@@ -44,7 +44,7 @@ jobs:
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
-          deepeval set-gemini --model=${{ secrets.GEMINI_MODEL }}
+          deepeval set-gemini --model-name=${{ secrets.GEMINI_MODEL }}
 
       - name: Run DeepEval tests
         id: run-evals
