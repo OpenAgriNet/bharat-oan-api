@@ -1,0 +1,106 @@
+name: DeepEval Gate + Docker Hub Push
+
+on:
+  push:
+    branches:
+      - feature/deepeval-setup
+
+env:
+  BASE_IMAGE_NAME: bharat-oan-api-TEST-DEEPEVAL
+  PASS_THRESHOLD: 70  # minimum % to allow image push
+  LLM_MODERATION_MODEL_NAME: gemini-2.5-flash-lite
+  GEMINI_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+  LLM_PROVIDER: gemini
+
+jobs:
+  # ─────────────────────────────────────────────
+  # JOB 1: Run DeepEval tests and check threshold
+  # ─────────────────────────────────────────────
+  deepeval:
+    name: DeepEval Quality Gate
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+
+    outputs:
+      gate_passed: ${{ steps.check-threshold.outputs.gate_passed }}
+      pass_rate: ${{ steps.check-threshold.outputs.pass_rate }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install deepeval
+
+      - name: Configure DeepEval with Gemini model
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          deepeval set-gemini --model=${{ secrets.GEMINI_MODEL }}
+
+      - name: Run DeepEval tests
+        id: run-evals
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          # Run tests and capture full output
+          set +e  # don't fail immediately on non-zero exit
+          deepeval test run tests/evals --output-file eval_results.txt 2>&1 | tee eval_output.txt
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          set -e
+
+      - name: Check pass rate threshold
+        id: check-threshold
+        run: |
+          # Parse "X passed, Y failed" or "X/Y passed" from deepeval output
+          PASSED=$(grep -oP '\d+(?= passed)' eval_output.txt | tail -1 || echo "0")
+          FAILED=$(grep -oP '\d+(?= failed)' eval_output.txt | tail -1 || echo "0")
+          TOTAL=$((PASSED + FAILED))
+
+          echo "──────────────────────────────────"
+          echo "  DeepEval Results"
+          echo "  Passed : $PASSED"
+          echo "  Failed : $FAILED"
+          echo "  Total  : $TOTAL"
+
+          if [[ "$TOTAL" -eq 0 ]]; then
+            echo "  ⚠ No test results found — failing gate"
+            echo "gate_passed=false" >> $GITHUB_OUTPUT
+            echo "pass_rate=0" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          PASS_RATE=$(echo "scale=2; $PASSED * 100 / $TOTAL" | bc)
+          echo "  Pass Rate: $PASS_RATE%"
+          echo "  Threshold: ${{ env.PASS_THRESHOLD }}%"
+          echo "──────────────────────────────────"
+
+          echo "pass_rate=$PASS_RATE" >> $GITHUB_OUTPUT
+
+          # Compare as integers (floor)
+          PASS_INT=$(echo "$PASS_RATE" | cut -d'.' -f1)
+          if [[ "$PASS_INT" -ge "${{ env.PASS_THRESHOLD }}" ]]; then
+            echo "  ✅ Gate PASSED — proceeding to build"
+            echo "gate_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "  ❌ Gate FAILED — blocking image push"
+            echo "gate_passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Upload eval output as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepeval-results
+          path: eval_output.txt
+  
