@@ -53,7 +53,7 @@ jobs:
         run: |
           # Run tests and capture full output
           set +e  # don't fail immediately on non-zero exit
-          deepeval test run tests/evals --output-file eval_results.txt 2>&1 | tee eval_output.txt
+          deepeval test run tests/evals -v 2>&1 | tee eval_output.txt
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
           set -e
