@@ -43,7 +43,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
         run: |
-          deepeval set-openai --model-name=${{ env.LLM_MODERATION_MODEL_NAME }} --openai-api-key=${{ secrets.OPENAI_API_KEY }}
+          deepeval set-openai --model=${{ env.LLM_MODERATION_MODEL_NAME }}
 
       - name: Run DeepEval tests
         id: run-evals
