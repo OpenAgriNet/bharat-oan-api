@@ -80,3 +80,5 @@ humanize
 pycryptodome
 
 langfuse==2.60.3
+# deep-eval for LLM Agents Evaluvation 
+deepeval
