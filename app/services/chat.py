@@ -13,14 +13,15 @@ from app.utils import (
 )
 from agents.deps import FarmerContext
 from langfuse.decorators import observe, langfuse_context
-from langfuse import Langfuse
+from helpers.langfuse_helper import langfuse
+
 
 logger = get_logger(__name__)
-langfuse = Langfuse()
 
 MODEL_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
 
+@observe(name=os.getenv("LANGFUSE_TRACING_ENVIRONMENT", "Production"))
 async def stream_chat_messages(
     query: str,
     session_id: str,
@@ -31,6 +32,16 @@ async def stream_chat_messages(
     background_tasks: BackgroundTasks
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
+    langfuse_context.update_current_trace(
+        session_id=session_id,
+        user_id=user_id,
+        input=query,
+        metadata={
+            "query": query,
+            "source_lang": source_lang,
+            "target_lang": target_lang,
+        }
+    )
     deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
 
     message_pairs = "\n\n".join(format_message_pairs(history, 3))
@@ -80,7 +91,6 @@ async def stream_chat_messages(
 async def _run_moderation(user_message: str, session_id: str):
     """Run moderation agent and trace it in Langfuse."""
     langfuse_context.update_current_trace(
-        session_id=session_id,
         input=user_message,              # ← fixes null input on trace
     )
     langfuse_context.update_current_observation(
@@ -117,9 +127,6 @@ async def _run_agrinet(
 ):
     """Run main agrinet agent and trace it in Langfuse."""
     langfuse_context.update_current_trace(
-        session_id=session_id,
-        user_id=user_id,
-        input=query,
         tags=[moderation_category],
     )
     langfuse_context.update_current_observation(input=user_message)
