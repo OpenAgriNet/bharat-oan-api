@@ -55,7 +55,7 @@ class Settings(BaseSettings):
 
     # Redis Settings
     redis_host: str = "localhost"
-    redis_port: int = 6379
+    redis_port: int = 6380
     redis_db: int = 0
     redis_key_prefix: str = "sva-cache-"
     redis_socket_connect_timeout: int = 10

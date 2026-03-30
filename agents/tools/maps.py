@@ -19,7 +19,7 @@ photon_url = os.getenv("PHOTON_HOST")
 parsed = urlparse(photon_url)
 PHOTON_HOST = parsed.hostname or "10.128.188.19"
 PHOTON_PORT = parsed.port or 2322
-PHOTON_BASE_URL = f"http://{PHOTON_HOST}:{PHOTON_PORT}"
+PHOTON_BASE_URL = f"http://{photon_url}"
 
 # Shared async client for connection reuse
 _http_client = httpx.AsyncClient(base_url=PHOTON_BASE_URL, timeout=10.0)
