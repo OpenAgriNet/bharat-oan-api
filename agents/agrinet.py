@@ -10,7 +10,7 @@ from agents.deps import FarmerContext
 agrinet_agent = Agent(
     model=LLM_MODEL,
     name="Vistaar Agent",
-    instrument=True,
+    instrument=False,
     output_type=str,
     deps_type=FarmerContext,
     retries=3,

@@ -8,6 +8,7 @@ from typing import Optional, Any
 from urllib.parse import urlparse
 from pydantic import BaseModel, field_validator
 from helpers.utils import get_logger
+from langfuse.decorators import observe
 
 logger = get_logger(__name__)
 
@@ -84,6 +85,7 @@ def _feature_to_location(feature: dict, fallback_name: str = None) -> Location:
     return Location(place_name=display_name, latitude=latitude, longitude=longitude)
 
 
+@observe(name="tool:forward_geocode")
 async def forward_geocode(place_name: str) -> str:
     """Forward Geocoding to get latitude and longitude from a place name in India.
 
@@ -138,6 +140,7 @@ async def forward_geocode(place_name: str) -> str:
         return f"Unable to find location for '{place_name}'. Please try again later."
 
 
+@observe(name="tool:reverse_geocode")
 async def reverse_geocode(latitude: float, longitude: float) -> Optional[Location]:
     """Reverse Geocoding to get place name from latitude and longitude.
 
