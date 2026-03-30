@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 MODEL_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
 
-@observe(name=os.getenv("LANGFUSE_TRACING_ENVIRONMENT", "Production"))
+@observe(name=os.getenv("LANGFUSE_TRACING_ENVIRONMENT"))
 async def stream_chat_messages(
     query: str,
     session_id: str,
