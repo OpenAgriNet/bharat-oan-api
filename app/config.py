@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "RS256"
     jwt_public_key_path: str = os.getenv("JWT_PUBLIC_KEY_PATH", "jwt_public_key.pem")
     jwt_private_key_path: Optional[str] = os.getenv("JWT_PRIVATE_KEY_PATH")
+    disable_jwt: bool = os.getenv("DISABLE_JWT", "0") == "1" or os.getenv("DISABLE_JWT_FOR_LOCAL", "0") == "1"
+
 
     # Worker Settings
     uvicorn_workers: int = os.cpu_count() or 1
@@ -67,7 +69,9 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     sarvam_api_key: Optional[str] = None
     meity_api_key_value: Optional[str] = None
-    logfire_token: Optional[str] = None
+    langfuse_public_key: Optional[str] = None
+    langfuse_secret_key: Optional[str] = None
+    langfuse_host: Optional[str] = os.getenv("LANGFUSE_BASE_URL")
     bhashini_api_key: str = ""
     eleven_labs_api_key: str = ""
     inference_api_key: Optional[str] = None
@@ -86,7 +90,7 @@ class Settings(BaseSettings):
     marqo_index_name: Optional[str] = None
     marqo_pests_diseases_index_name: Optional[str] = None
 
-    # HTTP client timeouts for outbound API calls (connect and read; read should be > connect)
+ # HTTP client timeouts for outbound API calls (connect and read; read should be > connect)
     default_api_timeout: float = 5.0   # connect timeout (DEFAULT_API_TIMEOUT)
     default_api_read_timeout: float = 10.0  # read timeout (DEFAULT_API_READ_TIMEOUT)
 
@@ -96,7 +100,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# Default HTTP timeout for outbound API calls (connect + read)
+DEFAULT_HTTP_TIMEOUT = httpx.Timeout(settings.default_api_timeout, read=settings.default_api_read_timeout)
 
-def get_default_httpx_timeout() -> httpx.Timeout:
-    """Default timeout for outbound API calls. Connect from DEFAULT_API_TIMEOUT, read from DEFAULT_API_READ_TIMEOUT (read > connect)."""
-    return httpx.Timeout(settings.default_api_timeout, read=settings.default_api_read_timeout) 
+ 

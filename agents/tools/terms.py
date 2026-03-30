@@ -2,6 +2,7 @@ import json
 from enum import Enum
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
+from langfuse.decorators import observe
 
 # Load term pairs from JSON file with UTF-8 encoding
 term_pairs = json.load(open('assets/glossary_terms.json', 'r', encoding='utf-8'))
@@ -22,6 +23,7 @@ class TermPair(BaseModel):
 # Convert raw dictionaries to TermPair objects
 TERM_PAIRS = [TermPair(**pair) for pair in term_pairs]
 
+@observe(name="tool:search_terms")
 async def search_terms(
     term: str, 
     max_results: int = 5,

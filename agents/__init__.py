@@ -1,8 +1,9 @@
 import os
-import logfire
+from pydantic_ai import Agent
+from langfuse import Langfuse
 from dotenv import load_dotenv
 
 load_dotenv()
 
-
-logfire.configure(scrubbing=False,environment=os.getenv("ENVIRONMENT"))
+# langfuse = Langfuse()
+Agent.instrument_all()
