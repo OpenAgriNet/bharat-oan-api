@@ -6,14 +6,13 @@ Test data loaded from: tests/evals/dataset/oan_eval_dataset.json
 
 Metric strategy
 ---------------
-- is_decline=false  →  AnswerRelevancyMetric + DAGMetric
-- is_decline=true   →  DAGMetric only
-  (AnswerRelevancyMetric always scores 0 on correct declines
-   because the response intentionally ignores the original question.)
+- is_decline=false  →  AnswerRelevancyMetric + AG_DAG (requires source citation)
+- is_decline=true   →  DECLINE_DAG only
+  (separate metric that only checks polite refusal — no citation required)
 
 Run
 ---
-    pytest tests/evals/Integration_testing.py -v --tb=short -s
+    pytest tests/evals/test_integration.py -v --tb=short -s
 
 Required env vars
 -----------------
@@ -109,7 +108,8 @@ def load_test_cases() -> list[OANTestCase]:
 
 _oan_client: Optional[OANEvalClient] = None
 _relevancy_metric: Optional[AnswerRelevancyMetric] = None
-_dag_metric: Optional[GEval] = None
+_ag_dag_metric: Optional[GEval] = None
+_decline_dag_metric: Optional[GEval] = None
 
 
 def get_client() -> OANEvalClient:
@@ -132,20 +132,19 @@ def get_relevancy_metric() -> AnswerRelevancyMetric:
     return _relevancy_metric
 
 
-def get_dag_metric() -> GEval:
-    global _dag_metric
-    if _dag_metric is None:
-        _dag_metric = GEval(
-            name="DAG",
+def get_ag_dag_metric() -> GEval:
+    """DAG metric for valid agricultural responses — requires source citation."""
+    global _ag_dag_metric
+    if _ag_dag_metric is None:
+        _ag_dag_metric = GEval(
+            name="AG_DAG",
             criteria=(
                 "Evaluate the actual output on three axes:\n"
                 "1. DIRECTNESS (0-1): Response starts by addressing the question immediately "
                 "with no preamble like 'Let me explain' or 'I will help you'.\n"
-                "2. SCOPE ADHERENCE (0-1): Agricultural queries get agricultural content. "
-                "Invalid/out-of-scope queries are politely declined without answering them.\n"
+                "2. SCOPE ADHERENCE (0-1): Agricultural queries get agricultural content.\n"
                 "3. SOURCE CITATION (0-1): Factual agricultural responses include a bold "
-                "source citation e.g. **Source: ...** or **स्रोत: ...**. "
-                "Decline responses are exempt from this requirement.\n\n"
+                "source citation e.g. **Source: ...** or **स्रोत: ...**.\n\n"
                 "Final score = Directness×0.25 + Scope Adherence×0.50 + Source Citation×0.25."
             ),
             evaluation_params=[
@@ -158,7 +157,35 @@ def get_dag_metric() -> GEval:
             async_mode=False,
             verbose_mode=True,
         )
-    return _dag_metric
+    return _ag_dag_metric
+
+
+def get_decline_dag_metric() -> GEval:
+    """DAG metric for decline responses — only checks polite refusal, NO citation."""
+    global _decline_dag_metric
+    if _decline_dag_metric is None:
+        _decline_dag_metric = GEval(
+            name="DECLINE_DAG",
+            criteria=(
+                "The input is an invalid or out-of-scope query. "
+                "Evaluate the actual output on two axes:\n"
+                "1. SCOPE ADHERENCE (0-1): The response correctly refuses to answer "
+                "the out-of-scope query without providing the requested content.\n"
+                "2. POLITENESS (0-1): The response politely redirects the user toward "
+                "agricultural/farming topics without being rude or dismissive.\n\n"
+                "Final score = Scope Adherence×0.70 + Politeness×0.30.\n"
+                "Source citations are NOT required and must NOT affect the score."
+            ),
+            evaluation_params=[
+                LLMTestCaseParams.INPUT,
+                LLMTestCaseParams.ACTUAL_OUTPUT,
+            ],
+            threshold=DAG_THRESHOLD,
+            model=JUDGE_MODEL,
+            async_mode=False,
+            verbose_mode=True,
+        )
+    return _decline_dag_metric
 
 
 # ---------------------------------------------------------------------------
@@ -239,41 +266,44 @@ def test_oan_integration(tc: OANTestCase, actual_output: str | None) -> None:
         retrieval_context=tc.context or None,
     )
 
-    dag = get_dag_metric()
-
     if not tc.is_decline:
+        # --- Valid agricultural response: check relevancy + AG_DAG (citation required) ---
         relevancy = get_relevancy_metric()
+        ag_dag = get_ag_dag_metric()
+
         relevancy.measure(case)
         time.sleep(METRIC_CALL_DELAY)
-        dag.measure(case)
+        ag_dag.measure(case)
 
         print(
             f"\n[{tc.name}]  (valid agricultural)\n"
             f"  Judge model     : {JUDGE_MODEL}\n"
             f"  AnswerRelevancy : {relevancy.score:.3f}  pass={relevancy.is_successful()}\n"
-            f"  DAG             : {dag.score:.3f}  pass={dag.is_successful()}\n"
+            f"  AG_DAG          : {ag_dag.score:.3f}  pass={ag_dag.is_successful()}\n"
             f"  Relevancy reason: {relevancy.reason}\n"
-            f"  DAG reason      : {dag.reason}"
+            f"  AG_DAG reason   : {ag_dag.reason}"
         )
 
         assert relevancy.is_successful(), (
             f"AnswerRelevancy FAILED ({relevancy.score:.3f} < {RELEVANCY_THRESHOLD})"
             f" — {relevancy.reason}"
         )
-        assert dag.is_successful(), (
-            f"DAG FAILED ({dag.score:.3f} < {DAG_THRESHOLD}) — {dag.reason}"
+        assert ag_dag.is_successful(), (
+            f"AG_DAG FAILED ({ag_dag.score:.3f} < {DAG_THRESHOLD}) — {ag_dag.reason}"
         )
 
     else:
-        dag.measure(case)
+        # --- Decline response: only check polite refusal (no citation needed) ---
+        decline_dag = get_decline_dag_metric()
+        decline_dag.measure(case)
 
         print(
-            f"\n[{tc.name}]  (decline — DAG only)\n"
+            f"\n[{tc.name}]  (decline — DECLINE_DAG only)\n"
             f"  Judge model     : {JUDGE_MODEL}\n"
-            f"  DAG             : {dag.score:.3f}  pass={dag.is_successful()}\n"
-            f"  DAG reason      : {dag.reason}"
+            f"  DECLINE_DAG     : {decline_dag.score:.3f}  pass={decline_dag.is_successful()}\n"
+            f"  DECLINE_DAG reason: {decline_dag.reason}"
         )
 
-        assert dag.is_successful(), (
-            f"DAG FAILED ({dag.score:.3f} < {DAG_THRESHOLD}) — {dag.reason}"
+        assert decline_dag.is_successful(), (
+            f"DECLINE_DAG FAILED ({decline_dag.score:.3f} < {DAG_THRESHOLD}) — {decline_dag.reason}"
         )

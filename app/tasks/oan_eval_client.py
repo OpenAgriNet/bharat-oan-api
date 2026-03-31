@@ -48,8 +48,9 @@ class OANEvalClient:
         for attempt in range(1, self.liveness_retry_count + 1):
             try:
                 response = requests.get(url, headers={"accept": "application/json"}, timeout=5)
-                if response.status_code == 200:
-                    print(f"[OANEvalClient] Service is live (attempt {attempt})")
+                # 200 = live, 403 = live but auth-gated (e.g. WAF/reverse proxy in CI)
+                if response.status_code in (200, 403):
+                    print(f"[OANEvalClient] Service is live — status {response.status_code} (attempt {attempt})")
                     return
                 print(f"[OANEvalClient] Liveness check failed: status {response.status_code} (attempt {attempt}/{self.liveness_retry_count})")
             except requests.RequestException as e:
