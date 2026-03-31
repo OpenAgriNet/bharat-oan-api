@@ -315,6 +315,12 @@ def submit_grievance(identity_no: str, grievance_description: str, grievance_typ
         A user-friendly message summarizing submission outcome.
     """
     try:
+        # Track in Langfuse with a clear name so it shows up in dashboard
+        from langfuse.decorators import langfuse_context
+        langfuse_context.update_current_observation(
+            name="scheme_tool:grievance_submit",
+            input={"scheme": "pmkisan_grievance", "grievance_type": grievance_type},
+        )
         if not grievance_type or grievance_type not in GRIEVANCE_MAPPING:
             choices = '", "'.join(GRIEVANCE_TYPES)
             raise ModelRetry(f'Invalid grievance type: "{grievance_type}". Please select from: "{choices}".')
@@ -373,6 +379,12 @@ def grievance_status(identity_no: str) -> str:
         or an explanatory message if not found yet.
     """
     try:
+        # Track in Langfuse with a clear name so it shows up in dashboard
+        from langfuse.decorators import langfuse_context
+        langfuse_context.update_current_observation(
+            name="scheme_tool:grievance_status",
+            input={"scheme": "pmkisan_grievance"},
+        )
         client = GrievanceClient.from_env()
         identity_value, type_field = _resolve_identity(client, identity_no.strip(), purpose="status")
 

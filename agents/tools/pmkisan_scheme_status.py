@@ -454,6 +454,12 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
     Returns:
         str: Response from the scheme status check service
     """
+    # Track in Langfuse with a clear name so it shows up in dashboard
+    from langfuse.decorators import langfuse_context
+    langfuse_context.update_current_observation(
+        name="scheme_tool:pmkisan_init",
+        input={"scheme": "pmkisan", "reg_no_suffix": reg_no[-4:] if reg_no else ""},
+    )
     try:
         # Get session_id from context
         session_id = ctx.deps.session_id
@@ -525,6 +531,12 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
     Returns:
         str: Detailed scheme status information including beneficiary details, payment status, and any issues or next steps
     """
+    # Track in Langfuse with a clear name so it shows up in dashboard
+    from langfuse.decorators import langfuse_context
+    langfuse_context.update_current_observation(
+        name="scheme_tool:pmkisan_status",
+        input={"scheme": "pmkisan"},
+    )
     try:
         # Validate OTP format - must be exactly 4 digits
         otp_clean = str(otp).strip()
