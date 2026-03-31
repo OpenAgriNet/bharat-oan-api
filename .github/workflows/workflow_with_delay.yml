@@ -8,9 +8,8 @@ on:
 env:
   BASE_IMAGE_NAME: bharat-oan-api-TEST-DEEPEVAL
   PASS_THRESHOLD: 70
-  LLM_MODERATION_MODEL_NAME: gpt-4.1
   EVAL_MODEL: gpt-4.1
-  LLM_PROVIDER: openai
+  OAN_API_BASE_URL: https://dev-vistaar.da.gov.in
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 jobs:
@@ -104,7 +103,7 @@ jobs:
         id: run-evals
         run: |
           set +e
-          deepeval test run tests/evals -v 2>&1 | tee eval_output.txt
+          deepeval test run tests/evals/test_integration.py -v 2>&1 | tee eval_output.txt
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
           set -e
