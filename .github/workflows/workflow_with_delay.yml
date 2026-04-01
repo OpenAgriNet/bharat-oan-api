@@ -85,6 +85,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up VPN (India IP)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openvpn
+          
+          # Save VPN config from secrets
+          echo "${{ secrets.VPN_CONFIG }}" | base64 -d > /tmp/vpn.ovpn
+          
+          # Start VPN in background
+          sudo openvpn --config /tmp/vpn.ovpn --log /tmp/vpn.log --daemon
+          
+          # Wait for VPN to establish
+          sleep 10
+          
+          # Verify connection
+          echo "VPN connection established. Current IP info:"
+          curl -s https://ipinfo.io/json | jq '.country, .city'
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -93,7 +111,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
           pip install deepeval
 
       - name: Configure DeepEval
@@ -103,6 +120,7 @@ jobs:
         id: run-evals
         run: |
           set +e
+          # Ensure traffic routes through VPN
           deepeval test run tests/evals/test_integration.py -v 2>&1 | tee eval_output.txt
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
