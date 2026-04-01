@@ -10,12 +10,11 @@ env:
   PASS_THRESHOLD: 70
   EVAL_MODEL: gpt-4.1
   OAN_API_BASE_URL: https://dev-vistaar.da.gov.in
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 jobs:
-  # ─────────────────────────────────────────────
-  # JOB 0: Guard - allow only once per day
-  # ─────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────
+  # JOB 0: Guard — allow only once per day
+  # ──────────────────────────────────────────────────────
   guard:
     runs-on: ubuntu-latest
     outputs:
@@ -29,7 +28,6 @@ jobs:
 
           TODAY=$(date -u +%Y-%m-%d)
 
-          # github.workflow gives the *display name*, not the filename.
           # GITHUB_WORKFLOW_REF looks like:
           #   owner/repo/.github/workflows/deepeval-gate.yml@refs/heads/branch
           # Strip @ref suffix first, then extract the filename.
@@ -65,22 +63,25 @@ jobs:
             echo "should_run=true" >> $GITHUB_OUTPUT
           fi
 
-  # ─────────────────────────────────────────────
-  # JOB 1: DeepEval Quality Gate -- runs only if guard allows
-  # ─────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────
+  # JOB 1: DeepEval Quality Gate — runs only if guard allows
+  # ──────────────────────────────────────────────────────
   deepeval:
     name: DeepEval Quality Gate
     runs-on: ubuntu-latest
     needs: guard
-    if: needs.guard.outputs.should_run == 'false'
+    if: needs.guard.outputs.should_run == 'true'
+
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     outputs:
       gate_passed: ${{ steps.check-threshold.outputs.gate_passed }}
       pass_rate: ${{ steps.check-threshold.outputs.pass_rate }}
 
     steps:
-      - name: ⏱ Wait for 2 minutes
-        run: sleep 10
+      - name: Wait for 2 minutes
+        run: sleep 120
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -89,11 +90,11 @@ jobs:
         id: vpn-setup
         run: |
           set +e
-          
+
           echo "Installing OpenVPN..."
           sudo apt-get update -qq
           sudo apt-get install -y openvpn 2>&1 || { echo "OpenVPN install failed"; exit 1; }
-          
+
           # Check if VPN_CONFIG secret exists
           if [ -z "${{ secrets.VPN_CONFIG }}" ]; then
             echo "⚠️  WARNING: VPN_CONFIG secret not found!"
@@ -101,16 +102,14 @@ jobs:
             echo "vpn_configured=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           echo "Preparing VPN configuration..."
           # Accept VPN_CONFIG as either base64 or raw .ovpn content.
           if echo "${{ secrets.VPN_CONFIG }}" | base64 -d > /tmp/vpn.ovpn 2>/dev/null; then
             echo "VPN_CONFIG decoded as base64."
           else
             echo "VPN_CONFIG is not base64; treating it as raw .ovpn content."
-            cat > /tmp/vpn.ovpn << 'EOF'
-${{ secrets.VPN_CONFIG }}
-EOF
+            echo "${{ secrets.VPN_CONFIG }}" > /tmp/vpn.ovpn
           fi
 
           if ! grep -q "^remote " /tmp/vpn.ovpn; then
@@ -130,36 +129,32 @@ EOF
             chmod 600 /tmp/vpn-auth.txt
             sed -i 's|^auth-user-pass$|auth-user-pass /tmp/vpn-auth.txt|' /tmp/vpn.ovpn
           fi
-          
+
           echo "Starting OpenVPN daemon..."
           sudo openvpn --config /tmp/vpn.ovpn --log /tmp/vpn.log --daemon --suppress-timestamps
-          
-          # Wait for VPN to establish
+
           echo "Waiting for VPN connection (15 seconds)..."
           sleep 15
-          
-          # Check VPN connection
+
           if [ -f /tmp/vpn.log ]; then
             echo "VPN Log tail:"
             tail -20 /tmp/vpn.log
           fi
-          
-          # Verify connection with timeout
+
           echo "Verifying IP location..."
           IP_RESPONSE=$(timeout 5 curl -s https://ipinfo.io/json || echo '{}')
           COUNTRY=$(echo "$IP_RESPONSE" | jq -r '.country // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
           CITY=$(echo "$IP_RESPONSE" | jq -r '.city // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
-          
+
           echo "Current location: $CITY, $COUNTRY"
-          
+
           if [ "$COUNTRY" = "IN" ]; then
             echo "✅ VPN connected from India!"
-            echo "vpn_configured=true" >> $GITHUB_OUTPUT
           else
             echo "⚠️  VPN may not be properly connected. Country detected: $COUNTRY"
-            echo "vpn_configured=true" >> $GITHUB_OUTPUT
           fi
-          
+
+          echo "vpn_configured=true" >> $GITHUB_OUTPUT
           set -e
 
       - name: Set up Python
@@ -169,8 +164,7 @@ EOF
           cache: pip
 
       - name: Install dependencies
-        run: |
-          pip install deepeval
+        run: pip install deepeval
 
       - name: Configure DeepEval
         run: deepeval set-openai --model=${{ env.EVAL_MODEL }}
@@ -179,21 +173,17 @@ EOF
         id: run-evals
         run: |
           set +e
-          
-          # Log current environment
+
           echo "Running DeepEval tests..."
           echo "API Base URL: ${{ env.OAN_API_BASE_URL }}"
-          echo "Python version:"
-          python3 --version
-          
-          # Run tests with verbose output
+          echo "Python version: $(python3 --version)"
+
           deepeval test run tests/evals/test_integration.py -v 2>&1 | tee eval_output.txt
           EXIT_CODE=$?
-          
-          echo ""
+
           echo "Test exit code: $EXIT_CODE"
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          
+
           set -e
 
       - name: Check pass rate threshold
