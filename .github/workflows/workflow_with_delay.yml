@@ -80,7 +80,7 @@ jobs:
 
     steps:
       - name: ⏱ Wait for 2 minutes
-        run: sleep 120
+        run: sleep 10
 
       - name: Checkout repository
         uses: actions/checkout@v4
