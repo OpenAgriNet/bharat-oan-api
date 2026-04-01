@@ -72,7 +72,7 @@ jobs:
     name: DeepEval Quality Gate
     runs-on: ubuntu-latest
     needs: guard
-    if: needs.guard.outputs.should_run == 'false'
+    if: needs.guard.outputs.should_run == 'true'
 
     outputs:
       gate_passed: ${{ steps.check-threshold.outputs.gate_passed }}
@@ -86,22 +86,59 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up VPN (India IP)
+        id: vpn-setup
         run: |
-          sudo apt-get update
-          sudo apt-get install -y openvpn
+          set +e
           
-          # Save VPN config from secrets
-          echo "${{ secrets.VPN_CONFIG }}" | base64 -d > /tmp/vpn.ovpn
+          echo "Installing OpenVPN..."
+          sudo apt-get update -qq
+          sudo apt-get install -y openvpn 2>&1 || { echo "OpenVPN install failed"; exit 1; }
           
-          # Start VPN in background
-          sudo openvpn --config /tmp/vpn.ovpn --log /tmp/vpn.log --daemon
+          # Check if VPN_CONFIG secret exists
+          if [ -z "${{ secrets.VPN_CONFIG }}" ]; then
+            echo "⚠️  WARNING: VPN_CONFIG secret not found!"
+            echo "VPN will not be configured. Please add VPN_CONFIG secret to GitHub repo."
+            echo "vpn_configured=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Decoding and setting up VPN configuration..."
+          if ! echo "${{ secrets.VPN_CONFIG }}" | base64 -d > /tmp/vpn.ovpn 2>/dev/null; then
+            echo "❌ Failed to decode VPN_CONFIG. Ensure it's valid base64."
+            echo "vpn_configured=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Starting OpenVPN daemon..."
+          sudo openvpn --config /tmp/vpn.ovpn --log /tmp/vpn.log --daemon --suppress-timestamps
           
           # Wait for VPN to establish
-          sleep 10
+          echo "Waiting for VPN connection (15 seconds)..."
+          sleep 15
           
-          # Verify connection
-          echo "VPN connection established. Current IP info:"
-          curl -s https://ipinfo.io/json | jq '.country, .city'
+          # Check VPN connection
+          if [ -f /tmp/vpn.log ]; then
+            echo "VPN Log tail:"
+            tail -20 /tmp/vpn.log
+          fi
+          
+          # Verify connection with timeout
+          echo "Verifying IP location..."
+          IP_RESPONSE=$(timeout 5 curl -s https://ipinfo.io/json || echo '{}')
+          COUNTRY=$(echo "$IP_RESPONSE" | jq -r '.country // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
+          CITY=$(echo "$IP_RESPONSE" | jq -r '.city // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
+          
+          echo "Current location: $CITY, $COUNTRY"
+          
+          if [ "$COUNTRY" = "IN" ]; then
+            echo "✅ VPN connected from India!"
+            echo "vpn_configured=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  VPN may not be properly connected. Country detected: $COUNTRY"
+            echo "vpn_configured=true" >> $GITHUB_OUTPUT
+          fi
+          
+          set -e
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -120,10 +157,21 @@ jobs:
         id: run-evals
         run: |
           set +e
-          # Ensure traffic routes through VPN
+          
+          # Log current environment
+          echo "Running DeepEval tests..."
+          echo "API Base URL: ${{ env.OAN_API_BASE_URL }}"
+          echo "Python version:"
+          python3 --version
+          
+          # Run tests with verbose output
           deepeval test run tests/evals/test_integration.py -v 2>&1 | tee eval_output.txt
           EXIT_CODE=$?
+          
+          echo ""
+          echo "Test exit code: $EXIT_CODE"
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          
           set -e
 
       - name: Check pass rate threshold
