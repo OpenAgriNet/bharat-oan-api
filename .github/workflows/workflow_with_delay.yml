@@ -82,7 +82,7 @@ jobs:
 
     steps:
       - name: Wait for 2 minutes
-        run: sleep 120
+        run: sleep 1
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -105,16 +105,23 @@ jobs:
           fi
 
           echo "Preparing VPN configuration..."
+          RAW_VPN_CONFIG='${{ secrets.VPN_CONFIG }}'
+
           # Accept VPN_CONFIG as either base64 or raw .ovpn content.
-          if echo "${{ secrets.VPN_CONFIG }}" | base64 -d > /tmp/vpn.ovpn 2>/dev/null; then
+          if printf "%s" "$RAW_VPN_CONFIG" | base64 -d > /tmp/vpn.ovpn 2>/dev/null; then
             echo "VPN_CONFIG decoded as base64."
           else
             echo "VPN_CONFIG is not base64; treating it as raw .ovpn content."
-            echo "${{ secrets.VPN_CONFIG }}" > /tmp/vpn.ovpn
+            # If secret was pasted with literal \n, expand escapes into real newlines.
+            printf "%b" "$RAW_VPN_CONFIG" > /tmp/vpn.ovpn
           fi
 
-          if ! grep -q "^remote " /tmp/vpn.ovpn; then
-            echo "❌ VPN_CONFIG does not look like a valid .ovpn file."
+          # Normalize Windows line endings if present.
+          sed -i 's/\r$//' /tmp/vpn.ovpn
+
+          if ! grep -Eq '^[[:space:]]*remote[[:space:]]+' /tmp/vpn.ovpn; then
+            echo "❌ VPN_CONFIG does not look like a valid .ovpn file (missing remote directive)."
+            echo "Hint: store full .ovpn file, either base64-encoded or raw text with proper new lines."
             echo "vpn_configured=false" >> $GITHUB_OUTPUT
             exit 0
           fi
