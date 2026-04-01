@@ -119,6 +119,11 @@ jobs:
           # Normalize Windows line endings if present.
           sed -i 's/\r$//' /tmp/vpn.ovpn
 
+          # Force full-tunnel routing in CI so outbound IP changes.
+          if ! grep -Eq '^[[:space:]]*redirect-gateway[[:space:]]+def1' /tmp/vpn.ovpn; then
+            echo "redirect-gateway def1" >> /tmp/vpn.ovpn
+          fi
+
           if ! grep -Eq '^[[:space:]]*remote[[:space:]]+' /tmp/vpn.ovpn; then
             echo "❌ VPN_CONFIG does not look like a valid .ovpn file (missing remote directive)."
             echo "Hint: store full .ovpn file, either base64-encoded or raw text with proper new lines."
@@ -141,12 +146,25 @@ jobs:
           echo "Starting OpenVPN daemon..."
           sudo openvpn --config /tmp/vpn.ovpn --log /tmp/vpn.log --daemon --suppress-timestamps
 
-          echo "Waiting for VPN connection (15 seconds)..."
-          sleep 15
+          echo "Waiting for OpenVPN initialization..."
+          VPN_READY=false
+          for _ in $(seq 1 40); do
+            if grep -q "Initialization Sequence Completed" /tmp/vpn.log 2>/dev/null; then
+              VPN_READY=true
+              break
+            fi
+            sleep 1
+          done
 
           if [ -f /tmp/vpn.log ]; then
             echo "VPN Log tail:"
             tail -20 /tmp/vpn.log
+          fi
+
+          if [ "$VPN_READY" != "true" ]; then
+            echo "❌ OpenVPN did not finish initialization."
+            echo "vpn_configured=false" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
           echo "Verifying IP location..."
@@ -159,7 +177,9 @@ jobs:
           if [ "$COUNTRY" = "IN" ]; then
             echo "✅ VPN connected from India!"
           else
-            echo "⚠️  VPN may not be properly connected. Country detected: $COUNTRY"
+            echo "❌ VPN not routed through India. Country detected: $COUNTRY"
+            echo "vpn_configured=false" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
           echo "vpn_configured=true" >> $GITHUB_OUTPUT
