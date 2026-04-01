@@ -102,11 +102,33 @@ jobs:
             exit 0
           fi
           
-          echo "Decoding and setting up VPN configuration..."
-          if ! echo "${{ secrets.VPN_CONFIG }}" | base64 -d > /tmp/vpn.ovpn 2>/dev/null; then
-            echo "❌ Failed to decode VPN_CONFIG. Ensure it's valid base64."
+          echo "Preparing VPN configuration..."
+          # Accept VPN_CONFIG as either base64 or raw .ovpn content.
+          if echo "${{ secrets.VPN_CONFIG }}" | base64 -d > /tmp/vpn.ovpn 2>/dev/null; then
+            echo "VPN_CONFIG decoded as base64."
+          else
+            echo "VPN_CONFIG is not base64; treating it as raw .ovpn content."
+            cat > /tmp/vpn.ovpn << 'EOF'
+${{ secrets.VPN_CONFIG }}
+EOF
+          fi
+
+          if ! grep -q "^remote " /tmp/vpn.ovpn; then
+            echo "❌ VPN_CONFIG does not look like a valid .ovpn file."
             echo "vpn_configured=false" >> $GITHUB_OUTPUT
             exit 0
+          fi
+
+          # If config requires username/password, wire them from secrets.
+          if grep -q "^auth-user-pass$" /tmp/vpn.ovpn; then
+            if [ -z "${{ secrets.VPN_USERNAME }}" ] || [ -z "${{ secrets.VPN_PASSWORD }}" ]; then
+              echo "❌ VPN_USERNAME or VPN_PASSWORD is missing for auth-user-pass config."
+              echo "vpn_configured=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            printf "%s\n%s\n" "${{ secrets.VPN_USERNAME }}" "${{ secrets.VPN_PASSWORD }}" > /tmp/vpn-auth.txt
+            chmod 600 /tmp/vpn-auth.txt
+            sed -i 's|^auth-user-pass$|auth-user-pass /tmp/vpn-auth.txt|' /tmp/vpn.ovpn
           fi
           
           echo "Starting OpenVPN daemon..."
