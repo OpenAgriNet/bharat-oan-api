@@ -483,6 +483,12 @@ def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: st
     Returns:
         str: Response from the scheme init service (OTP sent confirmation)
     """
+    # Track in Langfuse with a clear name so it shows up in dashboard
+    from langfuse.decorators import langfuse_context
+    langfuse_context.update_current_observation(
+        name="scheme_tool:pmfby_init",
+        input={"scheme": "pmfby"},
+    )
     try:
         session_id = ctx.deps.session_id
         transaction_id = generate_transaction_id(session_id, phone_number)
@@ -564,6 +570,12 @@ def check_pmfby_status_with_otp(
     Returns:
         str: Detailed scheme status information
     """
+    # Track in Langfuse with a clear name so it shows up in dashboard
+    from langfuse.decorators import langfuse_context
+    langfuse_context.update_current_observation(
+        name="scheme_tool:pmfby_status",
+        input={"scheme": "pmfby", "inquiry_type": inquiry_type, "year": year, "season": season},
+    )
     try:
         otp_str = str(otp).strip() if otp else ""
         if not otp_str:

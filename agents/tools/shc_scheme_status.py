@@ -557,6 +557,12 @@ async def check_shc_status(
     Returns:
         str: Detailed soil health card information
     """
+    # Track in Langfuse for dashboard
+    from langfuse.decorators import langfuse_context
+    langfuse_context.update_current_observation(
+        name="scheme_tool:shc_status",
+        input={"scheme": "shc", "cycle": cycle},
+    )
     try:
         payload = SHCStatusRequest(
             cycle=cycle,
