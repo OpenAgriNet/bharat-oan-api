@@ -373,6 +373,12 @@ def grievance_status(identity_no: str) -> str:
         or an explanatory message if not found yet.
     """
     try:
+        # Track in Langfuse with a clear name so it shows up in dashboard
+        from langfuse.decorators import langfuse_context
+        langfuse_context.update_current_observation(
+            name="scheme_tool:grievance_status",
+            input={"scheme": "pmkisan_grievance"},
+        )
         client = GrievanceClient.from_env()
         identity_value, type_field = _resolve_identity(client, identity_no.strip(), purpose="status")
 

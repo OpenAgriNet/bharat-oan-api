@@ -7,7 +7,7 @@ from pydantic import BaseModel, AnyHttpUrl, Field
 from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 import os
-from langfuse.decorators import observe
+from langfuse.decorators import observe, langfuse_context   
 
 logger = get_logger(__name__)
 
@@ -238,14 +238,26 @@ class SchemeRequest(BaseModel):
         }
 
 
-@observe(name="tool:get_scheme_info")
-def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc"]) -> str:
-    """Retrieve detailed information about government agricultural schemes.
-    
-    This tool fetches comprehensive scheme data including benefits, eligibility criteria, 
-    application process, and other relevant details for agricultural schemes. Use this 
-    tool whenever users inquire about specific schemes or need general scheme information.
 
+
+@observe()
+def _track_scheme_call(scheme_name: str) -> None:
+    """Child observation: one per scheme call, named 'scheme_info:<scheme>'."""
+    langfuse_context.update_current_observation(
+        name=f"scheme_info:{scheme_name}",
+        input={"scheme_name": scheme_name},
+        metadata={"scheme_name": scheme_name},
+    )
+
+
+@observe(name="tool:get_scheme_info")
+def get_scheme_info(
+    scheme_name: Literal[
+        "kcc", "pmkisan", "pmfby", "shc", "pmksy",
+        "sathi", "pmasha", "aif", "smam", "pdmc"
+    ]
+) -> str:
+    """
     Args:
         scheme_name (str): Name of the scheme to retrieve. Options:
             - "kcc": Kisan Credit Card scheme
@@ -263,6 +275,13 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
         str: Formatted scheme data including introduction, benefits, eligibility, 
              application process, and other relevant information.
     """
+    langfuse_context.update_current_observation(
+        input={"scheme_name": scheme_name},
+        metadata={"scheme_name": scheme_name},
+    )
+
+    _track_scheme_call(scheme_name)
+
     try:
         payload = SchemeRequest(scheme_name=scheme_name).get_payload()
         logger.info(f"SchemeName: {scheme_name}")
