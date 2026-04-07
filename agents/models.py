@@ -61,18 +61,14 @@ elif LLM_PROVIDER == 'azure-openai':
     )
     
     AGRINET_MODEL = OpenAIChatModel(
-        os.getenv('LLM_AGRINET_MODEL_NAME', azure_deployment_name),
+        azure_deployment_name,
         provider=OpenAIProvider(openai_client=azure_client),
     )
     MODERATION_MODEL = OpenAIChatModel(
-        os.getenv('LLM_MODERATION_MODEL_NAME', azure_deployment_name),
+        os.getenv('LLM_MODERATION_MODEL_NAME','moderation-model'),
         provider=OpenAIProvider(
             openai_client=azure_client,
         ),
     )
 else:
     raise ValueError(f"Invalid LLM_PROVIDER: {LLM_PROVIDER}. Must be one of: 'vllm', 'openai', 'azure-openai'")
-
-# Aliases for compatibility
-LLM_AGRINET_MODEL = AGRINET_MODEL
-LLM_MODERATION_MODEL = MODERATION_MODEL
