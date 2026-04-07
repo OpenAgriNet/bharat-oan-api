@@ -1,5 +1,5 @@
 """
-PM-KISAN Grievance Tools (create_grievance, check_grievance_status)
+PM-KISAN Grievance Tools (pmkisan_submit_grievance, pmkisan_grievance_status)
 
 - Strongly typed with Pydantic
 - Centralized crypto + transport
@@ -301,8 +301,8 @@ def _format_status(payload: Dict[str, Any]) -> str:
 # Exported Tools
 # --------------------------------------------------------------------------------------
 
-@observe(name="tool:submit_grievance")
-def submit_grievance(identity_no: str, grievance_description: str, grievance_type: str) -> str:
+@observe(name="tool:pmkisan_submit_grievance")
+def pmkisan_submit_grievance(identity_no: str, grievance_description: str, grievance_type: str) -> str:
     """
     Create and submit a grievance to the PM-KISAN portal.
 
@@ -356,12 +356,12 @@ def submit_grievance(identity_no: str, grievance_description: str, grievance_typ
         # Bubble up actionable guidance to the agent/user
         return str(e)
     except Exception as e:
-        logger.error(f"Unexpected error in create_grievance: {e}")
+        logger.error(f"Unexpected error in pmkisan_submit_grievance: {e}")
         raise ModelRetry(f"Unexpected error while submitting grievance. {str(e)}")
 
 
-@observe(name="tool:grievance_status")
-def grievance_status(identity_no: str) -> str:
+@observe(name="tool:pmkisan_grievance_status")
+def pmkisan_grievance_status(identity_no: str) -> str:
     """
     Check grievance status by PM-KISAN Registration Number or Aadhaar (registered).
 
@@ -395,5 +395,5 @@ def grievance_status(identity_no: str) -> str:
     except ModelRetry as e:
         return str(e)
     except Exception as e:
-        logger.error(f"Unexpected error in check_grievance_status: {e}")
+        logger.error(f"Unexpected error in pmkisan_grievance_status: {e}")
         raise ModelRetry(f"Unexpected error while checking grievance status. {str(e)}")
