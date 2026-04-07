@@ -12,29 +12,37 @@ LLM_PROVIDER   = os.getenv('LLM_PROVIDER', 'openai').lower()
 LLM_MODEL_NAME  = os.getenv('LLM_MODEL_NAME')
 
 if LLM_PROVIDER == 'vllm':
+    agrinet_model_name = os.getenv('LLM_AGRINET_MODEL_NAME', 'agrinet-model')
+    moderation_model_name = os.getenv('LLM_MODERATION_MODEL_NAME', 'moderation-model')
+    vllm_agrinet_url = os.getenv('VLLM_AGRINET_MODEL_URL')
+    vllm_moderation_url = os.getenv('VLLM_MODERATION_MODEL_URL', vllm_agrinet_url)
+
+    if not vllm_agrinet_url:
+        raise ValueError("VLLM_AGRINET_MODEL_URL is required when using vllm provider")
+
     AGRINET_MODEL = OpenAIChatModel(
-        os.getenv('LLM_AGRINET_MODEL_NAME','agrinet-model'),
+        agrinet_model_name,
         provider=OpenAIProvider(
-            base_url=os.getenv('VLLM_AGRINET_MODEL_URL'), 
+            base_url=vllm_agrinet_url, 
             api_key="not-needed"  
         ),
     )
     MODERATION_MODEL = OpenAIChatModel(
-        os.getenv('LLM_MODERATION_MODEL_NAME','moderation-model'),
+        moderation_model_name,
         provider=OpenAIProvider(
-            base_url=os.getenv('VLLM_MODERATION_MODEL_URL'), 
+            base_url=vllm_moderation_url, 
             api_key="not-needed"  
         ),
     )
 elif LLM_PROVIDER == 'openai':
     AGRINET_MODEL = OpenAIChatModel(
-        os.getenv('LLM_AGRINET_MODEL_NAME','agrinet-model'),
+        os.getenv('LLM_AGRINET_MODEL_NAME', 'gpt-3.5-turbo'),
         provider=OpenAIProvider(
             api_key=os.getenv('OPENAI_API_KEY'),
         ),
     )
     MODERATION_MODEL = OpenAIChatModel(
-        os.getenv('LLM_MODERATION_MODEL_NAME','moderation-model'),
+        os.getenv('LLM_MODERATION_MODEL_NAME', 'gpt-3.5-turbo'),
         provider=OpenAIProvider(
             api_key=os.getenv('OPENAI_API_KEY'),
         ),
@@ -54,6 +62,10 @@ elif LLM_PROVIDER == 'azure-openai':
     if not azure_deployment_name:
         raise ValueError("AZURE_OPENAI_DEPLOYMENT_NAME environment variable is required")
     
+    # Allow overriding the deployment name for specific agents if needed
+    agrinet_deployment = os.getenv('LLM_AGRINET_MODEL_NAME', azure_deployment_name)
+    moderation_deployment = os.getenv('LLM_MODERATION_MODEL_NAME', azure_deployment_name)
+
     azure_client = AsyncAzureOpenAI(
         azure_endpoint=azure_endpoint.rstrip('/'),
         api_version=azure_api_version,
@@ -61,11 +73,11 @@ elif LLM_PROVIDER == 'azure-openai':
     )
     
     AGRINET_MODEL = OpenAIChatModel(
-        azure_deployment_name,
+        agrinet_deployment,
         provider=OpenAIProvider(openai_client=azure_client),
     )
     MODERATION_MODEL = OpenAIChatModel(
-        os.getenv('LLM_MODERATION_MODEL_NAME','moderation-model'),
+        moderation_deployment,
         provider=OpenAIProvider(
             openai_client=azure_client,
         ),
