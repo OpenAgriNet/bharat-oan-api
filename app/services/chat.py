@@ -26,16 +26,19 @@ logger = get_logger(__name__)
 
 MODEL_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
-# Single source of truth for the root observation name (avoid setting trace_name too — duplicates the root in the UI).
-CHAT_TRACE_ROOT_NAME = (
-    os.getenv("LANGFUSE_TRACE_ROOT_NAME")
-    or os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
-    or os.getenv("LLM_MODEL_NAME")
-    or "Vistaar Chat"
+# Trace list title / filters use propagate_attributes(trace_name=...).
+# Keep this stable at the product level; store model/deployment on spans/metadata instead.
+CHAT_TRACE_NAME = (
+    os.getenv("LANGFUSE_TRACE_NAME")
+    or os.getenv("LANGFUSE_TRACE_ROOT_NAME")
+    or "bharat-vistaar-chat"
 )
 
+# Root chain observation name in the tree (keep distinct from trace_name to avoid duplicate labels).
+CHAT_CHAIN_SPAN_NAME = "chain.chat"
 
-@observe(name=CHAT_TRACE_ROOT_NAME, as_type="chain")
+
+@observe(name=CHAT_CHAIN_SPAN_NAME, as_type="chain")
 async def stream_chat_messages(
     query: str,
     session_id: str,
@@ -58,7 +61,7 @@ async def stream_chat_messages(
         session_id=session_id,
         metadata=trace_meta,
         tags=[f"env:{environment}"],
-        trace_name=CHAT_TRACE_ROOT_NAME,
+        trace_name=CHAT_TRACE_NAME,
     ):
         lf_set_trace_io(input=query)
 
