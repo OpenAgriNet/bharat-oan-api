@@ -13,7 +13,7 @@ from dateutil import parser
 from dateutil.parser import ParserError
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
-from langfuse.decorators import observe
+from langfuse import observe
 
 load_dotenv()
 
@@ -352,7 +352,7 @@ class WeatherRequest(BaseModel):
         }
 
 
-@observe(name="tool:weather_forecast")
+@observe(name="tool:weather_forecast", as_type="tool")
 async def weather_forecast(latitude: float, longitude: float) -> str:
     """Get Weather forecast for a specific location.
 

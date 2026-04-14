@@ -1,9 +1,8 @@
 import os
 from pydantic_ai import Agent
-from langfuse import Langfuse
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# langfuse = Langfuse()
-Agent.instrument_all()
+# Off by default: Langfuse @observe builds production → agent.moderation → agent.vistaar → tool:*.
+Agent.instrument_all(False)

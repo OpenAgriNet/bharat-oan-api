@@ -77,4 +77,4 @@ markdownify
 humanize
 
 pycryptodome
-langfuse==2.60.3
+langfuse>=3.0.0
