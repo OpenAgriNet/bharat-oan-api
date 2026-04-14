@@ -1,4 +1,3 @@
-import os
 from pydantic_ai import Agent, RunContext
 from helpers.utils import get_prompt, get_today_date_str
 from agents.models import LLM_MODEL
@@ -15,16 +14,17 @@ agrinet_agent = Agent(
     deps_type=FarmerContext,
     retries=3,
     tools=TOOLS,
-    end_strategy='exhaustive',
+    end_strategy="exhaustive",
     model_settings=ModelSettings(
         max_tokens=8192,
         parallel_tool_calls=True,
-   )
+    ),
 )
+
 
 @agrinet_agent.instructions
 def get_instructions(ctx: RunContext[FarmerContext]):
     """Get the instructions for the agrinet agent."""
     deps = ctx.deps
-    lang_code = deps.lang_code if deps.lang_code else 'en'
-    return get_prompt(f'agrinet_{lang_code}', context={'today_date': get_today_date_str()})
+    lang_code = deps.lang_code if deps.lang_code else "en"
+    return get_prompt(f"agrinet_{lang_code}", context={"today_date": get_today_date_str()})

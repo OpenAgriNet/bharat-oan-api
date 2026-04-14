@@ -14,7 +14,7 @@ from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
 from helpers.inject_pdf_header import inject
 from markdownify import MarkdownConverter
-from langfuse.decorators import observe
+from langfuse import observe
 
 load_dotenv()
 
@@ -542,7 +542,7 @@ async def cache_html_and_replace_urls(response_data: SHCStatusResponse, phone_nu
 # Functions
 # -----------------------
 
-@observe(name="tool:check_shc_status")
+@observe(name="tool:check_shc_status", as_type="tool")
 async def check_shc_status(
     phone_number: str,
     cycle: str
