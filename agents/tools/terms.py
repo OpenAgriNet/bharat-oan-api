@@ -3,7 +3,7 @@ import re
 from enum import Enum
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz, process
-from langfuse.decorators import observe
+from langfuse import observe
 
 # Load term pairs from JSON file with UTF-8 encoding
 term_pairs = json.load(open('assets/glossary_terms.json', 'r', encoding='utf-8'))
@@ -56,7 +56,7 @@ TERM_PAIRS = [TermPair(**pair) for pair in term_pairs]
 
 
 
-@observe(name="tool:search_terms")
+@observe(name="tool:search_terms", as_type="tool")
 async def search_terms(
     term: str,
     max_results: int = 5,

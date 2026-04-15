@@ -15,7 +15,7 @@ from pydantic import BaseModel, AnyHttpUrl, Field
 from typing import List, Optional, Dict, Any
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
-from langfuse.decorators import observe
+from langfuse import observe
 
 load_dotenv()
 
@@ -388,7 +388,7 @@ class MandiRequest(BaseModel):
 
 
 
-@observe(name="tool:get_mandi_prices")
+@observe(name="tool:get_mandi_prices", as_type="tool")
 async def get_mandi_prices(
     latitude: float,
     longitude: float,

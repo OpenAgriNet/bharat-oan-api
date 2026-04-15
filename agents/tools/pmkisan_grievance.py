@@ -18,7 +18,7 @@ import httpx
 from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, Field, AnyUrl, ValidationError
 from pydantic_ai import ModelRetry
-from langfuse.decorators import observe
+from langfuse import observe
 from helpers.utils import get_logger
 from helpers.encryption import hex_to_bytes, encrypt_aes_gcm, decrypt_aes_gcm
 
@@ -301,7 +301,7 @@ def _format_status(payload: Dict[str, Any]) -> str:
 # Exported Tools
 # --------------------------------------------------------------------------------------
 
-@observe(name="tool:pmkisan_submit_grievance")
+@observe(name="tool:pmkisan_submit_grievance", as_type="tool")
 def pmkisan_submit_grievance(identity_no: str, grievance_description: str, grievance_type: str) -> str:
     """
     Create and submit a grievance to the PM-KISAN portal.
@@ -360,7 +360,7 @@ def pmkisan_submit_grievance(identity_no: str, grievance_description: str, griev
         raise ModelRetry(f"Unexpected error while submitting grievance. {str(e)}")
 
 
-@observe(name="tool:pmkisan_grievance_status")
+@observe(name="tool:pmkisan_grievance_status", as_type="tool")
 def pmkisan_grievance_status(identity_no: str) -> str:
     """
     Check grievance status by PM-KISAN Registration Number or Aadhaar (registered).

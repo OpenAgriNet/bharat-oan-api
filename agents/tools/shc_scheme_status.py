@@ -12,7 +12,7 @@ from typing import List, Optional, Dict, Any, Literal
 from app.core.cache import cache
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
-from langfuse.decorators import observe
+from langfuse import observe
 from helpers.inject_pdf_header import inject
 from markdownify import MarkdownConverter
 load_dotenv()
@@ -541,7 +541,7 @@ async def cache_html_and_replace_urls(response_data: SHCStatusResponse, phone_nu
 # Functions
 # -----------------------
 
-@observe(name="tool:check_shc_status")
+@observe(name="tool:check_shc_status", as_type="tool")
 async def check_shc_status(
     phone_number: str,
     cycle: str

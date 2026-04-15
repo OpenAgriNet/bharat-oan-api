@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     jwt_public_key_path: str = os.getenv("JWT_PUBLIC_KEY_PATH", "jwt_public_key.pem")
     jwt_private_key_path: Optional[str] = os.getenv("JWT_PRIVATE_KEY_PATH")
     jwt_expiry_minutes: int = int(os.getenv("JWT_EXPIRY_MINUTES", "15"))
+    disable_jwt: bool = (
+        os.getenv("DISABLE_JWT", "").strip().lower() in ("1", "true", "yes", "on")
+        or os.getenv("DISABLE_JWT_FOR_LOCAL", "").strip().lower() in ("1", "true", "yes", "on")
+    )
 
     # API Key Auth Configuration
     api_key_auth_token: Optional[str] = os.getenv("API_KEY_AUTH_TOKEN")
@@ -87,7 +91,10 @@ class Settings(BaseSettings):
     langfuse_public_key: Optional[str] = None
     langfuse_secret_key: Optional[str] = None
     langfuse_host: Optional[str] = None
-    langfuse_tracing_environment: str = "development"
+    # Langfuse UI "Env" badge + OTel resource; defaults to app ENVIRONMENT so it matches env: tags in chat traces.
+    langfuse_tracing_environment: str = (
+        os.getenv("LANGFUSE_TRACING_ENVIRONMENT") or os.getenv("ENVIRONMENT", "production")
+    )
     eleven_labs_api_key: str = ""
     inference_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None

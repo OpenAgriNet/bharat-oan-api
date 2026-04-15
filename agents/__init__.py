@@ -1,9 +1,7 @@
-import os
-from pydantic_ai import Agent
-from langfuse import Langfuse
 from dotenv import load_dotenv
+from pydantic_ai import Agent
 
 load_dotenv()
 
-# langfuse = Langfuse()
-Agent.instrument_all()
+# Off by default: Langfuse @observe builds chain.chat → agent.moderation → agent.vistaar → tool:*.
+Agent.instrument_all(False)

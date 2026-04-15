@@ -10,7 +10,7 @@ from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext   
 import os
-from langfuse.decorators import observe
+from langfuse import observe
 
 logger = get_logger(__name__)
 
@@ -442,7 +442,7 @@ class SchemeStatusRequest(BaseModel):
 # Functions
 # -----------------------
 
-@observe(name="tool:initiate_pm_kisan_status_check")
+@observe(name="tool:initiate_pm_kisan_status_check", as_type="tool")
 def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) -> str:
     """Initiate PM Kisan status check by sending OTP to farmer's mobile.
     
@@ -512,7 +512,7 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str) 
         raise ModelRetry(f"Unexpected error in scheme init request. {str(e)}")
 
 
-@observe(name="tool:check_pm_kisan_status_with_otp")
+@observe(name="tool:check_pm_kisan_status_with_otp", as_type="tool")
 def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg_no: str) -> str:
     """Check PM Kisan status using OTP after initiating the OTP check.
      

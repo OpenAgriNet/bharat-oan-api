@@ -7,7 +7,7 @@ import marqo
 from typing import Optional, Literal
 from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
-from langfuse.decorators import observe
+from langfuse import observe
 from helpers.utils import get_logger
 from agents.tools.terms import normalize_text_with_glossary
 
@@ -41,7 +41,7 @@ class SearchHit(BaseModel):
             return f"**[{self.name}]({self.source})**\n" + "```\n" + self.processed_text + "\n```\n"
 
 
-@observe(name="tool:search_documents")
+@observe(name="tool:search_documents", as_type="tool")
 async def search_documents(
     query: str, 
     top_k: int = 10, 
@@ -101,7 +101,7 @@ async def search_documents(
 
 
 
-@observe(name="tool:search_videos")
+@observe(name="tool:search_videos", as_type="tool")
 async def search_videos(
     query: str, 
     top_k: int = 3, 
@@ -153,7 +153,7 @@ async def search_videos(
 
 
 
-@observe(name="tool:search_pests_diseases")
+@observe(name="tool:search_pests_diseases", as_type="tool")
 async def search_pests_diseases(
     query: str, 
     top_k: int = 10, 
