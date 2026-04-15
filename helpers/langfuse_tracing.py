@@ -9,7 +9,7 @@ from langfuse import get_client
 
 
 def lf_set_trace_io(*, input: Any = None, output: Any = None) -> None:
-    """Trace-level input/output (legacy API; still used by Langfuse UI for top-level I/O)."""
+    """Trace-level input/output for the Langfuse trace detail view."""
     get_client().set_current_trace_io(input=input, output=output)
 
 
@@ -22,16 +22,25 @@ def lf_update_current_observation(
     request_tokens: Optional[int] = None,
     response_tokens: Optional[int] = None,
 ) -> None:
-    """Update the active observation (agent/span/tool). Token usage is stored on metadata for non-generation types."""
-    meta: dict[str, Any] = dict(metadata) if metadata else {}
-    if model is not None:
-        meta["model"] = model
-    if request_tokens is not None:
-        meta["usage_request_tokens"] = request_tokens
-    if response_tokens is not None:
-        meta["usage_response_tokens"] = response_tokens
-    get_client().update_current_span(
+    """Update the active LLM step. Uses Langfuse generation fields so Tokens / cost roll up on the trace.
+
+    Call only inside @observe(as_type="generation") (see chat moderation / agrinet).
+    """
+    meta: Optional[dict[str, Any]] = dict(metadata) if metadata else None
+    usage_details: Optional[dict[str, int]] = None
+    if request_tokens is not None or response_tokens is not None:
+        prompt_tok = int(request_tokens or 0)
+        completion_tok = int(response_tokens or 0)
+        usage_details = {
+            "prompt_tokens": prompt_tok,
+            "completion_tokens": completion_tok,
+            "total_tokens": prompt_tok + completion_tok,
+        }
+
+    get_client().update_current_generation(
         input=input,
         output=output,
-        metadata=meta or None,
+        metadata=meta,
+        model=model,
+        usage_details=usage_details,
     )

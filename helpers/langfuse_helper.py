@@ -1,14 +1,15 @@
-import os
-from dotenv import load_dotenv
-from langfuse import Langfuse
+"""Set Langfuse client env before get_client() / OpenTelemetry export."""
 
-load_dotenv()
+import os
 
 from app.config import settings
+from langfuse import Langfuse
 
 os.environ["LANGFUSE_PUBLIC_KEY"] = settings.langfuse_public_key or ""
 os.environ["LANGFUSE_SECRET_KEY"] = settings.langfuse_secret_key or ""
-os.environ["LANGFUSE_HOST"] = settings.langfuse_host or ""
-os.environ["LANGFUSE_TRACING_ENVIRONMENT"] = os.getenv("LANGFUSE_TRACING_ENVIRONMENT") or settings.environment
+os.environ["LANGFUSE_HOST"] = (
+    settings.langfuse_host or os.getenv("LANGFUSE_BASE_URL") or ""
+)
+os.environ["LANGFUSE_TRACING_ENVIRONMENT"] = settings.langfuse_tracing_environment
 
 langfuse = Langfuse()
