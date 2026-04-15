@@ -1,16 +1,17 @@
 import os
 from typing import AsyncGenerator
+
 from fastapi import BackgroundTasks
 
 from agents.agrinet import agrinet_agent
 from agents.moderation import moderation_agent
-from helpers.utils import get_logger
 from helpers.langfuse_trace_schema import (
     AGENT_MODERATION,
     AGENT_VISTAAR,
     chat_trace_metadata_strings,
 )
 from helpers.langfuse_tracing import lf_set_trace_io, lf_update_current_observation
+from helpers.utils import get_logger
 from app.config import settings
 from app.utils import (
     update_message_history,
@@ -24,17 +25,17 @@ from langfuse import get_client, observe, propagate_attributes
 
 logger = get_logger(__name__)
 
-MODEL_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+MODEL_NAME = (
+    os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+    or os.getenv("LLM_AGRINET_MODEL_NAME")
+    or os.getenv("LLM_MODEL_NAME")
+)
 
-# Trace list title / filters use propagate_attributes(trace_name=...).
-# Keep this stable at the product level; store model/deployment on spans/metadata instead.
 CHAT_TRACE_NAME = (
     os.getenv("LANGFUSE_TRACE_NAME")
     or os.getenv("LANGFUSE_TRACE_ROOT_NAME")
     or "bharat-vistaar-chat"
 )
-
-# Root chain observation name in the tree (keep distinct from trace_name to avoid duplicate labels).
 CHAT_CHAIN_SPAN_NAME = "chain.chat"
 
 
@@ -46,21 +47,24 @@ async def stream_chat_messages(
     target_lang: str,
     user_id: str,
     history: list,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
-    environment = settings.environment
+    lf_env = settings.langfuse_tracing_environment
     trace_meta = chat_trace_metadata_strings(
         source_lang=source_lang,
         target_lang=target_lang,
-        environment=environment,
+        environment=lf_env,
         query=query,
     )
+    trace_tags = [f"env:{lf_env}"]
+    if MODEL_NAME:
+        trace_tags.append(f"model:{MODEL_NAME}")
     with propagate_attributes(
         user_id=user_id,
         session_id=session_id,
         metadata=trace_meta,
-        tags=[f"env:{environment}"],
+        tags=trace_tags,
         trace_name=CHAT_TRACE_NAME,
     ):
         lf_set_trace_io(input=query)
@@ -69,7 +73,9 @@ async def stream_chat_messages(
 
         message_pairs = "\n\n".join(format_message_pairs(history, 3))
         logger.info(f"Message pairs: {message_pairs}")
-        last_response = f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
+        last_response = (
+            f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
+        )
 
         user_message = f"{last_response}{deps.get_user_message()}"
 
@@ -103,13 +109,15 @@ async def stream_chat_messages(
 
         clean_new_messages = filter_thinking_from_history(list(new_messages or []))
         messages = [*history, *clean_new_messages]
-        logger.info(f"Updating message history for session {session_id} with {len(messages)} messages")
+        logger.info(
+            f"Updating message history for session {session_id} with {len(messages)} messages"
+        )
         await update_message_history(session_id, messages)
 
         get_client().flush()
 
 
-@observe(name=AGENT_MODERATION, as_type="agent")
+@observe(name=AGENT_MODERATION, as_type="generation")
 async def _run_moderation(user_message: str, session_id: str):
     """Run moderation agent and trace it in Langfuse."""
     lf_set_trace_io(input=user_message)
@@ -132,7 +140,7 @@ async def _run_moderation(user_message: str, session_id: str):
     return run.output
 
 
-@observe(name=AGENT_VISTAAR, as_type="agent")
+@observe(name=AGENT_VISTAAR, as_type="generation")
 async def _run_agrinet(
     user_message: str,
     trimmed_history: list,
