@@ -32,6 +32,7 @@ class TimingAllowOriginMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI):
     """Lifespan events for startup and shutdown"""
     # Startup
+    token.validate_multi_provider_auth_config()
     print(f"🚀 {settings.app_name} starting up...")
     print(f"📍 Environment: {settings.environment}")
     print(f"🔧 Debug mode: {settings.debug}")
