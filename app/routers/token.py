@@ -72,11 +72,24 @@ class PlayIntegrityAuthRequest(BaseModel):
     integrity_token: str = Field(..., description="Play Integrity token generated on device")
     nonce: str = Field(..., description="Nonce used when requesting Play Integrity token")
     mobile: Optional[str] = Field(None, description="Mobile number")
-    client_code: Optional[str] = Field(None, description="Client code for selecting per-client config")
+    client_code: str = Field(..., description="Client code for selecting per-client config")
 
 
 class ApiKeyAuthRequest(BaseModel):
-    client_code: Optional[str] = Field(None, description="Client code for selecting per-client API key")
+    client_code: str = Field(..., description="Client code for selecting per-client API key")
+
+
+def _normalize_client_code(client_code: str) -> str:
+    return client_code.strip().upper().replace("-", "_").replace(" ", "_")
+
+
+def _require_client_code(client_code: Optional[str], context: str) -> str:
+    if client_code is None or not client_code.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"client_code is required for {context}."
+        )
+    return client_code.strip()
 
 
 def _issue_jwt_token(
@@ -127,14 +140,34 @@ def _issue_jwt_token(
 def _resolve_service_account_path(client_code: Optional[str] = None) -> Path:
     # If client_code is provided, use client-specific file path
     if client_code:
-        # Use the same base directory and pattern as default file
+        normalized = _normalize_client_code(client_code)
+
+        if settings.play_integrity_service_account_base_path:
+            candidate = Path(f"{settings.play_integrity_service_account_base_path}{normalized.lower()}.json")
+            resolved = candidate if candidate.is_absolute() else settings.base_dir / candidate
+            if resolved.exists():
+                return resolved
+            logger.warning(
+                "Client-specific Play Integrity service account not found from base path: %s",
+                str(resolved),
+            )
+
         base_path = Path(settings.play_integrity_service_account_file).parent if settings.play_integrity_service_account_file else Path("secrets")
-        client_file = f"play-integrity-service-account-{client_code}.json"
-        candidate = base_path / client_file
-        resolved = candidate if candidate.is_absolute() else settings.base_dir / candidate
-        if resolved.exists():
-            return resolved
-        logger.warning("Client-specific Play Integrity service account not found: %s, falling back to default", str(resolved))
+        candidate_names = [
+            f"play-integrity-service-account-{client_code}.json",
+            f"play-integrity-service-account-{normalized.lower()}.json",
+            f"play-integrity-service-account-{normalized.lower().replace('_', '-')}.json",
+        ]
+        for candidate_name in candidate_names:
+            candidate = base_path / candidate_name
+            resolved = candidate if candidate.is_absolute() else settings.base_dir / candidate
+            if resolved.exists():
+                return resolved
+
+        logger.warning(
+            "Client-specific Play Integrity service account not found for client_code=%s, falling back to default",
+            client_code,
+        )
 
     # Fall back to default service account file
     if not settings.play_integrity_service_account_file:
@@ -148,11 +181,16 @@ def _resolve_service_account_path(client_code: Optional[str] = None) -> Path:
 
 def _resolve_play_integrity_package_name(client_code: Optional[str] = None) -> str:
     if client_code:
-        normalized = client_code.strip().upper().replace('-', '_')
+        normalized = _normalize_client_code(client_code)
         env_key = f"{settings.play_integrity_package_name_prefix}{normalized}"
         package_name = os.getenv(env_key)
         if package_name:
             return package_name
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Missing Play Integrity package configuration for client_code '{client_code}' ({env_key})."
+        )
 
     if not settings.play_integrity_package_name:
         raise HTTPException(
@@ -164,11 +202,16 @@ def _resolve_play_integrity_package_name(client_code: Optional[str] = None) -> s
 
 def _resolve_api_key(client_code: Optional[str] = None) -> str:
     if client_code:
-        normalized = client_code.strip().upper().replace('-', '_')
+        normalized = _normalize_client_code(client_code)
         env_key = f"{settings.api_key_auth_token_prefix}{normalized}"
         client_key = os.getenv(env_key)
         if client_key:
             return client_key
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Missing API key configuration for client_code '{client_code}' ({env_key})."
+        )
 
     if not settings.api_key_auth_token:
         raise HTTPException(
@@ -181,7 +224,7 @@ def _resolve_api_key(client_code: Optional[str] = None) -> str:
 async def _get_play_integrity_access_token(client_code: Optional[str] = None) -> str:
     global _play_integrity_credentials
 
-    client_key = client_code or "default"
+    client_key = _normalize_client_code(client_code) if client_code else "default"
 
     async with _play_integrity_credentials_lock:
         if client_key not in _play_integrity_credentials:
@@ -199,14 +242,14 @@ async def _get_play_integrity_access_token(client_code: Optional[str] = None) ->
             
             # If client_code exists, try to load private key from environment variable
             if client_code:
-                normalized = client_code.strip().upper().replace('-', '_')
+                normalized = _normalize_client_code(client_code)
                 env_key = f"{settings.play_integrity_private_key_prefix}{normalized}"
                 private_key_from_env = os.getenv(env_key)
                 
                 if private_key_from_env:
                     # Replace the private_key in JSON with env value
                     service_account_info['private_key'] = private_key_from_env
-                    logger.info(f"Loaded private key for {client_code} from env var {env_key}")
+                    logger.info(f"Loaded private key for {client_key} from env var {env_key}")
             
             _play_integrity_credentials[client_key] = service_account.Credentials.from_service_account_info(
                 service_account_info,
@@ -226,8 +269,11 @@ async def _get_play_integrity_access_token(client_code: Optional[str] = None) ->
         return credentials.token
 
 
-async def _decode_play_integrity_token(integrity_token: str, client_code: Optional[str] = None) -> Dict[str, Any]:
-    package_name = _resolve_play_integrity_package_name(client_code)
+async def _decode_play_integrity_token(
+    integrity_token: str,
+    package_name: str,
+    client_code: Optional[str] = None,
+) -> Dict[str, Any]:
     access_token = await _get_play_integrity_access_token(client_code)
     url = PLAY_INTEGRITY_DECODE_URL_TEMPLATE.format(package_name=package_name)
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -264,10 +310,14 @@ async def _decode_play_integrity_token(integrity_token: str, client_code: Option
     return token_payload
 
 
-def _validate_play_integrity_payload(token_payload: Dict[str, Any], expected_nonce: str) -> None:
+def _validate_play_integrity_payload(
+    token_payload: Dict[str, Any],
+    expected_nonce: str,
+    expected_package_name: str,
+) -> None:
     request_details = token_payload.get("requestDetails") or {}
     package_name = request_details.get("requestPackageName")
-    if package_name != settings.play_integrity_package_name:
+    if package_name != expected_package_name:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid package name in Play Integrity verdict."
@@ -407,13 +457,14 @@ async def create_auth_token(request: Optional[AuthRequest] = None):
 
 @router.post("/api-key", status_code=status.HTTP_200_OK, response_model=StaticAuthResponse)
 async def create_auth_token_with_api_key(
-    request: Optional[ApiKeyAuthRequest] = None,
+    request: ApiKeyAuthRequest,
     api_key: str = Header(..., alias="X-API-Key", description="Client API key"),
 ):
     """
     Validate static API key from env and issue expiring JWT.
     """
-    resolved_api_key = _resolve_api_key(request.client_code if request else None)
+    client_code = _require_client_code(request.client_code, "API key authentication")
+    resolved_api_key = _resolve_api_key(client_code)
 
     if not hmac.compare_digest(api_key, resolved_api_key):
         raise HTTPException(
@@ -433,8 +484,14 @@ async def create_auth_token_with_play_integrity(request: PlayIntegrityAuthReques
     """
     Validate Google Play Integrity verdict and issue JWT.
     """
-    token_payload = await _decode_play_integrity_token(request.integrity_token, request.client_code)
-    _validate_play_integrity_payload(token_payload, request.nonce)
+    client_code = _require_client_code(request.client_code, "Play Integrity authentication")
+    package_name = _resolve_play_integrity_package_name(client_code)
+    token_payload = await _decode_play_integrity_token(
+        request.integrity_token,
+        package_name=package_name,
+        client_code=client_code,
+    )
+    _validate_play_integrity_payload(token_payload, request.nonce, expected_package_name=package_name)
     await _ensure_nonce_not_reused(request.nonce)
 
     mobile = request.mobile if request.mobile else "verified_device"
@@ -451,3 +508,30 @@ async def create_auth_token_with_play_integrity(request: PlayIntegrityAuthReques
             detail="Failed to compute token expiry."
         )
     return AuthResponse(token=token, expires_in=expires_in)
+
+
+def validate_multi_provider_auth_config() -> None:
+    api_key_prefix = settings.api_key_auth_token_prefix
+    play_package_prefix = settings.play_integrity_package_name_prefix
+    play_private_key_prefix = settings.play_integrity_private_key_prefix
+
+    def _has_provider_suffix(env_key: str, prefix: str) -> bool:
+        if not env_key.startswith(prefix):
+            return False
+        suffix = env_key[len(prefix):]
+        return bool(suffix) and suffix != "PREFIX"
+
+    provider_errors = []
+
+    for env_key, env_value in os.environ.items():
+        if _has_provider_suffix(env_key, api_key_prefix) and not (env_value or "").strip():
+            provider_errors.append(f"{env_key} is empty")
+        if _has_provider_suffix(env_key, play_package_prefix) and not (env_value or "").strip():
+            provider_errors.append(f"{env_key} is empty")
+        if _has_provider_suffix(env_key, play_private_key_prefix) and not (env_value or "").strip():
+            provider_errors.append(f"{env_key} is empty")
+
+    if provider_errors:
+        raise RuntimeError(
+            "Invalid multi-provider auth configuration: " + "; ".join(provider_errors)
+        )

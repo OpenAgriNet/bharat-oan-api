@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     # Play Integrity Auth Configuration
     play_integrity_package_name: Optional[str] = os.getenv("PLAY_INTEGRITY_PACKAGE_NAME")
     play_integrity_service_account_file: Optional[str] = os.getenv("PLAY_INTEGRITY_SERVICE_ACCOUNT_FILE")
+    play_integrity_service_account_base_path: Optional[str] = os.getenv("PLAY_INTEGRITY_SERVICE_ACCOUNT_BASE_PATH")
     play_integrity_package_name_prefix: str = os.getenv("PLAY_INTEGRITY_PACKAGE_NAME_PREFIX", "PLAY_INTEGRITY_PACKAGE_NAME_")
     play_integrity_private_key_prefix: str = os.getenv("PLAY_INTEGRITY_PRIVATE_KEY_PREFIX", "PLAY_INTEGRITY_PRIVATE_KEY_")
     play_integrity_freshness_seconds: int = int(os.getenv("PLAY_INTEGRITY_FRESHNESS_SECONDS", "120"))
