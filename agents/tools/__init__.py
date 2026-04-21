@@ -50,12 +50,12 @@ TOOLS = [
     ),
     Tool(
         pmkisan_submit_grievance,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
         pmkisan_grievance_status,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
