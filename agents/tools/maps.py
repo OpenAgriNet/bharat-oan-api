@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 from typing import Optional, Any
 from urllib.parse import urlparse
 from pydantic import BaseModel, field_validator
-from langfuse import observe
 from helpers.utils import get_logger
+from langfuse import observe
 
 logger = get_logger(__name__)
 
@@ -85,7 +85,6 @@ def _feature_to_location(feature: dict, fallback_name: str = None) -> Location:
     return Location(place_name=display_name, latitude=latitude, longitude=longitude)
 
 
-
 @observe(name="tool:forward_geocode", as_type="tool")
 async def forward_geocode(place_name: str) -> str:
     """Forward Geocoding to get latitude and longitude from a place name in India.
@@ -139,7 +138,6 @@ async def forward_geocode(place_name: str) -> str:
     except Exception as e:
         logger.error(f"Unexpected error during forward geocoding for '{place_name}': {e}")
         return f"Unable to find location for '{place_name}'. Please try again later."
-
 
 
 @observe(name="tool:reverse_geocode", as_type="tool")

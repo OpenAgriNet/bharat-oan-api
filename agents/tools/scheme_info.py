@@ -187,6 +187,9 @@ class SchemeRequest(BaseModel):
              - "aif": Agriculture Infrastructure Fund
              - "smam": Sub-Mission on Agricultural Mechanization
              - "pdmc": Per Drop More Crop scheme
+             - "pkvy": Paramparagat Krishi Vikas Yojana (PKVY)
+             - "nfsm": National Food Security Mission (NFSM)
+             - "rad": Rainfed Area Development (RAD)
     """
     scheme_name: str
     
@@ -237,9 +240,8 @@ class SchemeRequest(BaseModel):
             }
         }
 
-
 @observe(name="tool:get_scheme_info", as_type="tool")
-def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc"]) -> str:
+def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc", "pkvy", "nfsm", "rad"]) -> str:
     """Retrieve detailed information about government agricultural schemes.
     
     This tool fetches comprehensive scheme data including benefits, eligibility criteria, 
@@ -258,6 +260,9 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
             - "aif": Agriculture Infrastructure Fund
             - "smam": Sub-Mission on Agricultural Mechanization
             - "pdmc": Per Drop More Crop scheme
+            - "pkvy": Paramparagat Krishi Vikas Yojana (PKVY)
+            - "nfsm": National Food Security Mission (NFSM)
+            - "rad": Rainfed Area Development (RAD)
 
     Returns:
         str: Formatted scheme data including introduction, benefits, eligibility, 

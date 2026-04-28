@@ -469,7 +469,6 @@ class PMfbyStatusWithOtpRequest(BaseModel):
 # Functions
 # -----------------------
 
-
 @observe(name="tool:initiate_pmfby_status_check", as_type="tool")
 def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: str) -> str:
     """Initiate PMFBY status check by sending OTP to farmer's mobile.
@@ -537,7 +536,6 @@ def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: st
     except Exception as e:
         logger.error(f"Error in PMFBY init: {e}")
         raise ModelRetry(f"Unexpected error in PMFBY init request. {str(e)}")
-
 
 
 @observe(name="tool:check_pmfby_status_with_otp", as_type="tool")

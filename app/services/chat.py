@@ -10,9 +10,9 @@ from helpers.langfuse_trace_schema import (
     AGENT_VISTAAR,
     chat_trace_metadata_strings,
 )
+from helpers.langfuse_helper import get_langfuse_tracing_environment
 from helpers.langfuse_tracing import lf_set_trace_io, lf_update_current_observation
 from helpers.utils import get_logger
-from app.config import settings
 from app.utils import (
     update_message_history,
     trim_history,
@@ -50,7 +50,7 @@ async def stream_chat_messages(
     background_tasks: BackgroundTasks,
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
-    lf_env = settings.langfuse_tracing_environment
+    lf_env = get_langfuse_tracing_environment()
     trace_meta = chat_trace_metadata_strings(
         source_lang=source_lang,
         target_lang=target_lang,
@@ -117,7 +117,7 @@ async def stream_chat_messages(
         get_client().flush()
 
 
-@observe(name=AGENT_MODERATION, as_type="agent")
+@observe(name=AGENT_MODERATION, as_type="generation")
 async def _run_moderation(user_message: str, session_id: str):
     """Run moderation agent and trace it in Langfuse."""
     lf_set_trace_io(input=user_message)
@@ -140,7 +140,7 @@ async def _run_moderation(user_message: str, session_id: str):
     return run.output
 
 
-@observe(name=AGENT_VISTAAR, as_type="agent")
+@observe(name=AGENT_VISTAAR, as_type="generation")
 async def _run_agrinet(
     user_message: str,
     trimmed_history: list,

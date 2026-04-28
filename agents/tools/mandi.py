@@ -387,7 +387,6 @@ class MandiRequest(BaseModel):
         }
 
 
-
 @observe(name="tool:get_mandi_prices", as_type="tool")
 async def get_mandi_prices(
     latitude: float,

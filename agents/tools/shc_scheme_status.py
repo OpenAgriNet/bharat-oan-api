@@ -15,6 +15,8 @@ from dotenv import load_dotenv
 from langfuse import observe
 from helpers.inject_pdf_header import inject
 from markdownify import MarkdownConverter
+from langfuse import observe
+
 load_dotenv()
 
 

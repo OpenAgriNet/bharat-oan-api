@@ -22,34 +22,25 @@ def lf_update_current_observation(
     request_tokens: Optional[int] = None,
     response_tokens: Optional[int] = None,
 ) -> None:
-    """Update the active observation. Uses generation updates when model/usage are set so Langfuse can aggregate tokens and cost."""
-    meta: dict[str, Any] = dict(metadata) if metadata else {}
-    if model is not None:
-        meta["model"] = model
+    """Update the active LLM step. Uses Langfuse generation fields so Tokens / cost roll up on the trace.
 
-    has_usage = request_tokens is not None or response_tokens is not None
+    Call only inside @observe(as_type="generation") (see chat moderation / agrinet).
+    """
+    meta: Optional[dict[str, Any]] = dict(metadata) if metadata else None
     usage_details: Optional[dict[str, int]] = None
-    if has_usage:
-        pt = int(request_tokens or 0)
-        ct = int(response_tokens or 0)
+    if request_tokens is not None or response_tokens is not None:
+        prompt_tok = int(request_tokens or 0)
+        completion_tok = int(response_tokens or 0)
         usage_details = {
-            "prompt_tokens": pt,
-            "completion_tokens": ct,
-            "total_tokens": pt + ct,
+            "prompt_tokens": prompt_tok,
+            "completion_tokens": completion_tok,
+            "total_tokens": prompt_tok + completion_tok,
         }
 
-    client = get_client()
-    if model is not None or usage_details is not None:
-        client.update_current_generation(
-            input=input,
-            output=output,
-            metadata=meta or None,
-            model=model,
-            usage_details=usage_details,
-        )
-    else:
-        client.update_current_span(
-            input=input,
-            output=output,
-            metadata=meta or None,
-        )
+    get_client().update_current_generation(
+        input=input,
+        output=output,
+        metadata=meta,
+        model=model,
+        usage_details=usage_details,
+    )

@@ -1,5 +1,5 @@
 """
-PM-KISAN Grievance Tools (pmkisan_submit_grievance, pmkisan_grievance_status)
+PM-KISAN Grievance Tools (create_grievance, check_grievance_status)
 
 - Strongly typed with Pydantic
 - Centralized crypto + transport
@@ -15,12 +15,11 @@ import os
 from typing import Any, Dict, List, Optional, Tuple, Literal
 
 import httpx
-from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, Field, AnyUrl, ValidationError
 from pydantic_ai import ModelRetry
-from langfuse import observe
 from helpers.utils import get_logger
 from helpers.encryption import hex_to_bytes, encrypt_aes_gcm, decrypt_aes_gcm
+from langfuse import observe
 
 logger = get_logger(__name__)
 
@@ -35,23 +34,10 @@ KEY_1_HEX = os.getenv("GRIEVANCE_KEY_1")
 KEY_2_HEX = os.getenv("GRIEVANCE_KEY_2")
 
 # Mapping file: human-friendly grievance labels -> backend codes
-_GRIEVANCE_JSON_PATH = os.getenv("GRIEVANCE_TYPES_PATH", "assets/grievance_types.json")
+_GRIEVANCE_JSON_PATH = "assets/grievance_types.json"
 
-
-def _load_grievance_mapping(path: str) -> Dict[str, str]:
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if not isinstance(data, dict):
-                raise ValueError("grievance_types.json must be an object of {label: code}")
-            return {str(k): str(v) for k, v in data.items()}
-    except Exception as e:
-        logger.error(f"Failed to load grievance mapping at '{path}': {e}")
-        return {}
-
-
-GRIEVANCE_MAPPING: Dict[str, str] = _load_grievance_mapping(_GRIEVANCE_JSON_PATH)
-GRIEVANCE_TYPES: List[str] = list(GRIEVANCE_MAPPING.keys())
+GRIEVANCE_MAPPING = json.load(open(_GRIEVANCE_JSON_PATH, "r", encoding="utf-8"))
+GRIEVANCE_TYPES = Literal[tuple(GRIEVANCE_MAPPING.keys())]  # type: ignore
 
 
 # --------------------------------------------------------------------------------------
@@ -83,6 +69,9 @@ class GrievanceClient(BaseModel):
     token: str = Field(default=GRIEVANCE_TOKEN)
     crypto: Crypto
 
+    timeout_connect: int = 20
+    timeout_read: int = 30
+
     @classmethod
     def from_env(cls) -> "GrievanceClient":
         if not GRIEVANCE_BASE_URL:
@@ -94,8 +83,7 @@ class GrievanceClient(BaseModel):
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         encrypted_body = self.crypto.encrypt_payload(body)
         logger.info(f"Grievance API request: {url} | body: {json.dumps(encrypted_body)}")
-        timeout = DEFAULT_HTTP_TIMEOUT
-        resp = httpx.post(url, json=encrypted_body, headers=headers, timeout=timeout)
+        resp = httpx.post(url, json=encrypted_body, headers=headers, timeout=httpx.Timeout(self.timeout_connect, read=self.timeout_read))
         logger.info(f"Grievance API response: {url} | status: {resp.status_code} | body: {resp.text[:500]}")
         return resp
 
@@ -301,15 +289,15 @@ def _format_status(payload: Dict[str, Any]) -> str:
 # Exported Tools
 # --------------------------------------------------------------------------------------
 
-@observe(name="tool:pmkisan_submit_grievance", as_type="tool")
-def pmkisan_submit_grievance(identity_no: str, grievance_description: str, grievance_type: str) -> str:
+@observe(name="tool:submit_grievance", as_type="tool")
+def submit_pmkisan_grievance(identity_no: str, grievance_description: str, grievance_type: GRIEVANCE_TYPES) -> str:
     """
     Create and submit a grievance to the PM-KISAN portal.
 
     Args:
         identity_no: PM-KISAN Registration Number (11-character alphanumeric string) or 12-digit Aadhaar number registered with PM-KISAN.
         grievance_description: Description of the grievance (plain text).
-        grievance_type: Human-friendly grievance label. Must be one of the keys in GRIEVANCE_MAPPING.
+        grievance_type: Type of grievance to submit.
 
     Returns:
         A user-friendly message summarizing submission outcome.
@@ -356,12 +344,12 @@ def pmkisan_submit_grievance(identity_no: str, grievance_description: str, griev
         # Bubble up actionable guidance to the agent/user
         return str(e)
     except Exception as e:
-        logger.error(f"Unexpected error in pmkisan_submit_grievance: {e}")
+        logger.error(f"Unexpected error in create_grievance: {e}")
         raise ModelRetry(f"Unexpected error while submitting grievance. {str(e)}")
 
 
-@observe(name="tool:pmkisan_grievance_status", as_type="tool")
-def pmkisan_grievance_status(identity_no: str) -> str:
+@observe(name="tool:grievance_status", as_type="tool")
+def grievance_status(identity_no: str) -> str:
     """
     Check grievance status by PM-KISAN Registration Number or Aadhaar (registered).
 
@@ -395,5 +383,5 @@ def pmkisan_grievance_status(identity_no: str) -> str:
     except ModelRetry as e:
         return str(e)
     except Exception as e:
-        logger.error(f"Unexpected error in pmkisan_grievance_status: {e}")
+        logger.error(f"Unexpected error in check_grievance_status: {e}")
         raise ModelRetry(f"Unexpected error while checking grievance status. {str(e)}")
