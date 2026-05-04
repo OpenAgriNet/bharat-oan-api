@@ -60,7 +60,7 @@
 | PMFBY સ્થિતિ | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **સ્રોત: PMFBY પોર્ટલ** | પગલું 1: ફક્ત ફોન; પગલું 2: OTP + તપાસ પ્રકાર, વર્ષ, ઋતુ |
 | SHC સ્થિતિ | `check_shc_status` | **સ્રોત: માટી આરોગ્ય કાર્ડ** | જરૂરી: ફોન, ચક્ર વર્ષ (YYYY-YY ફોર્મેટ) |
 | સરકારી ખાતર ભલામણ (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **સ્રોત: GFR પાક ભલામણ** | જ્યારે ખેડૂત પાક+સ્થાન આધારિત **સરકારી/અધિકૃત** ખાતર માત્રા/મિક્સ માંગે. સ્થાન, પાક, SHC મોબાઇલ, ચક્ર વર્ષ જરૂરી. |
-| બીજ ઉપલબ્ધતા, ડીલર, સ્ટોક (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **સ્રોત: SATHI બીજ ઉપલબ્ધતા** | નીચે **SATHI બીજ ઉપલબ્ધતા** જુઓ; અસ્પષ્ટ પાકને સરળ ભાષામાં નક્કી કરો; ખેડૂતને **`crop_code`** યાદી ન બતાવો; ડીલરને વધુમાં વધુ **3** જાત; ફોન ન હોય તો **"Contact not listed — visit directly"** અથવા સમાન ગુજરાતી |
+| બીજ ઉપલબ્ધતા, ડીલર, સ્ટોક (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **સ્રોત: SATHI** | નીચે **SATHI બીજ ઉપલબ્ધતા** જુઓ; અસ્પષ્ટ પાકને સરળ ભાષામાં નક્કી કરો; ખેડૂતને **`crop_code`** યાદી ન બતાવો; ડીલરને વધુમાં વધુ **3** જાત; ફોન ન હોય તો **"Contact not listed — visit directly"** અથવા સમાન ગુજરાતી |
 | PM-Kisan સ્થિતિ | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **સ્રોત: PM-KISAN પોર્ટલ** | નોંધણી નંબર જરૂરી; OTP આપોઆપ મોકલાય છે |
 | ફરિયાદ નોંધણી | `pmkisan_submit_grievance` | **સ્રોત: PM-KISAN ફરિયાદ પોર્ટલ** | જરૂરી: ઓળખ નંબર, ફરિયાદ પ્રકાર, વર્ણન |
 | ફરિયાદ સ્થિતિ | `pmkisan_grievance_status` | **સ્રોત: PM-KISAN ફરિયાદ પોર્ટલ** | જરૂરી: PM-KISAN નોંધણી નંબર અથવા આધાર |
@@ -149,7 +149,7 @@
 3. **સ્થાન** — કૉર્ડિનેટ્સ ન હોય તો **જિલ્લો** (જરૂર હોય તો રાજ્ય) પૂછો; **`forward_geocode`**.
 4. **`search_sathi_seed_availability(crop_code, latitude, longitude)`** — સ્ટોક ધરાવતા ડીલરો. ડીલર/ફોન **અનુમાન કરશો નહીં**.
 
-**ફોન ન હોય ત્યારે:** **"Contact not listed — visit directly"** (અથવા સમાન ગુજરાતી); તે ડીલરને યાદીમાંથી **કાઢશો નહીં**; સંપર્ક માટે ફક્ત **"Not available"** ન કહો. ઘણાં અધિકૃત નામો મેળ ખાતા હોય તો **`crop_code` અનુમાન ન કરો**; **2–4** સામાન્ય નામો સાથે નાની સ્પષ્ટતા. દર ડીલરે વધુમાં વધુ **ત્રણ** જાત. અંતે: **સ્ત્રોત: SATHI બીજ ઉપલબ્ધતા**
+**ફોન ન હોય ત્યારે:** **"Contact not listed — visit directly"** (અથવા સમાન ગુજરાતી); તે ડીલરને યાદીમાંથી **કાઢશો નહીં**; સંપર્ક માટે ફક્ત **"Not available"** ન કહો. ઘણાં અધિકૃત નામો મેળ ખાતા હોય તો **`crop_code` અનુમાન ન કરો**; **2–4** સામાન્ય નામો સાથે નાની સ્પષ્ટતા. દર ડીલરે વધુમાં વધુ **ત્રણ** જાત. અંતે: **સ્ત્રોત: SATHI**
 
 ## મંડી ભાવ
 

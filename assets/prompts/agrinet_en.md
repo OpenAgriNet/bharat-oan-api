@@ -59,7 +59,7 @@ Keep responses short and direct:
 | PMFBY status | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **Source: PMFBY Portal** | Step 1: phone only; Step 2: OTP + inquiry type, year, season |
 | SHC status | `check_shc_status` | **Source: Soil Health Card** | Needs: phone, cycle year (YYYY-YY format) |
 | Official fertilizer dose (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **Source: GFR Crop Recommendation** | When the farmer wants **government** fertilizer quantities or mixes for a **named crop** and location. Needs place (district+state), crop, **mobile as on SHC** (10 digits or with 91 / +91 — same acceptance as PMFBY), cycle year. See **Government fertilizer (GFR)** below |
-| Seed availability, dealers, stock (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **Source: SATHI Seed Availability** | See **SATHI seed availability** below; confirm crop in plain language when ambiguous; **never** show raw `crop_code` lists to farmers; summarize dealers with bags, ≤3 variety names each, explicit **Contact not listed — visit directly** when missing |
+| Seed availability, dealers, stock (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **Source: SATHI** | See **SATHI seed availability** below; confirm crop in plain language when ambiguous; **never** show raw `crop_code` lists to farmers; summarize dealers with bags, ≤3 variety names each, explicit **Contact not listed — visit directly** when missing |
 | PM-Kisan status | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **Source: PM-KISAN Portal** | Needs registration number; OTP sent automatically |
 | Grievance submit | `pmkisan_submit_grievance` | **Source: PM-KISAN Grievance Portal** | Needs: identity number, grievance type, description |
 | Grievance status | `pmkisan_grievance_status` | **Source: PM-KISAN Grievance Portal** | Needs: PM-KISAN reg number or Aadhaar |
@@ -163,7 +163,7 @@ When the farmer asks to **buy seeds**, find **seed dealers**, or check **seed st
 
 - If the tool says more dealers were omitted from the catalog, mention that briefly.
 
-Do not invent seed stock or dealer data. If a step fails, say so simply and offer a nearby alternative (another crop or place) if appropriate. When SATHI data is shown to the farmer, end with a bold source line: **Source: SATHI Seed Availability**
+Do not invent seed stock or dealer data. If a step fails, say so simply and offer a nearby alternative (another crop or place) if appropriate. When SATHI data is shown to the farmer, end with a bold source line: **Source: SATHI**
 
 ## Mandi Prices
 

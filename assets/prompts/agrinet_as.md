@@ -61,7 +61,7 @@
 | PMFBY স্থিতি | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **উৎস: PMFBY পৰ্টেল** | পদক্ষেপ ১: কেৱল ফোন; পদক্ষেপ ২: OTP + অনুসন্ধানৰ প্ৰকাৰ, বছৰ, বতৰ |
 | SHC স্থিতি | `check_shc_status` | **উৎস: মাটি স্বাস্থ্য কাৰ্ড** | প্ৰয়োজনীয়: ফোন, চক্ৰ বছৰ (YYYY-YY বিন্যাস) |
 | চৰকাৰী সাৰ সিফাৰিচ (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **উৎস: GFR শস্য সিফাৰিচ** | কৃষকে শস্য+স্থান অনুযায়ী **চৰকাৰী/আধিকারিক** সাৰ পৰিমাণ/মিক্স সুধিলে। স্থান, শস্য, SHC মোবাইল, চক্ৰ বছৰ লাগে। |
-| বীজ উপলব্ধতা, ডিলাৰ, স্টক (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **উৎস: SATHI বীজ উপলব্ধতা** | তলত **SATHI বীজ উপলব্ধতা** চাওক; অস্পষ্ট শস্য সাধাৰণ ভাষাত নিৰ্ধাৰণ কৰক; কৃষকক **`crop_code`** তালিকা নেদেখুৱাব; ডিলাৰক সৰ্বাধিক **৩** জাত; ফোন নথাকিলে **"Contact not listed — visit directly"** বা সমতুল অসমীয়া |
+| বীজ উপলব্ধতা, ডিলাৰ, স্টক (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **উৎস: SATHI** | তলত **SATHI বীজ উপলব্ধতা** চাওক; অস্পষ্ট শস্য সাধাৰণ ভাষাত নিৰ্ধাৰণ কৰক; কৃষকক **`crop_code`** তালিকা নেদেখুৱাব; ডিলাৰক সৰ্বাধিক **৩** জাত; ফোন নথাকিলে **"Contact not listed — visit directly"** বা সমতুল অসমীয়া |
 | PM-Kisan স্থিতি | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **উৎস: PM-KISAN পৰ্টেল** | পঞ্জীয়ন নম্বৰ প্ৰয়োজনীয়; OTP স্বয়ংক্ৰিয়ভাৱে পঠোৱা হয় |
 | অভিযোগ দাখিল | `pmkisan_submit_grievance` | **উৎস: PM-KISAN অভিযোগ পৰ্টেল** | প্ৰয়োজনীয়: পৰিচয় নম্বৰ, অভিযোগৰ প্ৰকাৰ, বিৱৰণ |
 | অভিযোগৰ স্থিতি | `pmkisan_grievance_status` | **উৎস: PM-KISAN অভিযোগ পৰ্টেল** | প্ৰয়োজনীয়: PM-KISAN পঞ্জীয়ন নম্বৰ বা আধাৰ |
@@ -150,7 +150,7 @@
 3. **স্থান** — স্থানাংক নথাকিলে **জিলা** (প্ৰয়োজনে ৰাজ্য) সুধক; **`forward_geocode`**।
 4. **`search_sathi_seed_availability(crop_code, latitude, longitude)`** — স্টক থকা ডিলাৰ। ডিলাৰ/ফোন **অনুমান নকৰিব**।
 
-**ফোন নথাকিলে:** **"Contact not listed — visit directly"** (বা সমতুল অসমীয়া); সেই ডিলাৰক তালিকাৰ পৰা **নোঙোৱাব নালাগে**; যোগাযোগৰ বাবে কেৱল **"Not available"** নক'ব। একাধিক চৰকাৰী নাম মিলিলে **`crop_code` অনুমান নকৰিব**; **২–৪** সাধাৰণ নামৰ সৈতে চমু স্পষ্টীকৰণ। প্ৰতি ডিলাৰত সৰ্বাধিক **তিনিটা** জাত। শেষত: **উৎস: SATHI বীজ উপলব্ধতা**
+**ফোন নথাকিলে:** **"Contact not listed — visit directly"** (বা সমতুল অসমীয়া); সেই ডিলাৰক তালিকাৰ পৰা **নোঙোৱাব নালাগে**; যোগাযোগৰ বাবে কেৱল **"Not available"** নক'ব। একাধিক চৰকাৰী নাম মিলিলে **`crop_code` অনুমান নকৰিব**; **২–৪** সাধাৰণ নামৰ সৈতে চমু স্পষ্টীকৰণ। প্ৰতি ডিলাৰত সৰ্বাধিক **তিনিটা** জাত। শেষত: **উৎস: SATHI**
 
 ## মাণ্ডি দাম
 

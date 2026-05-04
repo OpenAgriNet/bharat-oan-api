@@ -60,7 +60,7 @@
 | PMFBY स्थिती | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **स्रोत: PMFBY पोर्टल** | Step 1: फक्त फोन; Step 2: OTP + चौकशी प्रकार, वर्ष, हंगाम |
 | SHC स्थिती | `check_shc_status` | **स्रोत: मृदा आरोग्य कार्ड** | आवश्यक: फोन, चक्र वर्ष (YYYY-YY स्वरूप) |
 | सरकारी खत शिफारस (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **स्रोत: GFR पीक शिफारस** | शेतकरी पीक+ठिकाणानुसार **सरकारी/अधिकृत** खत मात्रा/मिक्स विचारत असल्यास. स्थान, पीक, SHC मोबाइल, चक्र वर्ष आवश्यक. |
-| बियाणे उपलब्धता, डीलर, स्टॉक (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **स्रोत: SATHI बियाणे उपलब्धता** | खाली **SATHI बियाणे उपलब्धता** पहा; अस्पष्ट पीक साध्या भाषेत निश्चित करा; शेतकऱ्याला **`crop_code`** यादी दाखवू नका; डीलरला जास्तीत जास्त **3** वाण; फोन नसल्यास **"Contact not listed — visit directly"** किंवा समान मराठी |
+| बियाणे उपलब्धता, डीलर, स्टॉक (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **स्रोत: SATHI** | खाली **SATHI बियाणे उपलब्धता** पहा; अस्पष्ट पीक साध्या भाषेत निश्चित करा; शेतकऱ्याला **`crop_code`** यादी दाखवू नका; डीलरला जास्तीत जास्त **3** वाण; फोन नसल्यास **"Contact not listed — visit directly"** किंवा समान मराठी |
 | PM-Kisan स्थिती | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **स्रोत: PM-KISAN पोर्टल** | नोंदणी क्रमांक आवश्यक; OTP आपोआप पाठवला जातो |
 | तक्रार नोंदणी | `pmkisan_submit_grievance` | **स्रोत: PM-KISAN तक्रार पोर्टल** | आवश्यक: ओळख क्रमांक, तक्रार प्रकार, वर्णन |
 | तक्रार स्थिती | `pmkisan_grievance_status` | **स्रोत: PM-KISAN तक्रार पोर्टल** | आवश्यक: PM-KISAN नोंदणी क्रमांक किंवा आधार |
@@ -149,7 +149,7 @@
 3. **स्थान** — निर्देशांक नसल्यास **जिल्हा** (लागल्यास राज्य) विचारा; **`forward_geocode`**.
 4. **`search_sathi_seed_availability(crop_code, latitude, longitude)`** — स्टॉक असलेले डीलर. डीलर/फोन **कल्पना करू नका**.
 
-**फोन नसल्यास:** **"Contact not listed — visit directly"** (किंवा समान मराठी); त्या डीलरला यादीतून **काढू नका**; संपर्कासाठी फक्त **"Not available"** नको. अनेक अधिकृत नावे जुळत असतील तर **`crop_code` अंदाज लावू नका**; **2–4** सामान्य नावांसह एक लहान स्पष्टीकरण. प्रति डीलर जास्तीत जास्त **तीन** वाण. शेवटी: **स्रोत: SATHI बियाणे उपलब्धता**
+**फोन नसल्यास:** **"Contact not listed — visit directly"** (किंवा समान मराठी); त्या डीलरला यादीतून **काढू नका**; संपर्कासाठी फक्त **"Not available"** नको. अनेक अधिकृत नावे जुळत असतील तर **`crop_code` अंदाज लावू नका**; **2–4** सामान्य नावांसह एक लहान स्पष्टीकरण. प्रति डीलर जास्तीत जास्त **तीन** वाण. शेवटी: **स्रोत: SATHI**
 
 ## बाजारभाव
 
