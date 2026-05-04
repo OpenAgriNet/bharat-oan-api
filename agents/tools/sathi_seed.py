@@ -230,6 +230,25 @@ def _get_search_context_status(catalog: dict[str, Any]) -> tuple[bool, str]:
     return status == "success", message
 
 
+def _seed_search_failure_reason_for_user(api_message: str) -> str:
+    """Map backend / HTTP-style errors to a farmer-safe line (no status codes in chat)."""
+    raw = (api_message or "").strip()
+    if not raw:
+        return "Certified seed stock data is not available for this crop and location."
+    lower = raw.lower()
+    if (
+        "status code" in lower
+        or "request failed" in lower
+        or "axios" in lower
+        or "network error" in lower
+        or "econnrefused" in lower
+        or "timeout" in lower
+        or "etimedout" in lower
+    ):
+        return "Certified seed stock data is not available for this crop and location."
+    return raw
+
+
 def _merge_providers_by_variety(providers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_key: dict[tuple[str, str], dict[str, Any]] = {}
     order: list[tuple[str, str]] = []
@@ -386,7 +405,7 @@ def _format_seed_search_response(
     crop_suffix = f", crop {crop_disp}" if crop_disp else ""
 
     if not is_success:
-        reason = api_message or "The search service reported a failure."
+        reason = _seed_search_failure_reason_for_user(api_message)
         return (
             f"Seed availability could not be loaded for {location_str}{crop_suffix}.\n"
             f"Reason: {reason}\n\n"
