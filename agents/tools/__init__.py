@@ -20,7 +20,11 @@ from agents.tools.gfr import (
     gfr_get_crop_registries,
     gfr_get_recommendations,
 )
-
+from agents.tools.sathi_seed import (
+    get_sathi_crop_groups,
+    list_sathi_crops_in_group,
+    search_sathi_seed_availability,
+)
 TOOLS = [
     Tool(
         get_scheme_info,
@@ -114,6 +118,21 @@ TOOLS = [
     ),
     Tool(
         gfr_get_recommendations,
+        takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        get_sathi_crop_groups,
+        takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        list_sathi_crops_in_group,
+        takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        search_sathi_seed_availability,
         takes_ctx=False,
         strict=False,
     ),
