@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     allowed_credentials: bool = True
     allowed_methods: List[str] = ["*"]
     allowed_headers: List[str] = ["*"]
+    disable_auth: bool = (
+        os.getenv("DISABLE_AUTH", "").strip().lower() in ("1", "true", "yes", "y", "on")
+        or os.getenv("ENVIRONMENT", "production").strip().lower() in ("local", "dev", "development")
+    )
+    disable_auth_mobile: str = os.getenv("DISABLE_AUTH_MOBILE", "9999999999")
 
     # JWT Configuration
     jwt_algorithm: str = "RS256"
