@@ -11,29 +11,21 @@ load_dotenv()
 
 logger = get_logger(__name__)
 
-# OAuth2 scheme for FastAPI.
-# When auth is disabled (local/dev), allow requests without a Bearer token.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=not settings.disable_auth)
+# OAuth2 scheme for FastAPI - always requires Bearer token (no env-based bypass)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Construct the absolute path to the public key using settings
 public_key_path = settings.base_dir / settings.jwt_public_key_path
 
-public_key = None
-if settings.disable_auth:
-    logger.warning("Auth disabled via settings; skipping JWT public key load.")
-else:
-    with open(public_key_path, 'rb') as key_file:
-        public_key = serialization.load_pem_public_key(key_file.read())
-    logger.info(f"Successfully loaded JWT Public Key from: {public_key_path}")
+with open(public_key_path, 'rb') as key_file:
+    public_key = serialization.load_pem_public_key(key_file.read())
+logger.info(f"Successfully loaded JWT Public Key from: {public_key_path}")
 
-async def get_current_user(token: str | None = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme)):
     """
     FastAPI dependency to get current authenticated user from JWT token.
     Always validates the JWT; no environment-based bypass.
     """
-    if settings.disable_auth:
-        return settings.disable_auth_mobile
-
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -42,9 +34,6 @@ async def get_current_user(token: str | None = Depends(oauth2_scheme)):
     
     if public_key is None:
         logger.error("JWT Public Key is not loaded, cannot verify tokens.")
-        raise credentials_exception
-
-    if not token:
         raise credentials_exception
         
     try:
