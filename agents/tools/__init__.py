@@ -16,6 +16,11 @@ from agents.tools.weather import weather_forecast
 from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
 from agents.tools.maps import reverse_geocode, forward_geocode
+from agents.tools.sathi_seed import (
+    get_sathi_crop_groups,
+    list_sathi_crops_in_group,
+    search_sathi_seed_availability,
+)
 
 TOOLS = [
     Tool(
@@ -101,6 +106,21 @@ TOOLS = [
     Tool(
         reverse_geocode,
         takes_ctx=False,    
+        strict=False,
+    ),
+    Tool(
+        get_sathi_crop_groups,
+        takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        list_sathi_crops_in_group,
+        takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        search_sathi_seed_availability,
+        takes_ctx=False,
         strict=False,
     ),
 ]
