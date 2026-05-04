@@ -26,24 +26,35 @@ from agents.deps import FarmerContext
 logger = get_logger(__name__)
 
 # --------------------------------------------------------------------------------------
-# Integration values
+# Constants
 # --------------------------------------------------------------------------------------
+
+TICKET_CATEGORY_ID = "3"
+TICKET_SUB_CATEGORY_ID = "10"
+
+_OTP_FAILURE_SUBSTRINGS = (
+    "invalid otp",
+    "otp invalid",
+    "wrong otp",
+    "expired otp",
+    "otp expired",
+    "verification failed",
+    "otp mismatch",
+    "incorrect otp",
+)
+
 
 def _today_yyyy_mm_dd() -> str:
     return datetime.now(timezone.utc).date().isoformat()
 
-# Keep these hardcoded (do not ask the user).
-TICKET_CATEGORY_ID = "3"
-TICKET_SUB_CATEGORY_ID = "10"
-
 
 def generate_transaction_id(session_id: str, key: str) -> str:
-    """Generate a consistent transaction ID across init calls."""
+    """Deterministic transaction id across OTP init, status verify, and grievance submit."""
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, (session_id + key)))
 
 
 def normalize_phone_for_api(phone: str) -> str:
-    """Strip to digits only. BAP expects 10-digit Indian number (no country code)."""
+    """Digits only; 10-digit Indian mobile for BAP (no country code)."""
     digits = "".join(c for c in str(phone).strip() if c.isdigit())
     if len(digits) == 12 and digits.startswith("91"):
         return digits[2:]
@@ -62,20 +73,119 @@ def _validate_otp(otp: str) -> str:
     return digits
 
 
-_OTP_FAILURE_SUBSTRINGS = (
-    "invalid otp",
-    "otp invalid",
-    "wrong otp",
-    "expired otp",
-    "otp expired",
-    "verification failed",
-    "otp mismatch",
-    "incorrect otp",
-)
+def _normalize_request_season_for_pmfby_api(season: str) -> str:
+    """Map Kharif/Rabi/Zaid (and 1–3) to PMFBY-style season ids for `request_season` tag."""
+    raw = str(season).strip()
+    if not raw:
+        return raw
+    low = raw.lower()
+    try:
+        n = int(raw)
+        if 1 <= n <= 3:
+            return str(n)
+    except ValueError:
+        pass
+    if "kharif" in low or "खरीफ" in raw or "monsoon" in low:
+        return "1"
+    if "rabi" in low or "रबी" in raw:
+        return "2"
+    if "summer" in low or "zaid" in low or "जायद" in raw or "ग्रीष्म" in raw:
+        return "3"
+    return raw
+
+
+def _require_nonempty(value: Optional[str], retry_message: str) -> str:
+    s = str(value).strip() if value is not None else ""
+    if not s:
+        raise ModelRetry(retry_message)
+    return s
+
+
+# --------------------------------------------------------------------------------------
+# Beckn transport
+# --------------------------------------------------------------------------------------
+
+
+def _bap_url(path: str) -> str:
+    base = os.getenv("BAP_ENDPOINT", "").rstrip("/")
+    if not base:
+        raise ModelRetry("BAP endpoint is not configured. Set BAP_ENDPOINT.")
+    return f"{base}/{path.lstrip('/')}"
+
+
+def _beckn_context(*, transaction_id: str, action: str) -> Dict[str, Any]:
+    return {
+        "domain": "schemes:vistaar",
+        "action": action,
+        "version": "1.1.0",
+        "bap_id": os.getenv("BAP_ID"),
+        "bap_uri": os.getenv("BAP_URI"),
+        "bpp_id": os.getenv("BPP_ID"),
+        "bpp_uri": os.getenv("BPP_URI"),
+        "transaction_id": transaction_id,
+        "message_id": str(uuid.uuid4()),
+        "timestamp": str(int(datetime.now(timezone.utc).timestamp())),
+        "ttl": "PT10M",
+        "location": {"country": {"code": "IND"}, "city": {"code": "*"}},
+    }
+
+
+def _post_json_logged(url: str, payload: Dict[str, Any], log_prefix: str) -> httpx.Response:
+    logger.info("%s URL: %s", log_prefix, url)
+    logger.info("%s Payload: %s", log_prefix, json.dumps(payload, indent=2))
+    resp = httpx.post(url, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
+    logger.info("%s Status: %s", log_prefix, resp.status_code)
+    logger.info("%s Body: %s", log_prefix, resp.text)
+    return resp
+
+
+# --------------------------------------------------------------------------------------
+# Request payloads
+# --------------------------------------------------------------------------------------
+
+
+def _payload_get_otp_grievance_flow(*, transaction_id: str, phone: str) -> Dict[str, Any]:
+    return {
+        "context": _beckn_context(transaction_id=transaction_id, action="init"),
+        "message": {
+            "order": {
+                "provider": {"id": "pmfby-agri"},
+                "items": [{"id": "pmfby"}],
+                "fulfillments": [
+                    {
+                        "customer": {
+                            "person": {
+                                "tags": [
+                                    {"descriptor": {"code": "request_type"}, "value": "get_otp"},
+                                    {"descriptor": {"code": "phone_number"}, "value": phone},
+                                ]
+                            },
+                            "contact": {"phone": phone},
+                        }
+                    }
+                ],
+            }
+        },
+    }
+
+
+def _payload_status_verify_otp(*, transaction_id: str, otp: str, phone: str) -> Dict[str, Any]:
+    return {
+        "context": _beckn_context(transaction_id=transaction_id, action="status"),
+        "message": {
+            "order_id": otp,
+            "order": {
+                "id": "order-1",
+                "provider": {"id": "pmfby-agri"},
+                "items": [{"id": "pmfby"}],
+                "fulfillments": [{"customer": {"contact": {"phone": phone}}}],
+            },
+        },
+    }
 
 
 class PMfbyGrievanceInitRequest(BaseModel):
-    """Builds the Beckn `/init` request for submitting a PMFBY grievance."""
+    """Beckn `/init` body for `pmfby-grievance` submit."""
 
     transaction_id: str
     phone_number: str
@@ -89,54 +199,35 @@ class PMfbyGrievanceInitRequest(BaseModel):
     grievance_description: str
 
     def get_payload(self) -> Dict[str, Any]:
-        now = datetime.now(timezone.utc)
-        timestamp_str = str(int(now.timestamp()))
         phone = normalize_phone_for_api(self.phone_number)
+        tags: List[Dict[str, Any]] = [
+            ("request_type", "submit_grievance"),
+            ("phone_number", phone),
+            ("complaint_date", str(self.complaint_date)),
+            ("receipt_source_id", str(self.receipt_source_id)),
+            ("ticket_category_id", str(self.ticket_category_id)),
+            ("ticket_sub_category_id", str(self.ticket_sub_category_id)),
+            ("request_year", str(self.request_year)),
+            ("request_season", str(self.request_season)),
+            ("application_no", str(self.application_no)),
+            ("grievance_description", str(self.grievance_description)),
+        ]
+        tag_objs = [{"descriptor": {"code": code}, "value": val} for code, val in tags]
         return {
-            "context": {
-                "domain": "schemes:vistaar",
-                "action": "init",
-                "version": "1.1.0",
-                "bap_id": os.getenv("BAP_ID"),
-                "bap_uri": os.getenv("BAP_URI"),
-                "bpp_id": os.getenv("BPP_ID"),
-                "bpp_uri": os.getenv("BPP_URI"),
-                "transaction_id": self.transaction_id,
-                "message_id": str(uuid.uuid4()),
-                "timestamp": timestamp_str,
-                "ttl": "PT10M",
-                "location": {"country": {"code": "IND"}, "city": {"code": "*"}},
-            },
+            "context": _beckn_context(transaction_id=self.transaction_id, action="init"),
             "message": {
                 "order": {
                     "provider": {"id": "pmfby-grievance"},
                     "items": [{"id": "pmfby-grievance"}],
-                    "fulfillments": [
-                        {
-                            "customer": {
-                                "person": {
-                                    "tags": [
-                                        {"descriptor": {"code": "request_type"}, "value": "submit_grievance"},
-                                        {"descriptor": {"code": "phone_number"}, "value": phone},
-                                        {"descriptor": {"code": "complaint_date"}, "value": str(self.complaint_date)},
-                                        {"descriptor": {"code": "receipt_source_id"}, "value": str(self.receipt_source_id)},
-                                        {"descriptor": {"code": "ticket_category_id"}, "value": str(self.ticket_category_id)},
-                                        {"descriptor": {"code": "ticket_sub_category_id"}, "value": str(self.ticket_sub_category_id)},
-                                        {"descriptor": {"code": "request_year"}, "value": str(self.request_year)},
-                                        {"descriptor": {"code": "request_season"}, "value": str(self.request_season)},
-                                        {"descriptor": {"code": "application_no"}, "value": str(self.application_no)},
-                                        {
-                                            "descriptor": {"code": "grievance_description"},
-                                            "value": str(self.grievance_description),
-                                        },
-                                    ]
-                                }
-                            }
-                        }
-                    ],
+                    "fulfillments": [{"customer": {"person": {"tags": tag_objs}}}],
                 }
             },
         }
+
+
+# --------------------------------------------------------------------------------------
+# Response parsing (grievance submit)
+# --------------------------------------------------------------------------------------
 
 
 class Descriptor(BaseModel):
@@ -172,10 +263,6 @@ class InitResponse(BaseModel):
     responses: List[InitResponseItem] = []
 
     def format_grievance_result(self) -> str:
-        """
-        Expected (sample) response path:
-        responses[0].message.order.tags[... descriptor.code == "grievance-response" ...].list -> status/ticket-no/message/...
-        """
         if not self.responses:
             return "PMFBY grievance service returned no response. Please try again."
 
@@ -192,9 +279,7 @@ class InitResponse(BaseModel):
 
                 kv: Dict[str, str] = {}
                 for li in tag.list:
-                    if not li.display or not li.descriptor or not li.descriptor.code:
-                        continue
-                    if li.value is None:
+                    if not li.display or not li.descriptor or not li.descriptor.code or li.value is None:
                         continue
                     kv[str(li.descriptor.code)] = str(li.value)
 
@@ -217,64 +302,20 @@ class InitResponse(BaseModel):
         return "PMFBY grievance submitted, but ticket details were not found in the response."
 
 
+# --------------------------------------------------------------------------------------
+# Tools
+# --------------------------------------------------------------------------------------
+
+
 @observe(name="tool:initiate_pmfby_grievance_otp", as_type="tool")
 def initiate_pmfby_grievance_otp(ctx: RunContext[FarmerContext], phone_number: str) -> str:
-    """
-    Initiate PMFBY OTP verification for grievance lodging.
-
-    This mirrors the PMFBY status OTP init flow (`/init` with request_type=get_otp) so the
-    platform can verify the farmer's mobile before lodging a grievance.
-    """
+    """Send OTP to the farmer's registered mobile for PMFBY grievance (`get_otp` /init)."""
     try:
-        session_id = ctx.deps.session_id
-        transaction_id = generate_transaction_id(session_id, phone_number)
+        transaction_id = generate_transaction_id(ctx.deps.session_id, phone_number)
         phone = normalize_phone_for_api(phone_number)
-
-        payload = {
-            "context": {
-                "domain": "schemes:vistaar",
-                "action": "init",
-                "version": "1.1.0",
-                "bap_id": os.getenv("BAP_ID"),
-                "bap_uri": os.getenv("BAP_URI"),
-                "bpp_id": os.getenv("BPP_ID"),
-                "bpp_uri": os.getenv("BPP_URI"),
-                "transaction_id": transaction_id,
-                "message_id": str(uuid.uuid4()),
-                "timestamp": str(int(datetime.now(timezone.utc).timestamp())),
-                "ttl": "PT10M",
-                "location": {"country": {"code": "IND"}, "city": {"code": "*"}},
-            },
-            "message": {
-                "order": {
-                    "provider": {"id": "pmfby-agri"},
-                    "items": [{"id": "pmfby"}],
-                    "fulfillments": [
-                        {
-                            "customer": {
-                                "person": {
-                                    "tags": [
-                                        {"descriptor": {"code": "request_type"}, "value": "get_otp"},
-                                        {"descriptor": {"code": "phone_number"}, "value": phone},
-                                    ]
-                                },
-                                "contact": {"phone": phone},
-                            }
-                        }
-                    ],
-                }
-            },
-        }
-
-        endpoint = os.getenv("BAP_ENDPOINT", "").rstrip("/") + "/init"
-        if not endpoint or endpoint == "/init":
-            raise ModelRetry("BAP endpoint is not configured. Set BAP_ENDPOINT.")
-
-        logger.info(f"[PMFBY GRIEVANCE OTP INIT] Request URL: {endpoint}")
-        logger.info(f"[PMFBY GRIEVANCE OTP INIT] Request Payload: {json.dumps(payload, indent=2)}")
-        response = httpx.post(endpoint, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
-        logger.info(f"[PMFBY GRIEVANCE OTP INIT] Response Status: {response.status_code}")
-        logger.info(f"[PMFBY GRIEVANCE OTP INIT] Response Payload: {response.text}")
+        payload = _payload_get_otp_grievance_flow(transaction_id=transaction_id, phone=phone)
+        url = _bap_url("init")
+        response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_OTP_INIT]")
 
         if response.status_code != 200:
             return f"PMFBY OTP init service unavailable. Status code: {response.status_code}"
@@ -288,8 +329,8 @@ def initiate_pmfby_grievance_otp(ctx: RunContext[FarmerContext], phone_number: s
     except ModelRetry as e:
         return str(e)
     except Exception as e:
-        logger.error(f"Unexpected error in initiate_pmfby_grievance_otp: {e}")
-        raise ModelRetry(f"Unexpected error in PMFBY OTP init request. {str(e)}")
+        logger.error("initiate_pmfby_grievance_otp: %s", e)
+        raise ModelRetry(f"Unexpected error in PMFBY OTP init request. {str(e)}") from e
 
 
 @observe(name="tool:check_pmfby_grievance_otp", as_type="tool")
@@ -298,57 +339,14 @@ def check_pmfby_grievance_otp(
     otp: str,
     phone_number: str,
 ) -> str:
-    """
-    Verify PMFBY OTP before grievance lodging.
-
-    Calls Beckn `action=status` with `message.order_id` set to the 6-digit OTP, provider `pmfby-agri`,
-    and fulfillments containing only `customer.contact.phone` (same deterministic `transaction_id`
-    as `initiate_pmfby_grievance_otp`).
-
-    On HTTP 200, success is inferred unless the response body contains known OTP-failure phrases
-    (e.g. invalid/expired OTP).
-    """
+    """Verify OTP via `/status` (order_id = OTP, phone-only fulfillments). HTTP 200 + no OTP-failure phrases → success."""
     try:
         otp_str = _validate_otp(otp)
-        session_id = ctx.deps.session_id
-        transaction_id = generate_transaction_id(session_id, phone_number)
+        transaction_id = generate_transaction_id(ctx.deps.session_id, phone_number)
         phone = normalize_phone_for_api(phone_number)
-
-        payload: Dict[str, Any] = {
-            "context": {
-                "domain": "schemes:vistaar",
-                "action": "status",
-                "version": "1.1.0",
-                "bap_id": os.getenv("BAP_ID"),
-                "bap_uri": os.getenv("BAP_URI"),
-                "bpp_id": os.getenv("BPP_ID"),
-                "bpp_uri": os.getenv("BPP_URI"),
-                "transaction_id": transaction_id,
-                "message_id": str(uuid.uuid4()),
-                "timestamp": str(int(datetime.now(timezone.utc).timestamp())),
-                "ttl": "PT10M",
-                "location": {"country": {"code": "IND"}, "city": {"code": "*"}},
-            },
-            "message": {
-                "order_id": otp_str,
-                "order": {
-                    "id": "order-1",
-                    "provider": {"id": "pmfby-agri"},
-                    "items": [{"id": "pmfby"}],
-                    "fulfillments": [{"customer": {"contact": {"phone": phone}}}],
-                },
-            },
-        }
-
-        endpoint = os.getenv("BAP_ENDPOINT", "").rstrip("/") + "/status"
-        if not endpoint or endpoint == "/status":
-            raise ModelRetry("BAP endpoint is not configured. Set BAP_ENDPOINT.")
-
-        logger.info(f"[PMFBY GRIEVANCE OTP STATUS] Request URL: {endpoint}")
-        logger.info(f"[PMFBY GRIEVANCE OTP STATUS] Request Payload: {json.dumps(payload, indent=2)}")
-        response = httpx.post(endpoint, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
-        logger.info(f"[PMFBY GRIEVANCE OTP STATUS] Response Status: {response.status_code}")
-        logger.info(f"[PMFBY GRIEVANCE OTP STATUS] Response Payload: {response.text}")
+        payload = _payload_status_verify_otp(transaction_id=transaction_id, otp=otp_str, phone=phone)
+        url = _bap_url("status")
+        response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_OTP_STATUS]")
 
         if response.status_code != 200:
             return f"OTP verification failed (service unavailable). Status code: {response.status_code}"
@@ -366,8 +364,8 @@ def check_pmfby_grievance_otp(
     except ModelRetry as e:
         return str(e)
     except Exception as e:
-        logger.error(f"Unexpected error in check_pmfby_grievance_otp: {e}")
-        raise ModelRetry(f"Unexpected error during OTP verification. {str(e)}")
+        logger.error("check_pmfby_grievance_otp: %s", e)
+        raise ModelRetry(f"Unexpected error during OTP verification. {str(e)}") from e
 
 
 @observe(name="tool:pmfby_submit_grievance", as_type="tool")
@@ -381,35 +379,21 @@ def pmfby_submit_grievance(
     application_no: str,
     grievance_description: str,
 ) -> str:
-    """
-    Submit a PMFBY grievance through the Beckn `/init` flow.
-
-    Fields to collect from the user (after OTP verification):
-    - phone_number
-    - receipt_source_id
-    - request_year
-    - request_season
-    - application_no
-    - grievance_description
-
-    Hardcoded:
-    - complaint_date = 2026-01-20
-    - ticket_category_id / ticket_sub_category_id
-    """
+    """Submit PMFBY grievance via Beckn `/init` (pmfby-grievance) after OTP verification."""
     try:
         _ = _validate_otp(otp)
+        _require_nonempty(phone_number, "Please share your registered mobile number.")
+        _require_nonempty(receipt_source_id, "Please share the receipt source ID.")
+        _require_nonempty(request_year, "Please share the request year.")
+        raw_season = _require_nonempty(request_season, "Please share the request season.")
 
-        if not phone_number or not str(phone_number).strip():
-            raise ModelRetry("Please share your registered mobile number.")
-
-        if not receipt_source_id or not str(receipt_source_id).strip():
-            raise ModelRetry("Please share the receipt source ID.")
-
-        if not request_year or not str(request_year).strip():
-            raise ModelRetry("Please share the request year.")
-
-        if not request_season or not str(request_season).strip():
-            raise ModelRetry("Please share the request season.")
+        season_api = _normalize_request_season_for_pmfby_api(raw_season)
+        if season_api not in ("1", "2", "3"):
+            raise ModelRetry(
+                "Ask which crop season the PMFBY policy is for — **Kharif**, **Rabi**, or **Zaid / summer** "
+                "(or the same in the farmer's language). Do not ask them to memorize number codes; "
+                "pass the season name to this tool."
+            )
 
         if not application_no or not str(application_no).strip():
             raise ModelRetry("Please share your PMFBY application number.")
@@ -417,28 +401,19 @@ def pmfby_submit_grievance(
         if not grievance_description or len(grievance_description.strip()) < 10:
             raise ModelRetry("Please provide a brief grievance description (at least 10 characters).")
 
-        session_id = ctx.deps.session_id
-        transaction_id = generate_transaction_id(session_id, phone_number)
-
+        transaction_id = generate_transaction_id(ctx.deps.session_id, phone_number)
         payload = PMfbyGrievanceInitRequest(
             transaction_id=transaction_id,
             phone_number=phone_number,
-            receipt_source_id=receipt_source_id,
-            request_year=request_year,
-            request_season=request_season,
-            application_no=application_no,
+            receipt_source_id=receipt_source_id.strip(),
+            request_year=request_year.strip(),
+            request_season=season_api,
+            application_no=application_no.strip(),
             grievance_description=grievance_description.strip(),
         ).get_payload()
 
-        endpoint = os.getenv("BAP_ENDPOINT", "").rstrip("/") + "/init"
-        if not endpoint or endpoint == "/init":
-            raise ModelRetry("BAP endpoint is not configured. Set BAP_ENDPOINT.")
-
-        logger.info(f"[PMFBY GRIEVANCE INIT] Request URL: {endpoint}")
-        logger.info(f"[PMFBY GRIEVANCE INIT] Request Payload: {json.dumps(payload, indent=2)}")
-        response = httpx.post(endpoint, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
-        logger.info(f"[PMFBY GRIEVANCE INIT] Response Status: {response.status_code}")
-        logger.info(f"[PMFBY GRIEVANCE INIT] Response Payload: {response.text}")
+        url = _bap_url("init")
+        response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_SUBMIT]")
 
         if response.status_code != 200:
             return f"PMFBY grievance service unavailable. Status code: {response.status_code}"
@@ -452,8 +427,7 @@ def pmfby_submit_grievance(
         except json.JSONDecodeError:
             return "PMFBY grievance submitted, but the service returned a non-JSON response."
 
-        parsed = InitResponse.model_validate(response_json)
-        return parsed.format_grievance_result()
+        return InitResponse.model_validate(response_json).format_grievance_result()
 
     except httpx.TimeoutException:
         return "PMFBY grievance request timed out. Please try again later."
@@ -462,6 +436,5 @@ def pmfby_submit_grievance(
     except ModelRetry as e:
         return str(e)
     except Exception as e:
-        logger.error(f"Unexpected error in pmfby_submit_grievance: {e}")
-        raise ModelRetry(f"Unexpected error in PMFBY grievance submission. {str(e)}")
-
+        logger.error("pmfby_submit_grievance: %s", e)
+        raise ModelRetry(f"Unexpected error in PMFBY grievance submission. {str(e)}") from e
