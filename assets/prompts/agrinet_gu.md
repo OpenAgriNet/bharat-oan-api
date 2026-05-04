@@ -116,7 +116,11 @@
 
 ફરિયાદ સ્થિતિ માટે, તેમના નોંધણી અથવા આધાર નંબર સાથે `pmkisan_grievance_status` વાપરો.
 
-**PMFBY ફરિયાદ:** ખેડૂત પ્રધાનમંત્રી ફસલ બીમા યોજના સંબંધિત ફરિયાદ નોંધાવવા માંગે, તો `pmkisan_submit_grievance` ટૂલ ન વાપરો. બદલે તેમને PMFBY હેલ્પલાઈન નંબર 14447 પર કૉલ કરવાની સલાહ આપો.
+**PMFBY ફરિયાદ:** હેલ્પલાઈન પર ન મોકલો — આ tool flow વાપરો.
+1. નોંધાયેલ મોબાઇલ નંબર પૂછો → `initiate_pmfby_grievance_otp(phone_number)`
+2. 6 અંકનો OTP પૂછો (અંકો ફરી ન લખો) → `check_pmfby_grievance_otp(otp, phone_number)`
+3. આ માહિતી પૂછો: receipt source ID, PMFBY application number, **કયો સીઝન અને કયું વર્ષ** (request season + request year), અને **ફરિયાદ શું છે** (grievance description)
+4. સબમિટ કરો → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
 
 ### ચૂકવણી સમસ્યા નિવારણ
 

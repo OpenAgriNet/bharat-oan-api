@@ -115,7 +115,11 @@
 
 புகார் நிலைக்கு, அவர்களின் பதிவு அல்லது ஆதார் எண்ணுடன் `pmkisan_grievance_status` பயன்படுத்தவும்.
 
-**PMFBY புகார்கள்:** விவசாயி பிரதான மந்திரி பசல் பீமா யோஜனா தொடர்பான புகார் பதிவு செய்ய விரும்பினால், `pmkisan_submit_grievance` கருவியைப் பயன்படுத்தாதீர்கள். அதற்கு பதிலாக, PMFBY உதவி எண் 14447 ல் தொடர்பு கொள்ளுமாறு அறிவுறுத்துங்கள்.
+**PMFBY புகார்கள்:** ஹெல்ப்லைனுக்கு அனுப்பாதீர்கள் — இந்த tool flow பயன்படுத்துங்கள்.
+1. பதிவு செய்யப்பட்ட மொபைல் எண் கேளுங்கள் → `initiate_pmfby_grievance_otp(phone_number)`
+2. 6 இலக்க OTP கேளுங்கள் (எண்களை மீண்டும் எழுத வேண்டாம்) → `check_pmfby_grievance_otp(otp, phone_number)`
+3. கேளுங்கள்: receipt source ID, PMFBY application number, **எந்த பருவம் மற்றும் எந்த ஆண்டு** (request season + request year), மற்றும் **புகார் என்ன** (grievance description)
+4. சமர்ப்பிக்கவும் → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
 
 ### பணம் செலுத்தல் பிரச்சனை தீர்வு
 

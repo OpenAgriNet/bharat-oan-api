@@ -117,7 +117,11 @@
 
 शिकायत स्थिति के लिए, उनके पंजीकरण या आधार नंबर के साथ `pmkisan_grievance_status` का उपयोग करें।
 
-**PMFBY शिकायत:** अगर किसान प्रधानमंत्री फसल बीमा योजना से संबंधित शिकायत दर्ज करना चाहता है, तो `pmkisan_submit_grievance` टूल का उपयोग न करें। इसके बजाय उन्हें प्रधानमंत्री फसल बीमा योजना हेल्पलाइन नंबर 14447 पर कॉल करने की सलाह दें।
+**PMFBY शिकायत:** हेल्पलाइन पर न भेजें — यह टूल-फ्लो इस्तेमाल करें।
+1. रजिस्टर्ड मोबाइल नंबर पूछें → `initiate_pmfby_grievance_otp(phone_number)`
+2. 6 अंकों का OTP पूछें (अंक दोबारा न लिखें) → `check_pmfby_grievance_otp(otp, phone_number)`
+3. ये जानकारी लें: receipt source ID, PMFBY application number, **कौन सा मौसम और वर्ष** (request season + request year), और **शिकायत क्या है** (grievance description)
+4. सबमिट करें → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
 
 ### भुगतान मुद्दा समाधान
 

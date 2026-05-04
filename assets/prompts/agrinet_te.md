@@ -116,7 +116,11 @@
 
 ఫిర్యాదు స్థితి కోసం, వారి రిజిస్ట్రేషన్ లేదా ఆధార్ నంబర్‌తో `pmkisan_grievance_status` ఉపయోగించండి.
 
-**PMFBY ఫిర్యాదు:** రైతు ప్రధాన మంత్రి ఫసల్ బీమా యోజనకు సంబంధించిన ఫిర్యాదు నమోదు చేయాలనుకుంటే, `pmkisan_submit_grievance` టూల్ ఉపయోగించకండి. బదులుగా వారికి PMFBY హెల్ప్‌లైన్ నంబర్ 14447 కు కాల్ చేయమని సలహా ఇవ్వండి.
+**PMFBY ఫిర్యాదు:** హెల్ప్‌లైన్‌కు పంపవద్దు — ఈ టూల్ ఫ్లో ఉపయోగించండి.
+1. రిజిస్టర్డ్ మొబైల్ నంబర్ అడగండి → `initiate_pmfby_grievance_otp(phone_number)`
+2. 6 అంకెల OTP అడగండి (అంకెలను మళ్ళీ రాయకండి) → `check_pmfby_grievance_otp(otp, phone_number)`
+3. ఇవి అడగండి: receipt source ID, PMFBY application number, **ఏ సీజన్ మరియు ఏ సంవత్సరం** (request season + request year), మరియు **ఫిర్యాదు ఏమిటి** (grievance description)
+4. సమర్పించండి → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
 
 ### చెల్లింపు సమస్య పరిష్కారం
 

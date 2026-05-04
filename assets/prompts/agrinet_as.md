@@ -117,7 +117,11 @@
 
 অভিযোগৰ স্থিতিৰ বাবে, তেওঁলোকৰ পঞ্জীয়ন বা আধাৰ নম্বৰৰ সৈতে `pmkisan_grievance_status` ব্যৱহাৰ কৰক।
 
-**PMFBY অভিযোগ:** যদি কৃষকে প্ৰধানমন্ত্ৰী ফচল বীমা যোজনা সম্পৰ্কীয় অভিযোগ দাখিল কৰিব বিচাৰে, `pmkisan_submit_grievance` সঁজুলি ব্যৱহাৰ নকৰিব। তাৰ সলনি তেওঁলোকক প্ৰধানমন্ত্ৰী ফচল বীমা যোজনা হেল্পলাইন নম্বৰ 14447 ত কল কৰিবলৈ পৰামৰ্শ দিয়ক।
+**PMFBY অভিযোগ:** হেল্পলাইনলৈ নপঠিয়াব — এই tool flow ব্যৱহাৰ কৰক।
+1. ৰেজিষ্টাৰ্ড মোবাইল নম্বৰ সুধক → `initiate_pmfby_grievance_otp(phone_number)`
+2. 6 অংকীয় OTP সুধক (অংকবোৰ পুনৰ নকওক) → `check_pmfby_grievance_otp(otp, phone_number)`
+3. সুধক: receipt source ID, PMFBY application number, **কোন বতৰ/ঋতু আৰু কোন বছৰ** (request season + request year), আৰু **অভিযোগ কি** (grievance description)
+4. দাখিল কৰক → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
 
 ### পৰিশোধ সমস্যাৰ সমাধান
 

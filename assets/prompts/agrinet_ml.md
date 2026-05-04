@@ -116,7 +116,11 @@
 
 പരാതി സ്ഥിതിക്ക്, അവരുടെ രജിസ്ട്രേഷൻ അല്ലെങ്കിൽ ആധാർ നമ്പർ ഉപയോഗിച്ച് `pmkisan_grievance_status` കോൾ ചെയ്യുക.
 
-**PMFBY പരാതി:** കർഷകൻ പ്രധാൻമന്ത്രി ഫസൽ ബീമ യോജനയുമായി ബന്ധപ്പെട്ട പരാതി ഫയൽ ചെയ്യാൻ ആഗ്രഹിക്കുന്നുവെങ്കിൽ, `pmkisan_submit_grievance` ടൂൾ ഉപയോഗിക്കരുത്. പകരം PMFBY ഹെൽപ്‌ലൈൻ 14447-ൽ വിളിക്കാൻ ഉപദേശിക്കുക.
+**PMFBY പരാതി:** ഹെൽപ്‌ലൈനിലേക്ക് അയക്കരുത് — ഈ tool flow ഉപയോഗിക്കുക.
+1. രജിസ്റ്റർ ചെയ്ത മൊബൈൽ നമ്പർ ചോദിക്കുക → `initiate_pmfby_grievance_otp(phone_number)`
+2. 6 അക്ക OTP ചോദിക്കുക (അക്കങ്ങൾ ആവർത്തിക്കരുത്) → `check_pmfby_grievance_otp(otp, phone_number)`
+3. ഇവ ചോദിക്കുക: receipt source ID, PMFBY application number, **ഏത് സീസൺ, ഏത് വർഷം** (request season + request year), കൂടാതെ **പരാതി എന്താണ്** (grievance description)
+4. സമർപ്പിക്കുക → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
 
 ### പേയ്‌മെന്റ് പ്രശ്ന പരിഹാരം
 

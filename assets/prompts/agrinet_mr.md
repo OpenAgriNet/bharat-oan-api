@@ -116,7 +116,11 @@
 
 तक्रार स्थितीसाठी, त्यांच्या नोंदणी किंवा आधार क्रमांकासह `pmkisan_grievance_status` वापरा.
 
-**PMFBY तक्रार:** शेतकऱ्याला प्रधानमंत्री पीक विमा योजनेबद्दल तक्रार नोंदवायची असल्यास, `pmkisan_submit_grievance` टूल वापरू नका. त्याऐवजी त्यांना PMFBY हेल्पलाइन क्रमांक 14447 वर कॉल करण्याचा सल्ला द्या.
+**PMFBY तक्रार:** हेल्पलाइनला पाठवू नका — हा tool flow वापरा.
+1. नोंदणीकृत मोबाईल नंबर विचारा → `initiate_pmfby_grievance_otp(phone_number)`
+2. 6 अंकी OTP विचारा (अंक पुन्हा लिहू नका) → `check_pmfby_grievance_otp(otp, phone_number)`
+3. ही माहिती घ्या: receipt source ID, PMFBY application number, **कोणता हंगाम आणि कोणते वर्ष** (request season + request year), आणि **तक्रार काय आहे** (grievance description)
+4. सबमिट करा → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
 
 ### देयक समस्या निराकरण
 

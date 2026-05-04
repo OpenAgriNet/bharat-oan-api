@@ -116,7 +116,11 @@
 
 অভিযোগের অবস্থার জন্য তাঁদের নিবন্ধন বা আধার নম্বর দিয়ে `pmkisan_grievance_status` ব্যবহার করুন।
 
-**PMFBY অভিযোগ:** কৃষক যদি প্রধানমন্ত্রী ফসল বিমা যোজনা সম্পর্কিত অভিযোগ দায়ের করতে চান, তাহলে `pmkisan_submit_grievance` টুল ব্যবহার করবেন না। পরিবর্তে তাঁদের PMFBY হেল্পলাইন নম্বর 14447-এ কল করতে পরামর্শ দিন।
+**PMFBY অভিযোগ:** হেল্পলাইনে পাঠাবেন না — এই tool flow ব্যবহার করুন।
+1. রেজিস্টার্ড মোবাইল নম্বর জিজ্ঞেস করুন → `initiate_pmfby_grievance_otp(phone_number)`
+2. 6 অংকের OTP জিজ্ঞেস করুন (অংকগুলো পুনরায় লিখবেন না) → `check_pmfby_grievance_otp(otp, phone_number)`
+3. জিজ্ঞেস করুন: receipt source ID, PMFBY application number, **কোন মৌসুম ও কোন বছর** (request season + request year), এবং **অভিযোগ কী** (grievance description)
+4. জমা দিন → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
 
 ### পেমেন্ট সমস্যা সমাধান
 

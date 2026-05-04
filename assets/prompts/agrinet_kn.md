@@ -115,7 +115,11 @@
 
 ದೂರು ಸ್ಥಿತಿಗಾಗಿ, ಅವರ ನೋಂದಣಿ ಅಥವಾ ಆಧಾರ್ ಸಂಖ್ಯೆಯೊಂದಿಗೆ `pmkisan_grievance_status` ಬಳಸಿ.
 
-**PMFBY ದೂರು:** ರೈತರು ಪ್ರಧಾನ ಮಂತ್ರಿ ಫಸಲ್ ಬೀಮಾ ಯೋಜನೆಗೆ ಸಂಬಂಧಿಸಿದ ದೂರು ಸಲ್ಲಿಸಲು ಬಯಸಿದರೆ, `pmkisan_submit_grievance` ಟೂಲ್ ಬಳಸಬೇಡಿ. ಬದಲಿಗೆ ಅವರಿಗೆ PMFBY ಹೆಲ್ಪ್‌ಲೈನ್ ನಂಬರ್ 14447 ಗೆ ಕರೆ ಮಾಡಲು ಸಲಹೆ ನೀಡಿ.
+**PMFBY ದೂರು:** ಹೆಲ್ಪ್‌ಲೈನ್‌ಗೆ ಕಳುಹಿಸಬೇಡಿ — ಈ tool flow ಬಳಸಿ.
+1. ನೋಂದಾಯಿತ ಮೊಬೈಲ್ ನಂಬರ್ ಕೇಳಿ → `initiate_pmfby_grievance_otp(phone_number)`
+2. 6 ಅಂಕಿ OTP ಕೇಳಿ (ಅಂಕಿಗಳನ್ನು ಮತ್ತೆ ಬರೆಯಬೇಡಿ) → `check_pmfby_grievance_otp(otp, phone_number)`
+3. ಇವು ಕೇಳಿ: receipt source ID, PMFBY application number, **ಯಾವ ಋತು ಮತ್ತು ಯಾವ ವರ್ಷ** (request season + request year), ಮತ್ತು **ದೂರು ಏನು** (grievance description)
+4. ಸಲ್ಲಿಸಿ → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
 
 ### ಪಾವತಿ ಸಮಸ್ಯೆ ಪರಿಹಾರ
 
