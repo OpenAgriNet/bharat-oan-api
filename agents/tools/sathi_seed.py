@@ -230,6 +230,15 @@ def _get_search_context_status(catalog: dict[str, Any]) -> tuple[bool, str]:
     return status == "success", message
 
 
+def _seed_availability_data_not_available_response(location_str: str) -> str:
+    """Farmer-safe line when search failed or catalog has no providers — no HTTP text or crop codes."""
+    place = (location_str or "").strip() or "this location"
+    return (
+        f"Data is not available for certified seed stock in {place}.\n\n"
+        "**Source: SATHI**"
+    )
+
+
 def _merge_providers_by_variety(providers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_key: dict[tuple[str, str], dict[str, Any]] = {}
     order: list[tuple[str, str]] = []
@@ -376,7 +385,7 @@ def _format_seed_search_response(
 
     providers = _beckn_flatten_providers_from_catalog(data, catalog)
 
-    is_success, api_message = _get_search_context_status(catalog)
+    is_success, _api_message = _get_search_context_status(catalog)
     ctx = _catalog_search_context_map(catalog)
     crop_code_ctx = str(ctx.get("crop-code") or "").strip()
     district = str(ctx.get("district-name") or "").strip()
@@ -386,18 +395,10 @@ def _format_seed_search_response(
     crop_suffix = f", crop {crop_disp}" if crop_disp else ""
 
     if not is_success:
-        reason = api_message or "The search service reported a failure."
-        return (
-            f"Seed availability could not be loaded for {location_str}{crop_suffix}.\n"
-            f"Reason: {reason}\n\n"
-            "**Source: SATHI**"
-        )
+        return _seed_availability_data_not_available_response(location_str)
 
     if not providers:
-        return (
-            f"No seed catalog was returned for {location_str}{crop_suffix}.\n\n"
-            "**Source: SATHI**"
-        )
+        return _seed_availability_data_not_available_response(location_str)
 
     merged = _merge_providers_by_variety(providers)
     dealer_acc: dict[str, dict[str, Any]] = {}
