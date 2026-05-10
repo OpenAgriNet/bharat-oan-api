@@ -16,7 +16,7 @@ for _name in ("helpers.transcription", "helpers.tts", "app.tasks.telemetry", "ap
     logging.getLogger(_name).setLevel(_log_level)
 
 # Import all routers
-from app.routers import chat, transcribe, tts, health, file, token
+from app.routers import chat, transcribe, tts, health, file, token, training_export
 # from app.routers import suggestions  # Commented out: suggestion agent disabled
 
 class TimingAllowOriginMiddleware(BaseHTTPMiddleware):
@@ -78,4 +78,5 @@ app.include_router(transcribe.router, prefix=settings.api_prefix)
 app.include_router(tts.router, prefix=settings.api_prefix)
 app.include_router(health.router, prefix=settings.api_prefix)
 app.include_router(file.router, prefix=settings.api_prefix)
-app.include_router(token.router, prefix=settings.api_prefix) 
+app.include_router(token.router, prefix=settings.api_prefix)
+app.include_router(training_export.router, prefix=settings.api_prefix)
