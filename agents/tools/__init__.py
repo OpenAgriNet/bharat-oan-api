@@ -7,6 +7,7 @@ from agents.tools.scheme_info import get_scheme_info
 from agents.tools.pmkisan_scheme_status import initiate_pm_kisan_status_check, check_pm_kisan_status_with_otp
 from agents.tools.pmfby_scheme_status import initiate_pmfby_status_check, check_pmfby_status_with_otp
 from agents.tools.shc_scheme_status import check_shc_status
+from agents.tools.smam_scheme_status import check_smam_scheme_status
 from agents.tools.pmkisan_grievance import pmkisan_submit_grievance, pmkisan_grievance_status
 from agents.tools.pmfby_grievance import initiate_pmfby_grievance_otp, pmfby_submit_grievance
 from agents.tools.terms import search_terms
@@ -54,6 +55,11 @@ TOOLS = [
     ),
     Tool(
         check_shc_status,
+        takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        check_smam_scheme_status,
         takes_ctx=False,
         strict=False,
     ),
