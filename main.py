@@ -1,11 +1,13 @@
 import logging
+from contextlib import asynccontextmanager
+
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, status, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+
 from app.config import settings
 from app.core.cache import cache
-from contextlib import asynccontextmanager
 
 load_dotenv()
 
@@ -16,8 +18,9 @@ for _name in ("helpers.transcription", "helpers.tts", "app.tasks.telemetry", "ap
     logging.getLogger(_name).setLevel(_log_level)
 
 # Import all routers
-from app.routers import chat, transcribe, tts, health, file, token, telemetry
+from app.routers import chat, transcribe, tts, health, file, token, image, telemetry
 # from app.routers import suggestions  # Commented out: suggestion agent disabled
+
 
 class TimingAllowOriginMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -39,6 +42,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     print(f"🛑 {settings.app_name} shutting down...")
+
 
 # Create FastAPI app with settings
 app = FastAPI(
@@ -72,6 +76,7 @@ async def root():
         "api_prefix": settings.api_prefix
     }
 
+
 # Include all routers with API prefix from settings
 app.include_router(chat.router, prefix=settings.api_prefix)
 app.include_router(transcribe.router, prefix=settings.api_prefix)
@@ -80,4 +85,40 @@ app.include_router(tts.router, prefix=settings.api_prefix)
 app.include_router(health.router, prefix=settings.api_prefix)
 app.include_router(file.router, prefix=settings.api_prefix)
 app.include_router(token.router, prefix=settings.api_prefix)
+app.include_router(image.router, prefix=settings.api_prefix)
 app.include_router(telemetry.router, prefix=settings.api_prefix)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Redis connection on startup"""
+    try:
+        await cache.connect()
+        logger = logging.getLogger(__name__)
+        logger.info("Redis connection established successfully")
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to connect to Redis: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close Redis connection on shutdown"""
+    try:
+        await cache.disconnect()
+        logger = logging.getLogger(__name__)
+        logger.info("Redis connection closed successfully")
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error closing Redis connection: {e}")
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler for unhandled exceptions"""
+    logger = logging.getLogger(__name__)
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="An internal server error occurred"
+    )

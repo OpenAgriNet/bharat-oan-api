@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional, Literal
 
 SESSION_ID_DESCRIPTION = "Session ID"
 
+
 class ChatRequest(BaseModel):
     query: str = Field(..., description="The user's chat query")
     session_id: Optional[str] = Field(None, description="Session ID for maintaining conversation context")
@@ -10,8 +11,9 @@ class ChatRequest(BaseModel):
     source_lang: str = Field('hi', description="Source language code")
     target_lang: str = Field('hi', description="Target language code")
     user_id: str = Field('anonymous', description="User identifier")
-    latitude: Optional[str] = Field(None, description="Request-time latitude")
-    longitude: Optional[str] = Field(None, description="Request-time longitude")
+    latitude: Optional[float] = Field(None, description="User latitude for geocode lookup")
+    longitude: Optional[float] = Field(None, description="User longitude for geocode lookup")
+
 
 class TelemetryFeedbackRequest(BaseModel):
     qid: str = Field(..., description="Question or message ID for telemetry correlation")
@@ -22,12 +24,14 @@ class TelemetryFeedbackRequest(BaseModel):
     question_text: str = Field("", description="Question text")
     answer_text: str = Field("", description="Answer text")
 
+
 class TelemetryErrorRequest(BaseModel):
     qid: str = Field(..., description="Question ID for telemetry correlation")
     session_id: str = Field(..., description=SESSION_ID_DESCRIPTION)
     error_text: str = Field(..., description="Error text")
     question_text: Optional[str] = Field(None, description="Question text")
     message_id: Optional[str] = Field(None, description="Related message ID")
+
 
 class GenericTelemetryEventRequest(BaseModel):
     event_name: str = Field(..., description="Client telemetry event name")
@@ -43,6 +47,7 @@ class GenericTelemetryEventRequest(BaseModel):
             raise ValueError("must not be empty")
         return value
 
+
 class TranscribeRequest(BaseModel):
     audio_content: str = Field(..., description="Base64 encoded audio content")
     lang_code: str = Field(..., description="Language code for transcription")
@@ -50,16 +55,18 @@ class TranscribeRequest(BaseModel):
     session_id: Optional[str] = Field(None, description=SESSION_ID_DESCRIPTION)
     qid: Optional[str] = Field(None, description="Question ID")
 
+
 class SuggestionsRequest(BaseModel):
     session_id: str = Field(..., description="Session ID to get suggestions for")
     target_lang: str = Field('hi', description="Target language for suggestions")
+
 
 class TTSRequest(BaseModel):
     text: str = Field(..., description="Text to convert to speech")
     target_lang: str = Field('hi', description="Language code for TTS")
     session_id: Optional[str] = Field(None, description=SESSION_ID_DESCRIPTION)
     service_type: Literal['bhashini', 'eleven_labs'] = Field('bhashini', description="TTS service to use")
-    qid: Optional[str] = Field(None, description="Question ID") 
+    qid: Optional[str] = Field(None, description="Question ID")
 
 
 class FileRequest(BaseModel):

@@ -23,6 +23,7 @@ from agents.tools.sathi_seed import (
     list_sathi_crops_in_group,
     search_sathi_seed_availability,
 )
+from agents.tools.npss import analyze_crop_image
 
 TOOLS = [
     Tool(
@@ -138,6 +139,11 @@ TOOLS = [
     Tool(
         check_smam_scheme_status,
         takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        analyze_crop_image,
+        takes_ctx=True,
         strict=False,
     ),
 ]

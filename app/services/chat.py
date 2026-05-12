@@ -1,5 +1,6 @@
 import asyncio
 import os
+from copy import deepcopy
 from typing import AsyncGenerator, Awaitable, Optional, TypeVar
 
 from fastapi import BackgroundTasks
@@ -28,6 +29,7 @@ from app.utils import (
     format_message_pairs,
     filter_thinking_from_history,
 )
+from app.services.npss_response import post_process_npss_response
 from agents.deps import FarmerContext
 from langfuse import get_client, observe, propagate_attributes
 
@@ -88,6 +90,9 @@ async def stream_chat_messages(
     history: list,
     background_tasks: BackgroundTasks,
     channel: str = "BharatVistaar",
+    is_image_analysis: bool = False,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
     qid: str = "",
     current_user: Optional[dict] = None,
 ) -> AsyncGenerator[str, None]:
@@ -126,7 +131,13 @@ async def stream_chat_messages(
         try:
             lf_set_trace_io(input=query)
 
-            deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
+            deps = FarmerContext(
+                query=query,
+                lang_code=target_lang,
+                session_id=session_id,
+                latitude=latitude,
+                longitude=longitude,
+            )
 
             message_pairs = "\n\n".join(format_message_pairs(history, 3))
             logger.info(f"Message pairs: {message_pairs}")
@@ -134,7 +145,46 @@ async def stream_chat_messages(
                 f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
             )
 
-            user_message = f"{last_response}{deps.get_user_message()}"
+            def build_user_message() -> str:
+                base_user_message = deps.get_user_message()
+                if is_image_analysis:
+                    if latitude is not None and longitude is not None:
+                        location_instruction = (
+                            f"Browser coordinates are available for this image upload "
+                            f"(latitude={latitude}, longitude={longitude}). "
+                            "You MUST call `analyze_crop_image` and pass those coordinates directly."
+                        )
+                    else:
+                        location_instruction = (
+                            "No browser coordinates were sent with this image upload. "
+                            "Check the conversation history first for any farmer-provided location. "
+                            "If the farmer already mentioned a place in this conversation, call `forward_geocode` on that place and then call `analyze_crop_image` with the resulting coordinates. "
+                            "If no place is available yet, do NOT call `analyze_crop_image` now. "
+                            "Ask the farmer: 'To get the most accurate pest identification, please share your city, town, or village, along with district and state.' "
+                            "Then wait for their reply before calling the tool. "
+                            "If the farmer explicitly refuses to share location, call `analyze_crop_image` without coordinates."
+                        )
+                    base_user_message = (
+                        f"[USER UPLOADED A CROP IMAGE]\n\n"
+                        f"{base_user_message}\n\n"
+                        f"INSTRUCTION: The user has uploaded a crop image for pest/disease identification. "
+                        f"Use the exact image URL already present in the user's message or recent conversation history when calling `analyze_crop_image`. "
+                        f"{location_instruction} "
+                        f"Do NOT call `search_pests_diseases` automatically. "
+                        f"Present the NPSS result as a clean, farmer-friendly structured card in the Selected Language using this format:\n"
+                        f"**Pest:** <pest name>\n"
+                        f"**Crop:** <crop name>\n"
+                        f"**Cause:** <pathogen class, e.g. fungi / bacteria / virus>\n\n"
+                        f"<short symptoms/identification summary translated into the Selected Language>\n\n"
+                        f"Skip any field that is empty, null, or not present in the tool result. "
+                        f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
+                        f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
+                        f"If the tool returns multiple findings, show only the most relevant one. "
+                        f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
+                    )
+                return f"{last_response}{base_user_message}"
+
+            user_message = build_user_message()
 
             yield SSE_KEEPALIVE
 
@@ -149,7 +199,7 @@ async def stream_chat_messages(
             logger.info(f"Moderation data: {moderation_data}")
             deps.update_moderation_str(str(moderation_data))
 
-            user_message = f"{last_response}{deps.get_user_message()}"
+            user_message = build_user_message()
 
             trimmed_history = trim_history(history, max_tokens=64_000)
             logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
@@ -159,7 +209,7 @@ async def stream_chat_messages(
             with propagate_attributes(tags=[moderation_data.category]):
                 async for item in _await_with_sse_keepalives(
                     _run_agrinet(
-                        user_message=deps.get_user_message(),
+                        user_message=user_message,
                         trimmed_history=trimmed_history,
                         deps=deps,
                         session_id=session_id,
@@ -176,13 +226,18 @@ async def stream_chat_messages(
             new_messages = result.new_messages()
             logger.info(f"Agent run complete for session {session_id}")
 
-            lf_set_trace_io(output=result.output)
+            output_text = post_process_npss_response(
+                text=result.output,
+                target_lang=target_lang,
+                npss_used=deps.npss_used,
+            )
+            lf_set_trace_io(output=output_text)
 
             answer_event = create_chat_answer_event(
                 current_user=telemetry_user,
                 qid=telemetry_qid,
                 question_text=query,
-                answer_text=result.output,
+                answer_text=output_text,
                 session_id=session_id,
             )
             background_tasks.add_task(
@@ -190,9 +245,10 @@ async def stream_chat_messages(
                 TelemetryRequest(events=create_frontend_compatible_item_batch(answer_event)).model_dump(),
             )
 
-            yield result.output
+            yield output_text
 
             clean_new_messages = filter_thinking_from_history(list(new_messages or []))
+            clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
             messages = [*history, *clean_new_messages]
             logger.info(
                 f"Updating message history for session {session_id} with {len(messages)} messages"
@@ -236,6 +292,20 @@ async def _run_moderation(user_message: str, session_id: str):
     )
     lf_set_trace_io(output=str(run.output))
     return run.output
+
+
+def _replace_last_text_output(messages: list, output_text: str) -> list:
+    """Store the same post-processed response that the farmer received."""
+    if not messages or not output_text:
+        return messages
+
+    copied = deepcopy(messages)
+    for message in reversed(copied):
+        for part in reversed(getattr(message, "parts", []) or []):
+            if getattr(part, "part_kind", "") == "text" and hasattr(part, "content"):
+                part.content = output_text
+                return copied
+    return copied
 
 
 @observe(name=AGENT_VISTAAR, as_type="generation")
