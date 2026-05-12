@@ -2,6 +2,15 @@ name: Build and Push to GCP Artifact Registry
 
 on:
   workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: GitHub environment to use for secrets and tagging
+        required: true
+        default: bh-dev
+        type: choice
+        options:
+          - bh-dev
+          - main
   push:
     branches:
       - main
@@ -18,7 +27,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     # Use the target branch name as the environment (GitHub Environments must match branch names: main, bh-dev)
-    environment: ${{ github.base_ref || github.ref_name }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment || github.base_ref || github.ref_name }}
 
     steps:
       - name: Checkout repository
@@ -31,7 +40,9 @@ jobs:
         id: set-tags
         run: |
           # Determine the branch name depending on event type
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            BRANCH="${{ github.event.inputs.deploy_environment }}"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BRANCH="${{ github.base_ref }}"
           else
             BRANCH="${{ github.ref_name }}"
