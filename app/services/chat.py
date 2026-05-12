@@ -1,5 +1,5 @@
 import os
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from fastapi import BackgroundTasks
 
@@ -48,6 +48,10 @@ async def stream_chat_messages(
     user_id: str,
     history: list,
     background_tasks: BackgroundTasks,
+    is_image_analysis: bool = False,
+    image_url: str = "",
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
     lf_env = settings.langfuse_tracing_environment
@@ -69,7 +73,13 @@ async def stream_chat_messages(
     ):
         lf_set_trace_io(input=query)
 
-        deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
+        deps = FarmerContext(
+            query=query,
+            lang_code=target_lang,
+            session_id=session_id,
+            latitude=latitude,
+            longitude=longitude,
+        )
 
         message_pairs = "\n\n".join(format_message_pairs(history, 3))
         logger.info(f"Message pairs: {message_pairs}")
@@ -77,13 +87,43 @@ async def stream_chat_messages(
             f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
         )
 
-        user_message = f"{last_response}{deps.get_user_message()}"
+        def build_user_message() -> str:
+            base_user_message = deps.get_user_message()
+            if is_image_analysis:
+                if latitude is not None and longitude is not None:
+                    location_instruction = (
+                        f"Browser coordinates are available for this image upload "
+                        f"(latitude={latitude}, longitude={longitude}). "
+                        "You MUST call `analyze_crop_image` and pass those coordinates directly."
+                    )
+                else:
+                    location_instruction = (
+                        "No browser coordinates were sent with this image upload. "
+                        "Check the conversation history first for any farmer-provided location. "
+                        "If the farmer already mentioned a place in this conversation, call `forward_geocode` on that place and then call `analyze_crop_image` with the resulting coordinates. "
+                        "If no place is available yet, do NOT call `analyze_crop_image` now. "
+                        "Ask the farmer: 'To get the most accurate pest identification, please share your city, town, or village, along with district and state.' "
+                        "Then wait for their reply before calling the tool. "
+                        "If the farmer explicitly refuses to share location, call `analyze_crop_image` without coordinates."
+                    )
+                base_user_message = (
+                    f"[USER UPLOADED A CROP IMAGE]\n\n"
+                    f"{base_user_message}\n\n"
+                    f"INSTRUCTION: The user has uploaded a crop image for pest/disease identification. "
+                    f"Use the exact image URL already present in the user's message or recent conversation history when calling `analyze_crop_image`. "
+                    f"{location_instruction} "
+                    f"Do NOT call `search_pests_diseases` automatically. "
+                    f"Return only the diagnosis or detection result provided by the tool in short natural language. "
+                    f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
+                )
+            return f"{last_response}{base_user_message}"
+
+        user_message = build_user_message()
 
         moderation_data = await _run_moderation(user_message, session_id)
         logger.info(f"Moderation data: {moderation_data}")
         deps.update_moderation_str(str(moderation_data))
-
-        user_message = f"{last_response}{deps.get_user_message()}"
+        user_message = build_user_message()
 
         trimmed_history = trim_history(history, max_tokens=64_000)
         logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
@@ -91,7 +131,7 @@ async def stream_chat_messages(
 
         with propagate_attributes(tags=[moderation_data.category]):
             result = await _run_agrinet(
-                user_message=deps.get_user_message(),
+                user_message=user_message,
                 trimmed_history=trimmed_history,
                 deps=deps,
                 session_id=session_id,
