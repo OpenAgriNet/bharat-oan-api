@@ -370,13 +370,15 @@ def pmkisan_submit_grievance(
     Submit a grievance to the PM-KISAN portal via Vistaar Network.
 
     Args:
-        reg_no: PM-KISAN Registration Number (11-character alphanumeric string, e.g., 'BRXXXXXXXXX').
+        reg_no: PM-KISAN Registration Number (11-character alphanumeric, e.g., 'BRXXXXXXXXX'). Use empty string when submitting with aadhaar_no only.
         grievance_description: Detailed description of the grievance.
         grievance_type: The type of grievance. Must be one of:
             "ACCOUNT_NUMBER_NOT_CORRECT", "ONLINE_APPLICATION_PENDING_FOR_APPROVAL",
             "INSTALLMENT_NOT_RECEIVED", "TRANSACTION_FAILED", "PROBLEM_IN_AADHAAR_CORRECTION",
             "GENDER_NOT_CORRECT", "PAYMENT_RELATED", "PROBLEM_IN_OTP_BASED_EKYC",
             "PROBLEM_IN_BIO_METRIC_BASED_EKYC", "PROBLEM_IN_FACIAL_BASED_EKYC"
+        aadhaar_no: Optional 12-digit Aadhaar. When provided (non-empty), it is used instead of reg_no
+            for the init payload and transaction_id.
 
     Returns:
         A confirmation message or an error if the submission failed.
@@ -452,23 +454,43 @@ def pmkisan_submit_grievance(
 
 
 @observe(name="tool:pmkisan_grievance_status", as_type="tool")
-def pmkisan_grievance_status(ctx: RunContext[FarmerContext], reg_no: str, raw: bool = False) -> str:
+def pmkisan_grievance_status(
+    ctx: RunContext[FarmerContext],
+    reg_no: str = "",
+    raw: bool = False,
+    aadhaar_no: Optional[str] = None,
+) -> str:
     """
-    Check the status of a previously submitted grievance using PM-KISAN Registration Number.
+    Check the status of a previously submitted grievance using PM-KISAN Registration Number or Aadhaar.
 
     Args:
-        reg_no: PM-KISAN Registration Number (11-character alphanumeric, e.g., 'BRXXXXXXXXX').
+        reg_no: PM-KISAN Registration Number (11-character alphanumeric, e.g., 'BRXXXXXXXXX'). Optional if aadhaar_no is set.
+        raw: If True, return raw HTTP body (pretty JSON when possible).
+        aadhaar_no: Optional 12-digit Aadhaar. When set (non-empty), used instead of reg_no for the search payload
+            and for transaction_id (must match the identifier used when submitting).
 
     Returns:
         A status summary including the latest updates on the grievance.
     """
     try:
-        if not reg_no or not reg_no.strip():
-            raise ModelRetry("Please provide the PM-KISAN Registration Number to check grievance status.")
+        identifier_value: Optional[str] = None
+        identifier_type: Optional[Literal["reg-number", "aad-number"]] = None
 
-        reg_no = reg_no.strip()
+        if aadhaar_no and str(aadhaar_no).strip():
+            identifier_value = str(aadhaar_no).strip()
+            identifier_type = "aad-number"
+        elif reg_no and reg_no.strip():
+            identifier_value = reg_no.strip()
+            identifier_type = "reg-number"
+        else:
+            raise ModelRetry(
+                "Please provide either a PM-KISAN Registration Number or an Aadhaar Number to check grievance status."
+            )
+
+        identifier_name = "Registration Number" if identifier_type == "reg-number" else "Aadhaar Number"
+
         session_id = ctx.deps.session_id
-        transaction_id = generate_transaction_id(session_id, reg_no)
+        transaction_id = generate_transaction_id(session_id, identifier_value)
 
         payload = {
             "context": Context(action="search", transaction_id=transaction_id).model_dump(by_alias=True),
@@ -496,10 +518,10 @@ def pmkisan_grievance_status(ctx: RunContext[FarmerContext], reg_no: str, raw: b
                                                 "list": [
                                                     {
                                                         "descriptor": {
-                                                            "name": "Registration Number",
-                                                            "code": "reg-number",
+                                                            "name": identifier_name,
+                                                            "code": identifier_type,
                                                         },
-                                                        "value": reg_no,
+                                                        "value": identifier_value,
                                                         "display": True,
                                                     }
                                                 ],
@@ -531,6 +553,8 @@ def pmkisan_grievance_status(ctx: RunContext[FarmerContext], reg_no: str, raw: b
 
         return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
 
+    except ModelRetry as e:
+        return str(e)
     except Exception as e:
         logger.error(f"Error in pmkisan_grievance_status: {e}")
         return "An error occurred while checking grievance status. Please try again later."
