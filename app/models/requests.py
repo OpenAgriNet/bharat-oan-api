@@ -7,6 +7,8 @@ class ChatRequest(BaseModel):
     source_lang: str = Field('hi', description="Source language code")
     target_lang: str = Field('hi', description="Target language code")
     user_id: str = Field('anonymous', description="User identifier")
+    latitude: Optional[float] = Field(None, description="User latitude for geocode lookup")
+    longitude: Optional[float] = Field(None, description="User longitude for geocode lookup")
 
 class TranscribeRequest(BaseModel):
     audio_content: str = Field(..., description="Base64 encoded audio content")

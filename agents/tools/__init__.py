@@ -16,6 +16,11 @@ from agents.tools.weather import weather_forecast
 from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
 from agents.tools.maps import reverse_geocode, forward_geocode
+# from agents.tools.gfr import (
+#     gfr_get_crop_registries,
+#     gfr_get_recommendations,
+# )
+from agents.tools.npss import analyze_crop_image
 
 TOOLS = [
     Tool(
@@ -100,7 +105,22 @@ TOOLS = [
     ),
     Tool(
         reverse_geocode,
-        takes_ctx=False,    
+        takes_ctx=False,
+        strict=False,
+    ),
+    # Tool(
+    #     gfr_get_crop_registries,
+    #     takes_ctx=False,
+    #     strict=False,
+    # ),
+    # Tool(
+    #     gfr_get_recommendations,
+    #     takes_ctx=False,
+    #     strict=False,
+    # ),
+    Tool(
+        analyze_crop_image,
+        takes_ctx=True,
         strict=False,
     ),
 ]

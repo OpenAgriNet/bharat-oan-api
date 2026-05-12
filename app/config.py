@@ -116,6 +116,18 @@ class Settings(BaseSettings):
     default_api_timeout: float = 5.0   # connect timeout (DEFAULT_API_TIMEOUT)
     default_api_read_timeout: float = 10.0  # read timeout (DEFAULT_API_READ_TIMEOUT)
 
+    # NPSS Configuration
+    npss_base_url: Optional[str] = os.getenv("NPSS_BASE_URL")
+    npss_username: Optional[str] = os.getenv("NPSS_USERNAME")
+    npss_password: Optional[str] = os.getenv("NPSS_PASSWORD")
+
+    # Image Storage Configuration
+    temp_upload_dir: str = os.getenv("TEMP_UPLOAD_DIR", "/tmp/oan-uploads")
+    gcs_mount_path: Optional[str] = os.getenv("GCS_MOUNT_PATH")
+    image_ttl_minutes: int = int(os.getenv("IMAGE_TTL_MINUTES", "60"))
+    base_url: Optional[str] = os.getenv("BASE_URL")
+    gcs_move_after_process: bool = os.getenv("GCS_MOVE_AFTER_PROCESS", "").strip().lower() in ("1", "true", "yes", "on")
+
     class Config:
         env_file = ".env"
         extra = 'ignore'  # Ignore extra fields from .env
