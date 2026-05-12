@@ -12,9 +12,6 @@ router = APIRouter(prefix="/image", tags=["image"])
 
 class ImageUploadResponse(BaseModel):
     image_id: str
-    image_url: str
-    mimetype: str
-    message: str
 
 
 @router.post("/upload", response_model=ImageUploadResponse)
@@ -25,8 +22,8 @@ async def upload_image(
     """
     Upload a crop image for pest/disease analysis.
 
-    The image is stored temporarily on the backend. The returned `image_url`
-    should be included in the chat message so the agent can analyze it.
+    The image is stored temporarily on the backend and only the `image_id`
+    is returned to the client.
     After NPSS processing, the image is automatically cleaned up or moved to GCS.
     """
     # Validate mimetype
@@ -37,16 +34,12 @@ async def upload_image(
             detail=f"Invalid image format: {image.content_type}. Allowed: JPEG, PNG."
         )
 
-    image_id, image_url = await save_uploaded_image(image)
-    metadata = get_image_metadata(image_id)
+    image_id, _image_url = await save_uploaded_image(image)
 
     logger.info(f"Image uploaded by {current_user}: {image_id}")
 
     return ImageUploadResponse(
-        image_id=image_id,
-        image_url=image_url,
-        mimetype=metadata["mimetype"] if metadata else "unknown",
-        message="Image uploaded successfully. Include the image_url in your chat message for analysis."
+        image_id=image_id
     )
 
 
