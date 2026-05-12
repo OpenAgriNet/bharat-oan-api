@@ -1,26 +1,25 @@
 """
 PM-KISAN Grievance Tools (pmkisan_submit_grievance, pmkisan_grievance_status)
 
-- Strongly typed with Pydantic
-- Centralized crypto + transport
-- Clear request builders
-- Safe logging & timeouts
-- DRY formatting for user-facing strings
 """
 
 from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List, Optional, Tuple, Literal
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Literal
+from pathlib import Path
 
 import httpx
 from app.config import DEFAULT_HTTP_TIMEOUT
-from pydantic import BaseModel, Field, AnyUrl, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from pydantic_ai import ModelRetry
+from pydantic_ai.tools import RunContext
+from agents.deps import FarmerContext
 from langfuse import observe
 from helpers.utils import get_logger
-from helpers.encryption import hex_to_bytes, encrypt_aes_gcm, decrypt_aes_gcm
 
 logger = get_logger(__name__)
 
@@ -28,19 +27,24 @@ logger = get_logger(__name__)
 # Config / Constants
 # --------------------------------------------------------------------------------------
 
-# TODO: Integrate this with OpenAgriNet network
-GRIEVANCE_BASE_URL = os.getenv("GRIEVANCE_BASE_URL")  # e.g. https://pmkisan.gov.in/api
-GRIEVANCE_TOKEN = os.getenv("GRIEVANCE_TOKEN", "PMK_123456")  # server expects a static token
-KEY_1_HEX = os.getenv("GRIEVANCE_KEY_1")
-KEY_2_HEX = os.getenv("GRIEVANCE_KEY_2")
+BAP_ENDPOINT = os.getenv("BAP_ENDPOINT")
+BAP_ID = os.getenv("BAP_ID")
+BAP_URI = os.getenv("BAP_URI")
+BPP_ID = os.getenv("BPP_ID")
+BPP_URI = os.getenv("BPP_URI")
 
 # Mapping file: human-friendly grievance labels -> backend codes
-_GRIEVANCE_JSON_PATH = os.getenv("GRIEVANCE_TYPES_PATH", "assets/grievance_types.json")
-
+_DEFAULT_GRIEVANCE_JSON_PATH = (
+    Path(__file__).resolve().parents[2] / "assets" / "grievance_types.json"
+)
+_GRIEVANCE_JSON_PATH = os.getenv("GRIEVANCE_TYPES_PATH", str(_DEFAULT_GRIEVANCE_JSON_PATH))
 
 def _load_grievance_mapping(path: str) -> Dict[str, str]:
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        p = Path(path)
+        if not p.is_absolute():
+            p = (Path.cwd() / p).resolve()
+        with p.open("r", encoding="utf-8") as f:
             data = json.load(f)
             if not isinstance(data, dict):
                 raise ValueError("grievance_types.json must be an object of {label: code}")
@@ -49,302 +53,384 @@ def _load_grievance_mapping(path: str) -> Dict[str, str]:
         logger.error(f"Failed to load grievance mapping at '{path}': {e}")
         return {}
 
-
 GRIEVANCE_MAPPING: Dict[str, str] = _load_grievance_mapping(_GRIEVANCE_JSON_PATH)
 GRIEVANCE_TYPES: List[str] = list(GRIEVANCE_MAPPING.keys())
 
+# -----------------------
+# Response formatting
+# -----------------------
 
-# --------------------------------------------------------------------------------------
-# Transport + Crypto
-# --------------------------------------------------------------------------------------
-
-class Crypto(BaseModel):
-    key: bytes
-    iv: bytes
-
-    @classmethod
-    def from_env(cls) -> "Crypto":
-        if not KEY_1_HEX or not KEY_2_HEX:
-            raise ModelRetry("Grievance crypto keys not configured. Set GRIEVANCE_KEY_1 and GRIEVANCE_KEY_2.")
-        return cls(key=hex_to_bytes(KEY_1_HEX), iv=hex_to_bytes(KEY_2_HEX))
-
-    def encrypt_payload(self, payload: Dict[str, Any]) -> Dict[str, str]:
-        plaintext = json.dumps(payload, ensure_ascii=False)
-        encrypted = encrypt_aes_gcm(plaintext, self.key, self.iv)
-        return {"EncryptedRequest": encrypted}
-
-    def decrypt_envelope_output(self, encrypted_output: str) -> Dict[str, Any]:
-        plaintext = decrypt_aes_gcm(encrypted_output, self.key, self.iv)
-        return json.loads(plaintext)
-
-
-class GrievanceClient(BaseModel):
-    base_url: AnyUrl
-    token: str = Field(default=GRIEVANCE_TOKEN)
-    crypto: Crypto
-
-    @classmethod
-    def from_env(cls) -> "GrievanceClient":
-        if not GRIEVANCE_BASE_URL:
-            raise ModelRetry("Grievance service base URL not configured. Set GRIEVANCE_BASE_URL.")
-        return cls(base_url=GRIEVANCE_BASE_URL, crypto=Crypto.from_env())
-
-    def _post(self, path: str, body: Dict[str, Any]) -> httpx.Response:
-        url = f"{str(self.base_url).rstrip('/')}/{path.lstrip('/')}"
-        headers = {"Content-Type": "application/json", "Accept": "application/json"}
-        encrypted_body = self.crypto.encrypt_payload(body)
-        logger.info(f"Grievance API request: {url} | body: {json.dumps(encrypted_body)}")
-        timeout = DEFAULT_HTTP_TIMEOUT
-        resp = httpx.post(url, json=encrypted_body, headers=headers, timeout=timeout)
-        logger.info(f"Grievance API response: {url} | status: {resp.status_code} | body: {resp.text[:500]}")
-        return resp
-
-    def post_encrypted(self, path: str, body: Dict[str, Any]) -> "ServiceEnvelope":
-        resp = self._post(path, body)
-        if resp.status_code != 200:
-            logger.error(f"Grievance API {path} -> HTTP {resp.status_code}: {resp.text[:500]}")
-            raise ModelRetry(f"Grievance service unavailable (HTTP {resp.status_code}).")
+def _format_http_response_raw(response: httpx.Response, *, max_chars: int = 8000) -> str:
+    """
+    Return the network response as a string (prefer pretty JSON), truncated to max_chars.
+    """
+    try:
+        body: str
         try:
-            env = ServiceEnvelope.model_validate(resp.json())
-        except ValidationError as e:
-            logger.error(f"Invalid grievance envelope for {path}: {e}")
-            raise ModelRetry("Grievance service returned an invalid response envelope.")
-        return env
+            body = json.dumps(response.json(), ensure_ascii=False, indent=2)
+        except Exception:
+            body = response.text
+        body = (body or "").strip()
+        if len(body) > max_chars:
+            body = body[:max_chars] + "\n... (truncated)"
+        return body
+    except Exception:
+        # Last-resort: never crash while formatting tool output
+        return (response.text or "").strip()
 
 
-# --------------------------------------------------------------------------------------
-# Service Envelope (encrypted response container)
-# --------------------------------------------------------------------------------------
-
-class EncryptedData(BaseModel):
-    type_: str = Field(..., alias="__type")
-    output: str  # base64 string
-
-    class Config:
-        populate_by_name = True
-
-
-class ServiceEnvelope(BaseModel):
-    d: EncryptedData
-
-    def decrypt(self, crypto: Crypto) -> Dict[str, Any]:
-        return crypto.decrypt_envelope_output(self.d.output)
+class GatewayContext(BaseModel):
+    action: Optional[str] = None
+    timestamp: Optional[str] = None
+    message_id: Optional[str] = None
+    transaction_id: Optional[str] = None
+    ttl: Optional[str] = None
+    domain: Optional[str] = None
+    version: Optional[str] = None
+    bap_id: Optional[str] = None
+    bap_uri: Optional[str] = None
+    bpp_id: Optional[str] = None
+    bpp_uri: Optional[str] = None
+    location: Optional[Dict[str, Any]] = None
 
 
-# --------------------------------------------------------------------------------------
-# Decrypted response schemas
-# --------------------------------------------------------------------------------------
-
-class AadhaarTokenResponse(BaseModel):
-    Responce: str  # service returns "True"/"False" spelled oddly
-    AadhaarToken: Optional[str] = None
-    message: Optional[str] = None
-
-    def ok(self) -> bool:
-        return str(self.Responce).lower() == "true"
+class TagDescriptor(BaseModel):
+    code: Optional[str] = None
+    name: Optional[str] = None
 
 
-class GrievanceStatusDetail(BaseModel):
-    Reg_No: Optional[str] = None
-    GrievanceDate: Optional[str] = None
-    GrievanceDescription: Optional[str] = None
-    OfficerReply: Optional[str] = None
-    OfficeReplyDate: Optional[str] = None
+class TagListItem(BaseModel):
+    descriptor: Optional[TagDescriptor] = None
+    value: Optional[str] = None
+    display: Optional[bool] = None
+
+
+class TagGroup(BaseModel):
+    descriptor: Optional[TagDescriptor] = None
+    list: Optional[List[TagListItem]] = None
+    display: Optional[bool] = None
+
+
+class ProviderRef(BaseModel):
+    id: Optional[str] = None
+
+
+class ItemRef(BaseModel):
+    id: Optional[str] = None
+
+
+class OrderOut(BaseModel):
+    provider: Optional[ProviderRef] = None
+    items: Optional[List[ItemRef]] = None
+    tags: Optional[List[TagGroup]] = None
+    type: Optional[str] = None
+
+
+class MessageOut(BaseModel):
+    order: Optional[OrderOut] = None
+
+
+class GatewaySubResponse(BaseModel):
+    context: Optional[GatewayContext] = None
+    message: Optional[MessageOut] = None
+
+
+class GatewayResponse(BaseModel):
+    context: Optional[GatewayContext] = None
+    responses: Optional[List[GatewaySubResponse]] = None
+    error: Optional[Any] = None
+
+    def _order_tags_kv(self) -> Dict[str, str]:
+        out: Dict[str, str] = {}
+        sub = (self.responses or [None])[0]
+        order = None
+        if sub and sub.message and sub.message.order:
+            order = sub.message.order
+        if not order or not order.tags:
+            return out
+        for group in order.tags:
+            if not group or not group.list:
+                continue
+            for item in group.list:
+                if not item or not item.descriptor or not item.descriptor.code:
+                    continue
+                if item.value is None:
+                    continue
+                out[str(item.descriptor.code)] = str(item.value)
+        return out
 
     def __str__(self) -> str:
+        # Mirror other tools: readable summary from validated JSON
         lines: List[str] = []
-        if self.Reg_No:
-            lines.append(f"Registration Number: {self.Reg_No}")
-        lines.append("Grievance Details:")
-        if self.GrievanceDate:
-            lines.append(f"  Date: {self.GrievanceDate}")
-        if self.GrievanceDescription:
-            lines.append(f"  Description: {self.GrievanceDescription}")
-        lines.append("Officer Response:")
-        if self.OfficerReply:
-            lines.append(f"  Reply: {self.OfficerReply}")
-            if self.OfficeReplyDate:
-                lines.append(f"  Reply Date: {self.OfficeReplyDate}")
-        else:
-            lines.append("  Reply: Not yet responded")
-        return "\n".join(lines)
+        tx = self.context.transaction_id if self.context else None
+        mid = self.context.message_id if self.context else None
+        if tx:
+            lines.append(f"transaction_id: {tx}")
+        if mid:
+            lines.append(f"message_id: {mid}")
+
+        tags = self._order_tags_kv()
+        if tags:
+            # These codes match what the gateway returns in your sample
+            if "status" in tags:
+                lines.append(f"Status: {tags.get('status', '').strip()}")
+            if "grievance-id" in tags:
+                lines.append(f"Grievance ID: {tags.get('grievance-id', '').strip()}")
+            if "identity-no" in tags:
+                lines.append(f"Identity No: {tags.get('identity-no', '').strip()}")
+            if "grievance-type" in tags:
+                lines.append(f"Grievance Type: {tags.get('grievance-type', '').strip()}")
+            if "message" in tags and tags["message"]:
+                lines.append(f"Message: {tags.get('message', '').strip()}")
+
+        if self.error is not None:
+            lines.append(f"Error: {json.dumps(self.error, ensure_ascii=False)}")
+
+        if not lines:
+            return "Request accepted."
+        return "\n".join([l for l in lines if l.strip()]).strip()
 
 
-class GrievanceStatusPayload(BaseModel):
-    Responce: str
-    message: Optional[str] = None
-    details: Optional[List[GrievanceStatusDetail]] = None
+def _format_grievance_response_formatted(response: httpx.Response) -> str:
+    """
+    Format the response the same way other tools do:
+    parse JSON -> validate -> return str(model).
+    """
+    resp_text = (response.text or "").strip()
+    if not resp_text:
+        return "Service returned empty response. Please try again later."
 
-    def ok(self) -> bool:
-        return str(self.Responce).lower() == "true"
+    try:
+        parsed = response.json()
+    except Exception:
+        return resp_text
 
-    def __str__(self) -> str:
-        if not self.ok():
-            return self.message or "No grievances found for this registration number."
-        if not self.details:
-            return "No grievance details available."
-        # Service typically returns a list; use the first record
-        return str(self.details[0])
+    try:
+        model = GatewayResponse.model_validate(parsed)
+        return str(model)
+    except ValidationError:
+        # If response shape evolves, don't break the tool — fallback to pretty JSON
+        try:
+            return json.dumps(parsed, ensure_ascii=False, indent=2)
+        except Exception:
+            return resp_text
 
+# -----------------------
+# Shared Helpers
+# -----------------------
 
-class GenericMessageResponse(BaseModel):
-    Responce: Optional[str] = None
-    message: Optional[str] = None
+def generate_transaction_id(session_id: str, identifier: str) -> str:
+    """Generate a stable transaction ID for a grievance flow."""
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, (session_id + identifier + "grievance")))
 
-    def ok(self) -> bool:
-        return str(self.Responce).lower() == "true" if self.Responce is not None else True
+# -----------------------
+# Vistaar Models
+# -----------------------
 
-    def __str__(self) -> str:
-        if self.message:
-            return self.message
-        return "Success" if self.ok() else "Failed"
+class Descriptor(BaseModel):
+    code: Optional[str] = None
+    name: Optional[str] = None
+    short_desc: Optional[str] = None
 
+class TagItem(BaseModel):
+    descriptor: Descriptor
+    value: Optional[str] = None
+    display: bool = True
 
-# --------------------------------------------------------------------------------------
-# Identity helpers
-# --------------------------------------------------------------------------------------
+class Tag(BaseModel):
+    display: bool = True
+    descriptor: Descriptor
+    list: Optional[List[TagItem]] = None
 
-def _is_aadhaar(identity_no: str) -> bool:
-    return identity_no.isdigit() and len(identity_no) == 12
+class Person(BaseModel):
+    name: Optional[str] = None
+    tags: Optional[List[Tag]] = None
 
+class Contact(BaseModel):
+    phone: Optional[str] = None
 
-def _aadhaar_token(client: GrievanceClient, identity_no: str) -> Optional[str]:
-    body = {
-        "Type": "IdentityNo_Details",
-        "TokenNo": client.token,
-        "IdentityNo": identity_no,
+class Customer(BaseModel):
+    person: Optional[Person] = None
+    contact: Optional[Contact] = None
+
+class Fulfillment(BaseModel):
+    customer: Optional[Customer] = None
+
+class Item(BaseModel):
+    id: str
+
+class Provider(BaseModel):
+    id: str
+
+class Order(BaseModel):
+    provider: Provider
+    items: List[Item]
+    fulfillments: Optional[List[Fulfillment]] = None
+
+class Context(BaseModel):
+    domain: str = "schemes:vistaar"
+    action: str
+    version: str = "1.1.0"
+    bap_id: Optional[str] = BAP_ID
+    bap_uri: Optional[str] = BAP_URI
+    bpp_id: Optional[str] = BPP_ID
+    bpp_uri: Optional[str] = BPP_URI
+    transaction_id: str
+    message_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z')
+    location: Dict[str, Any] = {
+        "country": {"code": "IND"},
+        "city": {"code": "*"}
     }
-    env = client.post_encrypted("/GrievanceAadhaarToken", body)
-    data = AadhaarTokenResponse.model_validate(env.decrypt(client.crypto))
-    if data.ok() and data.AadhaarToken:
-        return data.AadhaarToken
-    logger.warning(f"Aadhaar token lookup failed: {data.message or 'unknown error'}")
-    return None
 
-
-def _resolve_identity(client: GrievanceClient, identity_no: str, purpose: Literal["create", "status"]) -> Tuple[str, str]:
-    """
-    Returns (actual_identity_value, type_field)
-    - For Aadhaar, get token and use Type 'IdentityNo_Details' (create) or 'IdentityNo_Status' (status)
-    - For Reg_No, use Type 'Reg_No_Details' (create) or 'Reg_No_Status' (status)
-    """
-    if _is_aadhaar(identity_no):
-        token = _aadhaar_token(client, identity_no)
-        if not token:
-            raise ModelRetry(
-                "The provided Aadhaar number is not registered with PM-KISAN. "
-                "Please provide the Aadhaar number registered with PM-KISAN or your PM-KISAN registration number."
-            )
-        type_map = {"create": "IdentityNo_Details", "status": "IdentityNo_Status"}
-        return token, type_map[purpose]
-    else:
-        type_map = {"create": "Reg_No_Details", "status": "Reg_No_Status"}
-        return identity_no, type_map[purpose]
-
-
-# --------------------------------------------------------------------------------------
-# Request builders
-# --------------------------------------------------------------------------------------
-
-class CreateGrievanceRequest(BaseModel):
-    Type: str
-    TokenNo: str
-    IdentityNo: str
-    GrievanceType: str
-    GrievanceDescription: str
+class GrievanceInitRequest(BaseModel):
+    context: Context
+    message: Dict[str, Any]
 
     @classmethod
     def build(
         cls,
-        type_field: str,
-        token_no: str,
-        identity_value: str,
-        grievance_code: str,
+        transaction_id: str,
+        identifier_value: str,
+        identifier_type: Literal["reg-number", "aad-number"],
+        grievance_type_code: str,
         grievance_description: str,
-    ) -> "CreateGrievanceRequest":
+        customer_name: str = "Customer Name",
+        phone: str = ""
+    ) -> "GrievanceInitRequest":
+        identifier_name = "Registration Number" if identifier_type == "reg-number" else "Aadhaar Number"
         return cls(
-            Type=type_field,
-            TokenNo=token_no,
-            IdentityNo=identity_value,
-            GrievanceType=grievance_code,
-            GrievanceDescription=grievance_description,
+            context=Context(action="init", transaction_id=transaction_id),
+            message={
+                "order": {
+                    "provider": {"id": "pmkisan-greviance"},
+                    "items": [{"id": "pmkisan-greviance"}],
+                    "fulfillments": [
+                        {
+                            "customer": {
+                                "person": {
+                                    "name": customer_name,
+                                    "tags": [
+                                        {
+                                            "display": True,
+                                            "descriptor": {"name": "Registration Details", "code": "reg-details"},
+                                            "list": [
+                                                {
+                                                    "descriptor": {"name": identifier_name, "code": identifier_type},
+                                                    "value": identifier_value,
+                                                    "display": True
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "display": True,
+                                            "descriptor": {"name": "Grievance Details", "code": "grievance-details"},
+                                            "list": [
+                                                {
+                                                    "descriptor": {"name": "Grievance Type", "code": "grievance-type"},
+                                                    "value": grievance_type_code,
+                                                    "display": True
+                                                },
+                                                {
+                                                    "descriptor": {"name": "Grievance Description", "code": "grievance-description"},
+                                                    "value": grievance_description,
+                                                    "display": True
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                "contact": {"phone": phone} if phone else {}
+                            }
+                        }
+                    ]
+                }
+            }
         )
-
-
-class StatusRequest(BaseModel):
-    Type: str
-    TokenNo: str
-    IdentityNo: str
-
-    @classmethod
-    def build(cls, type_field: str, token_no: str, identity_value: str) -> "StatusRequest":
-        return cls(Type=type_field, TokenNo=token_no, IdentityNo=identity_value)
-
-
-# --------------------------------------------------------------------------------------
-# Formatters (user-facing strings)
-# --------------------------------------------------------------------------------------
-
-def _format_status(payload: Dict[str, Any]) -> str:
-    try:
-        status = GrievanceStatusPayload.model_validate(payload)
-        return str(status)
-    except ValidationError:
-        # Fallback to generic interpretation
-        msg = payload.get("message")
-        if msg:
-            return msg
-        return "No grievance records found."
-
 
 # --------------------------------------------------------------------------------------
 # Exported Tools
 # --------------------------------------------------------------------------------------
 
 @observe(name="tool:pmkisan_submit_grievance", as_type="tool")
-def pmkisan_submit_grievance(identity_no: str, grievance_description: str, grievance_type: str) -> str:
+async def pmkisan_submit_grievance(
+    ctx: RunContext[FarmerContext],
+    reg_no: str,
+    grievance_description: str,
+    grievance_type: str,
+    aadhaar_no: Optional[str] = None,
+    raw: bool = False,
+) -> str:
     """
-    Create and submit a grievance to the PM-KISAN portal.
+    Submit a grievance to the PM-KISAN portal via Vistaar Network.
 
     Args:
-        identity_no: PM-KISAN Registration Number (11-character alphanumeric string) or 12-digit Aadhaar number registered with PM-KISAN.
-        grievance_description: Description of the grievance (plain text).
-        grievance_type: Human-friendly grievance label. Must be one of the keys in GRIEVANCE_MAPPING.
+        reg_no: PM-KISAN Registration Number (11-character alphanumeric, e.g., 'BRXXXXXXXXX'). Use empty string when submitting with aadhaar_no only.
+        grievance_description: Detailed description of the grievance.
+        grievance_type: The type of grievance. Must be one of:
+            "ACCOUNT_NUMBER_NOT_CORRECT", "ONLINE_APPLICATION_PENDING_FOR_APPROVAL",
+            "INSTALLMENT_NOT_RECEIVED", "TRANSACTION_FAILED", "PROBLEM_IN_AADHAAR_CORRECTION",
+            "GENDER_NOT_CORRECT", "PAYMENT_RELATED", "PROBLEM_IN_OTP_BASED_EKYC",
+            "PROBLEM_IN_BIO_METRIC_BASED_EKYC", "PROBLEM_IN_FACIAL_BASED_EKYC"
+        aadhaar_no: Optional 12-digit Aadhaar. When provided (non-empty), it is used instead of reg_no
+            for the init payload and transaction_id.
 
     Returns:
-        A user-friendly message summarizing submission outcome.
+        A confirmation message or an error if the submission failed.
     """
     try:
+        identifier_value: Optional[str] = None
+        identifier_type: Optional[Literal["reg-number", "aad-number"]] = None
+
+        if aadhaar_no and aadhaar_no.strip():
+            identifier_value = aadhaar_no.strip()
+            identifier_type = "aad-number"
+        elif reg_no and reg_no.strip():
+            identifier_value = reg_no.strip()
+            identifier_type = "reg-number"
+        else:
+            raise ModelRetry("Please provide either a PM-KISAN Registration Number or an Aadhaar Number.")
+
         if not grievance_type or grievance_type not in GRIEVANCE_MAPPING:
             choices = '", "'.join(GRIEVANCE_TYPES)
             raise ModelRetry(f'Invalid grievance type: "{grievance_type}". Please select from: "{choices}".')
 
         if not grievance_description or len(grievance_description.strip()) < 10:
-            raise ModelRetry("Please provide a brief grievance description.")
+            raise ModelRetry("Please provide a brief grievance description (at least 10 characters).")
 
-        client = GrievanceClient.from_env()
-        identity_value, type_field = _resolve_identity(client, identity_no.strip(), purpose="create")
+        session_id = ctx.deps.session_id
+        transaction_id = generate_transaction_id(session_id, identifier_value)
+        
+        phone = ""
 
-        body = CreateGrievanceRequest.build(
-            type_field=type_field,
-            token_no=client.token,
-            identity_value=identity_value,
-            grievance_code=GRIEVANCE_MAPPING[grievance_type],
+        request_obj = GrievanceInitRequest.build(
+            transaction_id=transaction_id,
+            identifier_value=identifier_value,
+            identifier_type=identifier_type,
+            grievance_type_code=GRIEVANCE_MAPPING[grievance_type],
             grievance_description=grievance_description.strip(),
-        ).model_dump()
+            phone=phone
+        )
+        payload = request_obj.model_dump(by_alias=True)
+        
+        if not BAP_ENDPOINT:
+            raise ModelRetry("BAP_ENDPOINT is not configured in environment.")
 
-        logger.info("Submitting grievance (redacting IdentityNo from logs).")
-        # IMPORTANT: do not log body with IdentityNo in plaintext
-        env = client.post_encrypted("/LodgeGrievance", body)
-        decrypted = env.decrypt(client.crypto)
+        endpoint = f"{BAP_ENDPOINT.rstrip('/')}/init"
+        logger.info(f"[PM KISAN GRIEVANCE] Request URL: {endpoint}")
+        logger.info(f"[PM KISAN GRIEVANCE] Payload: {json.dumps(payload)}")
 
-        # Typical response carries {"message": "..."} and sometimes "Responce"
-        try:
-            msg = GenericMessageResponse.model_validate(decrypted)
-            return str(msg)
-        except ValidationError:
-            # Fallback if schema differs
-            return decrypted.get("message") or "Grievance submitted successfully."
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
+            response = await client.post(endpoint, json=payload)
+
+        logger.info(f"[PM KISAN GRIEVANCE] Response Status: {response.status_code}")
+        logger.info(f"[PM KISAN GRIEVANCE] Response Body: {response.text[:500]}")
+
+        if response.status_code != 200:
+            logger.error(f"Grievance submission failed with status {response.status_code}")
+            return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
+
+        return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
 
     except httpx.TimeoutException:
         logger.error("Grievance submission timed out.")
@@ -353,7 +439,6 @@ def pmkisan_submit_grievance(identity_no: str, grievance_description: str, griev
         logger.error(f"Grievance submission network error: {e}")
         return "Unable to reach grievance service. Please try again."
     except ModelRetry as e:
-        # Bubble up actionable guidance to the agent/user
         return str(e)
     except Exception as e:
         logger.error(f"Unexpected error in pmkisan_submit_grievance: {e}")
@@ -361,39 +446,110 @@ def pmkisan_submit_grievance(identity_no: str, grievance_description: str, griev
 
 
 @observe(name="tool:pmkisan_grievance_status", as_type="tool")
-def pmkisan_grievance_status(identity_no: str) -> str:
+async def pmkisan_grievance_status(
+    ctx: RunContext[FarmerContext],
+    reg_no: str = "",
+    raw: bool = False,
+    aadhaar_no: Optional[str] = None,
+) -> str:
     """
-    Check grievance status by PM-KISAN Registration Number or Aadhaar (registered).
+    Check the status of a previously submitted grievance using PM-KISAN Registration Number or Aadhaar.
 
     Args:
-        identity_no: PM-KISAN Registration Number (11-character alphanumeric string) or 12-digit Aadhaar registered with PM-KISAN.
+        reg_no: PM-KISAN Registration Number (11-character alphanumeric, e.g., 'BRXXXXXXXXX'). Optional if aadhaar_no is set.
+        raw: If True, return raw HTTP body (pretty JSON when possible).
+        aadhaar_no: Optional 12-digit Aadhaar. When set (non-empty), used instead of reg_no for the search payload
+            and for transaction_id (must match the identifier used when submitting).
 
     Returns:
-        A user-friendly status string (registration number, dates, officer reply, etc.),
-        or an explanatory message if not found yet.
+        A status summary including the latest updates on the grievance.
     """
     try:
-        client = GrievanceClient.from_env()
-        identity_value, type_field = _resolve_identity(client, identity_no.strip(), purpose="status")
+        identifier_value: Optional[str] = None
+        identifier_type: Optional[Literal["reg-number", "aad-number"]] = None
 
-        body = StatusRequest.build(
-            type_field=type_field,
-            token_no=client.token,
-            identity_value=identity_value,
-        ).model_dump()
+        if aadhaar_no and str(aadhaar_no).strip():
+            identifier_value = str(aadhaar_no).strip()
+            identifier_type = "aad-number"
+        elif reg_no and reg_no.strip():
+            identifier_value = reg_no.strip()
+            identifier_type = "reg-number"
+        else:
+            raise ModelRetry(
+                "Please provide either a PM-KISAN Registration Number or an Aadhaar Number to check grievance status."
+            )
 
-        env = client.post_encrypted("/GrievanceStatusCheck", body)
-        decrypted = env.decrypt(client.crypto)
-        return _format_status(decrypted)
+        identifier_name = "Registration Number" if identifier_type == "reg-number" else "Aadhaar Number"
+
+        session_id = ctx.deps.session_id
+        transaction_id = generate_transaction_id(session_id, identifier_value)
+
+        payload = {
+            "context": Context(action="search", transaction_id=transaction_id).model_dump(by_alias=True),
+            "message": {
+                "intent": {
+                    "category": {
+                        "descriptor": {
+                            "name": "grievance-agri",
+                            "code": "grievance",
+                        }
+                    },
+                    "order": {
+                        "fulfillments": [
+                            {
+                                "customer": {
+                                    "person": {
+                                        "name": "Customer Name",
+                                        "tags": [
+                                            {
+                                                "display": True,
+                                                "descriptor": {
+                                                    "name": "Registration Details",
+                                                    "code": "reg-details",
+                                                },
+                                                "list": [
+                                                    {
+                                                        "descriptor": {
+                                                            "name": identifier_name,
+                                                            "code": identifier_type,
+                                                        },
+                                                        "value": identifier_value,
+                                                        "display": True,
+                                                    }
+                                                ],
+                                            }
+                                        ],
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                }
+            }
+        }
+
+        if not BAP_ENDPOINT:
+            return "Grievance status check is currently unavailable (BAP not configured)."
+
+        endpoint = f"{BAP_ENDPOINT.rstrip('/')}/search"
+        logger.info(f"[PM KISAN GRIEVANCE STATUS] Request URL: {endpoint}")
+
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
+            response = await client.post(endpoint, json=payload)
+
+        if response.status_code != 200:
+            return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
+
+        return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
 
     except httpx.TimeoutException:
         logger.error("Grievance status check timed out.")
         return "Grievance status check timed out. Please try again."
     except httpx.RequestError as e:
         logger.error(f"Grievance status network error: {e}")
-        return "Unable to reach grievance service. Please try again."
+        return "Unable to reach grievance status service. Please try again."
     except ModelRetry as e:
         return str(e)
     except Exception as e:
-        logger.error(f"Unexpected error in pmkisan_grievance_status: {e}")
-        raise ModelRetry(f"Unexpected error while checking grievance status. {str(e)}")
+        logger.error(f"Error in pmkisan_grievance_status: {e}")
+        return "An error occurred while checking grievance status. Please try again later."
