@@ -78,11 +78,6 @@ def _format_http_response_raw(response: httpx.Response, *, max_chars: int = 8000
         # Last-resort: never crash while formatting tool output
         return (response.text or "").strip()
 
-def _pick(d: Dict[str, Any], *keys: str) -> Optional[Any]:
-    for k in keys:
-        if k in d and d[k] is not None:
-            return d[k]
-    return None
 
 class GatewayContext(BaseModel):
     action: Optional[str] = None
@@ -358,7 +353,7 @@ class GrievanceInitRequest(BaseModel):
 # --------------------------------------------------------------------------------------
 
 @observe(name="tool:pmkisan_submit_grievance", as_type="tool")
-def pmkisan_submit_grievance(
+async def pmkisan_submit_grievance(
     ctx: RunContext[FarmerContext],
     reg_no: str,
     grievance_description: str,
@@ -425,11 +420,8 @@ def pmkisan_submit_grievance(
         logger.info(f"[PM KISAN GRIEVANCE] Request URL: {endpoint}")
         logger.info(f"[PM KISAN GRIEVANCE] Payload: {json.dumps(payload)}")
 
-        response = httpx.post(
-            endpoint,
-            json=payload,
-            timeout=DEFAULT_HTTP_TIMEOUT
-        )
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
+            response = await client.post(endpoint, json=payload)
 
         logger.info(f"[PM KISAN GRIEVANCE] Response Status: {response.status_code}")
         logger.info(f"[PM KISAN GRIEVANCE] Response Body: {response.text[:500]}")
@@ -454,7 +446,7 @@ def pmkisan_submit_grievance(
 
 
 @observe(name="tool:pmkisan_grievance_status", as_type="tool")
-def pmkisan_grievance_status(
+async def pmkisan_grievance_status(
     ctx: RunContext[FarmerContext],
     reg_no: str = "",
     raw: bool = False,
@@ -541,18 +533,21 @@ def pmkisan_grievance_status(
 
         endpoint = f"{BAP_ENDPOINT.rstrip('/')}/search"
         logger.info(f"[PM KISAN GRIEVANCE STATUS] Request URL: {endpoint}")
-        
-        response = httpx.post(
-            endpoint,
-            json=payload,
-            timeout=DEFAULT_HTTP_TIMEOUT
-        )
+
+        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
+            response = await client.post(endpoint, json=payload)
 
         if response.status_code != 200:
             return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
 
         return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
 
+    except httpx.TimeoutException:
+        logger.error("Grievance status check timed out.")
+        return "Grievance status check timed out. Please try again."
+    except httpx.RequestError as e:
+        logger.error(f"Grievance status network error: {e}")
+        return "Unable to reach grievance status service. Please try again."
     except ModelRetry as e:
         return str(e)
     except Exception as e:
