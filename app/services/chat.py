@@ -49,7 +49,6 @@ async def stream_chat_messages(
     history: list,
     background_tasks: BackgroundTasks,
     is_image_analysis: bool = False,
-    image_url: str = "",
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
 ) -> AsyncGenerator[str, None]:
