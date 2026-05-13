@@ -21,6 +21,39 @@ from app.core.image_storage import mark_processed, cleanup_image
 
 logger = get_logger(__name__)
 
+
+def _format_npss_value(value, indent: int = 0) -> list[str]:
+    prefix = "  " * indent
+
+    if isinstance(value, dict):
+        lines: list[str] = []
+        for key, nested in value.items():
+            if isinstance(nested, (dict, list)):
+                lines.append(f"{prefix}- **{key}:**")
+                lines.extend(_format_npss_value(nested, indent + 1))
+            elif nested in (None, ""):
+                lines.append(f"{prefix}- **{key}:**")
+            else:
+                lines.append(f"{prefix}- **{key}:** {nested}")
+        return lines or [f"{prefix}-"]
+
+    if isinstance(value, list):
+        lines: list[str] = []
+        if not value:
+            return [f"{prefix}- None"]
+        for item in value:
+            if isinstance(item, (dict, list)):
+                lines.append(f"{prefix}-")
+                lines.extend(_format_npss_value(item, indent + 1))
+            else:
+                lines.append(f"{prefix}- {item}")
+        return lines
+
+    if value in (None, ""):
+        return [f"{prefix}-"]
+
+    return [f"{prefix}{value}"]
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -364,24 +397,28 @@ async def analyze_crop_image(
         if image_id:
             cleanup_image(image_id, move_to_gcs=GCS_MOVE_AFTER_PROCESS)
 
-    # Parse NPSS response
-    errors = result.get("errors")
-    if errors:
-        return f"NPSS analysis could not complete: {errors}"
+    # Preserve the full NPSS payload in a readable structure instead of summarizing it.
+    preferred_order = ["errors", "pest", "crop", "pathogenClass", "description"]
+    ordered_keys = [key for key in preferred_order if key in result]
+    ordered_keys.extend(key for key in result if key not in ordered_keys)
 
-    pest = result.get("pest", "Unknown")
-    crop = result.get("crop", "Unknown")
-    pathogen_class = result.get("pathogenClass", "Unknown")
-    description = result.get("description", "")
+    lines = ["**NPSS Analysis Result**", ""]
 
-    lines = [
-        f"**Diagnosis Result (NPSS)**",
-        f"",
-        f"**Pest / Disease:** {pest}",
-        f"**Crop:** {crop}",
-        f"**Pathogen Class:** {pathogen_class}",
-    ]
-    if description:
-        lines.append(f"**Description:** {description}")
+    for key in ordered_keys:
+        value = result.get(key)
 
-    return "\n".join(lines)
+        if isinstance(value, str):
+            if value:
+                if len(value) > 120 or "\n" in value:
+                    lines.extend([f"**{key}:**", value, ""])
+                else:
+                    lines.append(f"**{key}:** {value}")
+            else:
+                lines.append(f"**{key}:**")
+            continue
+
+        lines.append(f"**{key}:**")
+        lines.extend(_format_npss_value(value, indent=1))
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
