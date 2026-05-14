@@ -130,8 +130,26 @@ class OrderOut(BaseModel):
     type: Optional[str] = None
 
 
+class CatalogItem(BaseModel):
+    id: Optional[str] = None
+    descriptor: Optional[TagDescriptor] = None
+    tags: Optional[List[TagGroup]] = None
+
+
+class CatalogProvider(BaseModel):
+    id: Optional[str] = None
+    descriptor: Optional[TagDescriptor] = None
+    items: Optional[List[CatalogItem]] = None
+
+
+class CatalogOut(BaseModel):
+    descriptor: Optional[TagDescriptor] = None
+    providers: Optional[List[CatalogProvider]] = None
+
+
 class MessageOut(BaseModel):
     order: Optional[OrderOut] = None
+    catalog: Optional[CatalogOut] = None
 
 
 class GatewaySubResponse(BaseModel):
@@ -144,15 +162,12 @@ class GatewayResponse(BaseModel):
     responses: Optional[List[GatewaySubResponse]] = None
     error: Optional[Any] = None
 
-    def _order_tags_kv(self) -> Dict[str, str]:
-        out: Dict[str, str] = {}
-        sub = (self.responses or [None])[0]
-        order = None
-        if sub and sub.message and sub.message.order:
-            order = sub.message.order
-        if not order or not order.tags:
-            return out
-        for group in order.tags:
+    @staticmethod
+    def _add_tag_values(out: Dict[str, str], tag_groups: Optional[List[TagGroup]]) -> None:
+        if not tag_groups:
+            return
+
+        for group in tag_groups:
             if not group or not group.list:
                 continue
             for item in group.list:
@@ -161,7 +176,70 @@ class GatewayResponse(BaseModel):
                 if item.value is None:
                     continue
                 out[str(item.descriptor.code)] = str(item.value)
+
+    def _response_tags_kv(self) -> Dict[str, str]:
+        out: Dict[str, str] = {}
+
+        for sub in self.responses or []:
+            if not sub or not sub.message:
+                continue
+
+            if sub.message.order:
+                self._add_tag_values(out, sub.message.order.tags)
+
+            catalog = sub.message.catalog
+            if not catalog or not catalog.providers:
+                continue
+            for provider in catalog.providers:
+                if not provider or not provider.items:
+                    continue
+                for item in provider.items:
+                    if item:
+                        self._add_tag_values(out, item.tags)
+
         return out
+
+    @staticmethod
+    def _format_details(details: str) -> List[str]:
+        details = details.strip()
+        if not details:
+            return []
+
+        try:
+            parsed = json.loads(details)
+        except Exception:
+            return [f"Details: {details}"]
+
+        records = parsed if isinstance(parsed, list) else [parsed]
+        lines: List[str] = []
+        field_labels = {
+            "Farmer_Name": "Farmer Name",
+            "Father_Name": "Father Name",
+            "Gender": "Gender",
+            "Reg_No": "Registration Number",
+            "StateName": "State",
+            "DistrictName": "District",
+            "BlockName": "Block",
+            "RevenueVillageName": "Village",
+            "GrievanceDate": "Grievance Date",
+            "GrievanceStatus": "Grievance Status",
+            "OfficerReply": "Officer Reply",
+            "OfficeReplyDate": "Office Reply Date",
+            "MobileNo": "Mobile No",
+            "GrievanceDescription": "Grievance Description",
+        }
+
+        for index, record in enumerate(records, start=1):
+            if not isinstance(record, dict):
+                continue
+            if len(records) > 1:
+                lines.append(f"Record {index}:")
+            for field, label in field_labels.items():
+                value = record.get(field)
+                if value is not None and str(value).strip():
+                    lines.append(f"{label}: {str(value).strip()}")
+
+        return lines
 
     def __str__(self) -> str:
         # Mirror other tools: readable summary from validated JSON
@@ -173,19 +251,28 @@ class GatewayResponse(BaseModel):
         if mid:
             lines.append(f"message_id: {mid}")
 
-        tags = self._order_tags_kv()
+        tags = self._response_tags_kv()
         if tags:
             # These codes match what the gateway returns in your sample
             if "status" in tags:
                 lines.append(f"Status: {tags.get('status', '').strip()}")
             if "grievance-id" in tags:
                 lines.append(f"Grievance ID: {tags.get('grievance-id', '').strip()}")
+            if "lookup-type" in tags:
+                lines.append(f"Lookup Type: {tags.get('lookup-type', '').strip()}")
             if "identity-no" in tags:
                 lines.append(f"Identity No: {tags.get('identity-no', '').strip()}")
             if "grievance-type" in tags:
                 lines.append(f"Grievance Type: {tags.get('grievance-type', '').strip()}")
+            if "grievance-status" in tags:
+                grievance_status = tags.get("grievance-status", "").strip() or "Not available"
+                lines.append(f"Grievance Status: {grievance_status}")
+            if "grievance-date" in tags:
+                lines.append(f"Grievance Date: {tags.get('grievance-date', '').strip()}")
             if "message" in tags and tags["message"]:
                 lines.append(f"Message: {tags.get('message', '').strip()}")
+            if "details" in tags:
+                lines.extend(self._format_details(tags["details"]))
 
         if self.error is not None:
             lines.append(f"Error: {json.dumps(self.error, ensure_ascii=False)}")
