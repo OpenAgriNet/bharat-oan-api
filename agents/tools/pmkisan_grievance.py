@@ -18,6 +18,10 @@ from pydantic import BaseModel, Field, ValidationError
 from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
+from agents.tools.pmkisan_scheme_status import (
+    SchemeInitResponse,
+    SchemeStatusResponse,
+)
 from langfuse import observe
 from helpers.utils import get_logger
 
@@ -215,6 +219,201 @@ def _format_grievance_response_formatted(response: httpx.Response) -> str:
         except Exception:
             return resp_text
 
+
+def _format_otp_init_response(response: httpx.Response) -> str:
+    resp_text = (response.text or "").strip()
+    if not resp_text:
+        return "OTP has been sent to the registered mobile number. Please provide the OTP to continue."
+
+    try:
+        model = SchemeInitResponse.model_validate(response.json())
+        formatted = str(model).strip()
+        return formatted or "OTP has been sent to the registered mobile number. Please provide the OTP to continue."
+    except Exception:
+        return _format_http_response_raw(response)
+
+
+def _generate_pm_kisan_otp_transaction_id(session_id: str, reg_no: str) -> str:
+    """Match the PM-KISAN status OTP transaction id without changing that tool's payload builders."""
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, session_id + reg_no))
+
+
+def _build_pm_kisan_otp_context(action: Literal["init", "status"], transaction_id: str) -> Dict[str, Any]:
+    return {
+        "domain": "schemes:vistaar",
+        "action": action,
+        "version": "1.1.0",
+        "bap_id": BAP_ID,
+        "bap_uri": BAP_URI,
+        "bpp_id": BPP_ID,
+        "bpp_uri": BPP_URI,
+        "transaction_id": transaction_id,
+        "message_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+        "ttl": "PT10M",
+        "location": {
+            "country": {"code": "IND"},
+            "city": {"code": "*"},
+        },
+    }
+
+
+def _build_pm_kisan_otp_init_payload(reg_no: str, transaction_id: str) -> Dict[str, Any]:
+    return {
+        "context": _build_pm_kisan_otp_context("init", transaction_id),
+        "message": {
+            "order": {
+                "provider": {"id": "pmkisan"},
+                "items": [{"id": "pmkisan"}],
+                "fulfillments": [
+                    {
+                        "customer": {
+                            "person": {
+                                "name": "Farmer",
+                                "tags": [
+                                    {
+                                        "descriptor": {
+                                            "name": "Registration Details",
+                                            "code": "reg-details",
+                                        },
+                                        "list": [
+                                            {
+                                                "descriptor": {
+                                                    "name": "Registration Number",
+                                                    "code": "reg-number",
+                                                },
+                                                "value": reg_no,
+                                                "display": True,
+                                            }
+                                        ],
+                                    }
+                                ],
+                            }
+                        }
+                    }
+                ],
+            }
+        },
+    }
+
+
+def _build_pm_kisan_otp_status_payload(
+    reg_no: str,
+    otp: str,
+    transaction_id: str,
+    phone_number: str,
+) -> Dict[str, Any]:
+    return {
+        "context": _build_pm_kisan_otp_context("status", transaction_id),
+        "message": {
+            "order_id": otp,
+            "registration_number": reg_no,
+            "phone_number": phone_number,
+        },
+    }
+
+
+def _is_otp_verified(response_model: SchemeStatusResponse) -> bool:
+    for response_item in response_model.responses or []:
+        order = response_item.message.order
+        if (order.state or "").upper() == "COMPLETED":
+            return True
+
+        for fulfillment in order.fulfillments or []:
+            descriptor = fulfillment.state.descriptor if fulfillment.state else None
+            if not descriptor:
+                continue
+
+            code = (descriptor.code or "").lower()
+            short_desc = (descriptor.short_desc or "").lower()
+            if code == "completed" or "otp verified" in short_desc:
+                return True
+
+    return False
+
+
+async def _request_pm_kisan_otp(
+    ctx: RunContext[FarmerContext],
+    reg_no: str,
+    phone_number: str,
+    purpose: str,
+) -> str:
+    if not BAP_ENDPOINT:
+        raise ModelRetry("BAP_ENDPOINT is not configured in environment.")
+
+    reg_no_clean = reg_no.strip()
+    transaction_id = _generate_pm_kisan_otp_transaction_id(ctx.deps.session_id, reg_no_clean)
+    payload = _build_pm_kisan_otp_init_payload(reg_no_clean, transaction_id)
+
+    endpoint = f"{BAP_ENDPOINT.rstrip('/')}/init"
+    logger.info(f"[PM KISAN GRIEVANCE OTP INIT] Request URL: {endpoint}")
+    logger.info(f"[PM KISAN GRIEVANCE OTP INIT] Payload: {json.dumps(payload)}")
+
+    async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
+        response = await client.post(endpoint, json=payload)
+
+    logger.info(f"[PM KISAN GRIEVANCE OTP INIT] Response Status: {response.status_code}")
+    logger.info(f"[PM KISAN GRIEVANCE OTP INIT] Response Body: {response.text[:500]}")
+
+    if response.status_code != 200:
+        return f"Unable to send OTP for PM-KISAN grievance {purpose}. {_format_http_response_raw(response)}"
+
+    formatted = _format_otp_init_response(response).strip()
+    return f"{formatted}\nPlease provide the 4-digit OTP to {purpose}."
+
+
+async def _verify_pm_kisan_otp(
+    ctx: RunContext[FarmerContext],
+    reg_no: str,
+    otp: str,
+    phone_number: str,
+) -> Optional[str]:
+    otp_clean = str(otp).strip()
+    if not otp_clean.isdigit() or len(otp_clean) != 4:
+        return "Invalid OTP format. Please provide the 4-digit OTP received via SMS."
+
+    if not BAP_ENDPOINT:
+        raise ModelRetry("BAP_ENDPOINT is not configured in environment.")
+
+    reg_no_clean = reg_no.strip()
+    transaction_id = _generate_pm_kisan_otp_transaction_id(ctx.deps.session_id, reg_no_clean)
+    payload = _build_pm_kisan_otp_status_payload(
+        reg_no_clean,
+        otp_clean,
+        transaction_id,
+        phone_number.strip() if phone_number else "",
+    )
+
+    endpoint = f"{BAP_ENDPOINT.rstrip('/')}/status"
+    logger.info(f"[PM KISAN GRIEVANCE OTP VERIFY] Request URL: {endpoint}")
+    logger.info(f"[PM KISAN GRIEVANCE OTP VERIFY] Payload: {json.dumps(payload)}")
+
+    async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
+        response = await client.post(endpoint, json=payload)
+
+    logger.info(f"[PM KISAN GRIEVANCE OTP VERIFY] Response Status: {response.status_code}")
+    logger.info(f"[PM KISAN GRIEVANCE OTP VERIFY] Response Body: {response.text[:500]}")
+
+    if response.status_code != 200:
+        return f"OTP verification failed. {_format_http_response_raw(response)}"
+
+    resp_text = (response.text or "").strip()
+    if not resp_text:
+        return "OTP verification failed because the service returned an empty response. Please try again."
+
+    try:
+        response_model = SchemeStatusResponse.model_validate(response.json())
+    except Exception:
+        return f"OTP verification failed. {_format_http_response_raw(response)}"
+
+    if _is_otp_verified(response_model):
+        return None
+
+    response_summary = str(response_model).strip()
+    if response_summary:
+        return f"OTP verification was not successful.\n{response_summary}"
+    return "OTP verification was not successful. Please check the OTP and try again."
+
 # -----------------------
 # Shared Helpers
 # -----------------------
@@ -352,6 +551,47 @@ class GrievanceInitRequest(BaseModel):
 # Exported Tools
 # --------------------------------------------------------------------------------------
 
+@observe(name="tool:pmkisan_grievance_send_otp", as_type="tool")
+async def pmkisan_grievance_send_otp(
+    ctx: RunContext[FarmerContext],
+    reg_no: str,
+    phone_number: str = "",
+    purpose: Literal["submit_grievance", "check_status"] = "submit_grievance",
+) -> str:
+    """
+    Send OTP to the mobile registered with a PM-KISAN registration number.
+
+    Use before submitting a grievance or checking grievance status. After the user shares
+    the OTP, call pmkisan_submit_grievance or pmkisan_grievance_status with that OTP.
+
+    Args:
+        reg_no: PM-KISAN registration number used for OTP.
+        phone_number: Optional registered mobile number to include in the OTP payload.
+        purpose: Whether the OTP is for grievance submission or status check.
+
+    Returns:
+        OTP send confirmation or service error.
+    """
+    try:
+        if not reg_no or not reg_no.strip():
+            raise ModelRetry("Please provide the PM-KISAN Registration Number to send OTP.")
+
+        purpose_text = "submit the grievance" if purpose == "submit_grievance" else "check grievance status"
+        return await _request_pm_kisan_otp(ctx, reg_no.strip(), phone_number, purpose_text)
+
+    except httpx.TimeoutException:
+        logger.error("PM-KISAN grievance OTP request timed out.")
+        return "OTP request timed out. Please try again."
+    except httpx.RequestError as e:
+        logger.error(f"PM-KISAN grievance OTP request network error: {e}")
+        return "Unable to reach OTP service. Please try again."
+    except ModelRetry as e:
+        return str(e)
+    except Exception as e:
+        logger.error(f"Unexpected error in pmkisan_grievance_send_otp: {e}")
+        raise ModelRetry(f"Unexpected error while sending OTP. {str(e)}")
+
+
 @observe(name="tool:pmkisan_submit_grievance", as_type="tool")
 async def pmkisan_submit_grievance(
     ctx: RunContext[FarmerContext],
@@ -359,24 +599,27 @@ async def pmkisan_submit_grievance(
     grievance_description: str,
     grievance_type: str,
     aadhaar_no: Optional[str] = None,
+    otp: Optional[str] = None,
+    phone_number: str = "",
     raw: bool = False,
 ) -> str:
     """
-    Submit a grievance to the PM-KISAN portal via Vistaar Network.
+    Submit a PM-KISAN grievance only after OTP verification.
+
+    Call pmkisan_grievance_send_otp first. Use this tool only after the user shares
+    the OTP; it verifies the OTP before calling the grievance submit API.
 
     Args:
-        reg_no: PM-KISAN Registration Number (11-character alphanumeric, e.g., 'BRXXXXXXXXX'). Use empty string when submitting with aadhaar_no only.
+        reg_no: PM-KISAN registration number used for OTP verification.
         grievance_description: Detailed description of the grievance.
-        grievance_type: The type of grievance. Must be one of:
-            "ACCOUNT_NUMBER_NOT_CORRECT", "ONLINE_APPLICATION_PENDING_FOR_APPROVAL",
-            "INSTALLMENT_NOT_RECEIVED", "TRANSACTION_FAILED", "PROBLEM_IN_AADHAAR_CORRECTION",
-            "GENDER_NOT_CORRECT", "PAYMENT_RELATED", "PROBLEM_IN_OTP_BASED_EKYC",
-            "PROBLEM_IN_BIO_METRIC_BASED_EKYC", "PROBLEM_IN_FACIAL_BASED_EKYC"
-        aadhaar_no: Optional 12-digit Aadhaar. When provided (non-empty), it is used instead of reg_no
-            for the init payload and transaction_id.
+        grievance_type: One of GRIEVANCE_TYPES.
+        aadhaar_no: Optional Aadhaar used for the grievance payload after OTP verification.
+        otp: 4-digit OTP received on the registered mobile.
+        phone_number: Optional registered mobile number to include in OTP verification.
+        raw: If True, return the raw response body.
 
     Returns:
-        A confirmation message or an error if the submission failed.
+        Grievance submission result or OTP verification error.
     """
     try:
         identifier_value: Optional[str] = None
@@ -398,18 +641,32 @@ async def pmkisan_submit_grievance(
         if not grievance_description or len(grievance_description.strip()) < 10:
             raise ModelRetry("Please provide a brief grievance description (at least 10 characters).")
 
+        if not reg_no or not reg_no.strip():
+            raise ModelRetry(
+                "Please provide the PM-KISAN Registration Number used for OTP verification."
+            )
+
+        reg_no_clean = reg_no.strip()
+        if not otp or not str(otp).strip():
+            raise ModelRetry(
+                "OTP verification is required before submitting a grievance. "
+                "First call pmkisan_grievance_send_otp, then call this tool with the received OTP."
+            )
+
+        otp_error = await _verify_pm_kisan_otp(ctx, reg_no_clean, str(otp), phone_number)
+        if otp_error:
+            return otp_error
+
         session_id = ctx.deps.session_id
         transaction_id = generate_transaction_id(session_id, identifier_value)
         
-        phone = ""
-
         request_obj = GrievanceInitRequest.build(
             transaction_id=transaction_id,
             identifier_value=identifier_value,
             identifier_type=identifier_type,
             grievance_type_code=GRIEVANCE_MAPPING[grievance_type],
             grievance_description=grievance_description.strip(),
-            phone=phone
+            phone=phone_number.strip() if phone_number else ""
         )
         payload = request_obj.model_dump(by_alias=True)
         
@@ -451,18 +708,24 @@ async def pmkisan_grievance_status(
     reg_no: str = "",
     raw: bool = False,
     aadhaar_no: Optional[str] = None,
+    otp: Optional[str] = None,
+    phone_number: str = "",
 ) -> str:
     """
-    Check the status of a previously submitted grievance using PM-KISAN Registration Number or Aadhaar.
+    Check PM-KISAN grievance status only after OTP verification.
+
+    Call pmkisan_grievance_send_otp first with purpose="check_status". Use this tool only
+    after the user shares the OTP; it verifies the OTP before calling grievance search.
 
     Args:
-        reg_no: PM-KISAN Registration Number (11-character alphanumeric, e.g., 'BRXXXXXXXXX'). Optional if aadhaar_no is set.
+        reg_no: PM-KISAN registration number used for OTP verification.
         raw: If True, return raw HTTP body (pretty JSON when possible).
-        aadhaar_no: Optional 12-digit Aadhaar. When set (non-empty), used instead of reg_no for the search payload
-            and for transaction_id (must match the identifier used when submitting).
+        aadhaar_no: Optional Aadhaar used for grievance status search after OTP verification.
+        otp: 4-digit OTP received on the registered mobile.
+        phone_number: Optional registered mobile number to include in OTP verification.
 
     Returns:
-        A status summary including the latest updates on the grievance.
+        Grievance status summary or OTP verification error.
     """
     try:
         identifier_value: Optional[str] = None
@@ -478,6 +741,22 @@ async def pmkisan_grievance_status(
             raise ModelRetry(
                 "Please provide either a PM-KISAN Registration Number or an Aadhaar Number to check grievance status."
             )
+
+        if not reg_no or not reg_no.strip():
+            raise ModelRetry(
+                "Please provide the PM-KISAN Registration Number used for OTP verification."
+            )
+
+        reg_no_clean = reg_no.strip()
+        if not otp or not str(otp).strip():
+            raise ModelRetry(
+                "OTP verification is required before checking grievance status. "
+                "First call pmkisan_grievance_send_otp with purpose='check_status', then call this tool with the received OTP."
+            )
+
+        otp_error = await _verify_pm_kisan_otp(ctx, reg_no_clean, str(otp), phone_number)
+        if otp_error:
+            return otp_error
 
         identifier_name = "Registration Number" if identifier_type == "reg-number" else "Aadhaar Number"
 
