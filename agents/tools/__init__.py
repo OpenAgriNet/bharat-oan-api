@@ -1,19 +1,37 @@
 """
 Tools for the BharatVistaar AI Agent.
 """
+
 # from agents.tools.search_beckn import search_documents
+
 from pydantic_ai import Tool
+
 from agents.tools.scheme_info import get_scheme_info
-from agents.tools.pmkisan_scheme_status import initiate_pm_kisan_status_check, check_pm_kisan_status_with_otp
-from agents.tools.pmfby_scheme_status import initiate_pmfby_status_check, check_pmfby_status_with_otp
+from agents.tools.pmkisan_scheme_status import (
+    initiate_pm_kisan_status_check,
+    check_pm_kisan_status_with_otp,
+)
+from agents.tools.pmfby_scheme_status import (
+    initiate_pmfby_status_check,
+    check_pmfby_status_with_otp,
+)
 from agents.tools.shc_scheme_status import check_shc_status
+from agents.tools.pmkisan_grievance import (
+    pmkisan_grievance_send_otp,
+    pmkisan_submit_grievance,
+    pmkisan_grievance_status,
+)
 from agents.tools.smam_scheme_status import check_smam_scheme_status
-from agents.tools.pmkisan_grievance import pmkisan_submit_grievance, pmkisan_grievance_status
-from agents.tools.pmfby_grievance import initiate_pmfby_grievance_otp, pmfby_submit_grievance
+from agents.tools.pmfby_grievance import (
+    initiate_pmfby_grievance_otp,
+    pmfby_submit_grievance,
+)
 from agents.tools.terms import search_terms
-from agents.tools.search import search_documents
-from agents.tools.search import search_videos
-from agents.tools.search import search_pests_diseases
+from agents.tools.search import (
+    search_documents,
+    search_videos,
+    search_pests_diseases,
+)
 from agents.tools.weather import weather_forecast
 from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
@@ -27,6 +45,7 @@ from agents.tools.sathi_seed import (
     list_sathi_crops_in_group,
     search_sathi_seed_availability,
 )
+
 TOOLS = [
     Tool(
         get_scheme_info,
@@ -56,6 +75,11 @@ TOOLS = [
     Tool(
         check_shc_status,
         takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        pmkisan_grievance_send_otp,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -125,7 +149,7 @@ TOOLS = [
     ),
     Tool(
         reverse_geocode,
-        takes_ctx=False,    
+        takes_ctx=False,
         strict=False,
     ),
     Tool(
