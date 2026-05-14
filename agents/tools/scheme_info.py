@@ -8,8 +8,36 @@ from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 import os
 from langfuse import observe
+from helpers.langfuse_tracing import lf_update_current_observation
 
 logger = get_logger(__name__)
+
+# Text after "scheme_name:" in Langfuse metadata `Scheme_name` value; `scheme_code` is the tool literal.
+_SCHEME_LABELS: Dict[str, str] = {
+    "kcc": "Kisan Credit Card scheme",
+    "pmkisan": "Pradhan Mantri Kisan Samman Nidhi scheme",
+    "pmfby": "Pradhan Mantri Fasal Bima Yojana scheme",
+    "shc": "Soil Health Card scheme",
+    "pmksy": "Pradhan Mantri Krishi Sinchayee Yojana",
+    "sathi": "SATHI Seed Authentication, Traceability & Holistic Inventory",
+    "pmasha": "Pradhan Mantri Annadata Aay Sanrakshan Abhiyan",
+    "aif": "Agriculture Infrastructure Fund",
+    "smam": "Sub-Mission on Agricultural Mechanization",
+    "pdmc": "Per Drop More Crop scheme",
+    "pkvy": "Paramparagat Krishi Vikas Yojana",
+    "nfsm": "National Food Security Mission",
+    "rad": "Rainfed Area Development",
+}
+
+
+def _scheme_tool_metadata(scheme_name: str) -> Dict[str, str]:
+    label = _SCHEME_LABELS.get(scheme_name, scheme_name)
+    return {
+        "tool": "scheme.info",
+        "scheme_code": scheme_name,
+        "Scheme_name": f"scheme_name:{label}",
+    }
+
 
 # -----------------------
 # Basic Models
@@ -187,6 +215,9 @@ class SchemeRequest(BaseModel):
              - "aif": Agriculture Infrastructure Fund
              - "smam": Sub-Mission on Agricultural Mechanization
              - "pdmc": Per Drop More Crop scheme
+             - "pkvy": Paramparagat Krishi Vikas Yojana
+             - "nfsm": National Food Security Mission
+             - "rad": Rainfed Area Development
     """
     scheme_name: str
     
@@ -239,7 +270,7 @@ class SchemeRequest(BaseModel):
 
 
 @observe(name="tool:get_scheme_info", as_type="tool")
-def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc"]) -> str:
+def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc", "pkvy", "nfsm", "rad"]) -> str:
     """Retrieve detailed information about government agricultural schemes.
     
     This tool fetches comprehensive scheme data including benefits, eligibility criteria, 
@@ -258,12 +289,21 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
             - "aif": Agriculture Infrastructure Fund
             - "smam": Sub-Mission on Agricultural Mechanization
             - "pdmc": Per Drop More Crop scheme
+            - "pkvy": Paramparagat Krishi Vikas Yojana
+            - "nfsm": National Food Security Mission
+            - "rad": Rainfed Area Development
 
     Returns:
         str: Formatted scheme data including introduction, benefits, eligibility, 
              application process, and other relevant information.
     """
     try:
+        # Additive Langfuse metadata (does not affect tool output).
+        meta = _scheme_tool_metadata(scheme_name)
+        lf_update_current_observation(
+            input={"scheme_code": scheme_name, "Scheme_name": meta["Scheme_name"]},
+            metadata=meta,
+        )
         payload = SchemeRequest(scheme_name=scheme_name).get_payload()
         logger.info(f"SchemeName: {scheme_name}")
         logger.info(f"BAP_ENDPOINT: {os.getenv('BAP_ENDPOINT')}")
@@ -277,22 +317,48 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
         
         if response.status_code != 200:
             logger.error(f"Scheme API returned status code {response.status_code}")
+            lf_update_current_observation(
+                metadata={**_scheme_tool_metadata(scheme_name), "http_status": int(response.status_code)}
+            )
             return "Scheme service unavailable. Retrying"
             
         scheme_response = SchemeResponse.model_validate(response.json())
+
+        providers_count = 0
+        items_count = 0
+        for rsp in scheme_response.responses:
+            for provider in rsp.message.catalog.providers:
+                providers_count += 1
+                if provider.items:
+                    items_count += len(provider.items)
+
+        lf_update_current_observation(
+            metadata={
+                **_scheme_tool_metadata(scheme_name),
+                "has_scheme_data": bool(scheme_response._has_scheme_data()),
+                "providers_count": providers_count,
+                "items_count": items_count,
+            }
+        )
         return str(scheme_response)
                 
     except httpx.TimeoutException as e:
         logger.error(f"Scheme API request timed out: {str(e)}")
+        lf_update_current_observation(metadata={**_scheme_tool_metadata(scheme_name), "error_type": "timeout"})
         return "Scheme request timed out. Please try again later."
     
     except httpx.RequestError as e:
         logger.error(f"Scheme API request failed: {e}")
+        lf_update_current_observation(metadata={**_scheme_tool_metadata(scheme_name), "error_type": "request_error"})
         return f"Scheme request failed: {str(e)}"
     
     except UnexpectedModelBehavior as e:
         logger.warning("Scheme request exceeded retry limit")
+        lf_update_current_observation(
+            metadata={**_scheme_tool_metadata(scheme_name), "error_type": "unexpected_model_behavior"}
+        )
         return "Scheme data is temporarily unavailable. Please try again later."
     except Exception as e:
         logger.error(f"Error getting scheme data: {e}")
+        lf_update_current_observation(metadata={**_scheme_tool_metadata(scheme_name), "error_type": "exception"})
         raise ModelRetry(f"Unexpected error in scheme request. {str(e)}") 
