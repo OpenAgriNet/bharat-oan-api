@@ -169,6 +169,46 @@ def _payload_get_otp_grievance_flow(*, transaction_id: str, phone: str) -> Dict[
     }
 
 
+def _payload_grievance_status(
+    *, transaction_id: str, phone: str, grievance_support_ticket_no: str
+) -> Dict[str, Any]:
+    """Beckn `/status` for PMFBY grievance ticket lookup (`status_grievance`)."""
+    ticket = str(grievance_support_ticket_no).strip()
+    return {
+        "context": _beckn_context(transaction_id=transaction_id, action="status"),
+        "message": {
+            "order_id": ticket,
+            "order": {
+                "provider": {"id": "pmfby-grievance"},
+                "items": [{"id": "pmfby-grievance"}],
+                "fulfillments": [
+                    {
+                        "customer": {
+                            "person": {
+                                "tags": [
+                                    {
+                                        "descriptor": {"code": "request_type"},
+                                        "value": "status_grievance",
+                                    },
+                                    {
+                                        "descriptor": {"code": "requestorMobileNo"},
+                                        "value": phone,
+                                    },
+                                    {
+                                        # API field name (typo preserved for BAP compatibility).
+                                        "descriptor": {"code": "GrievenceSupportTicketNo"},
+                                        "value": ticket,
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                ],
+            },
+        },
+    }
+
+
 def _payload_status_verify_otp(*, transaction_id: str, otp: str, phone: str) -> Dict[str, Any]:
     return {
         "context": _beckn_context(transaction_id=transaction_id, action="status"),
@@ -301,6 +341,33 @@ class InitResponse(BaseModel):
 
         return "PMFBY grievance submitted, but ticket details were not found in the response."
 
+    def format_status_result(self) -> str:
+        """Format grievance status from `/status` (status_grievance) responses."""
+        if not self.responses:
+            return "No grievance status found for this ticket."
+
+        lines: List[str] = []
+        for r in self.responses:
+            order = (r.message.order if r.message and r.message.order else None) if r.message else None
+            if not order or not order.tags:
+                continue
+            for tag in order.tags:
+                if not tag.display:
+                    continue
+                if tag.list:
+                    for li in tag.list:
+                        if not li.display or not li.descriptor or li.value is None:
+                            continue
+                        name = li.descriptor.name or li.descriptor.code or "Detail"
+                        lines.append(f"{name}: {li.value}")
+                elif tag.descriptor and tag.value is not None:
+                    name = tag.descriptor.name or tag.descriptor.code or "Detail"
+                    lines.append(f"{name}: {tag.value}")
+
+        if lines:
+            return "\n".join(lines)
+        return "No grievance status found for this ticket."
+
 
 # --------------------------------------------------------------------------------------
 # Tools
@@ -366,6 +433,72 @@ def check_pmfby_grievance_otp(
     except Exception as e:
         logger.error("check_pmfby_grievance_otp: %s", e)
         raise ModelRetry(f"Unexpected error during OTP verification. {str(e)}") from e
+
+
+@observe(name="tool:pmfby_grievance_status", as_type="tool")
+def pmfby_grievance_status(
+    ctx: RunContext[FarmerContext],
+    phone_number: str,
+    grievance_support_ticket_no: str,
+) -> str:
+    """Check PMFBY grievance status for an existing support ticket.
+
+    Ask the farmer for their registered mobile number and grievance support ticket number,
+    then call this tool. No OTP is required for status lookup.
+
+    Args:
+        phone_number: Mobile number registered with PMFBY (10 digits).
+        grievance_support_ticket_no: Grievance support ticket number (same value as message order_id).
+
+    Returns:
+        Grievance status details from the PMFBY grievance portal.
+    """
+    try:
+        phone = normalize_phone_for_api(
+            _require_nonempty(phone_number, "Please share your registered mobile number.")
+        )
+        if len(phone) != 10:
+            raise ModelRetry("Please share a valid 10-digit mobile number registered with PMFBY.")
+
+        ticket = _require_nonempty(
+            grievance_support_ticket_no,
+            "Please share your PMFBY grievance support ticket number.",
+        )
+
+        transaction_id = generate_transaction_id(
+            ctx.deps.session_id, f"{phone}:{ticket}"
+        )
+        payload = _payload_grievance_status(
+            transaction_id=transaction_id,
+            phone=phone,
+            grievance_support_ticket_no=ticket,
+        )
+        url = _bap_url("status")
+        response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_STATUS]")
+
+        if response.status_code != 200:
+            return f"PMFBY grievance status service unavailable. Status code: {response.status_code}"
+
+        response_text = response.text.strip()
+        if not response_text:
+            return "PMFBY grievance status service returned an empty response. Please try again."
+
+        try:
+            response_json = response.json()
+        except json.JSONDecodeError:
+            return "PMFBY grievance status service returned a non-JSON response. Please try again."
+
+        return InitResponse.model_validate(response_json).format_status_result()
+
+    except httpx.TimeoutException:
+        return "PMFBY grievance status request timed out. Please try again later."
+    except httpx.RequestError as e:
+        return f"PMFBY grievance status request failed: {str(e)}"
+    except ModelRetry as e:
+        return str(e)
+    except Exception as e:
+        logger.error("pmfby_grievance_status: %s", e)
+        raise ModelRetry(f"Unexpected error checking PMFBY grievance status. {str(e)}") from e
 
 
 @observe(name="tool:pmfby_submit_grievance", as_type="tool")

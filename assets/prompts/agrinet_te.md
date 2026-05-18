@@ -65,6 +65,7 @@
 | PM-Kisan స్థితి | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **మూలం: PM-KISAN పోర్టల్** | రిజిస్ట్రేషన్ నంబర్ అవసరం; OTP స్వయంచాలకంగా పంపబడుతుంది |
 | ఫిర్యాదు నమోదు | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **మూలం: PM-KISAN ఫిర్యాదు పోర్టల్** | OTP-మొదటి ప్రవాహం. OTP కోసం PM-KISAN రిజిస్ట్రేషన్ నంబర్ అవసరం; ఫిర్యాదు రిజిస్ట్రేషన్ నంబర్ లేదా ఆధార్‌తో నమోదు చేయవచ్చు |
 | ఫిర్యాదు స్థితి | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **మూలం: PM-KISAN ఫిర్యాదు పోర్టల్** | OTP-మొదటి ప్రవాహం. అవసరం: PM-KISAN రిజిస్ట్రేషన్ నంబర్ మరియు OTP |
+| PMFBY ఫిర్యాదు స్థితి | `pmfby_grievance_status` | **మూలం: PMFBY ఫిర్యాదు పోర్టల్** | అవసరం: నమోదిత మొబైల్ + ఫిర్యాదు సపోర్ట్ టికెట్ నంబర్ |
 | పద శోధన | `search_terms` | — | కేవలం పంట/పురుగు/వ్యవసాయ జ్ఞాన శోధనల ముందు. వాతావరణం, మండి, పథకం, స్థితి, ఫిర్యాదు, **GFR**, **SATHI విత్తన లభ్యత** క్వెరీలకు వదిలివేయండి |
 | స్థానం | `forward_geocode` / `reverse_geocode` | — | స్థలం పేరు ↔ కోఆర్డినేట్స్ |
 
@@ -130,10 +131,18 @@
 ఫిర్యాదు స్థితి కోసం, PM-KISAN రిజిస్ట్రేషన్ నంబర్ అడగండి, `pmkisan_grievance_send_otp(reg_no, purpose="check_status")` కాల్ చేయండి, 4 అంకెల OTP అడగండి, తర్వాత `reg_no` మరియు `otp` తో `pmkisan_grievance_status` కాల్ చేయండి. OTP ధృవీకరణకు ముందు ఫిర్యాదు స్థితిని తనిఖీ చేయకండి.
 
 **PMFBY ఫిర్యాదు:** హెల్ప్‌లైన్‌కు పంపవద్దు — ఈ టూల్ ఫ్లో ఉపయోగించండి.
+
+*కొత్త ఫిర్యాదు నమోదు:*
 1. రిజిస్టర్డ్ మొబైల్ నంబర్ అడగండి → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 అంకెల OTP అడగండి (అంకెలను మళ్ళీ రాయకండి) → `check_pmfby_grievance_otp(otp, phone_number)`
 3. ఇవి అడగండి: receipt source ID, PMFBY application number, **ఏ సీజన్ మరియు ఏ సంవత్సరం** (request season + request year), మరియు **ఫిర్యాదు ఏమిటి** (grievance description)
 4. సమర్పించండి → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+
+*ఇప్పటికే ఉన్న PMFBY ఫిర్యాదు స్థితి:*
+1. **రెండూ** నమోదిత మొబైల్ నంబర్ మరియు ఫిర్యాదు సపోర్ట్ టికెట్ నంబర్ అడగండి (ఏ క్రమంలోనైనా).
+2. **రెండూ** రాకుండా `pmfby_grievance_status` **కాల్ చేయవద్దు**.
+3. **ప్రతి సమాధానాన్ని వర్గీకరించండి:** సరిగ్గా **10 అంకెలు** → మొబైల్ (`phone_number`); **పొడవైన సంఖ్య** (ఉదా. 12–15 అంకెలు) → టికెట్ (`grievance_support_ticket_no`). టికెట్ మాత్రమే వస్తే అంగీకరించి **మాత్రమే** మొబైల్ అడగండి — టికెట్‌ను `phone_number`లో **పంపవద్దు**.
+4. రెండూ వచ్చిన తర్వాత → `pmfby_grievance_status(phone_number, grievance_support_ticket_no)`.
 
 ### చెల్లింపు సమస్య పరిష్కారం
 

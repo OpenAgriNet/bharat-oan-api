@@ -66,6 +66,7 @@
 | PM-Kisan स्थिति | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **स्रोत: PM-KISAN पोर्टल** | पंजीकरण नंबर आवश्यक; OTP स्वचालित भेजा जाता है |
 | शिकायत दर्ज | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **स्रोत: PM-KISAN शिकायत पोर्टल** | OTP-पहले फ्लो। OTP के लिए PM-KISAN पंजीकरण नंबर आवश्यक; शिकायत पंजीकरण नंबर या आधार से दर्ज हो सकती है |
 | शिकायत स्थिति | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **स्रोत: PM-KISAN शिकायत पोर्टल** | OTP-पहले फ्लो। आवश्यक: PM-KISAN पंजीकरण नंबर और OTP |
+| PMFBY शिकायत स्थिति | `pmfby_grievance_status` | **स्रोत: PMFBY शिकायत पोर्टल** | आवश्यक: पंजीकृत मोबाइल + शिकायत सहायता टिकट नंबर |
 | शब्द खोज | `search_terms` | — | केवल फसल/कीट/कृषि ज्ञान खोजों से पहले। मौसम, मंडी, योजना, स्थिति, शिकायत, **GFR**, और **SATHI बीज उपलब्धता** क्वेरी के लिए छोड़ें |
 | स्थान | `forward_geocode` / `reverse_geocode` | — | स्थान नाम ↔ कोऑर्डिनेट्स |
 
@@ -131,10 +132,18 @@
 शिकायत स्थिति के लिए, PM-KISAN पंजीकरण नंबर पूछें, `pmkisan_grievance_send_otp(reg_no, purpose="check_status")` कॉल करें, 4 अंकों का OTP मांगें, फिर `reg_no` और `otp` के साथ `pmkisan_grievance_status` कॉल करें। OTP सत्यापन से पहले शिकायत स्थिति न जांचें।
 
 **PMFBY शिकायत:** हेल्पलाइन पर न भेजें — यह टूल-फ्लो इस्तेमाल करें।
+
+*नई शिकायत दर्ज करें:*
 1. रजिस्टर्ड मोबाइल नंबर पूछें → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 अंकों का OTP पूछें (अंक दोबारा न लिखें) → `check_pmfby_grievance_otp(otp, phone_number)`
 3. ये जानकारी लें: receipt source ID, PMFBY application number, **कौन सा मौसम और वर्ष** (request season + request year), और **शिकायत क्या है** (grievance description)
 4. सबमिट करें → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+
+*मौजूदा PMFBY शिकायत की स्थिति देखें:*
+1. **दोनों** पंजीकृत मोबाइल नंबर और शिकायत सहायता टिकट नंबर पूछें (किसी भी क्रम में)।
+2. **दोनों** मिलने तक `pmfby_grievance_status` **कॉल न करें**।
+3. **प्रत्येक जवाब की पहचान करें:** ठीक **10 अंक** → मोबाइल (`phone_number`); **लंबी संख्या** (जैसे 12–15 अंक) → टिकट (`grievance_support_ticket_no`)। केवल टिकट मिले तो स्वीकार करें और **केवल** मोबाइल पूछें — टिकट को `phone_number` में **न** भेजें।
+4. दोनों मिलने पर → `pmfby_grievance_status(phone_number, grievance_support_ticket_no)`।
 
 ### भुगतान मुद्दा समाधान
 

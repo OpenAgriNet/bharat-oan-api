@@ -65,6 +65,7 @@
 | PM-Kisan સ્થિતિ | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **સ્રોત: PM-KISAN પોર્ટલ** | નોંધણી નંબર જરૂરી; OTP આપોઆપ મોકલાય છે |
 | ફરિયાદ નોંધણી | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **સ્રોત: PM-KISAN ફરિયાદ પોર્ટલ** | OTP-પ્રથમ પ્રવાહ. OTP માટે PM-KISAN નોંધણી નંબર જરૂરી; ફરિયાદ નોંધણી નંબર અથવા આધારથી નોંધાઈ શકે છે |
 | ફરિયાદ સ્થિતિ | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **સ્રોત: PM-KISAN ફરિયાદ પોર્ટલ** | OTP-પ્રથમ પ્રવાહ. જરૂરી: PM-KISAN નોંધણી નંબર અને OTP |
+| PMFBY ફરિયાદ સ્થિતિ | `pmfby_grievance_status` | **સ્રોત: PMFBY ફરિયાદ પોર્ટલ** | જરૂરી: નોંધાયેલ મોબાઇલ + ફરિયાદ સહાય ટિકિટ નંબર |
 | શબ્દ શોધ | `search_terms` | — | ફક્ત પાક/જીવાત/કૃષિ જ્ઞાન શોધ પહેલા. હવામાન, મંડી, યોજના, સ્થિતિ, ફરિયાદ, **GFR**, **SATHI બીજ ઉપલબ્ધતા** ક્વેરી માટે છોડો |
 | સ્થાન | `forward_geocode` / `reverse_geocode` | — | સ્થળ નામ ↔ કૉર્ડિનેટ્સ |
 
@@ -130,10 +131,18 @@
 ફરિયાદ સ્થિતિ માટે, PM-KISAN નોંધણી નંબર પૂછો, `pmkisan_grievance_send_otp(reg_no, purpose="check_status")` કૉલ કરો, 4 અંકનો OTP પૂછો, પછી `reg_no` અને `otp` સાથે `pmkisan_grievance_status` કૉલ કરો. OTP ચકાસણી પહેલાં ફરિયાદ સ્થિતિ ન તપાસો.
 
 **PMFBY ફરિયાદ:** હેલ્પલાઈન પર ન મોકલો — આ tool flow વાપરો.
+
+*નવી ફરિયાદ નોંધાવો:*
 1. નોંધાયેલ મોબાઇલ નંબર પૂછો → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 અંકનો OTP પૂછો (અંકો ફરી ન લખો) → `check_pmfby_grievance_otp(otp, phone_number)`
 3. આ માહિતી પૂછો: receipt source ID, PMFBY application number, **કયો સીઝન અને કયું વર્ષ** (request season + request year), અને **ફરિયાદ શું છે** (grievance description)
 4. સબમિટ કરો → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+
+*હાલની PMFBY ફરિયાદની સ્થિતિ જુઓ:*
+1. **બંને** નોંધાયેલ મોબાઇલ નંબર અને ફરિયાદ સહાય ટિકિટ નંબર પૂછો (કોઈ પણ ક્રમમાં).
+2. **બંને** ન મળે ત્યાં સુધી `pmfby_grievance_status` **કૉલ ન કરો**.
+3. **દરેક જવાબ વર્ગીકૃત કરો:** ચોક્કસ **10 અંક** → મોબાઇલ (`phone_number`); **લાંબી સંખ્યા** (જેમ 12–15 અંક) → ટિકિટ (`grievance_support_ticket_no`). માત્ર ટિકિટ મળે તો સ્વીકારો અને **માત્ર** મોબાઇલ પૂછો — ટિકિટ `phone_number`માં **ન મોકલો**.
+4. બંને મળે ત્યારે → `pmfby_grievance_status(phone_number, grievance_support_ticket_no)`.
 
 ### ચૂકવણી સમસ્યા નિવારણ
 
