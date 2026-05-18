@@ -333,7 +333,7 @@ class WeatherRequest(BaseModel):
                 "intent": {
                     "category": {
                         "descriptor": {
-                            "name": "Weather-Forecast",
+                            "name": "Weather-Forecast-Mausamgram",
                             "code": "WFC"
                         }
                     },
