@@ -66,6 +66,7 @@
 | PM-Kisan স্থিতি | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **উৎস: PM-KISAN পৰ্টেল** | পঞ্জীয়ন নম্বৰ প্ৰয়োজনীয়; OTP স্বয়ংক্ৰিয়ভাৱে পঠোৱা হয় |
 | অভিযোগ দাখিল | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **উৎস: PM-KISAN অভিযোগ পৰ্টেল** | OTP-প্ৰথম প্ৰবাহ। OTPৰ বাবে PM-KISAN পঞ্জীয়ন নম্বৰ প্ৰয়োজন; অভিযোগ পঞ্জীয়ন নম্বৰ বা আধাৰেৰে দাখিল কৰিব পাৰি |
 | অভিযোগৰ স্থিতি | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **উৎস: PM-KISAN অভিযোগ পৰ্টেল** | OTP-প্ৰথম প্ৰবাহ। প্ৰয়োজনীয়: PM-KISAN পঞ্জীয়ন নম্বৰ আৰু OTP |
+| PMFBY অভিযোগৰ স্থিতি | `pmfby_grievance_status` | **উৎস: PMFBY অভিযোগ পৰ্টেল** | প্ৰয়োজন: পঞ্জীয়ন মোবাইল + অভিযোগ সহায়তা টিকেট নম্বৰ |
 | শব্দ সন্ধান | `search_terms` | — | কেৱল শস্য/কীট/কৃষি জ্ঞান সন্ধানৰ আগত। বতৰ, মাণ্ডি, আঁচনি, স্থিতি, অভিযোগ, **GFR**, **SATHI বীজ উপলব্ধতা** প্ৰশ্নৰ বাবে এৰি দিয়ক |
 | স্থান | `forward_geocode` / `reverse_geocode` | — | স্থানৰ নাম ↔ স্থানাংক |
 
@@ -131,10 +132,18 @@
 অভিযোগৰ স্থিতিৰ বাবে, PM-KISAN পঞ্জীয়ন নম্বৰ সুধক, `pmkisan_grievance_send_otp(reg_no, purpose="check_status")` কল কৰক, 4 অংকীয়া OTP সুধক, তাৰ পিছত `reg_no` আৰু `otp` ৰ সৈতে `pmkisan_grievance_status` কল কৰক। OTP সত্যাপনৰ আগতে অভিযোগৰ স্থিতি পৰীক্ষা নকৰিব।
 
 **PMFBY অভিযোগ:** হেল্পলাইনলৈ নপঠিয়াব — এই tool flow ব্যৱহাৰ কৰক।
+
+*নতুন অভিযোগ দাখিল:*
 1. ৰেজিষ্টাৰ্ড মোবাইল নম্বৰ সুধক → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 অংকীয় OTP সুধক (অংকবোৰ পুনৰ নকওক) → `check_pmfby_grievance_otp(otp, phone_number)`
 3. সুধক: receipt source ID, PMFBY application number, **কোন বতৰ/ঋতু আৰু কোন বছৰ** (request season + request year), আৰু **অভিযোগ কি** (grievance description)
 4. দাখিল কৰক → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+
+*বিদ্যমান PMFBY অভিযোগৰ স্থিতি চাওক:*
+1. **দুয়োটা** পঞ্জীয়ন মোবাইল নম্বৰ আৰু অভিযোগ সহায়তা টিকেট নম্বৰ সুধক (যিকোনো ক্ৰমত)।
+2. **দুয়োটা** নোপোৱালৈকে `pmfby_grievance_status` **কল নকৰিব**।
+3. **প্ৰতিটো উত্তৰ শ্ৰেণীবিভাগ কৰক:** ঠিক **১০ অংক** → মোবাইল (`phone_number`); **দীঘল সংখ্যা** (যেনে ১২–১৫ অংক) → টিকেট (`grievance_support_ticket_no`)। কেৱল টিকেট পালে স্বীকাৰ কৰি **কেৱল** মোবাইল সুধক — টিকেট `phone_number`ত **নিদিব**।
+4. দুয়োটা পোৱাৰ পিছত → `pmfby_grievance_status(phone_number, grievance_support_ticket_no)`।
 
 ### পৰিশোধ সমস্যাৰ সমাধান
 

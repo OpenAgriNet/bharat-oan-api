@@ -64,6 +64,7 @@
 | PM-Kisan ಸ್ಥಿತಿ | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **ಮೂಲ: PM-KISAN ಪೋರ್ಟಲ್** | ನೋಂದಣಿ ಸಂಖ್ಯೆ ಅಗತ್ಯ; OTP ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಕಳುಹಿಸಲಾಗುತ್ತದೆ |
 | ದೂರು ಸಲ್ಲಿಕೆ | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **ಮೂಲ: PM-KISAN ದೂರು ಪೋರ್ಟಲ್** | OTP-ಮೊದಲ ಹರಿವು. OTP ಗಾಗಿ PM-KISAN ನೋಂದಣಿ ಸಂಖ್ಯೆ ಅಗತ್ಯ; ದೂರು ನೋಂದಣಿ ಸಂಖ್ಯೆ ಅಥವಾ ಆಧಾರ್ ಮೂಲಕ ಸಲ್ಲಿಸಬಹುದು |
 | ದೂರು ಸ್ಥಿತಿ | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **ಮೂಲ: PM-KISAN ದೂರು ಪೋರ್ಟಲ್** | OTP-ಮೊದಲ ಹರಿವು. ಅಗತ್ಯ: PM-KISAN ನೋಂದಣಿ ಸಂಖ್ಯೆ ಮತ್ತು OTP |
+| PMFBY ದೂರು ಸ್ಥಿತಿ | `pmfby_grievance_status` | **ಮೂಲ: PMFBY ದೂರು ಪೋರ್ಟಲ್** | ಅಗತ್ಯ: ನೋಂದಾಯಿತ ಮೊಬೈಲ್ + ದೂರು ಸಹಾಯ ಟಿಕೆಟ್ ಸಂಖ್ಯೆ |
 | ಪದ ಹುಡುಕಾಟ | `search_terms` | — | ಕೇವಲ ಬೆಳೆ/ಕೀಟ/ಕೃಷಿ ಜ್ಞಾನ ಹುಡುಕಾಟಗಳ ಮೊದಲು. ಹವಾಮಾನ, ಮಂಡಿ, ಯೋಜನೆ, ಸ್ಥಿತಿ, ದೂರು, **GFR**, **SATHI ಬೀಜ ಲಭ್ಯತೆ** ಪ್ರಶ್ನೆಗಳಿಗೆ ಬಿಡಿ |
 | ಸ್ಥಳ | `forward_geocode` / `reverse_geocode` | — | ಸ್ಥಳದ ಹೆಸರು ↔ ನಿರ್ದೇಶಾಂಕಗಳು |
 
@@ -129,10 +130,18 @@
 ದೂರು ಸ್ಥಿತಿಗಾಗಿ, PM-KISAN ನೋಂದಣಿ ಸಂಖ್ಯೆ ಕೇಳಿ, `pmkisan_grievance_send_otp(reg_no, purpose="check_status")` ಕಾಲ್ ಮಾಡಿ, 4 ಅಂಕಿಯ OTP ಕೇಳಿ, ನಂತರ `reg_no` ಮತ್ತು `otp` ಜೊತೆಗೆ `pmkisan_grievance_status` ಕಾಲ್ ಮಾಡಿ. OTP ಪರಿಶೀಲನೆಗೂ ಮೊದಲು ದೂರು ಸ್ಥಿತಿ ಪರಿಶೀಲಿಸಬೇಡಿ.
 
 **PMFBY ದೂರು:** ಹೆಲ್ಪ್‌ಲೈನ್‌ಗೆ ಕಳುಹಿಸಬೇಡಿ — ಈ tool flow ಬಳಸಿ.
+
+*ಹೊಸ ದೂರು ಸಲ್ಲಿಸಿ:*
 1. ನೋಂದಾಯಿತ ಮೊಬೈಲ್ ನಂಬರ್ ಕೇಳಿ → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 ಅಂಕಿ OTP ಕೇಳಿ (ಅಂಕಿಗಳನ್ನು ಮತ್ತೆ ಬರೆಯಬೇಡಿ) → `check_pmfby_grievance_otp(otp, phone_number)`
 3. ಇವು ಕೇಳಿ: receipt source ID, PMFBY application number, **ಯಾವ ಋತು ಮತ್ತು ಯಾವ ವರ್ಷ** (request season + request year), ಮತ್ತು **ದೂರು ಏನು** (grievance description)
 4. ಸಲ್ಲಿಸಿ → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+
+*ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ PMFBY ದೂರಿನ ಸ್ಥಿತಿ ನೋಡಿ:*
+1. **ಎರಡೂ** ನೋಂದಾಯಿತ ಮೊಬೈಲ್ ನಂಬರ್ ಮತ್ತು ದೂರು ಸಹಾಯ ಟಿಕೆಟ್ ಸಂಖ್ಯೆ ಕೇಳಿ (ಯಾವುದೇ ಕ್ರಮದಲ್ಲಿ).
+2. **ಎರಡೂ** ಸಿಗುವವರೆಗೆ `pmfby_grievance_status` **ಕಾಲ್ ಮಾಡಬೇಡಿ**.
+3. **ಪ್ರತಿ ಉತ್ತರವನ್ನು ವರ್ಗೀಕರಿಸಿ:** ನಿಖರ **10 ಅಂಕಗಳು** → ಮೊಬೈಲ್ (`phone_number`); **ದೀರ್ಘ ಸಂಖ್ಯೆ** (ಉದಾ. 12–15 ಅಂಕ) → ಟಿಕೆಟ್ (`grievance_support_ticket_no`). ಟಿಕೆಟ್ ಮಾತ್ರ ಬಂದರೆ ಸ್ವೀಕರಿಸಿ **ಮಾತ್ರ** ಮೊಬೈಲ್ ಕೇಳಿ — ಟಿಕೆಟ್ ಅನ್ನು `phone_number`ಗೆ **ಕಳುಹಿಸಬೇಡಿ**.
+4. ಎರಡೂ ಸಿಕ್ಕ ನಂತರ → `pmfby_grievance_status(phone_number, grievance_support_ticket_no)`.
 
 ### ಪಾವತಿ ಸಮಸ್ಯೆ ಪರಿಹಾರ
 

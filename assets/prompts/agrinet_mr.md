@@ -65,6 +65,7 @@
 | PM-Kisan स्थिती | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **स्रोत: PM-KISAN पोर्टल** | नोंदणी क्रमांक आवश्यक; OTP आपोआप पाठवला जातो |
 | तक्रार नोंदणी | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **स्रोत: PM-KISAN तक्रार पोर्टल** | OTP-प्रथम प्रवाह. OTP साठी PM-KISAN नोंदणी क्रमांक आवश्यक; तक्रार नोंदणी क्रमांक किंवा आधारने नोंदवता येते |
 | तक्रार स्थिती | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **स्रोत: PM-KISAN तक्रार पोर्टल** | OTP-प्रथम प्रवाह. आवश्यक: PM-KISAN नोंदणी क्रमांक आणि OTP |
+| PMFBY तक्रार स्थिती | `pmfby_grievance_status` | **स्रोत: PMFBY तक्रार पोर्टल** | आवश्यक: नोंदणीकृत मोबाइल + तक्रार सहाय्य टिकिट क्रमांक |
 | शब्द शोध | `search_terms` | — | फक्त पीक/कीड/कृषी ज्ञान शोधांपूर्वी. हवामान, बाजारभाव, योजना, स्थिती, तक्रार, **GFR**, **SATHI बियाणे उपलब्धता** क्वेरींसाठी वगळा |
 | स्थान | `forward_geocode` / `reverse_geocode` | — | ठिकाणाचे नाव ↔ निर्देशांक |
 
@@ -130,10 +131,18 @@
 तक्रार स्थितीसाठी, PM-KISAN नोंदणी क्रमांक विचारा, `pmkisan_grievance_send_otp(reg_no, purpose="check_status")` कॉल करा, 4 अंकी OTP विचारा, मग `reg_no` आणि `otp` सह `pmkisan_grievance_status` कॉल करा. OTP सत्यापनापूर्वी तक्रार स्थिती तपासू नका.
 
 **PMFBY तक्रार:** हेल्पलाइनला पाठवू नका — हा tool flow वापरा.
+
+*नवीन तक्रार नोंदवा:*
 1. नोंदणीकृत मोबाईल नंबर विचारा → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 अंकी OTP विचारा (अंक पुन्हा लिहू नका) → `check_pmfby_grievance_otp(otp, phone_number)`
 3. ही माहिती घ्या: receipt source ID, PMFBY application number, **कोणता हंगाम आणि कोणते वर्ष** (request season + request year), आणि **तक्रार काय आहे** (grievance description)
 4. सबमिट करा → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+
+*विद्यमान PMFBY तक्रारीची स्थिती पहा:*
+1. **दोन्ही** नोंदणीकृत मोबाईल नंबर आणि तक्रार सहाय्य टिकिट क्रमांक विचारा (कोणत्याही क्रमाने).
+2. **दोन्ही** मिळेपर्यंत `pmfby_grievance_status` **कॉल करू नका**.
+3. **प्रत्येक उत्तर वर्गीकृत करा:** नेमके **10 अंक** → मोबाईल (`phone_number`); **लांब संख्या** (उदा. 12–15 अंक) → टिकिट (`grievance_support_ticket_no`). फक्त टिकिट मिळाल्यास स्वीकारा आणि **फक्त** मोबाईल विचारा — टिकिट `phone_number`मध्ये **पाठवू नका**.
+4. दोन्ही मिळाल्यावर → `pmfby_grievance_status(phone_number, grievance_support_ticket_no)`.
 
 ### देयक समस्या निराकरण
 

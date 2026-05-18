@@ -24,6 +24,8 @@ from agents.tools.pmkisan_grievance import (
 from agents.tools.smam_scheme_status import check_smam_scheme_status
 from agents.tools.pmfby_grievance import (
     initiate_pmfby_grievance_otp,
+    check_pmfby_grievance_otp,
+    pmfby_grievance_status,
     pmfby_submit_grievance,
 )
 from agents.tools.terms import search_terms
@@ -99,6 +101,16 @@ TOOLS = [
     ),
     Tool(
         initiate_pmfby_grievance_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        check_pmfby_grievance_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        pmfby_grievance_status,
         takes_ctx=True,
         strict=False,
     ),
