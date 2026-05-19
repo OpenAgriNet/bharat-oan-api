@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from app.models.requests import SuggestionsRequest
@@ -9,7 +11,7 @@ router = APIRouter(prefix="/suggest", tags=["suggest"])
 @router.get("/")
 async def suggest(
     request: SuggestionsRequest = Depends(),
-    current_user: str = Depends(get_current_user)
+    current_user: dict[str, Any] = Depends(get_current_user)
 ):
     """
     Get suggestions for a conversation session.

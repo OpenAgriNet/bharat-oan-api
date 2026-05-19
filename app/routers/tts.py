@@ -2,6 +2,7 @@ from fastapi import APIRouter, Body, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from app.models.requests import TTSRequest
 from helpers.tts import text_to_speech_bhashini
+from typing import Any
 import uuid
 import base64
 import time
@@ -17,11 +18,12 @@ router = APIRouter(prefix="/tts", tags=["tts"])
 @router.post("/")
 async def tts(
     request: TTSRequest = Body(...), 
-    current_user: str = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     """Convert text to speech using the specified service."""
     session_id = request.session_id or str(uuid.uuid4())
+    authenticated_user = current_user.get("mobile")
 
     logger.info(
         "TTS input | target_lang=%s session_id=%s text_length=%s",
@@ -63,7 +65,7 @@ async def tts(
             session_id=session_id,
             text=request.text,
             qid=request.qid or f"tts_{session_id}",
-            uid=current_user
+            uid=authenticated_user
         )
         telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
         background_tasks.add_task(send_telemetry, telemetry_data)

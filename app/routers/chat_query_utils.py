@@ -19,6 +19,14 @@ UUID_PATTERN = re.compile(
     r"[0-9a-fA-F]{12}$"
 )
 
+EMBEDDED_UUID_PATTERN = re.compile(
+    r"[0-9a-fA-F]{8}-"
+    r"[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{12}"
+)
+
 IMAGE_URL_ID_PATTERN = re.compile(r"/api/image/([0-9a-fA-F\-]{36})")
 TAGGED_IMAGE_ID_PATTERN = re.compile(r"\[IMAGE_ID:\s*([0-9a-fA-F\-]{36})\]")
 
@@ -38,6 +46,10 @@ def extract_image_id(query_text: str) -> Optional[str]:
     tagged_match = TAGGED_IMAGE_ID_PATTERN.search(query)
     if tagged_match:
         return tagged_match.group(1)
+
+    embedded_match = EMBEDDED_UUID_PATTERN.search(query)
+    if embedded_match:
+        return embedded_match.group(0)
 
     return None
 
@@ -59,7 +71,7 @@ def normalize_chat_query(query_text: str) -> Tuple[str, bool]:
 
     if image_id:
         image_url = build_internal_image_url(image_id)
-        return build_image_analysis_message(image_url), True
+        return build_image_analysis_message(image_url, query_text), True
 
     return query_text, is_image_analysis
 
