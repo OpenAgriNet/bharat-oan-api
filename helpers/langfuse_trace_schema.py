@@ -9,6 +9,7 @@ def chat_trace_metadata_strings(
     source_lang: str,
     target_lang: str,
     environment: str,
+    channel: str = "",
     query: str = "",
 ) -> dict[str, str]:
     """Propagated trace metadata (strings ≤200 chars for Langfuse)."""
@@ -17,6 +18,8 @@ def chat_trace_metadata_strings(
         "target_lang": target_lang,
         "environment": environment,
     }
+    if channel:
+        out["channel"] = channel
     if query:
         out["query"] = query if len(query) <= 200 else f"{query[:197]}..."
     return out

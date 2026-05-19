@@ -15,17 +15,18 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 async def chat_endpoint(
     background_tasks: BackgroundTasks,
     request: ChatRequest = Depends(),
-    current_user: str = Depends(get_current_user)  # Authentication required
+    current_user: dict = Depends(get_current_user),  # Authentication required
 ):
     """
     Chat endpoint that streams responses back to the client.
     Requires JWT authentication.
     """
     session_id = request.session_id or str(uuid.uuid4())
-    
+    channel = current_user.get("channel", "BharatVistaar")
+    authenticated_user = current_user.get("mobile")
     logger.info(
         f"Chat request received - session_id: {session_id}, user_id: {request.user_id}, "
-        f"authenticated_user: {current_user}, source_lang: {request.source_lang}, "
+        f"authenticated_user: {authenticated_user}, channel: {channel}, source_lang: {request.source_lang}, "
         f"target_lang: {request.target_lang}, query: {request.query}"
     )
     
@@ -40,7 +41,8 @@ async def chat_endpoint(
             target_lang=request.target_lang,
             user_id=request.user_id,
             history=history,
-            background_tasks=background_tasks
+            background_tasks=background_tasks,
+            channel=channel,
         ),
         media_type='text/event-stream'
     ) 
