@@ -373,6 +373,7 @@ async def analyze_crop_image(
     if image_id:
         mark_processed(image_id)
 
+    npss_completed = False
     try:
         result = await _call_npss_analyze(
             image_bytes=image_bytes,
@@ -384,6 +385,7 @@ async def analyze_crop_image(
             latitude=latitude,
             longitude=longitude,
         )
+        npss_completed = True
     except ModelRetry:
         raise
     except Exception as e:
@@ -393,8 +395,9 @@ async def analyze_crop_image(
             "Please try again with a clearer image."
         )
     finally:
-        # Cleanup: delete temp file or move to GCS
-        if image_id:
+        # Cleanup only after NPSS returns successfully. ModelRetry may re-run this tool
+        # with the same image URL, so deleting on retryable failures breaks the retry.
+        if image_id and npss_completed:
             cleanup_image(image_id, move_to_gcs=GCS_MOVE_AFTER_PROCESS)
 
     # Preserve the full NPSS payload in a readable structure instead of summarizing it.

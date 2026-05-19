@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Tuple
 from helpers.utils import get_logger
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 
 logger = get_logger(__name__)
 
@@ -26,6 +26,8 @@ TEMP_UPLOAD_DIR = Path(os.getenv("TEMP_UPLOAD_DIR", "/tmp/oan-uploads"))
 GCS_MOUNT_PATH = os.getenv("GCS_MOUNT_PATH", "")  # e.g. /mnt/gcs-bucket/crop-images
 IMAGE_TTL_MINUTES = int(os.getenv("IMAGE_TTL_MINUTES", "60"))
 BASE_URL = os.getenv("BASE_URL", "")  # e.g. https://api.example.com — used to build absolute URLs
+MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_IMAGE_UPLOAD_SIZE_MB", "10"))
+MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 # Ensure temp directory exists
 TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -121,9 +123,22 @@ async def save_uploaded_image(upload_file: UploadFile) -> Tuple[str, str]:
     ext = _get_extension_from_mimetype(upload_file.content_type or "application/octet-stream")
     file_path = TEMP_UPLOAD_DIR / f"{image_id}{ext}"
 
-    # Write file to disk
-    content = await upload_file.read()
-    file_path.write_bytes(content)
+    # Write file to disk with a hard size limit so large uploads do not exhaust memory/disk.
+    total_bytes = 0
+    try:
+        with file_path.open("wb") as out_file:
+            while chunk := await upload_file.read(1024 * 1024):
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UPLOAD_SIZE_BYTES:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Image too large. Maximum allowed size is {MAX_UPLOAD_SIZE_MB} MB.",
+                    )
+                out_file.write(chunk)
+    except Exception:
+        if file_path.exists():
+            file_path.unlink()
+        raise
 
     entry = {
         "path": file_path,
@@ -136,7 +151,7 @@ async def save_uploaded_image(upload_file: UploadFile) -> Tuple[str, str]:
     _persist_metadata(image_id, entry)
 
     image_url = _build_image_url(image_id)
-    logger.info(f"Saved uploaded image {image_id} ({len(content)} bytes) to {file_path}")
+    logger.info(f"Saved uploaded image {image_id} ({total_bytes} bytes) to {file_path}")
     return image_id, image_url
 
 
