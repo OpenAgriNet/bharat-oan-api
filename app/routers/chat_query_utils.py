@@ -74,7 +74,8 @@ async def prepare_image_analyze_payload(
     session_id: Optional[str],
 ) -> Tuple[str, str, List]:
     resolved_session_id, history = await get_session_history(session_id)
-    _image_id, image_url = await save_uploaded_image(image)
+    image_id, _image_url = await save_uploaded_image(image)
+    image_url = build_internal_image_url(image_id)
     user_message = build_image_analysis_message(image_url, query)
     return resolved_session_id, user_message, history
 
