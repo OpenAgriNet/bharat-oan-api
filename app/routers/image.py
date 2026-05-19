@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from app.auth.jwt_auth import get_current_user
@@ -44,7 +46,7 @@ async def upload_image(
 
 
 @router.get("/{image_id}")
-async def serve_image(image_id: str):
+async def serve_image(image_id: UUID):
     """
     Serve an uploaded image by its ID.
 
@@ -54,11 +56,12 @@ async def serve_image(image_id: str):
     NOTE: No auth required — image IDs are UUIDs (unguessable) and
     images are temporary (auto-deleted after processing).
     """
-    file_path = get_image_path(image_id)
+    image_id_str = str(image_id)
+    file_path = get_image_path(image_id_str)
     if not file_path:
         raise HTTPException(status_code=404, detail="Image not found or expired")
 
-    metadata = get_image_metadata(image_id)
+    metadata = get_image_metadata(image_id_str)
     mimetype = metadata["mimetype"] if metadata else "application/octet-stream"
 
     return FileResponse(
