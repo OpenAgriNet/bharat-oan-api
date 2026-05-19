@@ -22,8 +22,12 @@ from fastapi import HTTPException, UploadFile
 logger = get_logger(__name__)
 
 # Configuration
-TEMP_UPLOAD_DIR = Path(os.getenv("TEMP_UPLOAD_DIR", "/tmp/oan-uploads"))
+APP_BASE_DIR = Path(__file__).resolve().parents[2]
+TEMP_UPLOAD_DIR = Path(
+    os.getenv("TEMP_UPLOAD_DIR") or APP_BASE_DIR / ".oan-uploads"
+).expanduser().resolve()
 GCS_MOUNT_PATH = os.getenv("GCS_MOUNT_PATH", "")  # e.g. /mnt/gcs-bucket/crop-images
+GCS_MOUNT_DIR = Path(GCS_MOUNT_PATH).expanduser().resolve() if GCS_MOUNT_PATH else None
 IMAGE_TTL_MINUTES = int(os.getenv("IMAGE_TTL_MINUTES", "60"))
 BASE_URL = os.getenv("BASE_URL", "")  # e.g. https://api.example.com — used to build absolute URLs
 MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_IMAGE_UPLOAD_SIZE_MB", "10"))
@@ -37,8 +41,27 @@ TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 _upload_registry: dict = {}
 
 
+def _normalize_image_id(image_id: str) -> str:
+    return str(uuid.UUID(str(image_id)))
+
+
+def _safe_child_path(base_dir: Path, filename: str) -> Path:
+    candidate = (base_dir / filename).resolve()
+    candidate.relative_to(base_dir)
+    return candidate
+
+
+def _is_relative_to(path: Path, base_dir: Path) -> bool:
+    try:
+        path.relative_to(base_dir)
+        return True
+    except ValueError:
+        return False
+
+
 def _metadata_path(image_id: str) -> Path:
-    return TEMP_UPLOAD_DIR / f"{image_id}.json"
+    safe_id = _normalize_image_id(image_id)
+    return _safe_child_path(TEMP_UPLOAD_DIR, f"{safe_id}.json")
 
 
 def _guess_mimetype_from_path(file_path: Path) -> str:
@@ -60,9 +83,16 @@ def _serialize_metadata(entry: dict) -> dict:
 
 
 def _deserialize_metadata(data: dict) -> dict:
+    stored_path = Path(data["path"]).expanduser().resolve()
+    allowed_roots = [TEMP_UPLOAD_DIR]
+    if GCS_MOUNT_DIR:
+        allowed_roots.append(GCS_MOUNT_DIR)
+    if not any(_is_relative_to(stored_path, root) for root in allowed_roots):
+        raise ValueError("Image metadata path is outside allowed storage directories")
+
     return {
         **data,
-        "path": Path(data["path"]),
+        "path": stored_path,
         "created_at": datetime.fromisoformat(data["created_at"]),
     }
 
@@ -73,11 +103,10 @@ def _persist_metadata(image_id: str, entry: dict) -> None:
 
 
 def _load_metadata(image_id: str) -> Optional[dict]:
-    metadata_path = _metadata_path(image_id)
-    if not metadata_path.exists():
-        return None
-
     try:
+        metadata_path = _metadata_path(image_id)
+        if not metadata_path.exists():
+            return None
         return _deserialize_metadata(json.loads(metadata_path.read_text(encoding="utf-8")))
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         logger.warning(f"Failed to load image metadata for {image_id}: {exc}")
@@ -85,7 +114,10 @@ def _load_metadata(image_id: str) -> Optional[dict]:
 
 
 def _delete_metadata(image_id: str) -> None:
-    metadata_path = _metadata_path(image_id)
+    try:
+        metadata_path = _metadata_path(image_id)
+    except ValueError:
+        return
     if metadata_path.exists():
         metadata_path.unlink()
 
@@ -119,9 +151,9 @@ async def save_uploaded_image(upload_file: UploadFile) -> Tuple[str, str]:
     Returns:
         Tuple of (image_id, image_url)
     """
-    image_id = str(uuid.uuid4())
+    image_id = _normalize_image_id(str(uuid.uuid4()))
     ext = _get_extension_from_mimetype(upload_file.content_type or "application/octet-stream")
-    file_path = TEMP_UPLOAD_DIR / f"{image_id}{ext}"
+    file_path = _safe_child_path(TEMP_UPLOAD_DIR, f"{image_id}{ext}")
 
     # Write file to disk with a hard size limit so large uploads do not exhaust memory/disk.
     total_bytes = 0
@@ -157,20 +189,25 @@ async def save_uploaded_image(upload_file: UploadFile) -> Tuple[str, str]:
 
 def get_image_path(image_id: str) -> Optional[Path]:
     """Get the filesystem path for an image_id if it exists in temp storage."""
-    entry = _upload_registry.get(image_id)
+    try:
+        safe_id = _normalize_image_id(image_id)
+    except ValueError:
+        return None
+
+    entry = _upload_registry.get(safe_id)
     if entry and entry["path"].exists():
         return entry["path"]
 
     # Fallback: check if file exists on disk even if not in registry (e.g. after restart)
     for ext in (".jpg", ".jpeg", ".png", ".webp", ".bin"):
-        candidate = TEMP_UPLOAD_DIR / f"{image_id}{ext}"
+        candidate = _safe_child_path(TEMP_UPLOAD_DIR, f"{safe_id}{ext}")
         if candidate.exists():
             return candidate
 
     # Check GCS mount
-    if GCS_MOUNT_PATH:
+    if GCS_MOUNT_DIR:
         for ext in (".jpg", ".jpeg", ".png", ".webp", ".bin"):
-            candidate = Path(GCS_MOUNT_PATH) / f"{image_id}{ext}"
+            candidate = _safe_child_path(GCS_MOUNT_DIR, f"{safe_id}{ext}")
             if candidate.exists():
                 return candidate
 
@@ -179,16 +216,21 @@ def get_image_path(image_id: str) -> Optional[Path]:
 
 def get_image_metadata(image_id: str) -> Optional[dict]:
     """Get metadata for an image."""
-    entry = _upload_registry.get(image_id)
+    try:
+        safe_id = _normalize_image_id(image_id)
+    except ValueError:
+        return None
+
+    entry = _upload_registry.get(safe_id)
     if entry:
         return entry
 
-    entry = _load_metadata(image_id)
+    entry = _load_metadata(safe_id)
     if entry:
-        _upload_registry[image_id] = entry
+        _upload_registry[safe_id] = entry
         return entry
 
-    file_path = get_image_path(image_id)
+    file_path = get_image_path(safe_id)
     if not file_path:
         return None
 
@@ -203,12 +245,17 @@ def get_image_metadata(image_id: str) -> Optional[dict]:
 
 def mark_processed(image_id: str) -> None:
     """Mark an image as processed by NPSS."""
-    entry = get_image_metadata(image_id)
+    try:
+        safe_id = _normalize_image_id(image_id)
+    except ValueError:
+        return
+
+    entry = get_image_metadata(safe_id)
     if entry:
         entry["processed"] = True
-        _upload_registry[image_id] = entry
-        _persist_metadata(image_id, entry)
-        logger.info(f"Marked image {image_id} as processed")
+        _upload_registry[safe_id] = entry
+        _persist_metadata(safe_id, entry)
+        logger.info(f"Marked image {safe_id} as processed")
 
 
 def cleanup_image(image_id: str, move_to_gcs: bool = False) -> bool:
@@ -222,36 +269,42 @@ def cleanup_image(image_id: str, move_to_gcs: bool = False) -> bool:
     Returns:
         True if cleanup succeeded
     """
-    entry = get_image_metadata(image_id)
-    file_path = entry["path"] if entry else get_image_path(image_id)
-    _upload_registry.pop(image_id, None)
+    try:
+        safe_id = _normalize_image_id(image_id)
+    except ValueError:
+        logger.warning(f"Cleanup requested for invalid image_id: {image_id}")
+        return False
+
+    entry = get_image_metadata(safe_id)
+    file_path = entry["path"] if entry else get_image_path(safe_id)
+    _upload_registry.pop(safe_id, None)
     if not file_path:
-        logger.warning(f"Cleanup requested for unknown image_id: {image_id}")
-        _delete_metadata(image_id)
+        logger.warning(f"Cleanup requested for unknown image_id: {safe_id}")
+        _delete_metadata(safe_id)
         return False
 
     if not file_path.exists():
         logger.warning(f"Image file already gone: {file_path}")
-        _delete_metadata(image_id)
+        _delete_metadata(safe_id)
         return True
 
-    if move_to_gcs and GCS_MOUNT_PATH:
+    if move_to_gcs and GCS_MOUNT_DIR:
         try:
-            gcs_dir = Path(GCS_MOUNT_PATH)
+            gcs_dir = GCS_MOUNT_DIR
             gcs_dir.mkdir(parents=True, exist_ok=True)
-            dest = gcs_dir / file_path.name
+            dest = _safe_child_path(gcs_dir, file_path.name)
             shutil.move(str(file_path), str(dest))
-            logger.info(f"Moved image {image_id} to GCS: {dest}")
-            _delete_metadata(image_id)
+            logger.info(f"Moved image {safe_id} to GCS: {dest}")
+            _delete_metadata(safe_id)
             return True
         except Exception as e:
-            logger.error(f"Failed to move image {image_id} to GCS: {e}")
+            logger.error(f"Failed to move image {safe_id} to GCS: {e}")
             # Fall through to delete
 
     try:
         file_path.unlink()
-        logger.info(f"Deleted temp image {image_id}: {file_path}")
-        _delete_metadata(image_id)
+        logger.info(f"Deleted temp image {safe_id}: {file_path}")
+        _delete_metadata(safe_id)
         return True
     except Exception as e:
         logger.error(f"Failed to delete image {image_id}: {e}")
@@ -267,6 +320,10 @@ def cleanup_expired_images() -> int:
     to_clean = []
     for metadata_file in TEMP_UPLOAD_DIR.glob("*.json"):
         image_id = metadata_file.stem
+        try:
+            image_id = _normalize_image_id(image_id)
+        except ValueError:
+            continue
         entry = _load_metadata(image_id)
         if entry and entry.get("processed") and entry["created_at"] < cutoff:
             to_clean.append(image_id)
