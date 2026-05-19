@@ -1,5 +1,7 @@
 import jwt
 import os
+from typing import Any
+
 from dotenv import load_dotenv
 from cryptography.hazmat.primitives import serialization
 from fastapi import Depends, HTTPException, status
@@ -21,7 +23,10 @@ with open(public_key_path, 'rb') as key_file:
     public_key = serialization.load_pem_public_key(key_file.read())
 logger.info(f"Successfully loaded JWT Public Key from: {public_key_path}")
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+DEFAULT_AUTH_CHANNEL = "BharatVistaar"
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
     """
     FastAPI dependency to get current authenticated user from JWT token.
     Always validates the JWT; no environment-based bypass.
@@ -53,8 +58,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         if mobile is None:
             logger.warning("No mobile number found in token")
 #            raise credentials_exception
-            
-        return mobile
+
+        channel = decoded_token.get("channel") or DEFAULT_AUTH_CHANNEL
+
+        return {
+            "mobile": mobile,
+            "channel": channel,
+        }
         
     except jwt.ExpiredSignatureError:
         logger.warning("Token has expired")

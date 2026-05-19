@@ -48,6 +48,7 @@ async def stream_chat_messages(
     user_id: str,
     history: list,
     background_tasks: BackgroundTasks,
+    channel: str = "BharatVistaar",
     is_image_analysis: bool = False,
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
@@ -58,9 +59,10 @@ async def stream_chat_messages(
         source_lang=source_lang,
         target_lang=target_lang,
         environment=lf_env,
+        channel=channel,
         query=query,
     )
-    trace_tags = [f"env:{lf_env}"]
+    trace_tags = [f"env:{lf_env}", f"channel:{channel}"]
     if MODEL_NAME:
         trace_tags.append(f"model:{MODEL_NAME}")
     with propagate_attributes(

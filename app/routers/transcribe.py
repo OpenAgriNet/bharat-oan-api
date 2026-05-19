@@ -1,5 +1,7 @@
 import uuid
 import time
+from typing import Any
+
 from fastapi import APIRouter, Body, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from app.models.requests import TranscribeRequest
@@ -16,11 +18,12 @@ router = APIRouter(prefix="/transcribe", tags=["transcribe"])
 @router.post("/")
 async def transcribe(
     request: TranscribeRequest = Body(...), 
-    current_user: str = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     """Transcribe audio content using the specified service."""
     session_id = request.session_id or str(uuid.uuid4())
+    authenticated_user = current_user.get("mobile")
 
     logger.info(
         "Transcribe input | service_type=%s lang_code=%s session_id=%s audio_content_len=%s",
@@ -63,7 +66,7 @@ async def transcribe(
             session_id=session_id,
             text=transcription,
             qid=request.qid or f"asr_{session_id}",
-            uid=current_user
+            uid=authenticated_user
         )
         telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
         background_tasks.add_task(send_telemetry, telemetry_data)

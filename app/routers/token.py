@@ -97,6 +97,7 @@ def _issue_jwt_token(
     name: Optional[str] = None,
     role: Optional[str] = None,
     metadata: Optional[str] = None,
+    channel: Optional[str] = None,
     expires_minutes: Optional[int] = None,
     include_issued_at: bool = True,
 ) -> tuple[str, Optional[int]]:
@@ -117,6 +118,8 @@ def _issue_jwt_token(
             payload["role"] = role
         if metadata is not None:
             payload["metadata"] = metadata
+        if channel is not None:
+            payload["channel"] = channel
 
         if include_issued_at:
             payload["iat"] = int(now.timestamp())
@@ -473,6 +476,7 @@ async def create_auth_token_with_api_key(
         )
 
     token, expires_in = _issue_jwt_token(
+        channel=client_code,
         expires_minutes=settings.jwt_expiry_minutes,
         include_issued_at=True,
     )
@@ -500,6 +504,7 @@ async def create_auth_token_with_play_integrity(request: PlayIntegrityAuthReques
         name=settings.play_integrity_default_name,
         role=settings.play_integrity_default_role,
         metadata=settings.play_integrity_default_metadata,
+        channel=client_code,
         expires_minutes=settings.jwt_expiry_minutes,
     )
     if expires_in is None:
