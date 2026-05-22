@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 from fastapi import BackgroundTasks
 
 from agents.agrinet import agrinet_agent
-from agents.moderation import moderation_agent
+from agents.moderation import QueryModerationResult, moderation_agent
 from helpers.langfuse_trace_schema import (
     AGENT_MODERATION,
     AGENT_VISTAAR,
@@ -12,6 +12,7 @@ from helpers.langfuse_trace_schema import (
 )
 from helpers.langfuse_helper import get_langfuse_tracing_environment
 from helpers.langfuse_tracing import lf_set_trace_io, lf_update_current_observation
+from helpers.telemetry import TelemetryRequest, create_moderation_event
 from helpers.utils import get_logger
 from app.utils import (
     update_message_history,
@@ -19,6 +20,7 @@ from app.utils import (
     format_message_pairs,
     filter_thinking_from_history,
 )
+from app.tasks.telemetry import send_telemetry
 from agents.deps import FarmerContext
 from langfuse import get_client, observe, propagate_attributes
 
@@ -37,6 +39,38 @@ CHAT_TRACE_NAME = (
     or "bharat-vistaar-chat"
 )
 CHAT_CHAIN_SPAN_NAME = "chain.chat"
+
+
+def _enqueue_moderation_telemetry(
+    *,
+    background_tasks: BackgroundTasks,
+    query: str,
+    session_id: str,
+    user_id: str,
+    moderation_data: QueryModerationResult,
+) -> None:
+    """Queue moderation telemetry without affecting the chat response path."""
+    try:
+        telemetry_event = create_moderation_event(
+            question_text=query,
+            moderation_type="CHAT_QUERY",
+            content_id=session_id,
+            session_id=session_id,
+            content_type="chat_query",
+            moderation_service="moderation_agent",
+            flagged=moderation_data.category != "valid_agricultural",
+            category=moderation_data.category,
+            action=moderation_data.action,
+            uid=user_id,
+        )
+        telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
+        background_tasks.add_task(send_telemetry, telemetry_data)
+    except Exception:
+        logger.exception(
+            "Failed to enqueue moderation telemetry | session_id=%s user_id=%s",
+            session_id,
+            user_id,
+        )
 
 
 @observe(name=CHAT_CHAIN_SPAN_NAME, as_type="chain")
@@ -83,6 +117,13 @@ async def stream_chat_messages(
 
         moderation_data = await _run_moderation(user_message, session_id)
         logger.info(f"Moderation data: {moderation_data}")
+        _enqueue_moderation_telemetry(
+            background_tasks=background_tasks,
+            query=query,
+            session_id=session_id,
+            user_id=user_id,
+            moderation_data=moderation_data,
+        )
         deps.update_moderation_str(str(moderation_data))
 
         user_message = f"{last_response}{deps.get_user_message()}"
