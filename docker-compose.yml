@@ -10,6 +10,9 @@ services:
       - .:/app
     env_file:
       - .env  
+    environment:
+      REDIS_HOST: ${REDIS_HOST:-sva_redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
     restart: unless-stopped
     networks:
       - svanetwork
