@@ -88,7 +88,8 @@ def html_to_md_no_images(html_content):
             j += 1
         if values:
             value_str = ', '.join(values)
-            value_str = re.sub(r'\s*,\s*', ', ', value_str)
+            value_str = ', '.join(piece.strip() for piece in value_str.split(','))
+            # value_str = re.sub(r'\s*,\s*', ', ', value_str)
             value_str = re.sub(r'\s{2,}', ' ', value_str).strip()
             out_lines.append(f"{label}: {value_str}")
             i = j
