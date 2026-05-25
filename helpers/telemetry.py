@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator, field_serializer
 import hashlib
 import time
 import random
+import os
 
 class EventType(str, Enum):
     """Types of telemetry events"""
@@ -300,7 +301,8 @@ def resolve_telemetry_identity(
         or "unknown-device"
     )
     channel = (
-        telemetry_context.get("channel")
+        os.getenv("TELEMETRY_CHANNEL")
+        or telemetry_context.get("channel")
         or current_user.get("channel")
         or current_user.get("client_code")
         or "BharatVistaar"
@@ -804,4 +806,3 @@ def create_asr_event(
 #     """Logs an audio upload to telemetry"""
     
 #     return send_telemetry.s(request=telemetry_request.model_dump()).apply_async()
-
