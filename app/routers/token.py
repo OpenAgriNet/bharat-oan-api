@@ -111,7 +111,7 @@ def _issue_jwt_token(
         )
 
     try:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         payload = {}
         if mobile is not None:
             payload["mobile"] = mobile
@@ -447,7 +447,7 @@ async def create_auth_token(request: Optional[AuthRequest] = None):
         guest_sub = f"guest:{fingerprint_id}" if fingerprint_id else "guest:anon"
 
         # Create JWT payload
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         exp = now + timedelta(minutes=settings.jwt_expiry_minutes)
 
         payload = {
