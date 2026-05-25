@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 from fastapi import BackgroundTasks
 
 from agents.agrinet import agrinet_agent
+from agents.models import LANGFUSE_MODEL_NAME
 from agents.moderation import moderation_agent
 from helpers.langfuse_trace_schema import (
     AGENT_MODERATION,
@@ -11,7 +12,7 @@ from helpers.langfuse_trace_schema import (
     chat_trace_metadata_strings,
 )
 from helpers.langfuse_helper import get_langfuse_tracing_environment
-from helpers.langfuse_tracing import lf_set_trace_io, lf_update_current_observation
+from helpers.langfuse_tracing import lf_update_current_observation, lf_update_current_span
 from helpers.utils import get_logger
 from app.utils import (
     update_message_history,
@@ -24,12 +25,6 @@ from langfuse import get_client, observe, propagate_attributes
 
 
 logger = get_logger(__name__)
-
-MODEL_NAME = (
-    os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
-    or os.getenv("LLM_AGRINET_MODEL_NAME")
-    or os.getenv("LLM_MODEL_NAME")
-)
 
 CHAT_TRACE_NAME = (
     os.getenv("LANGFUSE_TRACE_NAME")
@@ -58,8 +53,6 @@ async def stream_chat_messages(
         query=query,
     )
     trace_tags = [f"env:{lf_env}"]
-    if MODEL_NAME:
-        trace_tags.append(f"model:{MODEL_NAME}")
     with propagate_attributes(
         user_id=user_id,
         session_id=session_id,
@@ -67,7 +60,7 @@ async def stream_chat_messages(
         tags=trace_tags,
         trace_name=CHAT_TRACE_NAME,
     ):
-        lf_set_trace_io(input=query)
+        lf_update_current_span(input=query)
 
         deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
 
@@ -103,7 +96,7 @@ async def stream_chat_messages(
         new_messages = result.new_messages()
         logger.info(f"Agent run complete for session {session_id}")
 
-        lf_set_trace_io(output=result.output)
+        lf_update_current_span(output=result.output)
 
         yield result.output
 
@@ -120,9 +113,9 @@ async def stream_chat_messages(
 @observe(name=AGENT_MODERATION, as_type="generation")
 async def _run_moderation(user_message: str, session_id: str):
     """Run moderation agent and trace it in Langfuse."""
-    lf_set_trace_io(input=user_message)
     lf_update_current_observation(
         input=user_message,
+        model=LANGFUSE_MODEL_NAME,
         metadata={"session_id": session_id},
     )
 
@@ -131,12 +124,11 @@ async def _run_moderation(user_message: str, session_id: str):
     usage_data = run.usage()
     lf_update_current_observation(
         output=str(run.output),
-        model=MODEL_NAME,
+        model=LANGFUSE_MODEL_NAME,
         request_tokens=usage_data.request_tokens or 0,
         response_tokens=usage_data.response_tokens or 0,
-        metadata={},
+        metadata={"session_id": session_id},
     )
-    lf_set_trace_io(output=str(run.output))
     return run.output
 
 
@@ -153,6 +145,7 @@ async def _run_agrinet(
     """Run main agrinet agent and trace it in Langfuse."""
     lf_update_current_observation(
         input=user_message,
+        model=LANGFUSE_MODEL_NAME,
         metadata={
             "session_id": session_id,
             "user_id": user_id,
@@ -169,10 +162,13 @@ async def _run_agrinet(
     usage_data = result.usage()
     lf_update_current_observation(
         output=result.output,
-        model=MODEL_NAME,
+        model=LANGFUSE_MODEL_NAME,
         request_tokens=usage_data.request_tokens or 0,
         response_tokens=usage_data.response_tokens or 0,
-        metadata={},
+        metadata={
+            "session_id": session_id,
+            "user_id": user_id,
+            "moderation_category": moderation_category,
+        },
     )
-    lf_set_trace_io(output=result.output)
     return result

@@ -53,3 +53,6 @@ elif LLM_PROVIDER == 'azure-openai':
     )
 else:
     raise ValueError(f"Invalid LLM_PROVIDER: {LLM_PROVIDER}. Must be one of: 'vllm', 'openai', 'azure-openai'")
+
+# Langfuse generation `model` field (providedModelName) for dashboard model breakdown.
+LANGFUSE_MODEL_NAME = LLM_MODEL.model_name

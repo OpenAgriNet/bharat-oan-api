@@ -8,9 +8,18 @@ from helpers import langfuse_helper  # noqa: F401 — initializes Langfuse env b
 from langfuse import get_client
 
 
-def lf_set_trace_io(*, input: Any = None, output: Any = None) -> None:
-    """Trace-level input/output for the Langfuse trace detail view."""
-    get_client().set_current_trace_io(input=input, output=output)
+def lf_update_current_span(
+    *,
+    input: Any = None,
+    output: Any = None,
+    metadata: Optional[Mapping[str, Any]] = None,
+) -> None:
+    """Set input/output on the active observation (replaces deprecated trace-level I/O)."""
+    get_client().update_current_span(
+        input=input,
+        output=output,
+        metadata=dict(metadata) if metadata else None,
+    )
 
 
 def lf_update_current_observation(
@@ -22,9 +31,10 @@ def lf_update_current_observation(
     request_tokens: Optional[int] = None,
     response_tokens: Optional[int] = None,
 ) -> None:
-    """Update the active LLM step. Uses Langfuse generation fields so Tokens / cost roll up on the trace.
+    """Update the active generation observation (not trace tags).
 
-    Call only inside @observe(as_type="generation") (see chat moderation / agrinet).
+    Sets Langfuse's first-class `model` field (providedModelName) so model filters,
+    cost tracking, and dashboard widgets work. Call inside @observe(as_type="generation").
     """
     meta: Optional[dict[str, Any]] = dict(metadata) if metadata else None
     usage_details: Optional[dict[str, int]] = None
