@@ -58,6 +58,10 @@ async def stream_chat_messages(
         query=query,
     )
     trace_tags = [f"env:{lf_env}", f"channel:{channel}"]
+    for model_name in dict.fromkeys(
+        (LANGFUSE_AGRINET_MODEL_NAME, LANGFUSE_MODERATION_MODEL_NAME)
+    ):
+        trace_tags.append(f"model:{model_name}")
     with propagate_attributes(
         user_id=user_id,
         session_id=session_id,
@@ -173,8 +177,8 @@ async def _run_moderation(user_message: str, session_id: str):
     lf_update_current_observation(
         output=str(run.output),
         model=LANGFUSE_MODERATION_MODEL_NAME,
-        request_tokens=usage_data.request_tokens or 0,
-        response_tokens=usage_data.response_tokens or 0,
+        input_tokens=usage_data.input_tokens or 0,
+        output_tokens=usage_data.output_tokens or 0,
         metadata={"session_id": session_id},
     )
     return run.output
@@ -211,8 +215,8 @@ async def _run_agrinet(
     lf_update_current_observation(
         output=result.output,
         model=LANGFUSE_AGRINET_MODEL_NAME,
-        request_tokens=usage_data.request_tokens or 0,
-        response_tokens=usage_data.response_tokens or 0,
+        input_tokens=usage_data.input_tokens or 0,
+        output_tokens=usage_data.output_tokens or 0,
         metadata={
             "session_id": session_id,
             "user_id": user_id,

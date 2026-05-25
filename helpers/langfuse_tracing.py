@@ -28,8 +28,8 @@ def lf_update_current_observation(
     output: Any = None,
     metadata: Optional[Mapping[str, Any]] = None,
     model: Optional[str] = None,
-    request_tokens: Optional[int] = None,
-    response_tokens: Optional[int] = None,
+    input_tokens: Optional[int] = None,
+    output_tokens: Optional[int] = None,
 ) -> None:
     """Update the active observation with optional generation fields.
 
@@ -38,11 +38,11 @@ def lf_update_current_observation(
     span update when neither is set (e.g. agent observations without LLM metadata).
     """
     meta: Optional[dict[str, Any]] = dict(metadata) if metadata else None
-    has_usage = request_tokens is not None or response_tokens is not None
+    has_usage = input_tokens is not None or output_tokens is not None
     usage_details: Optional[dict[str, int]] = None
     if has_usage:
-        prompt_tok = int(request_tokens or 0)
-        completion_tok = int(response_tokens or 0)
+        prompt_tok = int(input_tokens or 0)
+        completion_tok = int(output_tokens or 0)
         usage_details = {
             "prompt_tokens": prompt_tok,
             "completion_tokens": completion_tok,
