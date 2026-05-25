@@ -13,8 +13,15 @@ from helpers.langfuse_trace_schema import (
     chat_trace_metadata_strings,
 )
 from helpers.langfuse_tracing import lf_update_current_observation, lf_update_current_span
+from helpers.telemetry import (
+    TelemetryRequest,
+    create_chat_answer_event,
+    create_chat_error_event,
+    create_chat_question_event,
+)
 from helpers.utils import get_logger
 from app.config import settings
+from app.tasks.telemetry import send_telemetry
 from app.utils import (
     update_message_history,
     trim_history,
@@ -49,8 +56,23 @@ async def stream_chat_messages(
     is_image_analysis: bool = False,
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
+    qid: str = "",
+    current_user: Optional[dict] = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
+    telemetry_user = current_user or {"channel": channel}
+    telemetry_qid = qid or f"chat_{session_id}"
+    question_event = create_chat_question_event(
+        current_user=telemetry_user,
+        qid=telemetry_qid,
+        question_text=query,
+        session_id=session_id,
+    )
+    background_tasks.add_task(
+        send_telemetry,
+        TelemetryRequest(events=[question_event]).model_dump(),
+    )
+
     lf_env = settings.langfuse_tracing_environment
     trace_meta = chat_trace_metadata_strings(
         source_lang=source_lang,
@@ -71,105 +93,131 @@ async def stream_chat_messages(
         tags=trace_tags,
         trace_name=CHAT_TRACE_NAME,
     ):
-        lf_update_current_span(input=query)
+        try:
+            lf_update_current_span(input=query)
 
-        deps = FarmerContext(
-            query=query,
-            lang_code=target_lang,
-            session_id=session_id,
-            latitude=latitude,
-            longitude=longitude,
-        )
-
-        message_pairs = "\n\n".join(format_message_pairs(history, 3))
-        logger.info(f"Message pairs: {message_pairs}")
-        last_response = (
-            f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
-        )
-
-        def build_user_message() -> str:
-            base_user_message = deps.get_user_message()
-            if is_image_analysis:
-                if latitude is not None and longitude is not None:
-                    location_instruction = (
-                        f"Browser coordinates are available for this image upload "
-                        f"(latitude={latitude}, longitude={longitude}). "
-                        "You MUST call `analyze_crop_image` and pass those coordinates directly."
-                    )
-                else:
-                    location_instruction = (
-                        "No browser coordinates were sent with this image upload. "
-                        "Check the conversation history first for any farmer-provided location. "
-                        "If the farmer already mentioned a place in this conversation, call `forward_geocode` on that place and then call `analyze_crop_image` with the resulting coordinates. "
-                        "If no place is available yet, do NOT call `analyze_crop_image` now. "
-                        "Ask the farmer: 'To get the most accurate pest identification, please share your city, town, or village, along with district and state.' "
-                        "Then wait for their reply before calling the tool. "
-                        "If the farmer explicitly refuses to share location, call `analyze_crop_image` without coordinates."
-                    )
-                base_user_message = (
-                    f"[USER UPLOADED A CROP IMAGE]\n\n"
-                    f"{base_user_message}\n\n"
-                    f"INSTRUCTION: The user has uploaded a crop image for pest/disease identification. "
-                    f"Use the exact image URL already present in the user's message or recent conversation history when calling `analyze_crop_image`. "
-                    f"{location_instruction} "
-                    f"Do NOT call `search_pests_diseases` automatically. "
-                    f"Present the NPSS result as a clean, farmer-friendly structured card in the Selected Language using this format:\n"
-                    f"**Pest:** <pest name>\n"
-                    f"**Crop:** <crop name>\n"
-                    f"**Cause:** <pathogen class, e.g. fungi / bacteria / virus>\n\n"
-                    f"<short symptoms/identification summary translated into the Selected Language>\n\n"
-                    f"Skip any field that is empty, null, or not present in the tool result. "
-                    f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
-                    f"Do not add a bold label for the description — just output the summary text as a paragraph after the labeled fields. "
-                    f"If the tool returns multiple findings, show only the most relevant one. "
-                    f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
-                )
-            return f"{last_response}{base_user_message}"
-
-        user_message = build_user_message()
-
-        moderation_data = await _run_moderation(user_message, session_id)
-        logger.info(f"Moderation data: {moderation_data}")
-        deps.update_moderation_str(str(moderation_data))
-        user_message = build_user_message()
-
-        trimmed_history = trim_history(history, max_tokens=64_000)
-        logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
-        trimmed_history = filter_thinking_from_history(trimmed_history)
-
-        with propagate_attributes(tags=[moderation_data.category]):
-            result = await _run_agrinet(
-                user_message=user_message,
-                trimmed_history=trimmed_history,
-                deps=deps,
-                session_id=session_id,
-                user_id=user_id,
+            deps = FarmerContext(
                 query=query,
-                moderation_category=moderation_data.category,
+                lang_code=target_lang,
+                session_id=session_id,
+                latitude=latitude,
+                longitude=longitude,
             )
 
-        new_messages = result.new_messages()
-        logger.info(f"Agent run complete for session {session_id}")
+            message_pairs = "\n\n".join(format_message_pairs(history, 3))
+            logger.info(f"Message pairs: {message_pairs}")
+            last_response = (
+                f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
+            )
 
-        output_text = post_process_npss_response(
-            text=result.output,
-            target_lang=target_lang,
-            npss_used=deps.npss_used,
-        )
+            def build_user_message() -> str:
+                base_user_message = deps.get_user_message()
+                if is_image_analysis:
+                    if latitude is not None and longitude is not None:
+                        location_instruction = (
+                            f"Browser coordinates are available for this image upload "
+                            f"(latitude={latitude}, longitude={longitude}). "
+                            "You MUST call `analyze_crop_image` and pass those coordinates directly."
+                        )
+                    else:
+                        location_instruction = (
+                            "No browser coordinates were sent with this image upload. "
+                            "Check the conversation history first for any farmer-provided location. "
+                            "If the farmer already mentioned a place in this conversation, call `forward_geocode` on that place and then call `analyze_crop_image` with the resulting coordinates. "
+                            "If no place is available yet, do NOT call `analyze_crop_image` now. "
+                            "Ask the farmer: 'To get the most accurate pest identification, please share your city, town, or village, along with district and state.' "
+                            "Then wait for their reply before calling the tool. "
+                            "If the farmer explicitly refuses to share location, call `analyze_crop_image` without coordinates."
+                        )
+                    base_user_message = (
+                        f"[USER UPLOADED A CROP IMAGE]\n\n"
+                        f"{base_user_message}\n\n"
+                        f"INSTRUCTION: The user has uploaded a crop image for pest/disease identification. "
+                        f"Use the exact image URL already present in the user's message or recent conversation history when calling `analyze_crop_image`. "
+                        f"{location_instruction} "
+                        f"Do NOT call `search_pests_diseases` automatically. "
+                        f"Present the NPSS result as a clean, farmer-friendly structured card in the Selected Language using this format:\n"
+                        f"**Pest:** <pest name>\n"
+                        f"**Crop:** <crop name>\n"
+                        f"**Cause:** <pathogen class, e.g. fungi / bacteria / virus>\n\n"
+                        f"<short symptoms/identification summary translated into the Selected Language>\n\n"
+                        f"Skip any field that is empty, null, or not present in the tool result. "
+                        f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
+                        f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
+                        f"If the tool returns multiple findings, show only the most relevant one. "
+                        f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
+                    )
+                return f"{last_response}{base_user_message}"
 
-        lf_update_current_span(output=output_text)
+            user_message = build_user_message()
 
-        yield output_text
+            moderation_data = await _run_moderation(user_message, session_id)
+            logger.info(f"Moderation data: {moderation_data}")
+            deps.update_moderation_str(str(moderation_data))
+            user_message = build_user_message()
 
-        clean_new_messages = filter_thinking_from_history(list(new_messages or []))
-        clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
-        messages = [*history, *clean_new_messages]
-        logger.info(
-            f"Updating message history for session {session_id} with {len(messages)} messages"
-        )
-        await update_message_history(session_id, messages)
+            trimmed_history = trim_history(history, max_tokens=64_000)
+            logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
+            trimmed_history = filter_thinking_from_history(trimmed_history)
 
-        get_client().flush()
+            with propagate_attributes(tags=[moderation_data.category]):
+                result = await _run_agrinet(
+                    user_message=user_message,
+                    trimmed_history=trimmed_history,
+                    deps=deps,
+                    session_id=session_id,
+                    user_id=user_id,
+                    query=query,
+                    moderation_category=moderation_data.category,
+                )
+
+            new_messages = result.new_messages()
+            logger.info(f"Agent run complete for session {session_id}")
+
+            output_text = post_process_npss_response(
+                text=result.output,
+                target_lang=target_lang,
+                npss_used=deps.npss_used,
+            )
+
+            lf_update_current_span(output=output_text)
+
+            answer_event = create_chat_answer_event(
+                current_user=telemetry_user,
+                qid=telemetry_qid,
+                question_text=query,
+                answer_text=output_text,
+                session_id=session_id,
+            )
+            background_tasks.add_task(
+                send_telemetry,
+                TelemetryRequest(events=[answer_event]).model_dump(),
+            )
+
+            yield output_text
+
+            clean_new_messages = filter_thinking_from_history(list(new_messages or []))
+            clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
+            messages = [*history, *clean_new_messages]
+            logger.info(
+                f"Updating message history for session {session_id} with {len(messages)} messages"
+            )
+            await update_message_history(session_id, messages)
+
+            get_client().flush()
+        except Exception as exc:
+            error_event = create_chat_error_event(
+                current_user=telemetry_user,
+                qid=telemetry_qid,
+                session_id=session_id,
+                error_text=f"{type(exc).__name__}: {exc}",
+                question_text=query,
+            )
+            background_tasks.add_task(
+                send_telemetry,
+                TelemetryRequest(events=[error_event]).model_dump(),
+            )
+            raise
 
 
 @observe(name=AGENT_MODERATION, as_type="agent")

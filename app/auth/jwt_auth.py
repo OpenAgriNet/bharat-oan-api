@@ -60,10 +60,24 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict[str, Any
 #            raise credentials_exception
 
         channel = decoded_token.get("channel") or DEFAULT_AUTH_CHANNEL
+        telemetry_context = decoded_token.get("telemetry_context") or {}
+        metadata = decoded_token.get("metadata") or {}
 
         return {
+            "sub": decoded_token.get("sub"),
             "mobile": mobile,
+            "name": decoded_token.get("name"),
+            "email": decoded_token.get("email"),
+            "role": decoded_token.get("role"),
+            "farmer_id": decoded_token.get("farmer_id"),
+            "unique_id": decoded_token.get("unique_id"),
+            "locations": decoded_token.get("locations") or [],
             "channel": channel,
+            "client_code": decoded_token.get("client_code"),
+            "auth_source": decoded_token.get("auth_source"),
+            "is_guest_user": decoded_token.get("is_guest_user") is True,
+            "telemetry_context": telemetry_context if isinstance(telemetry_context, dict) else {},
+            "metadata": metadata if isinstance(metadata, dict) else {},
         }
         
     except jwt.ExpiredSignatureError:

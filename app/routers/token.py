@@ -55,7 +55,8 @@ class AuthRequest(BaseModel):
     mobile: Optional[str] = Field(None, description="Mobile number")
     name: Optional[str] = Field(None, description="User name")
     role: Optional[str] = Field(None, description="User role")
-    metadata: Optional[str] = Field(None, description="Additional metadata as string")
+    fingerprint_id: Optional[str] = Field(None, description="Client fingerprint/device identifier")
+    metadata: Optional[Any] = Field(None, description="Additional metadata")
 
 
 class AuthResponse(BaseModel):
@@ -96,10 +97,11 @@ def _issue_jwt_token(
     mobile: Optional[str] = None,
     name: Optional[str] = None,
     role: Optional[str] = None,
-    metadata: Optional[str] = None,
+    metadata: Optional[Any] = None,
     channel: Optional[str] = None,
     expires_minutes: Optional[int] = None,
     include_issued_at: bool = True,
+    extra_claims: Optional[Dict[str, Any]] = None,
 ) -> tuple[str, Optional[int]]:
     if private_key is None:
         raise HTTPException(
@@ -120,6 +122,8 @@ def _issue_jwt_token(
             payload["metadata"] = metadata
         if channel is not None:
             payload["channel"] = channel
+        if extra_claims:
+            payload.update(extra_claims)
 
         if include_issued_at:
             payload["iat"] = int(now.timestamp())
@@ -414,24 +418,58 @@ async def create_auth_token(request: Optional[AuthRequest] = None):
         )
 
     try:
-        # Use request data if provided, otherwise use defaults
-        mobile = request.mobile if request and request.mobile else "1111111111"
+        fingerprint_id = request.fingerprint_id if request and request.fingerprint_id else None
+        metadata: Dict[str, Any] = {}
+        if request and request.metadata:
+            if isinstance(request.metadata, dict):
+                metadata.update(request.metadata)
+            elif isinstance(request.metadata, str):
+                try:
+                    parsed_metadata = json.loads(request.metadata)
+                    if isinstance(parsed_metadata, dict):
+                        metadata.update(parsed_metadata)
+                    else:
+                        metadata["raw"] = request.metadata
+                except json.JSONDecodeError:
+                    metadata["raw"] = request.metadata
+            else:
+                metadata["raw"] = str(request.metadata)
+        if fingerprint_id:
+            metadata["fingerprint_id"] = fingerprint_id
+        metadata["surface"] = metadata.get("surface") or "public_chat"
+
+        # Use request data if provided, otherwise issue a logged-out guest token.
+        mobile = request.mobile if request and request.mobile else None
         name = request.name if request and request.name else "guest"
         role = request.role if request and request.role else "public"
-        metadata = request.metadata if request and request.metadata else ""
+        channel = "BharatVistaar"
+        guest_sub = f"guest:{fingerprint_id}" if fingerprint_id else "guest:anon"
 
         # Create JWT payload
         now = datetime.utcnow()
         exp = now + timedelta(minutes=settings.jwt_expiry_minutes)
 
         payload = {
-            "mobile": mobile,
+            "sub": guest_sub,
             "name": name,
             "role": role,
+            "channel": channel,
+            "client_code": channel,
+            "auth_source": "guest_token",
+            "is_guest_user": True,
+            "telemetry_context": {
+                "uid": "guest",
+                "did": fingerprint_id,
+                "channel": channel,
+                "pdata_id": "BharatVistaar",
+                "pdata_ver": "v0.1",
+            },
             "metadata": metadata,
             "iat": int(now.timestamp()),
             "exp": int(exp.timestamp())
         }
+        if mobile:
+            payload["mobile"] = mobile
 
         # Encode JWT token using private key
         token = jwt.encode(
