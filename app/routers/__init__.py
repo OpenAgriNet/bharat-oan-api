@@ -6,4 +6,4 @@ from . import transcribe
 from . import tts
 from . import health
 from . import token
-
+from . import telemetry

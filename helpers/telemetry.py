@@ -42,6 +42,7 @@ class Target(BaseModel):
     questionsDetails: Optional[Dict[str, Any]] = None
     ttsResponseDetails: Optional[Dict[str, Any]] = None
     asrResponseDetails: Optional[Dict[str, Any]] = None
+    feedbackDetails: Optional[Dict[str, Any]] = None
 
 
 class BaseEventData(BaseModel):
@@ -132,11 +133,11 @@ class TelemetryEvent(BaseModel):
     etags: Dict[str, List[Any]] = Field(default_factory=lambda: {"partner": []})
     
     @field_validator("mid", mode="before")
-    def generate_mid_if_empty(cls, values):
-        if not values.get("mid"):
-            random_str = f"{time.time()}{random.random()}"
-            values["mid"] = f"OE_{hashlib.md5(random_str.encode()).hexdigest()}"
-        return values
+    def generate_mid_if_empty(cls, value):
+        if value:
+            return value
+        random_str = f"{time.time()}{random.random()}"
+        return f"OE_{hashlib.md5(random_str.encode()).hexdigest()}"
     
     @field_serializer("eid")
     def serialize_eid(self, eid: Union[EventType, str]) -> str:
@@ -253,7 +254,7 @@ def create_item_response_event(
             "sessionId": session_id
         }
     )
-    
+
     return create_event(
         event_type=EventType.OE_ITEM_RESPONSE,
         event_data=ItemResponseEks(
@@ -274,6 +275,186 @@ def create_item_response_event(
     )
 
 
+def resolve_telemetry_identity(
+    current_user: Dict[str, Any],
+) -> Dict[str, str]:
+    """Resolve telemetry identity from JWT claims with guest fallbacks."""
+    telemetry_context = current_user.get("telemetry_context") or {}
+    metadata = current_user.get("metadata") or {}
+    if not isinstance(telemetry_context, dict):
+        telemetry_context = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    uid = (
+        current_user.get("mobile")
+        or current_user.get("unique_id")
+        or current_user.get("farmer_id")
+        or telemetry_context.get("uid")
+        or "guest"
+    )
+    did = (
+        telemetry_context.get("did")
+        or metadata.get("fingerprint_id")
+        or current_user.get("sub")
+        or "unknown-device"
+    )
+    channel = (
+        telemetry_context.get("channel")
+        or current_user.get("channel")
+        or current_user.get("client_code")
+        or "BharatVistaar"
+    )
+
+    return {
+        "uid": str(uid),
+        "did": str(did),
+        "channel": str(channel),
+        "pdata_id": str(telemetry_context.get("pdata_id") or "BharatVistaar"),
+        "pdata_ver": str(telemetry_context.get("pdata_ver") or "v0.1"),
+    }
+
+
+def create_chat_question_event(
+    current_user: Dict[str, Any],
+    qid: str,
+    question_text: str,
+    session_id: str,
+    timestamp: Optional[int] = None,
+) -> TelemetryEvent:
+    identity = resolve_telemetry_identity(current_user)
+    return create_item_response_event(
+        uid=identity["uid"],
+        qid=qid,
+        question_text=question_text,
+        session_id=session_id,
+        channel=identity["channel"],
+        did=identity["did"],
+        pdata_id=identity["pdata_id"],
+        pdata_ver=identity["pdata_ver"],
+        timestamp=timestamp,
+    )
+
+
+def create_chat_answer_event(
+    current_user: Dict[str, Any],
+    qid: str,
+    question_text: str,
+    answer_text: str,
+    session_id: str,
+    timestamp: Optional[int] = None,
+) -> TelemetryEvent:
+    identity = resolve_telemetry_identity(current_user)
+    target = Target(
+        id="default",
+        ver="v0.1",
+        type="QuestionResponse",
+        parent={"id": "p1", "type": "default"},
+        questionsDetails={
+            "questionText": question_text,
+            "answerText": answer_text,
+            "sessionId": session_id,
+        },
+    )
+
+    return create_event(
+        event_type=EventType.OE_ITEM_RESPONSE,
+        event_data=ItemResponseEks(
+            target=target,
+            qid=qid,
+            type="CHOOSE",
+            state="",
+        ),
+        uid=identity["uid"],
+        sid=session_id,
+        channel=identity["channel"],
+        did=identity["did"],
+        pdata_id=identity["pdata_id"],
+        pdata_ver=identity["pdata_ver"],
+        timestamp=timestamp,
+    )
+
+
+def create_chat_error_event(
+    current_user: Dict[str, Any],
+    qid: str,
+    session_id: str,
+    error_text: str,
+    question_text: Optional[str] = None,
+    timestamp: Optional[int] = None,
+) -> TelemetryEvent:
+    identity = resolve_telemetry_identity(current_user)
+    target = Target(
+        id="default",
+        ver="v0.1",
+        type="Error",
+        parent={"id": "p1", "type": "default"},
+        questionsDetails={
+            "questionText": question_text,
+            "sessionId": session_id,
+        } if question_text else {"sessionId": session_id},
+    )
+
+    return create_event(
+        event_type=EventType.OE_ITEM_RESPONSE,
+        event_data=ItemResponseEks(
+            target=target,
+            qid=qid,
+            type="CHOOSE",
+            state="",
+            errorDetails={"errorText": error_text, "sessionId": session_id},
+        ),
+        uid=identity["uid"],
+        sid=session_id,
+        channel=identity["channel"],
+        did=identity["did"],
+        pdata_id=identity["pdata_id"],
+        pdata_ver=identity["pdata_ver"],
+        timestamp=timestamp,
+    )
+
+
+def create_chat_feedback_event(
+    current_user: Dict[str, Any],
+    qid: str,
+    session_id: str,
+    feedback_text: str,
+    feedback_type: str,
+    question_text: str = "",
+    answer_text: str = "",
+    timestamp: Optional[int] = None,
+) -> TelemetryEvent:
+    identity = resolve_telemetry_identity(current_user)
+    target = Target(
+        id="default",
+        ver="v0.1",
+        type="Feedback",
+        parent={"id": "p1", "type": "default"},
+        feedbackDetails={
+            "feedbackText": feedback_text,
+            "sessionId": session_id,
+            "questionText": question_text,
+            "answerText": answer_text,
+            "feedbackType": feedback_type,
+        },
+    )
+
+    return create_event(
+        event_type=EventType.OE_ITEM_RESPONSE,
+        event_data=ItemResponseEks(
+            target=target,
+            qid=qid,
+            type="CHOOSE",
+            state="",
+        ),
+        uid=identity["uid"],
+        sid=session_id,
+        channel=identity["channel"],
+        did=identity["did"],
+        pdata_id=identity["pdata_id"],
+        pdata_ver=identity["pdata_ver"],
+        timestamp=timestamp,
+    )
 def create_end_event(
     uid: str,
     progress: int,
@@ -623,7 +804,4 @@ def create_asr_event(
 #     """Logs an audio upload to telemetry"""
     
 #     return send_telemetry.s(request=telemetry_request.model_dump()).apply_async()
-
-
-
 

@@ -1,5 +1,5 @@
 import os
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from fastapi import BackgroundTasks
 
@@ -12,7 +12,14 @@ from helpers.langfuse_trace_schema import (
 )
 from helpers.langfuse_helper import get_langfuse_tracing_environment
 from helpers.langfuse_tracing import lf_set_trace_io, lf_update_current_observation
+from helpers.telemetry import (
+    TelemetryRequest,
+    create_chat_answer_event,
+    create_chat_error_event,
+    create_chat_question_event,
+)
 from helpers.utils import get_logger
+from app.tasks.telemetry import send_telemetry
 from app.utils import (
     update_message_history,
     trim_history,
@@ -49,8 +56,23 @@ async def stream_chat_messages(
     history: list,
     background_tasks: BackgroundTasks,
     channel: str = "BharatVistaar",
+    qid: str = "",
+    current_user: Optional[dict] = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
+    telemetry_user = current_user or {"channel": channel}
+    telemetry_qid = qid or f"chat_{session_id}"
+    question_event = create_chat_question_event(
+        current_user=telemetry_user,
+        qid=telemetry_qid,
+        question_text=query,
+        session_id=session_id,
+    )
+    background_tasks.add_task(
+        send_telemetry,
+        TelemetryRequest(events=[question_event]).model_dump(),
+    )
+
     lf_env = get_langfuse_tracing_environment()
     trace_meta = chat_trace_metadata_strings(
         source_lang=source_lang,
@@ -69,54 +91,80 @@ async def stream_chat_messages(
         tags=trace_tags,
         trace_name=CHAT_TRACE_NAME,
     ):
-        lf_set_trace_io(input=query)
+        try:
+            lf_set_trace_io(input=query)
 
-        deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
+            deps = FarmerContext(query=query, lang_code=target_lang, session_id=session_id)
 
-        message_pairs = "\n\n".join(format_message_pairs(history, 3))
-        logger.info(f"Message pairs: {message_pairs}")
-        last_response = (
-            f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
-        )
-
-        user_message = f"{last_response}{deps.get_user_message()}"
-
-        moderation_data = await _run_moderation(user_message, session_id)
-        logger.info(f"Moderation data: {moderation_data}")
-        deps.update_moderation_str(str(moderation_data))
-
-        user_message = f"{last_response}{deps.get_user_message()}"
-
-        trimmed_history = trim_history(history, max_tokens=64_000)
-        logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
-        trimmed_history = filter_thinking_from_history(trimmed_history)
-
-        with propagate_attributes(tags=[moderation_data.category]):
-            result = await _run_agrinet(
-                user_message=deps.get_user_message(),
-                trimmed_history=trimmed_history,
-                deps=deps,
-                session_id=session_id,
-                user_id=user_id,
-                query=query,
-                moderation_category=moderation_data.category,
+            message_pairs = "\n\n".join(format_message_pairs(history, 3))
+            logger.info(f"Message pairs: {message_pairs}")
+            last_response = (
+                f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
             )
 
-        new_messages = result.new_messages()
-        logger.info(f"Agent run complete for session {session_id}")
+            user_message = f"{last_response}{deps.get_user_message()}"
 
-        lf_set_trace_io(output=result.output)
+            moderation_data = await _run_moderation(user_message, session_id)
+            logger.info(f"Moderation data: {moderation_data}")
+            deps.update_moderation_str(str(moderation_data))
 
-        yield result.output
+            user_message = f"{last_response}{deps.get_user_message()}"
 
-        clean_new_messages = filter_thinking_from_history(list(new_messages or []))
-        messages = [*history, *clean_new_messages]
-        logger.info(
-            f"Updating message history for session {session_id} with {len(messages)} messages"
-        )
-        await update_message_history(session_id, messages)
+            trimmed_history = trim_history(history, max_tokens=64_000)
+            logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
+            trimmed_history = filter_thinking_from_history(trimmed_history)
 
-        get_client().flush()
+            with propagate_attributes(tags=[moderation_data.category]):
+                result = await _run_agrinet(
+                    user_message=deps.get_user_message(),
+                    trimmed_history=trimmed_history,
+                    deps=deps,
+                    session_id=session_id,
+                    user_id=user_id,
+                    query=query,
+                    moderation_category=moderation_data.category,
+                )
+
+            new_messages = result.new_messages()
+            logger.info(f"Agent run complete for session {session_id}")
+
+            lf_set_trace_io(output=result.output)
+
+            yield result.output
+
+            answer_event = create_chat_answer_event(
+                current_user=telemetry_user,
+                qid=telemetry_qid,
+                question_text=query,
+                answer_text=result.output,
+                session_id=session_id,
+            )
+            background_tasks.add_task(
+                send_telemetry,
+                TelemetryRequest(events=[answer_event]).model_dump(),
+            )
+
+            clean_new_messages = filter_thinking_from_history(list(new_messages or []))
+            messages = [*history, *clean_new_messages]
+            logger.info(
+                f"Updating message history for session {session_id} with {len(messages)} messages"
+            )
+            await update_message_history(session_id, messages)
+
+            get_client().flush()
+        except Exception as exc:
+            error_event = create_chat_error_event(
+                current_user=telemetry_user,
+                qid=telemetry_qid,
+                session_id=session_id,
+                error_text=f"{type(exc).__name__}: {exc}",
+                question_text=query,
+            )
+            background_tasks.add_task(
+                send_telemetry,
+                TelemetryRequest(events=[error_event]).model_dump(),
+            )
+            raise
 
 
 @observe(name=AGENT_MODERATION, as_type="generation")
