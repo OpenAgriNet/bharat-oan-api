@@ -13,6 +13,7 @@ services:
     environment:
       REDIS_HOST: ${REDIS_HOST:-sva_redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
+      TELEMETRY_API_URL: ${TELEMETRY_API_URL:-https://dev-vistaar.da.gov.in/observability-service/action/data/v3/telemetry}
     restart: unless-stopped
     networks:
       - svanetwork
