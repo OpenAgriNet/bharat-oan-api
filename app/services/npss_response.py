@@ -6,10 +6,6 @@ from helpers.utils import get_logger, post_process_translation
 
 logger = get_logger(__name__)
 
-NPSS_SOURCE_NAME = "National Pest Surveillance System (NPSS)"
-NPSS_SOURCE_OWNER = "Department of Agriculture & Farmers Welfare, Ministry of Agriculture & Farmers Welfare, Government of India"
-NPSS_SOURCE_URL = "https://npss.dac.gov.in/"
-
 LABELS = {
     "en": {"pest": "Pest", "crop": "Crop", "cause": "Cause"},
     "hi": {"pest": "कीट", "crop": "फसल", "cause": "कारण"},
@@ -24,16 +20,16 @@ LABELS = {
 }
 
 SOURCE_LINES = {
-    "en": f"**Source: {NPSS_SOURCE_NAME}, {NPSS_SOURCE_OWNER}, {NPSS_SOURCE_URL}**",
-    "hi": f"**स्रोत: राष्ट्रीय कीट निगरानी प्रणाली (NPSS), कृषि और किसान कल्याण विभाग, भारत सरकार, {NPSS_SOURCE_URL}**",
-    "as": f"**উৎস: ৰাষ্ট্ৰীয় কীট নিৰীক্ষণ ব্যৱস্থা (NPSS), কৃষি আৰু কৃষক কল্যাণ বিভাগ, ভাৰত চৰকাৰ, {NPSS_SOURCE_URL}**",
-    "bn": f"**উৎস: জাতীয় কীট নজরদারি ব্যবস্থা (NPSS), কৃষি ও কৃষক কল্যাণ বিভাগ, ভারত সরকার, {NPSS_SOURCE_URL}**",
-    "gu": f"**સ્રોત: રાષ્ટ્રીય જીવાત દેખરેખ પ્રણાલી (NPSS), કૃષિ અને ખેડૂત કલ્યાણ વિભાગ, ભારત સરકાર, {NPSS_SOURCE_URL}**",
-    "kn": f"**ಮೂಲ: ರಾಷ್ಟ್ರೀಯ ಕೀಟ ನಿಗಾವಳಿ ವ್ಯವಸ್ಥೆ (NPSS), ಕೃಷಿ ಮತ್ತು ರೈತರ ಕಲ್ಯಾಣ ಇಲಾಖೆ, ಭಾರತ ಸರ್ಕಾರ, {NPSS_SOURCE_URL}**",
-    "ml": f"**ഉറവിടം: ദേശീയ കീട നിരീക്ഷണ സംവിധാനം (NPSS), കൃഷി കർഷക ക്ഷേമ വകുപ്പ്, ഇന്ത്യ സർക്കാർ, {NPSS_SOURCE_URL}**",
-    "mr": f"**स्रोत: राष्ट्रीय कीड देखरेख प्रणाली (NPSS), कृषी आणि शेतकरी कल्याण विभाग, भारत सरकार, {NPSS_SOURCE_URL}**",
-    "ta": f"**மூலம்: தேசிய பூச்சி கண்காணிப்பு அமைப்பு (NPSS), வேளாண்மை மற்றும் விவசாயிகள் நலத் துறை, இந்திய அரசு, {NPSS_SOURCE_URL}**",
-    "te": f"**మూలం: జాతీయ పురుగు పర్యవేక్షణ వ్యవస్థ (NPSS), వ్యవసాయ మరియు రైతు సంక్షేమ శాఖ, భారత ప్రభుత్వం, {NPSS_SOURCE_URL}**",
+    "en": "**Source: NPSS**",
+    "hi": "**स्रोत: NPSS**",
+    "as": "**উৎস: NPSS**",
+    "bn": "**উৎস: NPSS**",
+    "gu": "**સ્રોત: NPSS**",
+    "kn": "**ಮೂಲ: NPSS**",
+    "ml": "**ഉറവിടം: NPSS**",
+    "mr": "**स्रोत: NPSS**",
+    "ta": "**மூலம்: NPSS**",
+    "te": "**మూలం: NPSS**",
 }
 
 LABEL_NAMES = {"pest", "crop", "cause", "source", "source owner", "source url"}
@@ -49,6 +45,17 @@ SOURCE_PREFIXES = (
     "மூலம்:",
     "మూలం:",
 )
+LANGUAGE_SCRIPT_RANGES = {
+    "hi": ("\u0900", "\u097F"),
+    "mr": ("\u0900", "\u097F"),
+    "as": ("\u0980", "\u09FF"),
+    "bn": ("\u0980", "\u09FF"),
+    "gu": ("\u0A80", "\u0AFF"),
+    "kn": ("\u0C80", "\u0CFF"),
+    "ml": ("\u0D00", "\u0D7F"),
+    "ta": ("\u0B80", "\u0BFF"),
+    "te": ("\u0C00", "\u0C7F"),
+}
 
 
 def post_process_npss_response(
@@ -110,8 +117,13 @@ def _translate_npss_body(
         if parsed_label:
             label, value = parsed_label
             if label in ("pest", "crop", "cause") and value:
+                if _is_likely_in_target_language(value, target_lang):
+                    continue
                 line_slots.append((idx, label))
                 translatable.append(value)
+            continue
+
+        if _is_likely_in_target_language(line, target_lang):
             continue
 
         line_slots.append((idx, None))
@@ -187,3 +199,17 @@ def _is_source_line(line: str) -> bool:
     normalized = normalized.lower()
 
     return any(normalized.startswith(prefix) for prefix in SOURCE_PREFIXES)
+
+
+def _is_likely_in_target_language(text: str, target_lang: str) -> bool:
+    script_range = LANGUAGE_SCRIPT_RANGES.get(target_lang)
+    if not script_range:
+        return False
+
+    start, end = script_range
+    letters = [char for char in text if char.isalpha()]
+    if not letters:
+        return False
+
+    target_script_count = sum(1 for char in letters if start <= char <= end)
+    return target_script_count / len(letters) >= 0.35
