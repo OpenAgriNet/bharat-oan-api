@@ -156,7 +156,7 @@ async def stream_chat_messages(
             npss_used=deps.npss_used,
         )
 
-        lf_set_trace_io(output=output_text)
+        lf_update_current_span(output=output_text)
 
         yield output_text
 
