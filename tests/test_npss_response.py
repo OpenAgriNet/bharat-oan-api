@@ -59,9 +59,8 @@ class TestNPSSResponsePostProcessing(unittest.TestCase):
 
         processed = post_process_npss_response(response, "en", npss_used=True)
 
-        self.assertIn("**Source: National Pest Surveillance System (NPSS)", processed)
-        self.assertIn("Department of Agriculture & Farmers Welfare", processed)
-        self.assertIn("https://npss.dac.gov.in/", processed)
+        self.assertIn("**Source: NPSS**", processed)
+        self.assertNotIn("https://npss.dac.gov.in/", processed)
         self.assertNotIn("Would you like spray advice?", processed)
 
     def test_hindi_npss_response_is_translated_and_source_is_localized(self):
@@ -84,7 +83,7 @@ class TestNPSSResponsePostProcessing(unittest.TestCase):
         self.assertIn("**फसल:** कपास", processed)
         self.assertIn("**कारण:** कीट", processed)
         self.assertIn("लार्वा कपास के टिंडों को नुकसान पहुंचाते हैं।", processed)
-        self.assertIn("**स्रोत: राष्ट्रीय कीट निगरानी प्रणाली (NPSS)", processed)
+        self.assertIn("**स्रोत: NPSS**", processed)
         self.assertNotIn("NPSS Pest Advisory", processed)
 
     def test_other_language_path_uses_translator_for_body(self):
@@ -99,6 +98,24 @@ class TestNPSSResponsePostProcessing(unittest.TestCase):
 
         self.assertIn("छवि में पत्ती धब्बा रोग दिख रहा है।", processed)
         self.assertNotIn("The image shows leaf spot disease.", processed)
+
+    def test_existing_hindi_body_is_not_retranslated(self):
+        response = (
+            "**Pest:** Peach Leaf Curl\n"
+            "**Crop:** peach\n"
+            "**Cause:** fungi\n\n"
+            "पत्तियां मोटी, मुड़ी हुई और लाल-बैंगनी रंग की दिखती हैं।"
+        )
+
+        processed = post_process_npss_response(
+            response,
+            "hi",
+            npss_used=True,
+            translator_factory=fake_translator_factory,
+        )
+
+        self.assertIn("पत्तियां मोटी, मुड़ी हुई और लाल-बैंगनी रंग की दिखती हैं।", processed)
+        self.assertNotIn("अनुवादित: पत्तियां", processed)
 
 
 class TestNPSSToolMetadata(unittest.IsolatedAsyncioTestCase):
@@ -139,7 +156,7 @@ class TestNPSSToolMetadata(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(deps.npss_source_name, "National Pest Surveillance System (NPSS)")
             self.assertEqual(deps.npss_source_url, "https://npss.dac.gov.in/")
             self.assertEqual(deps.npss_raw_result["pest"], "Pink bollworm")
-            self.assertIn("**Source:** National Pest Surveillance System (NPSS)", result)
+            self.assertIn("**Source:** NPSS", result)
         finally:
             npss._download_image = original_download_image
             npss._call_npss_analyze = original_call_npss_analyze
