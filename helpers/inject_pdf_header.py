@@ -69,8 +69,6 @@ def inject(html: str, *, pdf_filename: str, label: str, selector: str) -> str:
         # insert pdf-offset into class attribute
         return re.sub(r'class="([^"]*)"', lambda c: f'class="{c.group(1)} pdf-offset"', tag, count=1)
 
-    # html = re.sub(r'<(div|section)([^>]*class="[^"]*container[^"]*"[^>]*)>',
-    #               lambda m: add_offset(m), html, count=1, flags=re.IGNORECASE)
     for m in re.finditer(r'<(?:div|section)[^>]*>', html, flags=re.IGNORECASE):
         cls = re.search(r'class="([^"]*)"', m.group(0))
         if cls and 'container' in cls.group(1):

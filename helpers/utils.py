@@ -86,19 +86,6 @@ def remove_redundant_parenthetical(text: str) -> str:
     # Optional but helps when the same glyph can be encoded two ways
     text = ud.normalize("NFC", text)
 
-    # pattern = re.compile(
-    #     r'''
-    #     (?P<term>                 # 1st copy
-    #         [^\s()]+              #   – at least one non-space, non-paren char
-    #         (?:\s+[^\s()]+)*      #   – then zero-or-more <space + word>
-    #     )
-    #     \s*                       # spaces before '('
-    #     \(\s*
-    #     (?P=term)                 # identical 2nd copy
-    #     \s*\)                     # closing ')'
-    #     ''',
-    #     flags=re.UNICODE | re.VERBOSE,
-    # )
     pattern = re.compile(
         r'''
         (?P<term>                     # 1st copy
@@ -130,19 +117,6 @@ def remove_redundant_angle_brackets(text: str) -> str:
     # Optional but helps when the same glyph can be encoded two ways
     text = ud.normalize("NFC", text)
 
-    # pattern = re.compile(
-    #     r'''
-    #     (?P<term>                 # 1st copy
-    #         [^\s<>]+              #   – at least one non-space, non-angle-bracket char
-    #         (?:\s+[^\s<>]+)*      #   – then zero-or-more <space + word>
-    #     )
-    #     \s*                       # spaces before '<'
-    #     <\s*
-    #     (?P=term)                 # identical 2nd copy
-    #     \s*>                      # closing '>'
-    #     ''',
-    #     flags=re.UNICODE | re.VERBOSE,
-    # )
     pattern = re.compile(
         r'''
         (?P<term>                     # 1st copy
