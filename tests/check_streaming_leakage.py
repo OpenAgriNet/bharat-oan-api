@@ -310,7 +310,7 @@ def main():
     items = json.loads(QUESTIONS_PATH.read_text())
 
     if args.sample and args.sample < len(items):
-        items = random.sample(items, args.sample)
+        items = random.SystemRandom().sample(items, args.sample)
 
     print(f"Running {len(items)} questions via STREAMING path...\n")
 

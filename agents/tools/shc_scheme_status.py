@@ -511,7 +511,7 @@ def generate_file_hash(phone_number: str, cycle: str) -> str:
     normalized_phone = format_phone_number(phone_number)
     # Create a hash to ensure consistent key length and avoid special characters
     key_data = f"{normalized_phone}:{cycle}:{uuid.uuid4()}"  # Add UUID for uniqueness per request
-    _hash = hashlib.md5(key_data.encode()).hexdigest()[:8]
+    _hash = hashlib.sha256(key_data.encode()).hexdigest()[:8]
     return _hash
 
 
