@@ -15,7 +15,10 @@ from typing import Any, Dict, List, Tuple, Union, Set
 
 load_dotenv(override=True)
 
-term_pairs = json.load(open('assets/word_mapping_reduced_1000.json', 'r', encoding='utf-8'))
+try:
+    term_pairs = json.load(open('assets/word_mapping_reduced_1000.json', 'r', encoding='utf-8'))
+except FileNotFoundError:
+    term_pairs = []
 
 def fix_underscores(text):
     """Replace underscores with spaces -> underscores."""

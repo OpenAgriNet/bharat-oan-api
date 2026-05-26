@@ -62,6 +62,9 @@ NPSS_USERNAME = os.getenv("NPSS_USERNAME", "")
 NPSS_PASSWORD = os.getenv("NPSS_PASSWORD", "")
 NPSS_TOKEN_CACHE_KEY = "npss:bearer_token"
 NPSS_TOKEN_TTL_SECONDS = 25 * 60  # 25 minutes
+NPSS_SOURCE_NAME = "National Pest Surveillance System (NPSS)"
+NPSS_SOURCE_OWNER = "Department of Agriculture & Farmers Welfare, Ministry of Agriculture & Farmers Welfare, Government of India"
+NPSS_SOURCE_URL = "https://npss.dac.gov.in/"
 
 GCS_MOVE_AFTER_PROCESS = os.getenv("GCS_MOVE_AFTER_PROCESS", "").strip().lower() in ("1", "true", "yes", "on")
 
@@ -400,6 +403,13 @@ async def analyze_crop_image(
         if image_id and npss_completed:
             cleanup_image(image_id, move_to_gcs=GCS_MOVE_AFTER_PROCESS)
 
+    ctx.deps.mark_npss_result(
+        raw_result=result,
+        source_name=NPSS_SOURCE_NAME,
+        source_owner=NPSS_SOURCE_OWNER,
+        source_url=NPSS_SOURCE_URL,
+    )
+
     # Preserve the full NPSS payload in a readable structure instead of summarizing it.
     preferred_order = ["errors", "pest", "crop", "pathogenClass", "description"]
     ordered_keys = [key for key in preferred_order if key in result]
@@ -423,5 +433,12 @@ async def analyze_crop_image(
         lines.append(f"**{key}:**")
         lines.extend(_format_npss_value(value, indent=1))
         lines.append("")
+
+    lines.extend([
+        "",
+        f"**Source:** {NPSS_SOURCE_NAME}",
+        f"**Source owner:** {NPSS_SOURCE_OWNER}",
+        f"**Source URL:** {NPSS_SOURCE_URL}",
+    ])
 
     return "\n".join(lines).rstrip()
