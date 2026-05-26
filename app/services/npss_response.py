@@ -1,4 +1,3 @@
-import re
 from typing import Callable, Optional
 
 from helpers.translation import BhashiniTranslator, BaseTranslator
@@ -37,10 +36,18 @@ SOURCE_LINES = {
     "te": f"**మూలం: జాతీయ పురుగు పర్యవేక్షణ వ్యవస్థ (NPSS), వ్యవసాయ మరియు రైతు సంక్షేమ శాఖ, భారత ప్రభుత్వం, {NPSS_SOURCE_URL}**",
 }
 
-LABEL_PATTERN = re.compile(r"^\*\*(Pest|Crop|Cause|Source|Source owner|Source URL):\*\*\s*(.*)$", re.IGNORECASE | re.MULTILINE)
-SOURCE_LINE_PATTERN = re.compile(
-    r"^\s*(?:\*\*)?(?:source|source owner|source url|स्रोत|উৎস|સ્રોત|ಮೂಲ|ഉറവിടം|மூலம்|మూలం)\s*:",
-    re.IGNORECASE,
+LABEL_NAMES = {"pest", "crop", "cause", "source", "source owner", "source url"}
+SOURCE_PREFIXES = (
+    "source:",
+    "source owner:",
+    "source url:",
+    "स्रोत:",
+    "উৎস:",
+    "સ્રોત:",
+    "ಮೂಲ:",
+    "ഉറവിടം:",
+    "மூலம்:",
+    "మూలం:",
 )
 
 
@@ -70,7 +77,7 @@ def post_process_npss_response(
 def _remove_existing_source_lines(text: str) -> str:
     lines = []
     for line in text.splitlines():
-        if SOURCE_LINE_PATTERN.match(line):
+        if _is_source_line(line):
             continue
         lines.append(line)
     return "\n".join(lines)
@@ -99,10 +106,9 @@ def _translate_npss_body(
         if not stripped:
             continue
 
-        match = LABEL_PATTERN.match(stripped)
-        if match:
-            label = match.group(1).lower()
-            value = match.group(2).strip()
+        parsed_label = _parse_markdown_label(stripped)
+        if parsed_label:
+            label, value = parsed_label
             if label in ("pest", "crop", "cause") and value:
                 line_slots.append((idx, label))
                 translatable.append(value)
@@ -136,12 +142,48 @@ def _translate_npss_body(
 
 def _localize_known_labels(text: str, target_lang: str) -> str:
     labels = LABELS.get(target_lang, LABELS["en"])
+    output_lines = []
 
-    def replace(match: re.Match) -> str:
-        label = match.group(1).lower()
-        value = match.group(2)
+    for line in text.splitlines():
+        parsed_label = _parse_markdown_label(line.strip())
+        if not parsed_label:
+            output_lines.append(line)
+            continue
+
+        label, value = parsed_label
         if label not in labels:
-            return match.group(0)
-        return f"**{labels[label]}:** {value}"
+            output_lines.append(line)
+            continue
 
-    return LABEL_PATTERN.sub(replace, text)
+        leading_space_count = len(line) - len(line.lstrip())
+        output_lines.append(f"{line[:leading_space_count]}**{labels[label]}:** {value}")
+
+    return "\n".join(output_lines)
+
+
+def _parse_markdown_label(line: str) -> Optional[tuple[str, str]]:
+    if not line.startswith("**"):
+        return None
+
+    close = line.find(":**", 2)
+    if close == -1:
+        return None
+
+    label = line[2:close].strip().lower()
+    if label not in LABEL_NAMES:
+        return None
+
+    return label, line[close + 3:].strip()
+
+
+def _is_source_line(line: str) -> bool:
+    parsed_label = _parse_markdown_label(line.strip())
+    if parsed_label and parsed_label[0] in ("source", "source owner", "source url"):
+        return True
+
+    normalized = line.strip()
+    if normalized.startswith("**"):
+        normalized = normalized[2:]
+    normalized = normalized.lower()
+
+    return any(normalized.startswith(prefix) for prefix in SOURCE_PREFIXES)
