@@ -1,4 +1,5 @@
 from uuid import UUID
+from typing import Any
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
@@ -19,7 +20,7 @@ class ImageUploadResponse(BaseModel):
 @router.post("/upload", response_model=ImageUploadResponse)
 async def upload_image(
     image: UploadFile = File(..., description="Crop image to upload (JPEG or PNG)"),
-    current_user: str = Depends(get_current_user)
+    current_user: dict[str, Any] = Depends(get_current_user)
 ):
     """
     Upload a crop image for pest/disease analysis.
@@ -37,8 +38,9 @@ async def upload_image(
         )
 
     image_id, _image_url = await save_uploaded_image(image)
+    authenticated_user = current_user.get("mobile")
 
-    logger.info(f"Image uploaded by {current_user}: {image_id}")
+    logger.info(f"Image uploaded by {authenticated_user}: {image_id}")
 
     return ImageUploadResponse(
         image_id=image_id
