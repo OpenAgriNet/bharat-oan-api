@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 from typing import AsyncGenerator, Optional
 
 from fastapi import BackgroundTasks
@@ -20,6 +21,7 @@ from app.utils import (
     format_message_pairs,
     filter_thinking_from_history,
 )
+from app.services.npss_response import post_process_npss_response
 from agents.deps import FarmerContext
 from langfuse import get_client, observe, propagate_attributes
 
@@ -148,11 +150,18 @@ async def stream_chat_messages(
         new_messages = result.new_messages()
         logger.info(f"Agent run complete for session {session_id}")
 
-        lf_update_current_span(output=result.output)
+        output_text = post_process_npss_response(
+            text=result.output,
+            target_lang=target_lang,
+            npss_used=deps.npss_used,
+        )
 
-        yield result.output
+        lf_set_trace_io(output=output_text)
+
+        yield output_text
 
         clean_new_messages = filter_thinking_from_history(list(new_messages or []))
+        clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
         messages = [*history, *clean_new_messages]
         logger.info(
             f"Updating message history for session {session_id} with {len(messages)} messages"
@@ -182,6 +191,20 @@ async def _run_moderation(user_message: str, session_id: str):
         metadata={"session_id": session_id},
     )
     return run.output
+
+
+def _replace_last_text_output(messages: list, output_text: str) -> list:
+    """Store the same post-processed response that the farmer received."""
+    if not messages or not output_text:
+        return messages
+
+    copied = deepcopy(messages)
+    for message in reversed(copied):
+        for part in reversed(getattr(message, "parts", []) or []):
+            if getattr(part, "part_kind", "") == "text" and hasattr(part, "content"):
+                part.content = output_text
+                return copied
+    return copied
 
 
 @observe(name=AGENT_VISTAAR, as_type="agent")
