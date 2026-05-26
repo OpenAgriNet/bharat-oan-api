@@ -434,11 +434,6 @@ async def analyze_crop_image(
         lines.extend(_format_npss_value(value, indent=1))
         lines.append("")
 
-    lines.extend([
-        "",
-        f"**Source:** {NPSS_SOURCE_NAME}",
-        f"**Source owner:** {NPSS_SOURCE_OWNER}",
-        f"**Source URL:** {NPSS_SOURCE_URL}",
-    ])
+    lines.extend(["", "**Source:** NPSS"])
 
     return "\n".join(lines).rstrip()
