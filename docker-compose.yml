@@ -10,16 +10,6 @@ services:
       - .:/app
     env_file:
       - .env  
-    environment:
-      REDIS_HOST: ${REDIS_HOST:-sva_redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      TELEMETRY_API_URL: ${TELEMETRY_API_URL:-https://dev-vistaar.da.gov.in/observability-service/action/data/v3/telemetry}
-      TELEMETRY_ORIGIN: ${TELEMETRY_ORIGIN:-https://dev-vistaar.da.gov.in}
-      TELEMETRY_REFERER: ${TELEMETRY_REFERER:-https://dev-vistaar.da.gov.in/chat}
-      TELEMETRY_CHANNEL: ${TELEMETRY_CHANNEL:-BharatVistaar-https://dev-vistaar.da.gov.in}
-      TELEMETRY_AUTH_TOKEN: ${TELEMETRY_AUTH_TOKEN:-}
-      TELEMETRY_AUTH_KEY: ${TELEMETRY_AUTH_KEY:-gyte5565fdbgbngfnhgmnhmjgm,jm,}
-      TELEMETRY_AUTH_SECRET: ${TELEMETRY_AUTH_SECRET:-gnjhgjugkk}
     restart: unless-stopped
     networks:
       - svanetwork
