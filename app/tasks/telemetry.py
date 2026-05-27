@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import json
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
@@ -12,9 +12,13 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-def _get_telemetry_auth_token() -> str:
+def _get_telemetry_auth_token() -> Optional[str]:
     if settings.telemetry_auth_token:
         return settings.telemetry_auth_token
+
+    if not settings.telemetry_auth_key or not settings.telemetry_auth_secret:
+        logger.warning("Telemetry auth is not configured; sending telemetry without Authorization header")
+        return None
 
     header = {"typ": "JWT", "alg": "HS256"}
     payload = {
@@ -46,8 +50,11 @@ def _get_telemetry_headers() -> Dict[str, str]:
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest",
         "dataType": "json",
-        "Authorization": f"Bearer {_get_telemetry_auth_token()}",
     }
+
+    auth_token = _get_telemetry_auth_token()
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
 
     if settings.telemetry_origin:
         headers["Origin"] = settings.telemetry_origin

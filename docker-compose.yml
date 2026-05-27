@@ -18,8 +18,8 @@ services:
       TELEMETRY_REFERER: ${TELEMETRY_REFERER:-https://dev-vistaar.da.gov.in/chat}
       TELEMETRY_CHANNEL: ${TELEMETRY_CHANNEL:-BharatVistaar-https://dev-vistaar.da.gov.in}
       TELEMETRY_AUTH_TOKEN: ${TELEMETRY_AUTH_TOKEN:-}
-      TELEMETRY_AUTH_KEY: ${TELEMETRY_AUTH_KEY:-gyte5565fdbgbngfnhgmnhmjgm,jm,}
-      TELEMETRY_AUTH_SECRET: ${TELEMETRY_AUTH_SECRET:-gnjhgjugkk}
+      TELEMETRY_AUTH_KEY: ${TELEMETRY_AUTH_KEY:-}
+      TELEMETRY_AUTH_SECRET: ${TELEMETRY_AUTH_SECRET:-}
     restart: unless-stopped
     networks:
       - svanetwork

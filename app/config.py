@@ -87,8 +87,8 @@ class Settings(BaseSettings):
     telemetry_referer: str = os.getenv("TELEMETRY_REFERER", "https://dev-vistaar.da.gov.in/chat")
     telemetry_channel: Optional[str] = os.getenv("TELEMETRY_CHANNEL")
     telemetry_auth_token: Optional[str] = os.getenv("TELEMETRY_AUTH_TOKEN")
-    telemetry_auth_key: str = os.getenv("TELEMETRY_AUTH_KEY", "gyte5565fdbgbngfnhgmnhmjgm,jm,")
-    telemetry_auth_secret: str = os.getenv("TELEMETRY_AUTH_SECRET", "gnjhgjugkk")
+    telemetry_auth_key: Optional[str] = os.getenv("TELEMETRY_AUTH_KEY")
+    telemetry_auth_secret: Optional[str] = os.getenv("TELEMETRY_AUTH_SECRET")
     bhashini_api_url: str = ""
     ollama_endpoint_url: Optional[str] = None
     marqo_endpoint_url: Optional[str] = None
