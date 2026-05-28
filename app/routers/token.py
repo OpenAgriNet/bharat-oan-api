@@ -1,5 +1,6 @@
 import asyncio
 import hmac
+import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -243,7 +244,6 @@ async def _get_play_integrity_access_token(client_code: Optional[str] = None) ->
                 )
             
             # Load JSON and replace private_key from env if client_code is provided
-            import json
             with open(service_account_path, 'r') as f:
                 service_account_info = json.load(f)
             
