@@ -174,7 +174,8 @@ def get_prompt(prompt_file: str, context: Dict = {}, prompt_dir: str = "assets/p
     if not prompt_file.endswith(".md"):
         prompt_file += ".md"
 
-    # Create Jinja2 environment
+    # These templates are markdown text for LLM prompts, not HTML shown in a browser.
+    # autoescape is off so prompt formatting is preserved; only trusted server values go in context.
     env = Environment(
         loader=FileSystemLoader(prompt_dir),
         autoescape=False  # We don't want HTML escaping for our prompts
