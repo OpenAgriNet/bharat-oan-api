@@ -88,14 +88,16 @@ def remove_redundant_parenthetical(text: str) -> str:
 
     pattern = re.compile(
         r'''
-        (?P<term>                 # 1st copy
-            [^\s()]+              #   – at least one non-space, non-paren char
-            (?:\s+[^\s()]+)*      #   – then zero-or-more <space + word>
+        (?P<term>                     # 1st copy
+            (?>                       # atomic group: lock the greedy match, prevent backtracking
+                [^\s()]+              #   – at least one non-space, non-paren char
+                (?:\s+[^\s()]+)*      #   – then zero-or-more <space + word>
+            )
         )
-        \s*                       # spaces before '('
+        \s*                           # spaces before '('
         \(\s*
-        (?P=term)                 # identical 2nd copy
-        \s*\)                     # closing ')'
+        (?P=term)                     # identical 2nd copy
+        \s*\)                         # closing ')'
         ''',
         flags=re.UNICODE | re.VERBOSE,
     )
@@ -117,14 +119,16 @@ def remove_redundant_angle_brackets(text: str) -> str:
 
     pattern = re.compile(
         r'''
-        (?P<term>                 # 1st copy
-            [^\s<>]+              #   – at least one non-space, non-angle-bracket char
-            (?:\s+[^\s<>]+)*      #   – then zero-or-more <space + word>
+        (?P<term>                     # 1st copy
+            (?>                       # atomic group: lock the greedy match, prevent backtracking
+                [^\s<>]+              #   – at least one non-space, non-angle-bracket char
+                (?:\s+[^\s<>]+)*      #   – then zero-or-more <space + word>
+            )
         )
-        \s*                       # spaces before '<'
+        \s*                           # spaces before '<'
         <\s*
-        (?P=term)                 # identical 2nd copy
-        \s*>                      # closing '>'
+        (?P=term)                     # identical 2nd copy
+        \s*>                          # closing '>'
         ''',
         flags=re.UNICODE | re.VERBOSE,
     )
@@ -170,7 +174,8 @@ def get_prompt(prompt_file: str, context: Dict = {}, prompt_dir: str = "assets/p
     if not prompt_file.endswith(".md"):
         prompt_file += ".md"
 
-    # Create Jinja2 environment
+    # These templates are markdown text for LLM prompts, not HTML shown in a browser.
+    # autoescape is off so prompt formatting is preserved; only trusted server values go in context.
     env = Environment(
         loader=FileSystemLoader(prompt_dir),
         autoescape=False  # We don't want HTML escaping for our prompts

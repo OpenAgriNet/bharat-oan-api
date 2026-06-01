@@ -281,7 +281,7 @@ def main():
         print(f"Filtered to {len(items)} questions in category '{args.category}'")
 
     if args.sample and args.sample < len(items):
-        items = random.sample(items, args.sample)
+        items = random.SystemRandom().sample(items, args.sample)
         print(f"Sampled {args.sample} questions from {QUESTIONS_PATH.name}\n")
     else:
         print(f"Loaded {len(items)} questions from {QUESTIONS_PATH.name}\n")

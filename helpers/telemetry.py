@@ -4,7 +4,7 @@ from enum import Enum
 from pydantic import BaseModel, Field, field_validator, field_serializer
 import hashlib
 import time
-import random
+import secrets
 
 class EventType(str, Enum):
     """Types of telemetry events"""
@@ -134,8 +134,8 @@ class TelemetryEvent(BaseModel):
     @field_validator("mid", mode="before")
     def generate_mid_if_empty(cls, values):
         if not values.get("mid"):
-            random_str = f"{time.time()}{random.random()}"
-            values["mid"] = f"OE_{hashlib.md5(random_str.encode()).hexdigest()}"
+            random_str = f"{time.time()}{secrets.SystemRandom().random()}"
+            values["mid"] = f"OE_{hashlib.sha256(random_str.encode()).hexdigest()[:32]}"
         return values
     
     @field_serializer("eid")

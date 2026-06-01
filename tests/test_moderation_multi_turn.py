@@ -210,7 +210,7 @@ def main():
     items = json.loads(QUESTIONS_PATH.read_text())
 
     if args.sample and args.sample < len(items):
-        items = random.sample(items, args.sample)
+        items = random.SystemRandom().sample(items, args.sample)
         print(f"Sampled {args.sample} conversations from {QUESTIONS_PATH.name}\n")
     else:
         print(f"Loaded {len(items)} conversations from {QUESTIONS_PATH.name}\n")

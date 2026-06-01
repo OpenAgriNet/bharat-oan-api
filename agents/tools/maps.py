@@ -19,6 +19,7 @@ photon_url = os.getenv("PHOTON_HOST")
 parsed = urlparse(photon_url)
 PHOTON_HOST = parsed.hostname or "10.128.188.19"
 PHOTON_PORT = parsed.port or 2322
+# Photon on server is HTTP-only. Do NOT switch to https:// for this host/port—TLS is not supported and will break geocoding.
 PHOTON_BASE_URL = f"http://{PHOTON_HOST}:{PHOTON_PORT}"
 
 # Shared async client for connection reuse
