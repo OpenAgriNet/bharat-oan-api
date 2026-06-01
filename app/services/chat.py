@@ -18,6 +18,7 @@ from helpers.telemetry import (
     create_chat_answer_event,
     create_chat_error_event,
     create_chat_question_event,
+    create_frontend_compatible_item_batch,
 )
 from helpers.utils import get_logger
 from app.config import settings
@@ -70,7 +71,7 @@ async def stream_chat_messages(
     )
     background_tasks.add_task(
         send_telemetry,
-        TelemetryRequest(events=[question_event]).model_dump(),
+        TelemetryRequest(events=create_frontend_compatible_item_batch(question_event)).model_dump(),
     )
 
     lf_env = settings.langfuse_tracing_environment
@@ -191,7 +192,7 @@ async def stream_chat_messages(
             )
             background_tasks.add_task(
                 send_telemetry,
-                TelemetryRequest(events=[answer_event]).model_dump(),
+                TelemetryRequest(events=create_frontend_compatible_item_batch(answer_event)).model_dump(),
             )
 
             yield output_text
@@ -215,7 +216,7 @@ async def stream_chat_messages(
             )
             background_tasks.add_task(
                 send_telemetry,
-                TelemetryRequest(events=[error_event]).model_dump(),
+                TelemetryRequest(events=create_frontend_compatible_item_batch(error_event)).model_dump(),
             )
             raise
 

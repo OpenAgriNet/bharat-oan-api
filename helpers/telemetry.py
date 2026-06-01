@@ -7,6 +7,11 @@ import time
 import random
 import os
 
+
+def generate_telemetry_mid() -> str:
+    random_str = f"{time.time()}{random.random()}"
+    return f"OE_{hashlib.md5(random_str.encode()).hexdigest()}"
+
 class EventType(str, Enum):
     """Types of telemetry events"""
     OE_START = "OE_START"
@@ -44,6 +49,7 @@ class Target(BaseModel):
     ttsResponseDetails: Optional[Dict[str, Any]] = None
     asrResponseDetails: Optional[Dict[str, Any]] = None
     feedbackDetails: Optional[Dict[str, Any]] = None
+    errorDetails: Optional[Dict[str, Any]] = None
 
 
 class BaseEventData(BaseModel):
@@ -58,6 +64,7 @@ class ItemResponseEks(BaseEventData):
     type: str
     state: str
     errorDetails: Optional[Dict[str, Any]] = None
+    fingerprint_details: Optional[Dict[str, Any]] = None
 
 
 class EndEventEks(BaseEventData):
@@ -65,11 +72,12 @@ class EndEventEks(BaseEventData):
     progress: int
     stageid: str = ""
     length: float
+    fingerprint_details: Optional[Dict[str, Any]] = None
 
 
 class StartEventEks(BaseEventData):
     """Extended data for OE_START events"""
-    pass
+    fingerprint_details: Optional[Dict[str, Any]] = None
 
 
 class MediaEventEks(BaseEventData):
@@ -140,13 +148,12 @@ class TelemetryEvent(BaseModel):
     did: str
     edata: EData
     etags: Dict[str, List[Any]] = Field(default_factory=lambda: {"partner": []})
-    
+
     @field_validator("mid", mode="before")
     def generate_mid_if_empty(cls, value):
         if value:
             return value
-        random_str = f"{time.time()}{random.random()}"
-        return f"OE_{hashlib.md5(random_str.encode()).hexdigest()}"
+        return generate_telemetry_mid()
     
     @field_serializer("eid")
     def serialize_eid(self, eid: Union[EventType, str]) -> str:
@@ -210,7 +217,8 @@ def create_event(
         edata=EData(eks=event_data)
     )
     event.eid = event.eid.value
-    event.edata.eks = event.edata.eks.model_dump(exclude_none=True)
+    if isinstance(event.edata.eks, BaseModel):
+        event.edata.eks = event.edata.eks.model_dump(exclude_none=True)
     return event
 
 
@@ -222,13 +230,16 @@ def create_start_event(
     pdata_ver: str = "v0.1",
     gdata_id: str = "content_id",
     gdata_ver: str = "content_ver",
+    session_id: str = "",
+    fingerprint_details: Optional[Dict[str, Any]] = None,
     timestamp: Optional[int] = None,
 ) -> TelemetryEvent:
     """Creates a start event for telemetry"""
     return create_event(
         event_type=EventType.OE_START,
-        event_data=StartEventEks(),
+        event_data=StartEventEks(fingerprint_details=fingerprint_details),
         uid=uid,
+        sid=session_id,
         channel=channel,
         did=did,
         pdata_id=pdata_id,
@@ -250,6 +261,7 @@ def create_item_response_event(
     pdata_ver: str = "v0.1",
     gdata_id: str = "content_id",
     gdata_ver: str = "content_ver",
+    fingerprint_details: Optional[Dict[str, Any]] = None,
     timestamp: Optional[int] = None,
 ) -> TelemetryEvent:
     """Creates an item response event for telemetry"""
@@ -270,7 +282,8 @@ def create_item_response_event(
             target=target,
             qid=qid,
             type=type,
-            state=""
+            state="",
+            fingerprint_details=fingerprint_details,
         ),
         uid=uid,
         sid=session_id,
@@ -286,7 +299,7 @@ def create_item_response_event(
 
 def resolve_telemetry_identity(
     current_user: Dict[str, Any],
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """Resolve telemetry identity from JWT claims with guest fallbacks."""
     telemetry_context = current_user.get("telemetry_context") or {}
     metadata = current_user.get("metadata") or {}
@@ -315,6 +328,15 @@ def resolve_telemetry_identity(
         or current_user.get("client_code")
         or "BharatVistaar"
     )
+    fingerprint_details = (
+        telemetry_context.get("fingerprint_details")
+        or metadata.get("fingerprint_details")
+        or {}
+    )
+    if not isinstance(fingerprint_details, dict):
+        fingerprint_details = {}
+    fingerprint_details = dict(fingerprint_details)
+    fingerprint_details.setdefault("device_id", str(did))
 
     return {
         "uid": str(uid),
@@ -322,6 +344,7 @@ def resolve_telemetry_identity(
         "channel": str(channel),
         "pdata_id": str(telemetry_context.get("pdata_id") or "BharatVistaar"),
         "pdata_ver": str(telemetry_context.get("pdata_ver") or "v0.1"),
+        "fingerprint_details": fingerprint_details,
     }
 
 
@@ -342,6 +365,7 @@ def create_chat_question_event(
         did=identity["did"],
         pdata_id=identity["pdata_id"],
         pdata_ver=identity["pdata_ver"],
+        fingerprint_details=identity["fingerprint_details"],
         timestamp=timestamp,
     )
 
@@ -374,6 +398,7 @@ def create_chat_answer_event(
             qid=qid,
             type="CHOOSE",
             state="",
+            fingerprint_details=identity["fingerprint_details"],
         ),
         uid=identity["uid"],
         sid=session_id,
@@ -403,6 +428,7 @@ def create_chat_error_event(
             "questionText": question_text,
             "sessionId": session_id,
         } if question_text else {"sessionId": session_id},
+        errorDetails={"errorText": error_text, "sessionId": session_id},
     )
 
     return create_event(
@@ -412,7 +438,7 @@ def create_chat_error_event(
             qid=qid,
             type="CHOOSE",
             state="",
-            errorDetails={"errorText": error_text, "sessionId": session_id},
+            fingerprint_details=identity["fingerprint_details"],
         ),
         uid=identity["uid"],
         sid=session_id,
@@ -456,6 +482,7 @@ def create_chat_feedback_event(
             qid=qid,
             type="CHOOSE",
             state="",
+            fingerprint_details=identity["fingerprint_details"],
         ),
         uid=identity["uid"],
         sid=session_id,
@@ -465,6 +492,46 @@ def create_chat_feedback_event(
         pdata_ver=identity["pdata_ver"],
         timestamp=timestamp,
     )
+
+
+def create_frontend_compatible_item_batch(
+    item_event: TelemetryEvent,
+    length: float = 0,
+) -> List[TelemetryEvent]:
+    """Wrap an item response with start/end events for observability ingestion."""
+    eks = item_event.edata.eks if isinstance(item_event.edata.eks, dict) else {}
+    fingerprint_details = eks.get("fingerprint_details")
+
+    start_event = create_start_event(
+        uid=item_event.uid,
+        channel=item_event.channel,
+        did=item_event.did,
+        pdata_id=item_event.pdata.id,
+        pdata_ver=item_event.pdata.ver,
+        gdata_id=item_event.gdata.id,
+        gdata_ver=item_event.gdata.ver,
+        session_id=item_event.sid,
+        fingerprint_details=fingerprint_details,
+        timestamp=item_event.ets,
+    )
+    end_event = create_end_event(
+        uid=item_event.uid,
+        progress=50,
+        length=length,
+        session_id=item_event.sid,
+        channel=item_event.channel,
+        did=item_event.did,
+        pdata_id=item_event.pdata.id,
+        pdata_ver=item_event.pdata.ver,
+        gdata_id=item_event.gdata.id,
+        gdata_ver=item_event.gdata.ver,
+        fingerprint_details=fingerprint_details,
+        timestamp=item_event.ets,
+    )
+    for event in (start_event, item_event, end_event):
+        if not event.mid:
+            event.mid = generate_telemetry_mid()
+    return [start_event, item_event, end_event]
 
 
 def create_ui_interact_event(
@@ -512,6 +579,7 @@ def create_end_event(
     pdata_ver: str = "v0.1",
     gdata_id: str = "content_id",
     gdata_ver: str = "content_ver",
+    fingerprint_details: Optional[Dict[str, Any]] = None,
     timestamp: Optional[int] = None,
 ) -> TelemetryEvent:
     """Creates an end event for telemetry"""
@@ -520,7 +588,8 @@ def create_end_event(
         event_data=EndEventEks(
             progress=progress,
             stageid="",
-            length=length
+            length=length,
+            fingerprint_details=fingerprint_details,
         ),
         uid=uid,
         sid=session_id,

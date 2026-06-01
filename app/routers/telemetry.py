@@ -11,6 +11,7 @@ from helpers.telemetry import (
     TelemetryRequest,
     create_chat_error_event,
     create_chat_feedback_event,
+    create_frontend_compatible_item_batch,
     create_ui_interact_event,
 )
 
@@ -32,7 +33,10 @@ async def relay_feedback_telemetry(
         question_text=request.question_text,
         answer_text=request.answer_text,
     )
-    background_tasks.add_task(send_telemetry, TelemetryRequest(events=[event]).model_dump())
+    background_tasks.add_task(
+        send_telemetry,
+        TelemetryRequest(events=create_frontend_compatible_item_batch(event)).model_dump(),
+    )
     return {"status": "accepted"}
 
 
@@ -49,7 +53,10 @@ async def relay_error_telemetry(
         error_text=request.error_text,
         question_text=request.question_text,
     )
-    background_tasks.add_task(send_telemetry, TelemetryRequest(events=[event]).model_dump())
+    background_tasks.add_task(
+        send_telemetry,
+        TelemetryRequest(events=create_frontend_compatible_item_batch(event)).model_dump(),
+    )
     return {"status": "accepted"}
 
 

@@ -14,6 +14,7 @@ from helpers.telemetry import (
     create_chat_error_event,
     create_chat_feedback_event,
     create_chat_question_event,
+    create_frontend_compatible_item_batch,
     create_ui_interact_event,
     resolve_telemetry_identity,
 )
@@ -42,6 +43,7 @@ def test_resolve_telemetry_identity_prefers_guest_fingerprint_context():
         "channel": "BharatVistaar",
         "pdata_id": "BharatVistaar",
         "pdata_ver": "v0.1",
+        "fingerprint_details": {"device_id": "fp_123"},
     }
 
 
@@ -82,9 +84,44 @@ def test_chat_telemetry_builders_match_frontend_event_shapes():
     assert payload["events"][0]["uid"] == "guest"
     assert payload["events"][0]["did"] == "fp_123"
     assert payload["events"][0]["channel"] == "BharatVistaar"
+    assert payload["events"][0]["edata"]["eks"]["fingerprint_details"] == {
+        "device_id": "fp_123"
+    }
     assert targets[1]["questionsDetails"]["answerText"] == "answer"
-    assert payload["events"][2]["edata"]["eks"]["errorDetails"]["errorText"] == "boom"
+    assert targets[2]["errorDetails"]["errorText"] == "boom"
     assert targets[3]["feedbackDetails"]["feedbackType"] == "like"
+
+
+def test_chat_item_batch_wraps_item_events_for_observability_ingestion():
+    current_user = {
+        "telemetry_context": {
+            "uid": "guest",
+            "did": "fp_123",
+            "channel": "BharatVistaar",
+            "pdata_id": "BharatVistaar",
+            "pdata_ver": "v0.1",
+        },
+        "metadata": {"fingerprint_id": "fp_123"},
+    }
+
+    question = create_chat_question_event(current_user, "q1", "question?", "s1")
+    payload = TelemetryRequest(
+        events=create_frontend_compatible_item_batch(question)
+    ).model_dump()
+    events = payload["events"]
+
+    assert [event["eid"] for event in events] == [
+        "OE_START",
+        "OE_ITEM_RESPONSE",
+        "OE_END",
+    ]
+    assert events[1]["edata"]["eks"]["target"]["type"] == "Question"
+    assert all(event["mid"].startswith("OE_") for event in events)
+    assert all(event["sid"] == "s1" for event in events)
+    assert all(
+        event["edata"]["eks"]["fingerprint_details"] == {"device_id": "fp_123"}
+        for event in events
+    )
 
 
 def test_generic_ui_interact_builder_preserves_metadata():
