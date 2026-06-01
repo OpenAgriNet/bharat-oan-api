@@ -1,12 +1,17 @@
 from fastapi import APIRouter, BackgroundTasks, Depends
 
 from app.auth.jwt_auth import get_current_user
-from app.models.requests import TelemetryErrorRequest, TelemetryFeedbackRequest
+from app.models.requests import (
+    GenericTelemetryEventRequest,
+    TelemetryErrorRequest,
+    TelemetryFeedbackRequest,
+)
 from app.tasks.telemetry import send_telemetry
 from helpers.telemetry import (
     TelemetryRequest,
     create_chat_error_event,
     create_chat_feedback_event,
+    create_ui_interact_event,
 )
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
@@ -46,3 +51,23 @@ async def relay_error_telemetry(
     )
     background_tasks.add_task(send_telemetry, TelemetryRequest(events=[event]).model_dump())
     return {"status": "accepted"}
+
+
+@router.post("/events")
+async def relay_generic_telemetry_events(
+    request: list[GenericTelemetryEventRequest],
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
+    events = [
+        create_ui_interact_event(
+            current_user=current_user,
+            event_name=event.event_name,
+            category=event.category,
+            client_time=event.time,
+            metadata=event.metadata,
+        )
+        for event in request
+    ]
+    background_tasks.add_task(send_telemetry, TelemetryRequest(events=events).model_dump())
+    return {"status": "accepted", "count": len(events)}

@@ -112,6 +112,14 @@ class ApiCallEventEks(BaseEventData):
     type: str
 
 
+class InteractEventEks(BaseEventData):
+    """Extended data for generic client interaction telemetry events"""
+    eventName: str
+    category: str
+    clientTime: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class EData(BaseModel):
     """Event specific data"""
     eks: Union[Dict[str, Any], BaseEventData]
@@ -457,6 +465,42 @@ def create_chat_feedback_event(
         pdata_ver=identity["pdata_ver"],
         timestamp=timestamp,
     )
+
+
+def create_ui_interact_event(
+    current_user: Dict[str, Any],
+    event_name: str,
+    category: str,
+    client_time: str,
+    metadata: Optional[Dict[str, Any]] = None,
+    timestamp: Optional[int] = None,
+) -> TelemetryEvent:
+    identity = resolve_telemetry_identity(current_user)
+    event_metadata = metadata or {}
+    session_id = str(
+        event_metadata.get("session_id")
+        or event_metadata.get("sessionId")
+        or ""
+    )
+
+    return create_event(
+        event_type=EventType.OE_INTERACT,
+        event_data=InteractEventEks(
+            eventName=event_name,
+            category=category,
+            clientTime=client_time,
+            metadata=event_metadata,
+        ),
+        uid=identity["uid"],
+        sid=session_id,
+        channel=identity["channel"],
+        did=identity["did"],
+        pdata_id=identity["pdata_id"],
+        pdata_ver=identity["pdata_ver"],
+        timestamp=timestamp,
+    )
+
+
 def create_end_event(
     uid: str,
     progress: int,

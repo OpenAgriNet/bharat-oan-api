@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Literal
+from pydantic import BaseModel, Field, field_validator
+from typing import Any, Dict, Optional, Literal
 
 class ChatRequest(BaseModel):
     query: str = Field(..., description="The user's chat query")
@@ -26,6 +26,20 @@ class TelemetryErrorRequest(BaseModel):
     error_text: str = Field(..., description="Error text")
     question_text: Optional[str] = Field(None, description="Question text")
     message_id: Optional[str] = Field(None, description="Related message ID")
+
+class GenericTelemetryEventRequest(BaseModel):
+    event_name: str = Field(..., description="Client telemetry event name")
+    category: str = Field(..., description="Client telemetry event category")
+    time: str = Field(..., description="Client event timestamp")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Client event metadata")
+
+    @field_validator("event_name", "category")
+    @classmethod
+    def validate_required_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be empty")
+        return value
 
 class TranscribeRequest(BaseModel):
     audio_content: str = Field(..., description="Base64 encoded audio content")
