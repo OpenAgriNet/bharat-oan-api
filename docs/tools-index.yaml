@@ -1,0 +1,93 @@
+# Minimal Vistaar tool catalog for engineers (no parameter schemas).
+# Full definitions live on the MCP-OAN server; the agent discovers them at runtime.
+#
+# MCP_SERVER_URL — streamable HTTP endpoint (default http://localhost:3001/mcp)
+
+tools:
+  - name: get_scheme_info
+    domain: schemes
+    summary: Government scheme details via Beckn
+  - name: initiate_pm_kisan_status_check
+    domain: pmkisan
+    summary: Start PM-Kisan status OTP flow
+  - name: check_pm_kisan_status_with_otp
+    domain: pmkisan
+    summary: PM-Kisan status after OTP
+  - name: initiate_pmfby_status_check
+    domain: pmfby
+    summary: Start PMFBY status OTP flow
+  - name: check_pmfby_status_with_otp
+    domain: pmfby
+    summary: PMFBY policy/claim status after OTP
+  - name: check_shc_status
+    domain: shc
+    summary: Soil Health Card status
+  - name: pmkisan_grievance_send_otp
+    domain: grievance
+    summary: PM-Kisan grievance OTP
+  - name: pmkisan_submit_grievance
+    domain: grievance
+    summary: Submit PM-Kisan grievance
+  - name: pmkisan_grievance_status
+    domain: grievance
+    summary: PM-Kisan grievance status
+  - name: check_smam_scheme_status
+    domain: smam
+    summary: SMAM application/beneficiary status
+  - name: initiate_pmfby_grievance_otp
+    domain: grievance
+    summary: PMFBY grievance OTP
+  - name: check_pmfby_grievance_otp
+    domain: grievance
+    summary: Verify PMFBY grievance OTP
+  - name: pmfby_grievance_status
+    domain: grievance
+    summary: PMFBY grievance ticket status
+  - name: pmfby_submit_grievance
+    domain: grievance
+    summary: Lodge PMFBY grievance
+  - name: search_terms
+    domain: search
+    summary: Multilingual agri glossary lookup
+  - name: search_documents
+    domain: search
+    summary: Marqo document search
+  - name: search_videos
+    domain: search
+    summary: Marqo video search
+  - name: search_pests_diseases
+    domain: search
+    summary: Crop pest/disease search
+  - name: weather_forecast
+    domain: weather
+    summary: IMD weather via Beckn
+  - name: get_mandi_prices
+    domain: mandi
+    summary: Mandi prices near coordinates
+  - name: search_commodity
+    domain: mandi
+    summary: AGMKT commodity code lookup
+  - name: forward_geocode
+    domain: maps
+    summary: Place name to coordinates
+  - name: reverse_geocode
+    domain: maps
+    summary: Coordinates to place name
+  - name: gfr_get_crop_registries
+    domain: gfr
+    summary: GFR crop registry at location
+  - name: gfr_get_recommendations
+    domain: gfr
+    summary: Official fertilizer recommendations
+  - name: get_sathi_crop_groups
+    domain: sathi
+    summary: SATHI crop group list
+  - name: list_sathi_crops_in_group
+    domain: sathi
+    summary: Crops in a SATHI group
+  - name: search_sathi_seed_availability
+    domain: sathi
+    summary: Certified seed dealer stock
+  - name: analyze_crop_image
+    domain: npss
+    summary: NPSS pest/disease image analysis

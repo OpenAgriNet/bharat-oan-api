@@ -138,15 +138,16 @@ async def stream_chat_messages(
         trimmed_history = filter_thinking_from_history(trimmed_history)
 
         with propagate_attributes(tags=[moderation_data.category]):
-            result = await _run_agrinet(
-                user_message=user_message,
-                trimmed_history=trimmed_history,
-                deps=deps,
-                session_id=session_id,
-                user_id=user_id,
-                query=query,
-                moderation_category=moderation_data.category,
-            )
+            async with agrinet_agent:
+                result = await _run_agrinet(
+                    user_message=user_message,
+                    trimmed_history=trimmed_history,
+                    deps=deps,
+                    session_id=session_id,
+                    user_id=user_id,
+                    query=query,
+                    moderation_category=moderation_data.category,
+                )
 
         new_messages = result.new_messages()
         logger.info(f"Agent run complete for session {session_id}")

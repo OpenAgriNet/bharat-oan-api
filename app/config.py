@@ -122,6 +122,11 @@ class Settings(BaseSettings):
     default_api_timeout: float = 5.0   # connect timeout (DEFAULT_API_TIMEOUT)
     default_api_read_timeout: float = 10.0  # read timeout (DEFAULT_API_READ_TIMEOUT)
 
+    # MCP tool server (MCP-OAN)
+    mcp_server_url: str = os.getenv("MCP_SERVER_URL", "http://localhost:3001/mcp")
+    mcp_api_key: Optional[str] = os.getenv("MCP_API_KEY")
+    mcp_timeout_seconds: float = float(os.getenv("MCP_TIMEOUT_SECONDS", "120"))
+
     # NPSS Configuration
     npss_base_url: Optional[str] = os.getenv("NPSS_BASE_URL")
     npss_username: Optional[str] = os.getenv("NPSS_USERNAME")

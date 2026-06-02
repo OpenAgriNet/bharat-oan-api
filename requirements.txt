@@ -33,6 +33,7 @@ openpyxl
 
 ### Pydantic AI (Updated to resolve conflicts)
 pydantic-ai==1.2.1
+mcp>=1.11.0
 asgiref
 
 # Web Server
