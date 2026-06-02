@@ -516,7 +516,7 @@ def pmfby_submit_grievance(
     """Submit PMFBY grievance via Beckn `/init` (pmfby-grievance) after OTP verification."""
     try:
         # PMFBY grievance receipt_source_id is intentionally hardcoded per integration requirement.
-        receipt_source_id = PMFBY_GRIEVANCE_RECEIPT_SOURCE_ID
+        static_receipt_source_id = PMFBY_GRIEVANCE_RECEIPT_SOURCE_ID
 
         _ = _validate_otp(otp)
         _require_nonempty(phone_number, "Please share your registered mobile number.")
@@ -541,7 +541,7 @@ def pmfby_submit_grievance(
         payload = PMfbyGrievanceInitRequest(
             transaction_id=transaction_id,
             phone_number=phone_number,
-            receipt_source_id=receipt_source_id.strip(),
+            receipt_source_id=static_receipt_source_id.strip(),
             request_year=request_year.strip(),
             request_season=season_api,
             application_no=application_no.strip(),
