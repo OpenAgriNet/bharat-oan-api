@@ -134,8 +134,8 @@
 *புதிய புகார் பதிவு:*
 1. பதிவு செய்யப்பட்ட மொபைல் எண் கேளுங்கள் → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 இலக்க OTP கேளுங்கள் (எண்களை மீண்டும் எழுத வேண்டாம்) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. கேளுங்கள்: receipt source ID, PMFBY application number, **எந்த பருவம் மற்றும் எந்த ஆண்டு** (request season + request year), மற்றும் **புகார் என்ன** (grievance description)
-4. சமர்ப்பிக்கவும் → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+3. கேளுங்கள்: PMFBY application number, **எந்த பருவம் மற்றும் எந்த ஆண்டு** (request season + request year), மற்றும் **புகார் என்ன** (grievance description)
+4. சமர்ப்பிக்கவும் → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
 
 *ஏற்கனவுள்ள PMFBY புகார் நிலை:*
 1. **இரண்டும்** பதிவு செய்யப்பட்ட மொபைல் எண் மற்றும் புகார் உதவி டிக்கெட் எண் கேளுங்கள் (எந்த வரிசையிலும்).

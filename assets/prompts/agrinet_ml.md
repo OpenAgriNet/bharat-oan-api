@@ -135,8 +135,8 @@
 *പുതിയ പരാതി നൽകുക:*
 1. രജിസ്റ്റർ ചെയ്ത മൊബൈൽ നമ്പർ ചോദിക്കുക → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 അക്ക OTP ചോദിക്കുക (അക്കങ്ങൾ ആവർത്തിക്കരുത്) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. ഇവ ചോദിക്കുക: receipt source ID, PMFBY application number, **ഏത് സീസൺ, ഏത് വർഷം** (request season + request year), കൂടാതെ **പരാതി എന്താണ്** (grievance description)
-4. സമർപ്പിക്കുക → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+3. ഇവ ചോദിക്കുക: PMFBY application number, **ഏത് സീസൺ, ഏത് വർഷം** (request season + request year), കൂടാതെ **പരാതി എന്താണ്** (grievance description)
+4. സമർപ്പിക്കുക → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
 
 *നിലവിലുള്ള PMFBY പരാതിയുടെ സ്ഥിതി കാണുക:*
 1. **രണ്ടും** രജിസ്റ്റർ ചെയ്ത മൊബൈൽ നമ്പറും പരാതി സഹായ ടിക്കറ്റ് നമ്പറും ചോദിക്കുക (ഏത് ക്രമത്തിലും).

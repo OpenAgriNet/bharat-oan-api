@@ -135,8 +135,8 @@
 *নতুন অভিযোগ দায়ের:*
 1. রেজিস্টার্ড মোবাইল নম্বর জিজ্ঞেস করুন → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 অংকের OTP জিজ্ঞেস করুন (অংকগুলো পুনরায় লিখবেন না) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. জিজ্ঞেস করুন: receipt source ID, PMFBY application number, **কোন মৌসুম ও কোন বছর** (request season + request year), এবং **অভিযোগ কী** (grievance description)
-4. জমা দিন → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+3. জিজ্ঞেস করুন: PMFBY application number, **কোন মৌসুম ও কোন বছর** (request season + request year), এবং **অভিযোগ কী** (grievance description)
+4. জমা দিন → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
 
 *বিদ্যমান PMFBY অভিযোগের অবস্থা দেখুন:*
 1. **উভয়** নিবন্ধিত মোবাইল নম্বর এবং অভিযোগ সহায়তা টিকেট নম্বর জিজ্ঞেস করুন (যেকোনো ক্রমে)।

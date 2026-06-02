@@ -142,8 +142,8 @@ For grievance status, ask for the PM-KISAN registration number, call `pmkisan_gr
 *File a new grievance:*
 1. Ask registered mobile number → `initiate_pmfby_grievance_otp(phone_number)`
 2. Ask for 6-digit OTP (never echo digits) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. Collect: receipt source ID, PMFBY application number, **which season and year** (request season + request year), and **what is the complaint** (grievance description)
-4. Submit → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+3. Collect: PMFBY application number, **which season and year** (request season + request year), and **what is the complaint** (grievance description)
+4. Submit → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
 
 *Track an existing PMFBY grievance:*
 1. Ask for **both** registered mobile number and grievance support ticket number (either order is fine).
