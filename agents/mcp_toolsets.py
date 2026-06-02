@@ -1,14 +1,20 @@
 """
-MCP toolset for the Vistaar agent — tools are defined and executed on the MCP-OAN server.
+MCP toolset for the Vistaar agent — tool schemas from a shared manifest; execution on MCP-OAN.
+
+The manifest is generated in MCP-OAN (shared/vistaar_tools_manifest.json) and copied here so
+the agent does not call MCP tools/list on every run. Only tools/call hits the MCP server.
 """
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 from typing import Any
 
 import httpx
 from pydantic_ai.mcp import CallToolFunc, MCPServerStreamableHTTP, ToolResult
-from pydantic_ai.tools import RunContext
+from pydantic_ai.toolsets.abstract import ToolsetTool
+from pydantic_ai.tools import RunContext, ToolDefinition
 
 from agents.deps import FarmerContext
 from app.config import settings
@@ -19,6 +25,52 @@ NPSS_SOURCE_OWNER = (
     "Government of India"
 )
 NPSS_SOURCE_URL = "https://npss.dac.gov.in/"
+
+_DEFAULT_MANIFEST = Path(__file__).resolve().parent / "data" / "vistaar_tools_manifest.json"
+
+
+def _manifest_path() -> Path:
+    override = os.getenv("VISTAAR_TOOLS_MANIFEST_PATH", "").strip()
+    if override:
+        return Path(override)
+    sibling = (
+        settings.base_dir.parent / "MCP-OAN" / "shared" / "vistaar_tools_manifest.json"
+    )
+    if sibling.is_file():
+        return sibling
+    return _DEFAULT_MANIFEST
+
+
+def load_vistaar_tool_manifest(path: Path | None = None) -> list[dict[str, Any]]:
+    manifest_file = path or _manifest_path()
+    with manifest_file.open(encoding="utf-8") as f:
+        data = json.load(f)
+    tools = data.get("tools")
+    if not isinstance(tools, list) or not tools:
+        raise ValueError(f"Invalid Vistaar tools manifest: {manifest_file}")
+    return tools
+
+
+class ManifestMCPToolset(MCPServerStreamableHTTP):
+    """MCP client that registers tools from a static manifest instead of tools/list."""
+
+    def __init__(self, *, manifest_tools: list[dict[str, Any]], url: str, **kwargs: Any) -> None:
+        super().__init__(url, **kwargs)
+        self._manifest_tools = manifest_tools
+
+    async def get_tools(self, ctx: RunContext[Any]) -> dict[str, ToolsetTool[Any]]:
+        del ctx
+        return {
+            entry["name"]: self.tool_for_tool_def(
+                ToolDefinition(
+                    name=entry["name"],
+                    description=entry.get("description"),
+                    parameters_json_schema=entry["inputSchema"],
+                ),
+            )
+            for entry in self._manifest_tools
+            if "name" in entry and "inputSchema" in entry
+        }
 
 
 def _mcp_headers() -> dict[str, str]:
@@ -83,9 +135,10 @@ def _tool_result_text(result: ToolResult) -> str:
     return str(result) if result is not None else ""
 
 
-def create_vistaar_mcp_toolset() -> MCPServerStreamableHTTP:
-    return MCPServerStreamableHTTP(
-        settings.mcp_server_url,
+def create_vistaar_mcp_toolset() -> ManifestMCPToolset:
+    return ManifestMCPToolset(
+        manifest_tools=load_vistaar_tool_manifest(),
+        url=settings.mcp_server_url,
         headers=_mcp_headers(),
         http_client=_build_http_client(),
         process_tool_call=inject_farmer_context,

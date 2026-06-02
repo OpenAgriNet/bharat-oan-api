@@ -1,0 +1,785 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-02T18:54:25.466289+00:00",
+  "source": "MCP-OAN/python/server.py",
+  "tools": [
+    {
+      "name": "analyze_crop_image",
+      "description": "Analyze a crop image for pests or diseases using the National Pest Surveillance System (NPSS).\n\nUse this tool ONLY when the user has provided an image URL (e.g. from an uploaded crop photo)\nand wants to identify the pest or disease affecting it.\n\nArgs:\n    image_url: The URL of the uploaded crop image. This is REQUIRED.\n    latitude: Optional user latitude for geocode lookup\n    longitude: Optional user longitude for geocode lookup\n    state_id: Optional NPSS State ID (overrides geocode lookup)\n    district_id: Optional NPSS District ID\n    sub_district_id: Optional NPSS SubDistrict ID\n    village_id: Optional NPSS Village ID\n\nReturns:\n    str: Diagnosis result from NPSS including pest name, crop, pathogen class, and description.\n    Do NOT call `search_pests_diseases` automatically after this tool.",
+      "inputSchema": {
+        "properties": {
+          "image_url": {
+            "title": "Image Url",
+            "type": "string"
+          },
+          "latitude": {
+            "default": null,
+            "title": "Latitude",
+            "type": "string"
+          },
+          "longitude": {
+            "default": null,
+            "title": "Longitude",
+            "type": "string"
+          },
+          "state_id": {
+            "default": null,
+            "title": "State Id",
+            "type": "string"
+          },
+          "district_id": {
+            "default": null,
+            "title": "District Id",
+            "type": "string"
+          },
+          "sub_district_id": {
+            "default": null,
+            "title": "Sub District Id",
+            "type": "string"
+          },
+          "village_id": {
+            "default": null,
+            "title": "Village Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_url"
+        ],
+        "title": "analyze_crop_imageArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "check_pm_kisan_status_with_otp",
+      "description": "Check PM Kisan status using OTP after initiating the OTP check.\n \nUse this tool to check the status of a farmer's PM Kisan benefit using the OTP received via SMS after calling initiate_pm_kisan_status_check.\n\nArgs:\n    otp (str): A 4 digit OTP received via SMS\n    reg_no (str): PM Kisan registration number, usually a 11 digit string such (2 digit state code + 9 digit unique number)\n\nReturns:\n    str: Detailed scheme status information including beneficiary details, payment status, and any issues or next steps",
+      "inputSchema": {
+        "properties": {
+          "otp": {
+            "title": "Otp",
+            "type": "string"
+          },
+          "reg_no": {
+            "title": "Reg No",
+            "type": "string"
+          }
+        },
+        "required": [
+          "otp",
+          "reg_no"
+        ],
+        "title": "check_pm_kisan_status_with_otpArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "check_pmfby_grievance_otp",
+      "description": "Verify OTP via `/status` (order_id = OTP, phone-only fulfillments). HTTP 200 + no OTP-failure phrases → success.",
+      "inputSchema": {
+        "properties": {
+          "otp": {
+            "title": "Otp",
+            "type": "string"
+          },
+          "phone_number": {
+            "title": "Phone Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "otp",
+          "phone_number"
+        ],
+        "title": "check_pmfby_grievance_otpArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "check_pmfby_status_with_otp",
+      "description": "Check PMFBY status using OTP after initiating the OTP check.\n\nUse this tool to check policy or claim status using the OTP received via SMS\nafter calling initiate_pmfby_status_check.\n\nArgs:\n    otp (str): 6-digit OTP received via SMS (used as order_id for API)\n    phone_number (str): Phone number registered with PMFBY (required)\n    inquiry_type (str): Type of inquiry - 'policy_status' or 'claim_status' (required)\n    year (str): Year for which status is requested (required)\n    season (str): Season - Kharif, Rabi, or Summer (required)\n\nReturns:\n    str: Detailed scheme status information",
+      "inputSchema": {
+        "properties": {
+          "otp": {
+            "title": "Otp",
+            "type": "string"
+          },
+          "phone_number": {
+            "title": "Phone Number",
+            "type": "string"
+          },
+          "inquiry_type": {
+            "title": "Inquiry Type",
+            "type": "string"
+          },
+          "year": {
+            "title": "Year",
+            "type": "string"
+          },
+          "season": {
+            "title": "Season",
+            "type": "string"
+          }
+        },
+        "required": [
+          "otp",
+          "phone_number",
+          "inquiry_type",
+          "year",
+          "season"
+        ],
+        "title": "check_pmfby_status_with_otpArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "check_shc_status",
+      "description": "Check soil health card status.\n\nUse this tool to check soil health card status for a farmer.\n\nArgs:\n    phone_number (str): Phone number registered with the scheme\n    cycle (str): Cycle year for which status is requested (e.g., \"2023-24\", \"2024-25\"). You must ask the user for the cycle year if not provided. Do not mention the format specification to the user - ask naturally for the cycle year.\n\nReturns:\n    str: Detailed soil health card information",
+      "inputSchema": {
+        "properties": {
+          "phone_number": {
+            "title": "Phone Number",
+            "type": "string"
+          },
+          "cycle": {
+            "title": "Cycle",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone_number",
+          "cycle"
+        ],
+        "title": "check_shc_statusArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "check_smam_scheme_status",
+      "description": "Check SMAM (Sub-Mission on Agricultural Mechanization) application / beneficiary status.\n\nUse this tool when the farmer wants to check SMAM subsidy or application status.\n\nArgs:\n    search_type: Lookup type — `mobile` (10-digit Indian), `application_no` (application reference\n        or numeric id), or `aadhaar` (12 digits).\n    search_value: Identifier shared by the farmer (no placeholders). Numeric values are\n        digit-normalized when applicable (e.g. `+91` / leading `0` removed for mobile-shaped inputs).\n\nReturns:\n    Human-readable status with implement details and status history (when available).",
+      "inputSchema": {
+        "properties": {
+          "search_type": {
+            "title": "Search Type",
+            "type": "string"
+          },
+          "search_value": {
+            "title": "Search Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "search_type",
+          "search_value"
+        ],
+        "title": "check_smam_scheme_statusArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "forward_geocode",
+      "description": "Forward Geocoding to get latitude and longitude from a place name in India.\n\nArgs:\n    place_name (str): The place name to geocode, in English. For best results, include additional context like district or state (e.g. \"Pune, Maharashtra\" or \"Latur, Maharashtra\").\n\nReturns:\n    str: The location details or an error message if not found in India.",
+      "inputSchema": {
+        "properties": {
+          "place_name": {
+            "title": "Place Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "place_name"
+        ],
+        "title": "forward_geocodeArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_mandi_prices",
+      "description": "Get mandi prices for a specific commodity near a location.\n\nUse this tool to fetch commodity price information from nearby mandis (agricultural markets).\nYou need the commodity code (use search_commodity tool to find it) and the farmer's location.\n\nArgs:\n    latitude (float): Latitude of the location\n    longitude (float): Longitude of the location\n    commodity_code (int): AGMKT commodity code (use search_commodity tool to find the code)\n    days_back (int): Number of days to look back from today for price data (default 30)\n\nReturns:\n    str: Formatted mandi price data for the requested commodity and location",
+      "inputSchema": {
+        "properties": {
+          "latitude": {
+            "title": "Latitude",
+            "type": "number"
+          },
+          "longitude": {
+            "title": "Longitude",
+            "type": "number"
+          },
+          "commodity_code": {
+            "title": "Commodity Code",
+            "type": "integer"
+          },
+          "days_back": {
+            "default": 30,
+            "title": "Days Back",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude",
+          "commodity_code"
+        ],
+        "title": "get_mandi_pricesArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_sathi_crop_groups",
+      "description": "Official SATHI crop groups (group_code, group_name); use group_code with list_sathi_crops_in_group.",
+      "inputSchema": {
+        "properties": {},
+        "title": "get_sathi_crop_groupsArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_scheme_info",
+      "description": "Retrieve detailed information about government agricultural schemes.\n\nThis tool fetches comprehensive scheme data including benefits, eligibility criteria, \napplication process, and other relevant details for agricultural schemes. Use this \ntool whenever users inquire about specific schemes or need general scheme information.\n\nArgs:\n    scheme_name (str): Name of the scheme to retrieve. Options:\n        - \"kcc\": Kisan Credit Card scheme\n        - \"pmkisan\": Pradhan Mantri Kisan Samman Nidhi scheme  \n        - \"pmfby\": Pradhan Mantri Fasal Bima Yojana scheme\n        - \"shc\": Soil Health Card scheme\n        - \"pmksy\": The Pradhan Mantri Krishi Sinchayee Yojana\n        - \"sathi\": Seed Authentication, Traceability & Holistic Inventory\n        - \"pmasha\": Pradhan Mantri Annadata Aay Sanrakshan Abhiyan\n        - \"aif\": Agriculture Infrastructure Fund\n        - \"smam\": Sub-Mission on Agricultural Mechanization\n        - \"pdmc\": Per Drop More Crop scheme\n        - \"pkvy\": Paramparagat Krishi Vikas Yojana\n        - \"nfsm\": National Food Security Mission\n        - \"rad\": Rainfed Area Development\n\nReturns:\n    str: Formatted scheme data including introduction, benefits, eligibility, \n         application process, and other relevant information.",
+      "inputSchema": {
+        "properties": {
+          "scheme_name": {
+            "title": "Scheme Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scheme_name"
+        ],
+        "title": "get_scheme_infoArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "gfr_get_crop_registries",
+      "description": "Crop registry from BAP /search (location lat/lon).",
+      "inputSchema": {
+        "properties": {
+          "latitude": {
+            "title": "Latitude",
+            "type": "string"
+          },
+          "longitude": {
+            "title": "Longitude",
+            "type": "string"
+          },
+          "only_gfr_available": {
+            "default": true,
+            "title": "Only Gfr Available",
+            "type": "string"
+          },
+          "crop_name_contains": {
+            "default": null,
+            "title": "Crop Name Contains",
+            "type": "string"
+          },
+          "limit": {
+            "default": 25,
+            "title": "Limit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "title": "gfr_get_crop_registriesArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "gfr_get_recommendations",
+      "description": "Fertilizer recommendation from BAP /search. Pass stateId, crop ids (from registry), phone\n(10-digit Indian number or with 91 / +91), SHC cycle year; optional\ndistrictId and lat/lon. Soil values come from the network (SHC). Default natural_farming=False\nmatches sandbox /search (chemical + organic quantity tables); True returns NF practice advisory text.",
+      "inputSchema": {
+        "properties": {
+          "state_id": {
+            "title": "State Id",
+            "type": "string"
+          },
+          "crops": {
+            "title": "Crops",
+            "type": "string"
+          },
+          "phone_no": {
+            "title": "Phone No",
+            "type": "string"
+          },
+          "cycle": {
+            "title": "Cycle",
+            "type": "string"
+          },
+          "district_id": {
+            "default": null,
+            "title": "District Id",
+            "type": "string"
+          },
+          "natural_farming": {
+            "default": false,
+            "title": "Natural Farming",
+            "type": "string"
+          },
+          "latitude": {
+            "default": null,
+            "title": "Latitude",
+            "type": "string"
+          },
+          "longitude": {
+            "default": null,
+            "title": "Longitude",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state_id",
+          "crops",
+          "phone_no",
+          "cycle"
+        ],
+        "title": "gfr_get_recommendationsArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "initiate_pm_kisan_status_check",
+      "description": "Initiate PM Kisan status check by sending OTP to farmer's mobile.\n\nUse this tool to initiate the process to check the status of a farmer's scheme benefit by sending an OTP to their registered mobile number.\n\nArgs:\n    reg_no (str): PM Kisan registration number, usually a 11 digit string such (2 digit state code + 9 digit unique number)\n\nReturns:\n    str: Response from the scheme status check service",
+      "inputSchema": {
+        "properties": {
+          "reg_no": {
+            "title": "Reg No",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reg_no"
+        ],
+        "title": "initiate_pm_kisan_status_checkArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "initiate_pmfby_grievance_otp",
+      "description": "Send OTP to the farmer's registered mobile for PMFBY grievance (`get_otp` /init).",
+      "inputSchema": {
+        "properties": {
+          "phone_number": {
+            "title": "Phone Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone_number"
+        ],
+        "title": "initiate_pmfby_grievance_otpArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "initiate_pmfby_status_check",
+      "description": "Initiate PMFBY status check by sending OTP to farmer's mobile.\n\nUse this tool to initiate the process. Sends an OTP to the farmer's registered mobile.\nAfter OTP is received, use check_pmfby_status_with_otp with the OTP and inquiry details.\n\nArgs:\n    phone_number (str): Phone number registered with PMFBY (required)\n\nReturns:\n    str: Response from the scheme init service (OTP sent confirmation)",
+      "inputSchema": {
+        "properties": {
+          "phone_number": {
+            "title": "Phone Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone_number"
+        ],
+        "title": "initiate_pmfby_status_checkArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "list_sathi_crops_in_group",
+      "description": "Crops in a SATHI group; pick crop_code for search_sathi_seed_availability.",
+      "inputSchema": {
+        "properties": {
+          "group_code": {
+            "title": "Group Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_code"
+        ],
+        "title": "list_sathi_crops_in_groupArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "pmfby_grievance_status",
+      "description": "Check PMFBY grievance status for an existing support ticket.\n\nAsk the farmer for their registered mobile number and grievance support ticket number,\nthen call this tool. No OTP is required for status lookup.\n\nArgs:\n    phone_number: Mobile number registered with PMFBY (10 digits).\n    grievance_support_ticket_no: Grievance support ticket number (same value as message order_id).\n\nReturns:\n    Grievance status details from the PMFBY grievance portal.",
+      "inputSchema": {
+        "properties": {
+          "phone_number": {
+            "title": "Phone Number",
+            "type": "string"
+          },
+          "grievance_support_ticket_no": {
+            "title": "Grievance Support Ticket No",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone_number",
+          "grievance_support_ticket_no"
+        ],
+        "title": "pmfby_grievance_statusArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "pmfby_submit_grievance",
+      "description": "Submit PMFBY grievance via Beckn `/init` (pmfby-grievance) after OTP verification.",
+      "inputSchema": {
+        "properties": {
+          "otp": {
+            "title": "Otp",
+            "type": "string"
+          },
+          "phone_number": {
+            "title": "Phone Number",
+            "type": "string"
+          },
+          "receipt_source_id": {
+            "title": "Receipt Source Id",
+            "type": "string"
+          },
+          "request_year": {
+            "title": "Request Year",
+            "type": "string"
+          },
+          "request_season": {
+            "title": "Request Season",
+            "type": "string"
+          },
+          "application_no": {
+            "title": "Application No",
+            "type": "string"
+          },
+          "grievance_description": {
+            "title": "Grievance Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "otp",
+          "phone_number",
+          "receipt_source_id",
+          "request_year",
+          "request_season",
+          "application_no",
+          "grievance_description"
+        ],
+        "title": "pmfby_submit_grievanceArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "pmkisan_grievance_send_otp",
+      "description": "Send OTP to the mobile registered with a PM-KISAN registration number.\n\nUse before submitting a grievance or checking grievance status. After the user shares\nthe OTP, call pmkisan_submit_grievance or pmkisan_grievance_status with that OTP.\n\nArgs:\n    reg_no: PM-KISAN registration number used for OTP.\n    phone_number: Optional registered mobile number to include in the OTP payload.\n    purpose: Whether the OTP is for grievance submission or status check.\n\nReturns:\n    OTP send confirmation or service error.",
+      "inputSchema": {
+        "properties": {
+          "reg_no": {
+            "title": "Reg No",
+            "type": "string"
+          },
+          "phone_number": {
+            "default": "",
+            "title": "Phone Number",
+            "type": "string"
+          },
+          "purpose": {
+            "default": "submit_grievance",
+            "title": "Purpose",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reg_no"
+        ],
+        "title": "pmkisan_grievance_send_otpArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "pmkisan_grievance_status",
+      "description": "Check PM-KISAN grievance status only after OTP verification.\n\nCall pmkisan_grievance_send_otp first with purpose=\"check_status\". Use this tool only\nafter the user shares the OTP; it verifies the OTP before calling grievance search.\n\nArgs:\n    reg_no: PM-KISAN registration number used for OTP verification.\n    raw: If True, return raw HTTP body (pretty JSON when possible).\n    aadhaar_no: Optional Aadhaar used for grievance status search after OTP verification.\n    otp: 4-digit OTP received on the registered mobile.\n    phone_number: Optional registered mobile number to include in OTP verification.\n\nReturns:\n    Grievance status summary or OTP verification error.",
+      "inputSchema": {
+        "properties": {
+          "reg_no": {
+            "default": "",
+            "title": "Reg No",
+            "type": "string"
+          },
+          "raw": {
+            "default": false,
+            "title": "Raw",
+            "type": "string"
+          },
+          "aadhaar_no": {
+            "default": null,
+            "title": "Aadhaar No",
+            "type": "string"
+          },
+          "otp": {
+            "default": null,
+            "title": "Otp",
+            "type": "string"
+          },
+          "phone_number": {
+            "default": "",
+            "title": "Phone Number",
+            "type": "string"
+          }
+        },
+        "title": "pmkisan_grievance_statusArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "pmkisan_submit_grievance",
+      "description": "Submit a PM-KISAN grievance only after OTP verification.\n\nCall pmkisan_grievance_send_otp first. Use this tool only after the user shares\nthe OTP; it verifies the OTP before calling the grievance submit API.\n\nArgs:\n    reg_no: PM-KISAN registration number used for OTP verification.\n    grievance_description: Detailed description of the grievance.\n    grievance_type: One of GRIEVANCE_TYPES.\n    aadhaar_no: Optional Aadhaar used for the grievance payload after OTP verification.\n    otp: 4-digit OTP received on the registered mobile.\n    phone_number: Optional registered mobile number to include in OTP verification.\n    raw: If True, return the raw response body.\n\nReturns:\n    Grievance submission result or OTP verification error.",
+      "inputSchema": {
+        "properties": {
+          "reg_no": {
+            "title": "Reg No",
+            "type": "string"
+          },
+          "grievance_description": {
+            "title": "Grievance Description",
+            "type": "string"
+          },
+          "grievance_type": {
+            "title": "Grievance Type",
+            "type": "string"
+          },
+          "aadhaar_no": {
+            "default": null,
+            "title": "Aadhaar No",
+            "type": "string"
+          },
+          "otp": {
+            "default": null,
+            "title": "Otp",
+            "type": "string"
+          },
+          "phone_number": {
+            "default": "",
+            "title": "Phone Number",
+            "type": "string"
+          },
+          "raw": {
+            "default": false,
+            "title": "Raw",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reg_no",
+          "grievance_description",
+          "grievance_type"
+        ],
+        "title": "pmkisan_submit_grievanceArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "reverse_geocode",
+      "description": "Reverse Geocoding to get place name from latitude and longitude.\n\nArgs:\n    latitude (float): The latitude of the location.\n    longitude (float): The longitude of the location.\n\nReturns:\n    Location: The location of the place.",
+      "inputSchema": {
+        "properties": {
+          "latitude": {
+            "title": "Latitude",
+            "type": "number"
+          },
+          "longitude": {
+            "title": "Longitude",
+            "type": "number"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "title": "reverse_geocodeArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "search_commodity",
+      "description": "Search commodity codes by fuzzy matching across terms (English, Hindi, and other Indic languages).\n\nArgs:\n    query: The commodity name to search for (any language/script)\n    max_results: Maximum number of results to return (default 5)\n    threshold: Minimum similarity score 0-1 to consider a match (default 0.6)\n\nReturns:\n    Formatted markdown table of matching commodities with codes and scores",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "max_results": {
+            "default": 5,
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "threshold": {
+            "default": 0.7,
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_commodityArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "search_documents",
+      "description": "Semantic search for documents. Use this tool to search for relevant documents.\n\nArgs:\n    query: The search query in *English* (required)\n    top_k: Maximum number of results to return (default: 10)\n    \nReturns:\n    search_results: Formatted list of documents",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "top_k": {
+            "default": 10,
+            "title": "Top K",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_documentsArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "search_pests_diseases",
+      "description": "Semantic search for **crop** pests and diseases only (e.g. crop insects, fungal/bacterial diseases of plants).\nDo NOT use for livestock/animal diseases (cattle, buffalo, goat, poultry, etc.) — use search_documents for those.\n\nArgs:\n    query: The search query in *English* (required)\n    top_k: Maximum number of results to return (default: 10)\n    \nReturns:\n    search_results: Formatted list of pests and diseases information",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "top_k": {
+            "default": 10,
+            "title": "Top K",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_pests_diseasesArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "search_sathi_seed_availability",
+      "description": "SATHI certified seed dealers with stock for ``crop_code`` at ``latitude``, ``longitude``.\n\nReturns dealer names, district, contact, aggregated bags/quintals, variety labels, and\n**Source: SATHI**. Dealer rows are capped when the catalog is very large.",
+      "inputSchema": {
+        "properties": {
+          "crop_code": {
+            "title": "Crop Code",
+            "type": "string"
+          },
+          "latitude": {
+            "title": "Latitude",
+            "type": "string"
+          },
+          "longitude": {
+            "title": "Longitude",
+            "type": "string"
+          }
+        },
+        "required": [
+          "crop_code",
+          "latitude",
+          "longitude"
+        ],
+        "title": "search_sathi_seed_availabilityArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "search_terms",
+      "description": "Search for terms using fuzzy partial string matching across all fields.\n\nArgs:\n    term: The term to search for\n    max_results: Maximum number of results to return\n    threshold: Minimum similarity score (0-1) to consider a match (default is 0.7)\n    language: Optional language to restrict search to (en/hi/transliteration/as/bn/gu/kn/ml/mr/ta/te)\n\nReturns:\n    str: Formatted string with matching results and their scores",
+      "inputSchema": {
+        "properties": {
+          "term": {
+            "title": "Term",
+            "type": "string"
+          },
+          "max_results": {
+            "default": 5,
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "threshold": {
+            "default": 0.7,
+            "title": "Threshold",
+            "type": "number"
+          },
+          "language": {
+            "default": null,
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term"
+        ],
+        "title": "search_termsArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "search_videos",
+      "description": "Semantic search for videos. Use this tool when recommending videos to the farmer.\n\nArgs:\n    query: The search query in *English* (required)\n    top_k: Maximum number of results to return (default: 3)\n    \nReturns:\n    search_results: Formatted list of videos",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "top_k": {
+            "default": 3,
+            "title": "Top K",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_videosArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "weather_forecast",
+      "description": "Get Weather forecast for a specific location.\n\nArgs:\n    latitude (float): Latitude of the location\n    longitude (float): Longitude of the location\n\nReturns:\n    str: The weather forecast for the specific location",
+      "inputSchema": {
+        "properties": {
+          "latitude": {
+            "title": "Latitude",
+            "type": "number"
+          },
+          "longitude": {
+            "title": "Longitude",
+            "type": "number"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "title": "weather_forecastArguments",
+        "type": "object"
+      }
+    }
+  ]
+}

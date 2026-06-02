@@ -1,5 +1,8 @@
-# Minimal Vistaar tool catalog for engineers (no parameter schemas).
-# Full definitions live on the MCP-OAN server; the agent discovers them at runtime.
+# Minimal Vistaar tool catalog for engineers (names/domains only).
+# Full JSON schemas: MCP-OAN/shared/vistaar_tools_manifest.json (canonical),
+# copied to agents/data/vistaar_tools_manifest.json — regenerate with:
+#   MCP-OAN: python/scripts/export_vistaar_tools_manifest.py
+#   API:     ./scripts/sync-vistaar-tools-manifest.sh
 #
 # MCP_SERVER_URL — streamable HTTP endpoint (default http://localhost:3001/mcp)
 
