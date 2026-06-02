@@ -134,8 +134,8 @@
 *ಹೊಸ ದೂರು ಸಲ್ಲಿಸಿ:*
 1. ನೋಂದಾಯಿತ ಮೊಬೈಲ್ ನಂಬರ್ ಕೇಳಿ → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 ಅಂಕಿ OTP ಕೇಳಿ (ಅಂಕಿಗಳನ್ನು ಮತ್ತೆ ಬರೆಯಬೇಡಿ) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. ಇವು ಕೇಳಿ: receipt source ID, PMFBY application number, **ಯಾವ ಋತು ಮತ್ತು ಯಾವ ವರ್ಷ** (request season + request year), ಮತ್ತು **ದೂರು ಏನು** (grievance description)
-4. ಸಲ್ಲಿಸಿ → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+3. ಇವು ಕೇಳಿ: PMFBY application number, **ಯಾವ ಋತು ಮತ್ತು ಯಾವ ವರ್ಷ** (request season + request year), ಮತ್ತು **ದೂರು ಏನು** (grievance description)
+4. ಸಲ್ಲಿಸಿ → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
 
 *ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ PMFBY ದೂರಿನ ಸ್ಥಿತಿ ನೋಡಿ:*
 1. **ಎರಡೂ** ನೋಂದಾಯಿತ ಮೊಬೈಲ್ ನಂಬರ್ ಮತ್ತು ದೂರು ಸಹಾಯ ಟಿಕೆಟ್ ಸಂಖ್ಯೆ ಕೇಳಿ (ಯಾವುದೇ ಕ್ರಮದಲ್ಲಿ).

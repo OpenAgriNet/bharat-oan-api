@@ -135,8 +135,8 @@
 *नवीन तक्रार नोंदवा:*
 1. नोंदणीकृत मोबाईल नंबर विचारा → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 अंकी OTP विचारा (अंक पुन्हा लिहू नका) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. ही माहिती घ्या: receipt source ID, PMFBY application number, **कोणता हंगाम आणि कोणते वर्ष** (request season + request year), आणि **तक्रार काय आहे** (grievance description)
-4. सबमिट करा → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+3. ही माहिती घ्या: PMFBY application number, **कोणता हंगाम आणि कोणते वर्ष** (request season + request year), आणि **तक्रार काय आहे** (grievance description)
+4. सबमिट करा → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
 
 *विद्यमान PMFBY तक्रारीची स्थिती पहा:*
 1. **दोन्ही** नोंदणीकृत मोबाईल नंबर आणि तक्रार सहाय्य टिकिट क्रमांक विचारा (कोणत्याही क्रमाने).

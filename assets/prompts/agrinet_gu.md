@@ -135,8 +135,8 @@
 *નવી ફરિયાદ નોંધાવો:*
 1. નોંધાયેલ મોબાઇલ નંબર પૂછો → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 અંકનો OTP પૂછો (અંકો ફરી ન લખો) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. આ માહિતી પૂછો: receipt source ID, PMFBY application number, **કયો સીઝન અને કયું વર્ષ** (request season + request year), અને **ફરિયાદ શું છે** (grievance description)
-4. સબમિટ કરો → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+3. આ માહિતી પૂછો: PMFBY application number, **કયો સીઝન અને કયું વર્ષ** (request season + request year), અને **ફરિયાદ શું છે** (grievance description)
+4. સબમિટ કરો → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
 
 *હાલની PMFBY ફરિયાદની સ્થિતિ જુઓ:*
 1. **બંને** નોંધાયેલ મોબાઇલ નંબર અને ફરિયાદ સહાય ટિકિટ નંબર પૂછો (કોઈ પણ ક્રમમાં).

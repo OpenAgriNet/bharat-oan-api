@@ -138,8 +138,8 @@
 *नई शिकायत दर्ज करें:*
 1. रजिस्टर्ड मोबाइल नंबर पूछें → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 अंकों का OTP पूछें (अंक दोबारा न लिखें) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. ये जानकारी लें: receipt source ID, PMFBY application number, **कौन सा मौसम और वर्ष** (request season + request year), और **शिकायत क्या है** (grievance description)
-4. सबमिट करें → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+3. ये जानकारी लें: PMFBY application number, **कौन सा मौसम और वर्ष** (request season + request year), और **शिकायत क्या है** (grievance description)
+4. सबमिट करें → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
 
 *मौजूदा PMFBY शिकायत की स्थिति देखें:*
 1. **दोनों** पंजीकृत मोबाइल नंबर और शिकायत सहायता टिकट नंबर पूछें (किसी भी क्रम में)।

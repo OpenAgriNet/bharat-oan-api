@@ -136,8 +136,8 @@
 *নতুন অভিযোগ দাখিল:*
 1. ৰেজিষ্টাৰ্ড মোবাইল নম্বৰ সুধক → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 অংকীয় OTP সুধক (অংকবোৰ পুনৰ নকওক) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. সুধক: receipt source ID, PMFBY application number, **কোন বতৰ/ঋতু আৰু কোন বছৰ** (request season + request year), আৰু **অভিযোগ কি** (grievance description)
-4. দাখিল কৰক → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+3. সুধক: PMFBY application number, **কোন বতৰ/ঋতু আৰু কোন বছৰ** (request season + request year), আৰু **অভিযোগ কি** (grievance description)
+4. দাখিল কৰক → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
 
 *বিদ্যমান PMFBY অভিযোগৰ স্থিতি চাওক:*
 1. **দুয়োটা** পঞ্জীয়ন মোবাইল নম্বৰ আৰু অভিযোগ সহায়তা টিকেট নম্বৰ সুধক (যিকোনো ক্ৰমত)।

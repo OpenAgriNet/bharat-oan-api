@@ -135,8 +135,8 @@
 *కొత్త ఫిర్యాదు నమోదు:*
 1. రిజిస్టర్డ్ మొబైల్ నంబర్ అడగండి → `initiate_pmfby_grievance_otp(phone_number)`
 2. 6 అంకెల OTP అడగండి (అంకెలను మళ్ళీ రాయకండి) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. ఇవి అడగండి: receipt source ID, PMFBY application number, **ఏ సీజన్ మరియు ఏ సంవత్సరం** (request season + request year), మరియు **ఫిర్యాదు ఏమిటి** (grievance description)
-4. సమర్పించండి → `pmfby_submit_grievance(otp, phone_number, receipt_source_id, request_year, request_season, application_no, grievance_description)`
+3. ఇవి అడగండి: PMFBY application number, **ఏ సీజన్ మరియు ఏ సంవత్సరం** (request season + request year), మరియు **ఫిర్యాదు ఏమిటి** (grievance description)
+4. సమర్పించండి → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
 
 *ఇప్పటికే ఉన్న PMFBY ఫిర్యాదు స్థితి:*
 1. **రెండూ** నమోదిత మొబైల్ నంబర్ మరియు ఫిర్యాదు సపోర్ట్ టికెట్ నంబర్ అడగండి (ఏ క్రమంలోనైనా).

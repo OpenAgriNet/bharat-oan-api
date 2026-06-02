@@ -31,6 +31,7 @@ logger = get_logger(__name__)
 
 TICKET_CATEGORY_ID = "3"
 TICKET_SUB_CATEGORY_ID = "10"
+PMFBY_GRIEVANCE_RECEIPT_SOURCE_ID = "134306"
 
 _OTP_FAILURE_SUBSTRINGS = (
     "invalid otp",
@@ -514,9 +515,11 @@ def pmfby_submit_grievance(
 ) -> str:
     """Submit PMFBY grievance via Beckn `/init` (pmfby-grievance) after OTP verification."""
     try:
+        # PMFBY grievance receipt_source_id is intentionally hardcoded per integration requirement.
+        static_receipt_source_id = PMFBY_GRIEVANCE_RECEIPT_SOURCE_ID
+
         _ = _validate_otp(otp)
         _require_nonempty(phone_number, "Please share your registered mobile number.")
-        _require_nonempty(receipt_source_id, "Please share the receipt source ID.")
         _require_nonempty(request_year, "Please share the request year.")
         raw_season = _require_nonempty(request_season, "Please share the request season.")
 
@@ -538,7 +541,7 @@ def pmfby_submit_grievance(
         payload = PMfbyGrievanceInitRequest(
             transaction_id=transaction_id,
             phone_number=phone_number,
-            receipt_source_id=receipt_source_id.strip(),
+            receipt_source_id=static_receipt_source_id.strip(),
             request_year=request_year.strip(),
             request_season=season_api,
             application_no=application_no.strip(),
