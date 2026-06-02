@@ -40,7 +40,9 @@ for line in \
   'ENVIRONMENT=local' \
   'REDIS_HOST=127.0.0.1' \
   'REDIS_PORT=6379' \
-  'USE_MEMORY_CACHE=true'; do
+  'USE_MEMORY_CACHE=true' \
+  'LLM_AGRINET_MODEL_NAME=gpt-4.1' \
+  'LLM_MODERATION_MODEL_NAME=gpt-4.1'; do
   key="${line%%=*}"
   if ! grep -q "^${key}=" "$API_ENV" 2>/dev/null; then
     echo "$line" >> "$API_ENV"

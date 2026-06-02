@@ -11,6 +11,17 @@ redis_ok() {
   redis-cli -h "${REDIS_HOST:-127.0.0.1}" -p "${REDIS_PORT:-6379}" ping 2>/dev/null | grep -q PONG
 }
 
+free_ports() {
+  for port in 3001 8000; do
+    pids=$(lsof -ti "tcp:${port}" 2>/dev/null || true)
+    if [[ -n "${pids}" ]]; then
+      echo "Freeing port ${port} (pids: ${pids})"
+      kill -9 ${pids} 2>/dev/null || true
+    fi
+  done
+  sleep 1
+}
+
 start_redis() {
   if [[ "${USE_MEMORY_CACHE:-}" == "true" ]] || grep -q '^USE_MEMORY_CACHE=true' "$ROOT/.env" 2>/dev/null; then
     echo "Using in-memory cache (USE_MEMORY_CACHE=true) — skipping Redis"
@@ -57,6 +68,7 @@ if [[ "${1:-}" == "status" ]]; then
   exit 0
 fi
 
+free_ports
 start_redis
 stop_services
 
