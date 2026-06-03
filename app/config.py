@@ -64,14 +64,14 @@ class Settings(BaseSettings):
     uvicorn_workers: int = os.cpu_count() or 1
 
     # Redis Settings
-    redis_host: str = "localhost"
-    redis_port: int = 6379
-    redis_db: int = 0
-    redis_key_prefix: str = "sva-cache-"
-    redis_socket_connect_timeout: int = 10
-    redis_socket_timeout: int = 10
-    redis_max_connections: int = 100
-    redis_retry_on_timeout: bool = True
+    redis_host: str = os.getenv("REDIS_HOST", "localhost")
+    redis_port: int = int(os.getenv("REDIS_PORT", "6379"))
+    redis_db: int = int(os.getenv("REDIS_DB", "0"))
+    redis_key_prefix: str = os.getenv("REDIS_KEY_PREFIX", "sva-cache-")
+    redis_socket_connect_timeout: int = int(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "10"))
+    redis_socket_timeout: int = int(os.getenv("REDIS_SOCKET_TIMEOUT", "10"))
+    redis_max_connections: int = int(os.getenv("REDIS_MAX_CONNECTIONS", "100"))
+    redis_retry_on_timeout: bool = os.getenv("REDIS_RETRY_ON_TIMEOUT", "true").strip().lower() in ("1", "true", "yes", "on")
 
     # Cache Configuration
     default_cache_ttl: int = 60 * 60 * 24  # 24 hours
@@ -83,6 +83,12 @@ class Settings(BaseSettings):
 
     # External Service URLs
     telemetry_api_url: str = os.getenv("TELEMETRY_API_URL", "https://dev-vistaar.da.gov.in/observability-service/action/data/v3/telemetry")
+    telemetry_origin: str = os.getenv("TELEMETRY_ORIGIN", "https://dev-vistaar.da.gov.in")
+    telemetry_referer: str = os.getenv("TELEMETRY_REFERER", "https://dev-vistaar.da.gov.in/chat")
+    telemetry_channel: Optional[str] = os.getenv("TELEMETRY_CHANNEL")
+    telemetry_auth_token: Optional[str] = os.getenv("TELEMETRY_AUTH_TOKEN")
+    telemetry_auth_key: Optional[str] = os.getenv("TELEMETRY_AUTH_KEY")
+    telemetry_auth_secret: Optional[str] = os.getenv("TELEMETRY_AUTH_SECRET")
     bhashini_api_url: str = ""
     ollama_endpoint_url: Optional[str] = None
     marqo_endpoint_url: Optional[str] = None

@@ -2,6 +2,20 @@ name: Build and Push to GCP Artifact Registry
 
 on:
   workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Branch/environment name to use for image tags and GitHub environment
+        required: true
+        default: bh-dev
+        type: choice
+        options:
+          - bh-dev
+          - main
+      push_image:
+        description: Push the built Docker image to Artifact Registry
+        required: true
+        default: true
+        type: boolean
   push:
     branches:
       - main
@@ -18,7 +32,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     # Use the target branch name as the environment (GitHub Environments must match branch names: main, bh-dev)
-    environment: ${{ github.base_ref || github.ref_name }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target_environment || github.base_ref || github.ref_name }}
 
     steps:
       - name: Checkout repository
@@ -33,6 +47,8 @@ jobs:
           # Determine the branch name depending on event type
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BRANCH="${{ github.base_ref }}"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            BRANCH="${{ inputs.target_environment }}"
           else
             BRANCH="${{ github.ref_name }}"
           fi
@@ -76,7 +92,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Push Docker image
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push_image)
         run: |
           docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ steps.set-tags.outputs.LATEST_TAG }}
           docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ steps.set-tags.outputs.BUILD_TAG }}

@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
@@ -30,11 +31,12 @@ async def chat_endpoint(
     Requires JWT authentication.
     """
     session_id, history = await get_session_history(request.session_id)
+    qid = request.qid or str(uuid.uuid4())
     channel = current_user.get("channel", "BharatVistaar")
     authenticated_user = current_user.get("mobile")
 
     logger.info(
-        f"Chat request received - session_id: {session_id}, user_id: {request.user_id}, "
+        f"Chat request received - session_id: {session_id}, qid: {qid}, user_id: {request.user_id}, "
         f"authenticated_user: {authenticated_user}, channel: {channel}, source_lang: {request.source_lang}, "
         f"target_lang: {request.target_lang}, query: {request.query}"
     )
@@ -55,8 +57,11 @@ async def chat_endpoint(
             is_image_analysis=is_image_analysis,
             latitude=request.latitude,
             longitude=request.longitude,
+            qid=qid,
+            current_user=current_user,
         ),
         media_type="text/event-stream",
+        background=background_tasks,
     )
 
 
@@ -109,6 +114,9 @@ async def chat_analyze_image_endpoint(
             is_image_analysis=True,
             latitude=latitude,
             longitude=longitude,
+            qid=str(uuid.uuid4()),
+            current_user=current_user,
         ),
         media_type="text/event-stream",
+        background=background_tasks,
     )

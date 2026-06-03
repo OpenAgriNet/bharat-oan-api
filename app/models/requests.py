@@ -1,14 +1,45 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Literal
+from pydantic import BaseModel, Field, field_validator
+from typing import Any, Dict, Optional, Literal
 
 class ChatRequest(BaseModel):
     query: str = Field(..., description="The user's chat query")
     session_id: Optional[str] = Field(None, description="Session ID for maintaining conversation context")
+    qid: Optional[str] = Field(None, description="Question ID for telemetry correlation")
     source_lang: str = Field('hi', description="Source language code")
     target_lang: str = Field('hi', description="Target language code")
     user_id: str = Field('anonymous', description="User identifier")
     latitude: Optional[float] = Field(None, description="User latitude for geocode lookup")
     longitude: Optional[float] = Field(None, description="User longitude for geocode lookup")
+
+class TelemetryFeedbackRequest(BaseModel):
+    qid: str = Field(..., description="Question or message ID for telemetry correlation")
+    session_id: str = Field(..., description="Session ID")
+    message_id: Optional[str] = Field(None, description="Assistant message ID")
+    feedback_type: str = Field(..., description="Feedback type, e.g. like or dislike")
+    feedback_text: str = Field("", description="Feedback text")
+    question_text: str = Field("", description="Question text")
+    answer_text: str = Field("", description="Answer text")
+
+class TelemetryErrorRequest(BaseModel):
+    qid: str = Field(..., description="Question ID for telemetry correlation")
+    session_id: str = Field(..., description="Session ID")
+    error_text: str = Field(..., description="Error text")
+    question_text: Optional[str] = Field(None, description="Question text")
+    message_id: Optional[str] = Field(None, description="Related message ID")
+
+class GenericTelemetryEventRequest(BaseModel):
+    event_name: str = Field(..., description="Client telemetry event name")
+    category: str = Field(..., description="Client telemetry event category")
+    time: str = Field(..., description="Client event timestamp")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Client event metadata")
+
+    @field_validator("event_name", "category")
+    @classmethod
+    def validate_required_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be empty")
+        return value
 
 class TranscribeRequest(BaseModel):
     audio_content: str = Field(..., description="Base64 encoded audio content")
