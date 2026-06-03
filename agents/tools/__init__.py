@@ -16,6 +16,7 @@ from agents.tools.weather import weather_forecast
 from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
 from agents.tools.maps import reverse_geocode, forward_geocode
+from agents.tools.smam_scheme_status import check_smam_scheme_status
 from agents.tools.gfr import gfr_get_recommendations, gfr_get_crop_registries
 from agents.tools.sathi_seed import (
     get_sathi_crop_groups,
@@ -131,6 +132,11 @@ TOOLS = [
     ),
     Tool(
         search_sathi_seed_availability,
+        takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        check_smam_scheme_status,
         takes_ctx=False,
         strict=False,
     ),
