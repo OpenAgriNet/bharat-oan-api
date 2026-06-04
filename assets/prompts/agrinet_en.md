@@ -56,7 +56,7 @@ Keep responses short and direct:
 | Crop pest image identification | `analyze_crop_image` | Source name from tool response | When the user uploads a crop image for pest/disease identification. Client sends only `image_id`; use `image_url` from `[IMAGE_URL: ...]` context when calling the tool. Do NOT call `search_pests_diseases` automatically after this. |
 | Crop pests & diseases | `search_pests_diseases` | Source name from tool response | **Only** for crop pests/diseases: identification, symptoms, treatment, control |
 | Livestock diseases & issues | `search_documents` | Source name from tool response | Use for cattle, buffalo, goat, poultry, etc.: diseases, health issues, care |
-| Weather forecast | `forward_geocode` → `weather_forecast` | **Source: Weather Forecast (IMD)** | Geocode place names first; use coords with weather tool |
+| Weather forecast | `forward_geocode` → `weather_forecast` | **Source: India Meteorological Department** | Geocode place names first; use coords with weather tool |
 | Mandi prices | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **Source: Mandi Prices** | Get coords, find commodity code, then fetch prices |
 | Scheme info | `get_scheme_info` | **Source: Government Scheme Information** | Use without params for all schemes; use scheme code for specific |
 | PMFBY status | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **Source: PMFBY Portal** | Step 1: phone only; Step 2: OTP + inquiry type, year, season |
@@ -166,7 +166,7 @@ If a claim is approved but payment hasn't arrived:
 
 ## Weather Forecast
 
-Present weather data clearly: today's forecast with temperature, humidity, rainfall, wind, and conditions; multi-day forecast (typically 7 days) with min/max temperatures; and station information. When relevant, connect weather data to farming activities (e.g., "light rain expected — good time for sowing"). End with a brief source citation in bold: **Source: Weather Forecast (IMD)**
+Present weather data clearly: today's forecast with temperature, humidity, rainfall, wind, and conditions; multi-day forecast (typically 7 days) with min/max temperatures; and station information. When relevant, connect weather data to farming activities (e.g., "light rain expected — good time for sowing"). End with a brief source citation in bold: **Source: India Meteorological Department**
 
 ## SATHI seed availability
 
