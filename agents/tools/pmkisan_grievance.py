@@ -578,13 +578,13 @@ class GrievanceInitRequest(BaseModel):
         cls,
         transaction_id: str,
         identifier_value: str,
-        identifier_type: Literal["reg-number", "aad-number"],
+        identifier_type: Literal["reg-number"],
         grievance_type_code: str,
         grievance_description: str,
         customer_name: str = "Customer Name",
         phone: str = ""
     ) -> "GrievanceInitRequest":
-        identifier_name = "Registration Number" if identifier_type == "reg-number" else "Aadhaar Number"
+        identifier_name = "Registration Number"
         return cls(
             context=Context(action="init", transaction_id=transaction_id),
             message={
@@ -685,7 +685,6 @@ async def pmkisan_submit_grievance(
     reg_no: str,
     grievance_description: str,
     grievance_type: str,
-    aadhaar_no: Optional[str] = None,
     otp: Optional[str] = None,
     phone_number: str = "",
     raw: bool = False,
@@ -697,10 +696,9 @@ async def pmkisan_submit_grievance(
     the OTP; it verifies the OTP before calling the grievance submit API.
 
     Args:
-        reg_no: PM-KISAN registration number used for OTP verification.
+        reg_no: PM-KISAN registration number used for OTP verification and grievance submission.
         grievance_description: Detailed description of the grievance.
         grievance_type: One of GRIEVANCE_TYPES.
-        aadhaar_no: Optional Aadhaar used for the grievance payload after OTP verification.
         otp: 4-digit OTP received on the registered mobile.
         phone_number: Optional registered mobile number to include in OTP verification.
         raw: If True, return the raw response body.
@@ -709,17 +707,11 @@ async def pmkisan_submit_grievance(
         Grievance submission result or OTP verification error.
     """
     try:
-        identifier_value: Optional[str] = None
-        identifier_type: Optional[Literal["reg-number", "aad-number"]] = None
+        if not reg_no or not reg_no.strip():
+            raise ModelRetry("Please provide the PM-KISAN Registration Number.")
 
-        if aadhaar_no and aadhaar_no.strip():
-            identifier_value = aadhaar_no.strip()
-            identifier_type = "aad-number"
-        elif reg_no and reg_no.strip():
-            identifier_value = reg_no.strip()
-            identifier_type = "reg-number"
-        else:
-            raise ModelRetry("Please provide either a PM-KISAN Registration Number or an Aadhaar Number.")
+        identifier_value = reg_no.strip()
+        identifier_type: Literal["reg-number"] = "reg-number"
 
         if not grievance_type or grievance_type not in GRIEVANCE_MAPPING:
             choices = '", "'.join(GRIEVANCE_TYPES)
@@ -727,11 +719,6 @@ async def pmkisan_submit_grievance(
 
         if not grievance_description or len(grievance_description.strip()) < 10:
             raise ModelRetry("Please provide a brief grievance description (at least 10 characters).")
-
-        if not reg_no or not reg_no.strip():
-            raise ModelRetry(
-                "Please provide the PM-KISAN Registration Number used for OTP verification."
-            )
 
         reg_no_clean = reg_no.strip()
         if not otp or not str(otp).strip():
@@ -794,7 +781,6 @@ async def pmkisan_grievance_status(
     ctx: RunContext[FarmerContext],
     reg_no: str = "",
     raw: bool = False,
-    aadhaar_no: Optional[str] = None,
     otp: Optional[str] = None,
     phone_number: str = "",
 ) -> str:
@@ -805,9 +791,8 @@ async def pmkisan_grievance_status(
     after the user shares the OTP; it verifies the OTP before calling grievance search.
 
     Args:
-        reg_no: PM-KISAN registration number used for OTP verification.
+        reg_no: PM-KISAN registration number used for OTP verification and status lookup.
         raw: If True, return raw HTTP body (pretty JSON when possible).
-        aadhaar_no: Optional Aadhaar used for grievance status search after OTP verification.
         otp: 4-digit OTP received on the registered mobile.
         phone_number: Optional registered mobile number to include in OTP verification.
 
@@ -815,24 +800,13 @@ async def pmkisan_grievance_status(
         Grievance status summary or OTP verification error.
     """
     try:
-        identifier_value: Optional[str] = None
-        identifier_type: Optional[Literal["reg-number", "aad-number"]] = None
-
-        if aadhaar_no and str(aadhaar_no).strip():
-            identifier_value = str(aadhaar_no).strip()
-            identifier_type = "aad-number"
-        elif reg_no and reg_no.strip():
-            identifier_value = reg_no.strip()
-            identifier_type = "reg-number"
-        else:
-            raise ModelRetry(
-                "Please provide either a PM-KISAN Registration Number or an Aadhaar Number to check grievance status."
-            )
-
         if not reg_no or not reg_no.strip():
             raise ModelRetry(
-                "Please provide the PM-KISAN Registration Number used for OTP verification."
+                "Please provide the PM-KISAN Registration Number to check grievance status."
             )
+
+        identifier_value = reg_no.strip()
+        identifier_type: Literal["reg-number"] = "reg-number"
 
         reg_no_clean = reg_no.strip()
         if not otp or not str(otp).strip():
@@ -845,7 +819,7 @@ async def pmkisan_grievance_status(
         if otp_error:
             return otp_error
 
-        identifier_name = "Registration Number" if identifier_type == "reg-number" else "Aadhaar Number"
+        identifier_name = "Registration Number"
 
         session_id = ctx.deps.session_id
         transaction_id = generate_transaction_id(session_id, identifier_value)
