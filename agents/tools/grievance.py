@@ -123,15 +123,6 @@ class ServiceEnvelope(BaseModel):
 # Decrypted response schemas
 # --------------------------------------------------------------------------------------
 
-class AadhaarTokenResponse(BaseModel):
-    Responce: str  # service returns "True"/"False" spelled oddly
-    AadhaarToken: Optional[str] = None
-    message: Optional[str] = None
-
-    def ok(self) -> bool:
-        return str(self.Responce).lower() == "true"
-
-
 class GrievanceStatusDetail(BaseModel):
     Reg_No: Optional[str] = None
     GrievanceDate: Optional[str] = None
@@ -192,42 +183,17 @@ class GenericMessageResponse(BaseModel):
 # Identity helpers
 # --------------------------------------------------------------------------------------
 
-def _is_aadhaar(identity_no: str) -> bool:
-    return identity_no.isdigit() and len(identity_no) == 12
-
-
-def _aadhaar_token(client: GrievanceClient, identity_no: str) -> Optional[str]:
-    body = {
-        "Type": "IdentityNo_Details",
-        "TokenNo": client.token,
-        "IdentityNo": identity_no,
-    }
-    env = client.post_encrypted("/GrievanceAadhaarToken", body)
-    data = AadhaarTokenResponse.model_validate(env.decrypt(client.crypto))
-    if data.ok() and data.AadhaarToken:
-        return data.AadhaarToken
-    logger.warning(f"Aadhaar token lookup failed: {data.message or 'unknown error'}")
-    return None
-
-
-def _resolve_identity(client: GrievanceClient, identity_no: str, purpose: Literal["create", "status"]) -> Tuple[str, str]:
+def _resolve_identity(identity_no: str, purpose: Literal["create", "status"]) -> Tuple[str, str]:
     """
-    Returns (actual_identity_value, type_field)
-    - For Aadhaar, get token and use Type 'IdentityNo_Details' (create) or 'IdentityNo_Status' (status)
-    - For Reg_No, use Type 'Reg_No_Details' (create) or 'Reg_No_Status' (status)
+    Returns (registration number, type_field) for PM-KISAN Reg_No flow.
     """
-    if _is_aadhaar(identity_no):
-        token = _aadhaar_token(client, identity_no)
-        if not token:
-            raise ModelRetry(
-                "The provided Aadhaar number is not registered with PM-KISAN. "
-                "Please provide the Aadhaar number registered with PM-KISAN or your PM-KISAN registration number."
-            )
-        type_map = {"create": "IdentityNo_Details", "status": "IdentityNo_Status"}
-        return token, type_map[purpose]
-    else:
-        type_map = {"create": "Reg_No_Details", "status": "Reg_No_Status"}
-        return identity_no, type_map[purpose]
+    if identity_no.isdigit() and len(identity_no) == 12:
+        raise ModelRetry(
+            "Aadhaar number cannot be used for PM-KISAN grievances. "
+            "Please provide your PM-KISAN registration number."
+        )
+    type_map = {"create": "Reg_No_Details", "status": "Reg_No_Status"}
+    return identity_no, type_map[purpose]
 
 
 # --------------------------------------------------------------------------------------
@@ -295,7 +261,7 @@ def submit_pmkisan_grievance(identity_no: str, grievance_description: str, griev
     Create and submit a grievance to the PM-KISAN portal.
 
     Args:
-        identity_no: PM-KISAN Registration Number (11-character alphanumeric string) or 12-digit Aadhaar number registered with PM-KISAN.
+        identity_no: PM-KISAN Registration Number (11-character alphanumeric string).
         grievance_description: Description of the grievance (plain text).
         grievance_type: Type of grievance to submit.
 
@@ -311,7 +277,7 @@ def submit_pmkisan_grievance(identity_no: str, grievance_description: str, griev
             raise ModelRetry("Please provide a brief grievance description.")
 
         client = GrievanceClient.from_env()
-        identity_value, type_field = _resolve_identity(client, identity_no.strip(), purpose="create")
+        identity_value, type_field = _resolve_identity(identity_no.strip(), purpose="create")
 
         body = CreateGrievanceRequest.build(
             type_field=type_field,
@@ -351,10 +317,10 @@ def submit_pmkisan_grievance(identity_no: str, grievance_description: str, griev
 @observe(name="tool:grievance_status", as_type="tool")
 def grievance_status(identity_no: str) -> str:
     """
-    Check grievance status by PM-KISAN Registration Number or Aadhaar (registered).
+    Check grievance status by PM-KISAN Registration Number.
 
     Args:
-        identity_no: PM-KISAN Registration Number (11-character alphanumeric string) or 12-digit Aadhaar registered with PM-KISAN.
+        identity_no: PM-KISAN Registration Number (11-character alphanumeric string).
 
     Returns:
         A user-friendly status string (registration number, dates, officer reply, etc.),
@@ -362,7 +328,7 @@ def grievance_status(identity_no: str) -> str:
     """
     try:
         client = GrievanceClient.from_env()
-        identity_value, type_field = _resolve_identity(client, identity_no.strip(), purpose="status")
+        identity_value, type_field = _resolve_identity(identity_no.strip(), purpose="status")
 
         body = StatusRequest.build(
             type_field=type_field,
