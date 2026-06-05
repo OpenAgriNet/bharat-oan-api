@@ -61,6 +61,7 @@ GRIEVANCE_MAPPING: Dict[str, str] = _load_grievance_mapping(_GRIEVANCE_JSON_PATH
 GRIEVANCE_TYPES: List[str] = list(GRIEVANCE_MAPPING.keys())
 
 _REGISTRATION_NUMBER_LABEL = "Registration Number"
+_BAP_ENDPOINT_NOT_CONFIGURED_MSG = "BAP_ENDPOINT is not configured in environment."
 
 # -----------------------
 # Response formatting
@@ -428,7 +429,7 @@ async def _request_pm_kisan_otp(
     purpose: str,
 ) -> str:
     if not BAP_ENDPOINT:
-        raise ModelRetry("BAP_ENDPOINT is not configured in environment.")
+        raise ModelRetry(_BAP_ENDPOINT_NOT_CONFIGURED_MSG)
 
     reg_no_clean = reg_no.strip()
     transaction_id = _generate_pm_kisan_otp_transaction_id(ctx.deps.session_id, reg_no_clean)
@@ -462,7 +463,7 @@ async def _verify_pm_kisan_otp(
         return "Invalid OTP format. Please provide the 4-digit OTP received via SMS."
 
     if not BAP_ENDPOINT:
-        raise ModelRetry("BAP_ENDPOINT is not configured in environment.")
+        raise ModelRetry(_BAP_ENDPOINT_NOT_CONFIGURED_MSG)
 
     reg_no_clean = reg_no.strip()
     transaction_id = _generate_pm_kisan_otp_transaction_id(ctx.deps.session_id, reg_no_clean)
@@ -689,7 +690,7 @@ async def _submit_grievance_init_request(
     payload = request_obj.model_dump(by_alias=True)
 
     if not BAP_ENDPOINT:
-        raise ModelRetry("BAP_ENDPOINT is not configured in environment.")
+        raise ModelRetry(_BAP_ENDPOINT_NOT_CONFIGURED_MSG)
 
     endpoint = f"{BAP_ENDPOINT.rstrip('/')}/init"
     logger.info(f"[PM KISAN GRIEVANCE] Request URL: {endpoint}")
