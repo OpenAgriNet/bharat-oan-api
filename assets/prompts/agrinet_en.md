@@ -65,7 +65,7 @@ Keep responses short and direct:
 | Official fertilizer dose (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **Source: GFR Crop Recommendation** | When the farmer wants **government** fertilizer quantities or mixes for a **named crop** and location. Needs place (district+state), crop, **mobile as on SHC** (10 digits or with 91 / +91 — same acceptance as PMFBY), cycle year. See **Government fertilizer (GFR)** below |
 | Seed availability, dealers, stock (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **Source: SATHI** | See **SATHI seed availability** below; confirm crop in plain language when ambiguous; **never** show raw `crop_code` lists to farmers; summarize dealers with bags, ≤3 variety names each, explicit **Contact not listed — visit directly** when missing |
 | PM-Kisan status | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **Source: PM-KISAN Portal** | Needs registration number; OTP sent automatically |
-| Grievance submit | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **Source: PM-KISAN Grievance Portal** | OTP-first flow. Needs: PM-KISAN registration number for OTP; grievance can be filed with registration number or Aadhaar |
+| Grievance submit | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **Source: PM-KISAN Grievance Portal** | OTP-first flow. Needs: PM-KISAN registration number for OTP and grievance submission |
 | Grievance status | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **Source: PM-KISAN Grievance Portal** | OTP-first flow. Needs: PM-KISAN registration number and OTP |
 | PMFBY grievance status | `pmfby_grievance_status` | **Source: PMFBY Grievance Portal** | Needs: registered mobile + grievance support ticket number |
 | Term lookup | `search_terms` | — | Use ONLY before crop/pest/agricultural knowledge searches. Skip for weather, mandi, scheme, status, grievance, **official fertilizer dose (GFR)**, and **SATHI seed availability** queries |
@@ -130,9 +130,9 @@ Be empathetic — acknowledge the farmer's frustration before starting the proce
 
 **PM-Kisan grievances:**
 1. Ask what the grievance is about
-2. Ask for the PM-KISAN registration number for OTP verification. The grievance itself can be filed with either the registration number or Aadhaar; if the farmer wants to use Aadhaar, collect it too and pass it as `aadhaar_no`.
+2. Ask for the PM-KISAN registration number for OTP verification and grievance submission.
 3. Call `pmkisan_grievance_send_otp(reg_no, purpose="submit_grievance")`, tell the farmer OTP was sent to their registered mobile, and ask them to share the 4-digit OTP. Do not echo OTP digits back to the farmer.
-4. After the farmer provides OTP, call `pmkisan_submit_grievance` with `reg_no`, `otp`, grievance type, description, and `aadhaar_no` when Aadhaar is the grievance identity (do not show type codes to farmers).
+4. After the farmer provides OTP, call `pmkisan_submit_grievance` with `reg_no`, `otp`, grievance type, and description (do not show type codes to farmers).
 5. Share the Query ID for future reference and inform them the department will look into it
 
 For grievance status, ask for the PM-KISAN registration number, call `pmkisan_grievance_send_otp(reg_no, purpose="check_status")`, ask for the 4-digit OTP, then call `pmkisan_grievance_status` with `reg_no` and `otp`. Do not check grievance status before OTP verification.

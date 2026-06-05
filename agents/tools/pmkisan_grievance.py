@@ -60,6 +60,9 @@ def _load_grievance_mapping(path: str) -> Dict[str, str]:
 GRIEVANCE_MAPPING: Dict[str, str] = _load_grievance_mapping(_GRIEVANCE_JSON_PATH)
 GRIEVANCE_TYPES: List[str] = list(GRIEVANCE_MAPPING.keys())
 
+_REGISTRATION_NUMBER_LABEL = "Registration Number"
+_BAP_ENDPOINT_NOT_CONFIGURED_MSG = "BAP_ENDPOINT is not configured in environment."
+
 # -----------------------
 # Response formatting
 # -----------------------
@@ -216,7 +219,7 @@ class GatewayResponse(BaseModel):
             "Farmer_Name": "Farmer Name",
             "Father_Name": "Father Name",
             "Gender": "Gender",
-            "Reg_No": "Registration Number",
+            "Reg_No": _REGISTRATION_NUMBER_LABEL,
             "StateName": "State",
             "DistrictName": "District",
             "BlockName": "Block",
@@ -366,7 +369,7 @@ def _build_pm_kisan_otp_init_payload(reg_no: str, transaction_id: str) -> Dict[s
                                         "list": [
                                             {
                                                 "descriptor": {
-                                                    "name": "Registration Number",
+                                                    "name": _REGISTRATION_NUMBER_LABEL,
                                                     "code": "reg-number",
                                                 },
                                                 "value": reg_no,
@@ -426,7 +429,7 @@ async def _request_pm_kisan_otp(
     purpose: str,
 ) -> str:
     if not BAP_ENDPOINT:
-        raise ModelRetry("BAP_ENDPOINT is not configured in environment.")
+        raise ModelRetry(_BAP_ENDPOINT_NOT_CONFIGURED_MSG)
 
     reg_no_clean = reg_no.strip()
     transaction_id = _generate_pm_kisan_otp_transaction_id(ctx.deps.session_id, reg_no_clean)
@@ -460,7 +463,7 @@ async def _verify_pm_kisan_otp(
         return "Invalid OTP format. Please provide the 4-digit OTP received via SMS."
 
     if not BAP_ENDPOINT:
-        raise ModelRetry("BAP_ENDPOINT is not configured in environment.")
+        raise ModelRetry(_BAP_ENDPOINT_NOT_CONFIGURED_MSG)
 
     reg_no_clean = reg_no.strip()
     transaction_id = _generate_pm_kisan_otp_transaction_id(ctx.deps.session_id, reg_no_clean)
@@ -578,13 +581,12 @@ class GrievanceInitRequest(BaseModel):
         cls,
         transaction_id: str,
         identifier_value: str,
-        identifier_type: Literal["reg-number", "aad-number"],
+        identifier_type: Literal["reg-number"],
         grievance_type_code: str,
         grievance_description: str,
         customer_name: str = "Customer Name",
         phone: str = ""
     ) -> "GrievanceInitRequest":
-        identifier_name = "Registration Number" if identifier_type == "reg-number" else "Aadhaar Number"
         return cls(
             context=Context(action="init", transaction_id=transaction_id),
             message={
@@ -602,7 +604,7 @@ class GrievanceInitRequest(BaseModel):
                                             "descriptor": {"name": "Registration Details", "code": "reg-details"},
                                             "list": [
                                                 {
-                                                    "descriptor": {"name": identifier_name, "code": identifier_type},
+                                                    "descriptor": {"name": _REGISTRATION_NUMBER_LABEL, "code": identifier_type},
                                                     "value": identifier_value,
                                                     "display": True
                                                 }
@@ -633,6 +635,78 @@ class GrievanceInitRequest(BaseModel):
                 }
             }
         )
+
+
+def _format_grievance_tool_response(response: httpx.Response, raw: bool) -> str:
+    if raw:
+        return _format_http_response_raw(response)
+    return _format_grievance_response_formatted(response)
+
+
+def _validate_submit_grievance_inputs(
+    reg_no: str,
+    grievance_type: str,
+    grievance_description: str,
+    otp: Optional[str],
+) -> tuple[str, str]:
+    """Return (identifier_value, reg_no_clean) or raise ModelRetry."""
+    if not reg_no or not reg_no.strip():
+        raise ModelRetry("Please provide the PM-KISAN Registration Number.")
+    identifier_value = reg_no.strip()
+    if not grievance_type or grievance_type not in GRIEVANCE_MAPPING:
+        choices = '", "'.join(GRIEVANCE_TYPES)
+        raise ModelRetry(f'Invalid grievance type: "{grievance_type}". Please select from: "{choices}".')
+    if not grievance_description or len(grievance_description.strip()) < 10:
+        raise ModelRetry("Please provide a brief grievance description (at least 10 characters).")
+    reg_no_clean = reg_no.strip()
+    if not otp or not str(otp).strip():
+        raise ModelRetry(
+            "OTP verification is required before submitting a grievance. "
+            "First call pmkisan_grievance_send_otp, then call this tool with the received OTP."
+        )
+    return identifier_value, reg_no_clean
+
+
+async def _submit_grievance_init_request(
+    ctx: RunContext[FarmerContext],
+    identifier_value: str,
+    grievance_type: str,
+    grievance_description: str,
+    phone_number: str,
+    raw: bool,
+) -> str:
+    session_id = ctx.deps.session_id
+    transaction_id = generate_transaction_id(session_id, identifier_value)
+    identifier_type: Literal["reg-number"] = "reg-number"
+
+    request_obj = GrievanceInitRequest.build(
+        transaction_id=transaction_id,
+        identifier_value=identifier_value,
+        identifier_type=identifier_type,
+        grievance_type_code=GRIEVANCE_MAPPING[grievance_type],
+        grievance_description=grievance_description.strip(),
+        phone=phone_number.strip() if phone_number else "",
+    )
+    payload = request_obj.model_dump(by_alias=True)
+
+    if not BAP_ENDPOINT:
+        raise ModelRetry(_BAP_ENDPOINT_NOT_CONFIGURED_MSG)
+
+    endpoint = f"{BAP_ENDPOINT.rstrip('/')}/init"
+    logger.info(f"[PM KISAN GRIEVANCE] Request URL: {endpoint}")
+    logger.info(f"[PM KISAN GRIEVANCE] Payload: {json.dumps(payload)}")
+
+    async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
+        response = await client.post(endpoint, json=payload)
+
+    logger.info(f"[PM KISAN GRIEVANCE] Response Status: {response.status_code}")
+    logger.info(f"[PM KISAN GRIEVANCE] Response Body: {response.text[:500]}")
+
+    if response.status_code != 200:
+        logger.error(f"Grievance submission failed with status {response.status_code}")
+
+    return _format_grievance_tool_response(response, raw)
+
 
 # --------------------------------------------------------------------------------------
 # Exported Tools
@@ -685,7 +759,6 @@ async def pmkisan_submit_grievance(
     reg_no: str,
     grievance_description: str,
     grievance_type: str,
-    aadhaar_no: Optional[str] = None,
     otp: Optional[str] = None,
     phone_number: str = "",
     raw: bool = False,
@@ -697,10 +770,9 @@ async def pmkisan_submit_grievance(
     the OTP; it verifies the OTP before calling the grievance submit API.
 
     Args:
-        reg_no: PM-KISAN registration number used for OTP verification.
+        reg_no: PM-KISAN registration number used for OTP verification and grievance submission.
         grievance_description: Detailed description of the grievance.
         grievance_type: One of GRIEVANCE_TYPES.
-        aadhaar_no: Optional Aadhaar used for the grievance payload after OTP verification.
         otp: 4-digit OTP received on the registered mobile.
         phone_number: Optional registered mobile number to include in OTP verification.
         raw: If True, return the raw response body.
@@ -709,72 +781,15 @@ async def pmkisan_submit_grievance(
         Grievance submission result or OTP verification error.
     """
     try:
-        identifier_value: Optional[str] = None
-        identifier_type: Optional[Literal["reg-number", "aad-number"]] = None
-
-        if aadhaar_no and aadhaar_no.strip():
-            identifier_value = aadhaar_no.strip()
-            identifier_type = "aad-number"
-        elif reg_no and reg_no.strip():
-            identifier_value = reg_no.strip()
-            identifier_type = "reg-number"
-        else:
-            raise ModelRetry("Please provide either a PM-KISAN Registration Number or an Aadhaar Number.")
-
-        if not grievance_type or grievance_type not in GRIEVANCE_MAPPING:
-            choices = '", "'.join(GRIEVANCE_TYPES)
-            raise ModelRetry(f'Invalid grievance type: "{grievance_type}". Please select from: "{choices}".')
-
-        if not grievance_description or len(grievance_description.strip()) < 10:
-            raise ModelRetry("Please provide a brief grievance description (at least 10 characters).")
-
-        if not reg_no or not reg_no.strip():
-            raise ModelRetry(
-                "Please provide the PM-KISAN Registration Number used for OTP verification."
-            )
-
-        reg_no_clean = reg_no.strip()
-        if not otp or not str(otp).strip():
-            raise ModelRetry(
-                "OTP verification is required before submitting a grievance. "
-                "First call pmkisan_grievance_send_otp, then call this tool with the received OTP."
-            )
-
+        identifier_value, reg_no_clean = _validate_submit_grievance_inputs(
+            reg_no, grievance_type, grievance_description, otp
+        )
         otp_error = await _verify_pm_kisan_otp(ctx, reg_no_clean, str(otp), phone_number)
         if otp_error:
             return otp_error
-
-        session_id = ctx.deps.session_id
-        transaction_id = generate_transaction_id(session_id, identifier_value)
-        
-        request_obj = GrievanceInitRequest.build(
-            transaction_id=transaction_id,
-            identifier_value=identifier_value,
-            identifier_type=identifier_type,
-            grievance_type_code=GRIEVANCE_MAPPING[grievance_type],
-            grievance_description=grievance_description.strip(),
-            phone=phone_number.strip() if phone_number else ""
+        return await _submit_grievance_init_request(
+            ctx, identifier_value, grievance_type, grievance_description, phone_number, raw
         )
-        payload = request_obj.model_dump(by_alias=True)
-        
-        if not BAP_ENDPOINT:
-            raise ModelRetry("BAP_ENDPOINT is not configured in environment.")
-
-        endpoint = f"{BAP_ENDPOINT.rstrip('/')}/init"
-        logger.info(f"[PM KISAN GRIEVANCE] Request URL: {endpoint}")
-        logger.info(f"[PM KISAN GRIEVANCE] Payload: {json.dumps(payload)}")
-
-        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-            response = await client.post(endpoint, json=payload)
-
-        logger.info(f"[PM KISAN GRIEVANCE] Response Status: {response.status_code}")
-        logger.info(f"[PM KISAN GRIEVANCE] Response Body: {response.text[:500]}")
-
-        if response.status_code != 200:
-            logger.error(f"Grievance submission failed with status {response.status_code}")
-            return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
-
-        return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
 
     except httpx.TimeoutException:
         logger.error("Grievance submission timed out.")
@@ -794,7 +809,6 @@ async def pmkisan_grievance_status(
     ctx: RunContext[FarmerContext],
     reg_no: str = "",
     raw: bool = False,
-    aadhaar_no: Optional[str] = None,
     otp: Optional[str] = None,
     phone_number: str = "",
 ) -> str:
@@ -805,9 +819,8 @@ async def pmkisan_grievance_status(
     after the user shares the OTP; it verifies the OTP before calling grievance search.
 
     Args:
-        reg_no: PM-KISAN registration number used for OTP verification.
+        reg_no: PM-KISAN registration number used for OTP verification and status lookup.
         raw: If True, return raw HTTP body (pretty JSON when possible).
-        aadhaar_no: Optional Aadhaar used for grievance status search after OTP verification.
         otp: 4-digit OTP received on the registered mobile.
         phone_number: Optional registered mobile number to include in OTP verification.
 
@@ -815,24 +828,13 @@ async def pmkisan_grievance_status(
         Grievance status summary or OTP verification error.
     """
     try:
-        identifier_value: Optional[str] = None
-        identifier_type: Optional[Literal["reg-number", "aad-number"]] = None
-
-        if aadhaar_no and str(aadhaar_no).strip():
-            identifier_value = str(aadhaar_no).strip()
-            identifier_type = "aad-number"
-        elif reg_no and reg_no.strip():
-            identifier_value = reg_no.strip()
-            identifier_type = "reg-number"
-        else:
-            raise ModelRetry(
-                "Please provide either a PM-KISAN Registration Number or an Aadhaar Number to check grievance status."
-            )
-
         if not reg_no or not reg_no.strip():
             raise ModelRetry(
-                "Please provide the PM-KISAN Registration Number used for OTP verification."
+                "Please provide the PM-KISAN Registration Number to check grievance status."
             )
+
+        identifier_value = reg_no.strip()
+        identifier_type: Literal["reg-number"] = "reg-number"
 
         reg_no_clean = reg_no.strip()
         if not otp or not str(otp).strip():
@@ -844,8 +846,6 @@ async def pmkisan_grievance_status(
         otp_error = await _verify_pm_kisan_otp(ctx, reg_no_clean, str(otp), phone_number)
         if otp_error:
             return otp_error
-
-        identifier_name = "Registration Number" if identifier_type == "reg-number" else "Aadhaar Number"
 
         session_id = ctx.deps.session_id
         transaction_id = generate_transaction_id(session_id, identifier_value)
@@ -876,7 +876,7 @@ async def pmkisan_grievance_status(
                                                 "list": [
                                                     {
                                                         "descriptor": {
-                                                            "name": identifier_name,
+                                                            "name": _REGISTRATION_NUMBER_LABEL,
                                                             "code": identifier_type,
                                                         },
                                                         "value": identifier_value,
@@ -903,10 +903,7 @@ async def pmkisan_grievance_status(
         async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
             response = await client.post(endpoint, json=payload)
 
-        if response.status_code != 200:
-            return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
-
-        return _format_http_response_raw(response) if raw else _format_grievance_response_formatted(response)
+        return _format_grievance_tool_response(response, raw)
 
     except httpx.TimeoutException:
         logger.error("Grievance status check timed out.")
