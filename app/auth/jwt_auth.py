@@ -54,10 +54,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict[str, Any
         )
         
         logger.info("Successfully decoded token")
-        mobile = decoded_token.get('mobile')
+        mobile = decoded_token.get("mobile")
         if mobile is None and decoded_token.get("is_guest_user") is not True:
             logger.warning("No mobile number found in token")
-#            raise credentials_exception
 
         channel = decoded_token.get("channel") or DEFAULT_AUTH_CHANNEL
         telemetry_context = decoded_token.get("telemetry_context") or {}

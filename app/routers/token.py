@@ -4,7 +4,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import httpx
 import jwt
@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from fastapi import APIRouter, Header, HTTPException, status
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2 import service_account
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.config import get_default_httpx_timeout, settings
 from app.core.cache import cache
@@ -78,7 +78,42 @@ class PlayIntegrityAuthRequest(BaseModel):
 
 
 class ApiKeyAuthRequest(BaseModel):
+    """Partner app token request — device + user identity embedded in JWT for telemetry."""
+
     client_code: str = Field(..., description="Client code for selecting per-client API key")
+    fingerprint_id: str = Field(
+        ...,
+        description=(
+            "Stable device / install identifier. When no device fingerprint exists, "
+            "send a unique user identifier in this field instead."
+        ),
+    )
+    user_id: Optional[str] = Field(
+        None,
+        description="Optional farmer or app user id (telemetry uid when provided)",
+    )
+    name: Optional[str] = Field(None, description="Display name")
+    role: Optional[str] = Field(None, description="User role")
+    metadata: Optional[Union[Dict[str, Any], str]] = Field(
+        None,
+        description="Additional client metadata (object or JSON string)",
+    )
+
+    @field_validator("client_code", "fingerprint_id")
+    @classmethod
+    def _strip_required_strings(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be empty")
+        return value
+
+    @field_validator("user_id", "name", "role")
+    @classmethod
+    def _strip_optional_strings(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
 
 
 def _normalize_client_code(client_code: str) -> str:
@@ -92,6 +127,82 @@ def _require_client_code(client_code: Optional[str], context: str) -> str:
             detail=f"client_code is required for {context}."
         )
     return client_code.strip()
+
+
+def _parse_metadata_field(
+    metadata: Optional[Union[Dict[str, Any], str]],
+) -> Dict[str, Any]:
+    if metadata is None:
+        return {}
+    if isinstance(metadata, dict):
+        return dict(metadata)
+    if isinstance(metadata, str):
+        try:
+            parsed = json.loads(metadata)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+        return {"raw": metadata}
+    return {"raw": str(metadata)}
+
+
+def _build_partner_jwt_payload(
+    *,
+    client_code: str,
+    fingerprint_id: str,
+    user_id: Optional[str] = None,
+    name: Optional[str] = None,
+    role: Optional[str] = None,
+    metadata: Optional[Union[Dict[str, Any], str]] = None,
+    auth_source: str = "api_key",
+) -> Dict[str, Any]:
+    """Build JWT claims with telemetry identity (channel = client_code)."""
+    channel = client_code
+    telemetry_uid = user_id or fingerprint_id
+    merged_metadata = _parse_metadata_field(metadata)
+    merged_metadata["fingerprint_id"] = fingerprint_id
+    if user_id:
+        merged_metadata["user_id"] = user_id
+    merged_metadata.setdefault("surface", channel)
+
+    payload: Dict[str, Any] = {
+        "sub": f"{client_code}:{telemetry_uid}",
+        "name": name or "farmer",
+        "role": role or "public",
+        "channel": channel,
+        "client_code": channel,
+        "auth_source": auth_source,
+        "is_guest_user": True,
+        "telemetry_context": {
+            "uid": telemetry_uid,
+            "did": fingerprint_id,
+            "channel": channel,
+            "pdata_id": "BharatVistaar",
+            "pdata_ver": "v0.1",
+            "fingerprint_details": {"device_id": fingerprint_id},
+        },
+        "metadata": merged_metadata,
+    }
+    return payload
+
+
+def _encode_jwt_payload(payload: Dict[str, Any], expires_minutes: int) -> tuple[str, int]:
+    if private_key is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="JWT private key is not configured. Please ensure private_key.pem file exists in the project root.",
+        )
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=expires_minutes)
+    payload = {
+        **payload,
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+    }
+    token = jwt.encode(payload, private_key, algorithm=settings.jwt_algorithm)
+    expires_in = int(exp.timestamp() - now.timestamp())
+    return token, expires_in
 
 
 def _issue_jwt_token(
@@ -502,7 +613,10 @@ async def create_auth_token_with_api_key(
     api_key: str = Header(..., alias="X-API-Key", description="Client API key"),
 ):
     """
-    Validate static API key from env and issue expiring JWT.
+    Validate static API key from env and issue a short-lived JWT with partner identity.
+
+    Requires fingerprint_id in the body (device id or unique user id when no fingerprint).
+    Optional user_id is stored in the JWT when provided; otherwise fingerprint_id drives uid.
     """
     client_code = _require_client_code(request.client_code, "API key authentication")
     resolved_api_key = _resolve_api_key(client_code)
@@ -513,11 +627,16 @@ async def create_auth_token_with_api_key(
             detail="Invalid API key."
         )
 
-    token, expires_in = _issue_jwt_token(
-        channel=client_code,
-        expires_minutes=settings.jwt_expiry_minutes,
-        include_issued_at=True,
+    payload = _build_partner_jwt_payload(
+        client_code=client_code,
+        fingerprint_id=request.fingerprint_id,
+        user_id=request.user_id,
+        name=request.name,
+        role=request.role,
+        metadata=request.metadata,
+        auth_source="api_key",
     )
+    token, expires_in = _encode_jwt_payload(payload, settings.jwt_expiry_minutes)
     return StaticAuthResponse(token=token, expires_in=expires_in)
 
 
