@@ -3,6 +3,9 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from pydantic_ai import FinalResultEvent, PartDeltaEvent, PartStartEvent, TextPartDelta
+from pydantic_ai.messages import TextPart
+
 from app.services import chat
 
 
@@ -41,7 +44,47 @@ class ChatSSETests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(items[-1], chat._AwaitedResult)
         self.assertEqual(items[-1].value, "done")
 
-    async def test_stream_chat_messages_emits_final_answer_as_sse_data(self):
+    async def test_stream_agrinet_emits_answer_deltas_as_sse_data(self):
+        class Result:
+            output = "Hello world"
+
+            def usage(self):
+                return SimpleNamespace(request_tokens=2, response_tokens=3)
+
+        async def fake_events(**_kwargs):
+            yield PartStartEvent(index=0, part=TextPart(content="Hello "))
+            yield FinalResultEvent(tool_name=None, tool_call_id=None)
+            yield PartDeltaEvent(
+                index=0,
+                delta=TextPartDelta(content_delta="world"),
+            )
+            yield SimpleNamespace(event_kind="agent_run_result", result=Result())
+
+        fake_agent = SimpleNamespace(run_stream_events=fake_events)
+
+        with (
+            patch.object(chat, "agrinet_agent", fake_agent),
+            patch.object(chat, "lf_update_current_observation"),
+            patch.object(chat, "lf_set_trace_io"),
+        ):
+            chunks = []
+            async for item in chat._stream_agrinet(
+                user_message="message",
+                trimmed_history=[],
+                deps=SimpleNamespace(),
+                session_id="s1",
+                user_id="u1",
+                query="question",
+                moderation_category="valid_agricultural",
+            ):
+                chunks.append(item)
+
+        self.assertEqual(chunks[0], "data: Hello \n\n")
+        self.assertEqual(chunks[1], "data: world\n\n")
+        self.assertIsInstance(chunks[2], chat._AwaitedResult)
+        self.assertEqual(chunks[2].value.output, "Hello world")
+
+    async def test_stream_chat_messages_emits_streamed_sse_chunks(self):
         class Moderation:
             category = "valid_agricultural"
 
@@ -57,8 +100,10 @@ class ChatSSETests(unittest.IsolatedAsyncioTestCase):
         async def fake_moderation(_user_message, _session_id):
             return Moderation()
 
-        async def fake_agrinet(**_kwargs):
-            return Result()
+        async def fake_stream_agrinet(**_kwargs):
+            yield "data: final-\n\n"
+            yield "data: answer\n\n"
+            yield chat._AwaitedResult(Result())
 
         async def fake_update_history(_session_id, _messages):
             return None
@@ -67,7 +112,7 @@ class ChatSSETests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(chat, "_run_moderation", fake_moderation),
-            patch.object(chat, "_run_agrinet", fake_agrinet),
+            patch.object(chat, "_stream_agrinet", fake_stream_agrinet),
             patch.object(chat, "update_message_history", fake_update_history),
             patch.object(chat, "get_client", lambda: fake_client),
         ):
@@ -85,7 +130,9 @@ class ChatSSETests(unittest.IsolatedAsyncioTestCase):
                 chunks.append(chunk)
 
         self.assertEqual(chunks[0], chat.SSE_KEEPALIVE)
-        self.assertEqual(chunks[-1], "data: final-answer\n\n")
+        self.assertIn("data: final-\n\n", chunks)
+        self.assertIn("data: answer\n\n", chunks)
+        self.assertEqual(chunks.count("data: final-answer\n\n"), 0)
 
 
 if __name__ == "__main__":

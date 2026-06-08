@@ -2,9 +2,11 @@ import asyncio
 import math
 import os
 from dataclasses import dataclass
-from typing import AsyncGenerator, Awaitable, Generic, TypeVar
+from typing import AsyncGenerator, AsyncIterator, Awaitable, Generic, TypeVar
 
 from fastapi import BackgroundTasks
+from pydantic_ai import TextPartDelta
+from pydantic_ai.messages import TextPart
 
 from agents.agrinet import agrinet_agent
 from agents.moderation import moderation_agent
@@ -88,6 +90,24 @@ def _format_sse_data(data: str) -> str:
     return "".join(f"data: {line}\n" for line in normalized.split("\n")) + "\n"
 
 
+def _strip_thinking_chunk(chunk: str, inside_thinking: bool) -> tuple[str, bool]:
+    if inside_thinking:
+        end_idx = chunk.find("</think>")
+        if end_idx < 0:
+            return "", True
+        chunk = chunk[end_idx + len("</think>") :]
+        inside_thinking = False
+
+    while "<think>" in chunk:
+        start_idx = chunk.find("<think>")
+        end_idx = chunk.find("</think>", start_idx)
+        if end_idx < 0:
+            return chunk[:start_idx], True
+        chunk = chunk[:start_idx] + chunk[end_idx + len("</think>") :]
+
+    return chunk, inside_thinking
+
+
 async def _await_with_sse_keepalives(
     coro: Awaitable[T],
     *,
@@ -110,6 +130,37 @@ async def _await_with_sse_keepalives(
             except BaseException:
                 pass
         raise
+
+
+async def _iter_with_sse_keepalives(
+    items: AsyncIterator[T],
+    *,
+    interval_s: float = SSE_KEEPALIVE_INTERVAL_S,
+) -> AsyncGenerator[str | _AwaitedResult[T], None]:
+    iterator = items.__aiter__()
+    while True:
+        task = asyncio.create_task(anext(iterator))
+        try:
+            while True:
+                done, _ = await asyncio.wait({task}, timeout=interval_s)
+                if task in done:
+                    try:
+                        yield _AwaitedResult(task.result())
+                    except StopAsyncIteration:
+                        return
+                    break
+                yield SSE_KEEPALIVE
+        except BaseException:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except BaseException:
+                    pass
+            aclose = getattr(iterator, "aclose", None)
+            if aclose:
+                await aclose()
+            raise
 
 
 @observe(name=CHAT_CHAIN_SPAN_NAME, as_type="chain")
@@ -175,28 +226,27 @@ async def stream_chat_messages(
 
         result = None
         with propagate_attributes(tags=[moderation_data.value.category]):
-            async for item in _await_with_sse_keepalives(
-                _run_agrinet(
-                    user_message=deps.get_user_message(),
-                    trimmed_history=trimmed_history,
-                    deps=deps,
-                    session_id=session_id,
-                    user_id=user_id,
-                    query=query,
-                    moderation_category=moderation_data.value.category,
-                ),
+            async for item in _stream_agrinet(
+                user_message=deps.get_user_message(),
+                trimmed_history=trimmed_history,
+                deps=deps,
+                session_id=session_id,
+                user_id=user_id,
+                query=query,
+                moderation_category=moderation_data.value.category,
             ):
                 if isinstance(item, _AwaitedResult):
-                    result = item
+                    result = item.value
                 else:
                     yield item
 
-        new_messages = result.value.new_messages()
+        if result is None:
+            raise RuntimeError("Agrinet stream completed without a final result")
+
+        new_messages = result.new_messages()
         logger.info(f"Agent run complete for session {session_id}")
 
-        lf_set_trace_io(output=result.value.output)
-
-        yield _format_sse_data(result.value.output)
+        lf_set_trace_io(output=result.output)
 
         clean_new_messages = filter_thinking_from_history(list(new_messages or []))
         messages = [*history, *clean_new_messages]
@@ -232,7 +282,7 @@ async def _run_moderation(user_message: str, session_id: str):
 
 
 @observe(name=AGENT_VISTAAR, as_type="generation")
-async def _run_agrinet(
+async def _stream_agrinet(
     user_message: str,
     trimmed_history: list,
     deps: FarmerContext,
@@ -240,8 +290,8 @@ async def _run_agrinet(
     user_id: str,
     query: str,
     moderation_category: str,
-):
-    """Run main agrinet agent and trace it in Langfuse."""
+) -> AsyncGenerator[str | _AwaitedResult, None]:
+    """Stream main agrinet agent text deltas and trace the final result."""
     lf_update_current_observation(
         input=user_message,
         metadata={
@@ -251,11 +301,75 @@ async def _run_agrinet(
         },
     )
 
-    result = await agrinet_agent.run(
-        user_prompt=user_message,
-        message_history=trimmed_history,
-        deps=deps,
-    )
+    result = None
+    final_result_found = False
+    pending_text_chunks: list[str] = []
+    inside_leaked_think = False
+
+    async def _yield_sse_text(chunk: str):
+        nonlocal inside_leaked_think
+        chunk, inside_leaked_think = _strip_thinking_chunk(
+            chunk,
+            inside_leaked_think,
+        )
+        if chunk:
+            yield _format_sse_data(chunk)
+
+    async for item in _iter_with_sse_keepalives(
+        agrinet_agent.run_stream_events(
+            user_prompt=user_message,
+            message_history=trimmed_history,
+            deps=deps,
+        ),
+    ):
+        if not isinstance(item, _AwaitedResult):
+            yield item
+            continue
+
+        event = item.value
+        event_kind = getattr(event, "event_kind", "")
+
+        if event_kind == "agent_run_result":
+            result = event.result
+            continue
+
+        if event_kind == "final_result":
+            final_result_found = True
+            for chunk in pending_text_chunks:
+                async for sse_chunk in _yield_sse_text(chunk):
+                    yield sse_chunk
+            pending_text_chunks.clear()
+            continue
+
+        if event_kind == "function_tool_result":
+            final_result_found = False
+            pending_text_chunks.clear()
+            inside_leaked_think = False
+            continue
+
+        if event_kind == "part_start":
+            part = getattr(event, "part", None)
+            if isinstance(part, TextPart):
+                chunk = part.content or ""
+                if final_result_found:
+                    async for sse_chunk in _yield_sse_text(chunk):
+                        yield sse_chunk
+                elif chunk:
+                    pending_text_chunks.append(chunk)
+            continue
+
+        if event_kind == "part_delta":
+            delta = getattr(event, "delta", None)
+            if isinstance(delta, TextPartDelta):
+                chunk = delta.content_delta or ""
+                if final_result_found:
+                    async for sse_chunk in _yield_sse_text(chunk):
+                        yield sse_chunk
+                elif chunk:
+                    pending_text_chunks.append(chunk)
+
+    if result is None:
+        raise RuntimeError("Agrinet agent stream ended without a final result")
 
     usage_data = result.usage()
     lf_update_current_observation(
@@ -266,4 +380,4 @@ async def _run_agrinet(
         metadata={},
     )
     lf_set_trace_io(output=result.output)
-    return result
+    yield _AwaitedResult(result)
