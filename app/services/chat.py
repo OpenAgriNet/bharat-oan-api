@@ -1,10 +1,6 @@
-import os
-import math
 import asyncio
-import contextlib
-from typing import AsyncGenerator, Optional
-from dataclasses import dataclass
-from typing import Awaitable, Generic, TypeVar
+import os
+from typing import AsyncGenerator, Awaitable, Optional, TypeVar
 
 from fastapi import BackgroundTasks
 
@@ -37,49 +33,6 @@ from langfuse import get_client, observe, propagate_attributes
 
 
 logger = get_logger(__name__)
-T = TypeVar("T")
-
-SSE_KEEPALIVE = "SSE_KEEPALIVE"
-
-
-def _resolve_keepalive_interval_s() -> float:
-    raw_value = os.getenv("CHAT_SSE_KEEPALIVE_INTERVAL_S", "3")
-    try:
-        interval = float(raw_value)
-    except (TypeError, ValueError):
-        logger.warning("Invalid CHAT_SSE_KEEPALIVE_INTERVAL_S=%r; using 3.0 seconds", raw_value)
-        return 3.0
-
-    if not math.isfinite(interval) or interval <= 0:
-        logger.warning("Non-positive CHAT_SSE_KEEPALIVE_INTERVAL_S=%r; using 3.0 seconds", raw_value)
-        return 3.0
-
-    return interval
-
-
-CHAT_SSE_KEEPALIVE_INTERVAL_S = _resolve_keepalive_interval_s()
-
-
-@dataclass(frozen=True)
-class _AwaitedResult(Generic[T]):
-    value: T
-
-
-async def _wait_with_keepalive(awaitable: Awaitable[T]) -> AsyncGenerator[str | _AwaitedResult[T], None]:
-    task = asyncio.create_task(awaitable)
-    try:
-        while True:
-            done, _ = await asyncio.wait({task}, timeout=CHAT_SSE_KEEPALIVE_INTERVAL_S)
-            if task in done:
-                yield _AwaitedResult(task.result())
-                return
-
-            yield SSE_KEEPALIVE
-    finally:
-        if not task.done():
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
 
 MODEL_NAME = (
     os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
@@ -93,6 +46,36 @@ CHAT_TRACE_NAME = (
     or "bharat-vistaar-chat"
 )
 CHAT_CHAIN_SPAN_NAME = "chain.chat"
+SSE_KEEPALIVE = "\n\n"
+SSE_KEEPALIVE_INTERVAL_S = float(os.getenv("CHAT_SSE_KEEPALIVE_INTERVAL_S", "3"))
+
+T = TypeVar("T")
+
+
+async def _await_with_sse_keepalives(
+    coro: Awaitable[T],
+    *,
+    interval_s: float = SSE_KEEPALIVE_INTERVAL_S,
+) -> AsyncGenerator[str, T]:
+    """Yield SSE comment heartbeats until `coro` completes, then return its result."""
+    task = asyncio.create_task(coro)
+    try:
+        while True:
+            done, _ = await asyncio.wait({task}, timeout=interval_s)
+            if task in done:
+                yield task.result()
+                return
+            yield SSE_KEEPALIVE
+    except asyncio.CancelledError:
+        if not task.done():
+            task.cancel()
+            await task
+        raise
+    except Exception:
+        if not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        raise
 
 
 @observe(name=CHAT_CHAIN_SPAN_NAME, as_type="chain")
@@ -153,12 +136,16 @@ async def stream_chat_messages(
 
             user_message = f"{last_response}{deps.get_user_message()}"
 
-            async for item in _wait_with_keepalive(_run_moderation(user_message, session_id)):
-                if item == SSE_KEEPALIVE:
-                    yield SSE_KEEPALIVE
-                    continue
-                moderation_data = item.value
+            yield SSE_KEEPALIVE
 
+            moderation_data = None
+            async for item in _await_with_sse_keepalives(
+                _run_moderation(user_message, session_id),
+            ):
+                if isinstance(item, str):
+                    yield item
+                else:
+                    moderation_data = item
             logger.info(f"Moderation data: {moderation_data}")
             deps.update_moderation_str(str(moderation_data))
 
@@ -168,8 +155,9 @@ async def stream_chat_messages(
             logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
             trimmed_history = filter_thinking_from_history(trimmed_history)
 
+            result = None
             with propagate_attributes(tags=[moderation_data.category]):
-                async for item in _wait_with_keepalive(
+                async for item in _await_with_sse_keepalives(
                     _run_agrinet(
                         user_message=deps.get_user_message(),
                         trimmed_history=trimmed_history,
@@ -178,12 +166,12 @@ async def stream_chat_messages(
                         user_id=user_id,
                         query=query,
                         moderation_category=moderation_data.category,
-                    )
+                    ),
                 ):
-                    if item == SSE_KEEPALIVE:
-                        yield SSE_KEEPALIVE
-                        continue
-                    result = item.value
+                    if isinstance(item, str):
+                        yield item
+                    else:
+                        result = item
 
             new_messages = result.new_messages()
             logger.info(f"Agent run complete for session {session_id}")

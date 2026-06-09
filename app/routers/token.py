@@ -384,33 +384,37 @@ def _validate_play_integrity_payload(
         )
 
 
-def _parse_auth_request_metadata(request: Optional[AuthRequest]) -> tuple[Dict[str, Any], Optional[str]]:
-    fingerprint_id = request.fingerprint_id if request and request.fingerprint_id else None
-    metadata: Dict[str, Any] = {}
-    if not request or not request.metadata:
-        if fingerprint_id:
-            metadata["fingerprint_id"] = fingerprint_id
-        metadata["surface"] = metadata.get("surface") or "public_chat"
-        return metadata, fingerprint_id
-
-    if isinstance(request.metadata, dict):
-        metadata.update(request.metadata)
-    elif isinstance(request.metadata, str):
+def _parse_metadata_field(raw_metadata: Any) -> Dict[str, Any]:
+    if isinstance(raw_metadata, dict):
+        return dict(raw_metadata)
+    if isinstance(raw_metadata, str):
         try:
-            parsed_metadata = json.loads(request.metadata)
+            parsed_metadata = json.loads(raw_metadata)
             if isinstance(parsed_metadata, dict):
-                metadata.update(parsed_metadata)
-            else:
-                metadata["raw"] = request.metadata
+                return dict(parsed_metadata)
+            return {"raw": raw_metadata}
         except json.JSONDecodeError:
-            metadata["raw"] = request.metadata
-    else:
-        metadata["raw"] = str(request.metadata)
+            return {"raw": raw_metadata}
+    return {"raw": str(raw_metadata)}
 
+
+def _finalize_auth_metadata(
+    metadata: Dict[str, Any],
+    fingerprint_id: Optional[str],
+) -> Dict[str, Any]:
     if fingerprint_id:
         metadata["fingerprint_id"] = fingerprint_id
     metadata["surface"] = metadata.get("surface") or "public_chat"
-    return metadata, fingerprint_id
+    return metadata
+
+
+def _parse_auth_request_metadata(request: Optional[AuthRequest]) -> tuple[Dict[str, Any], Optional[str]]:
+    fingerprint_id = request.fingerprint_id if request and request.fingerprint_id else None
+    if not request or not request.metadata:
+        return _finalize_auth_metadata({}, fingerprint_id), fingerprint_id
+
+    metadata = _parse_metadata_field(request.metadata)
+    return _finalize_auth_metadata(metadata, fingerprint_id), fingerprint_id
 
 
 def _build_guest_auth_payload(

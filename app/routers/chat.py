@@ -47,7 +47,7 @@ async def chat_endpoint(
             qid=qid,
             current_user=current_user,
         ),
-        media_type='text/event-stream',
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
@@ -56,4 +56,4 @@ async def chat_endpoint(
             "Access-Control-Expose-Headers": "X-QID",
         },
         background=background_tasks,
-    ) 
+    )

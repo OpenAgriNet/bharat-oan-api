@@ -16,17 +16,19 @@ async def _collect_async_generator(generator):
     return items
 
 
-def test_keepalive_waiter_emits_marker_before_string_result(monkeypatch):
+def test_keepalive_waiter_emits_marker_before_string_result():
     async def delayed_string():
         await asyncio.sleep(0.01)
         return "final-result"
 
-    monkeypatch.setattr(chat_service, "CHAT_SSE_KEEPALIVE_INTERVAL_S", 0.001)
-
-    items = asyncio.run(_collect_async_generator(chat_service._wait_with_keepalive(delayed_string())))
+    items = asyncio.run(
+        _collect_async_generator(
+            chat_service._await_with_sse_keepalives(delayed_string(), interval_s=0.001)
+        )
+    )
 
     assert chat_service.SSE_KEEPALIVE in items
-    assert items[-1] == chat_service._AwaitedResult("final-result")
+    assert items[-1] == "final-result"
 
 
 def test_chat_endpoint_returns_backend_owned_qid_header(monkeypatch):
