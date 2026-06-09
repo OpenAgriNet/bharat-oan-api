@@ -46,7 +46,7 @@ CHAT_TRACE_NAME = (
     or "bharat-vistaar-chat"
 )
 CHAT_CHAIN_SPAN_NAME = "chain.chat"
-SSE_KEEPALIVE = "\n\n"
+SSE_KEEPALIVE = "SSE_KEEPALIVE"
 SSE_KEEPALIVE_INTERVAL_S = float(os.getenv("CHAT_SSE_KEEPALIVE_INTERVAL_S", "3"))
 
 T = TypeVar("T")
