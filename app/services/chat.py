@@ -58,12 +58,12 @@ async def _await_with_sse_keepalives(
                 yield task.result()
                 return
             yield SSE_KEEPALIVE
-    except BaseException:
+    except (asyncio.CancelledError, Exception):
         if not task.done():
             task.cancel()
             try:
                 await task
-            except BaseException:
+            except asyncio.CancelledError:
                 pass
         raise
 
