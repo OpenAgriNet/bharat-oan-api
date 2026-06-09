@@ -165,7 +165,7 @@ def test_generic_ui_telemetry_events_route_enqueues_one_batch(monkeypatch):
     captured_payloads = []
     app = FastAPI()
 
-    async def fake_current_user():
+    def fake_current_user():
         return {
             "telemetry_context": {
                 "uid": "guest",
@@ -177,7 +177,7 @@ def test_generic_ui_telemetry_events_route_enqueues_one_batch(monkeypatch):
             "metadata": {"fingerprint_id": "fp_123"},
         }
 
-    async def fake_send_telemetry(payload):
+    def fake_send_telemetry(payload):
         captured_payloads.append(payload)
         return {"status_code": 200}
 

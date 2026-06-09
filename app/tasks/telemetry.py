@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 from typing import Dict, Optional
 
 import httpx
@@ -13,16 +14,19 @@ logger = logging.getLogger(__name__)
 
 
 def _get_telemetry_auth_token() -> Optional[str]:
-    if settings.telemetry_auth_token:
-        return settings.telemetry_auth_token
+    auth_token = os.getenv("TELEMETRY_AUTH_TOKEN")
+    if auth_token:
+        return auth_token
 
-    if not settings.telemetry_auth_key or not settings.telemetry_auth_secret:
+    auth_key = os.getenv("TELEMETRY_AUTH_KEY")
+    auth_secret = os.getenv("TELEMETRY_AUTH_SECRET")
+    if not auth_key or not auth_secret:
         logger.warning("Telemetry auth is not configured; sending telemetry without Authorization header")
         return None
 
     header = {"typ": "JWT", "alg": "HS256"}
     payload = {
-        "iss": settings.telemetry_auth_key,
+        "iss": auth_key,
         "iat": None,
         "exp": None,
         "aud": "",
@@ -35,7 +39,7 @@ def _get_telemetry_auth_token() -> Optional[str]:
 
     unsigned_token = f"{base64_url_encode(header)}.{base64_url_encode(payload)}"
     signature = hmac.new(
-        settings.telemetry_auth_secret.encode(),
+        auth_secret.encode(),
         unsigned_token.encode(),
         hashlib.sha256,
     ).digest()
@@ -56,10 +60,12 @@ def _get_telemetry_headers() -> Dict[str, str]:
     if auth_token:
         headers["Authorization"] = f"Bearer {auth_token}"
 
-    if settings.telemetry_origin:
-        headers["Origin"] = settings.telemetry_origin
-    if settings.telemetry_referer:
-        headers["Referer"] = settings.telemetry_referer
+    telemetry_origin = os.getenv("TELEMETRY_ORIGIN")
+    telemetry_referer = os.getenv("TELEMETRY_REFERER")
+    if telemetry_origin:
+        headers["Origin"] = telemetry_origin
+    if telemetry_referer:
+        headers["Referer"] = telemetry_referer
 
     return headers
 

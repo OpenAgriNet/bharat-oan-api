@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, BackgroundTasks, Depends
 
 from app.auth.jwt_auth import get_current_user
@@ -17,12 +19,14 @@ from helpers.telemetry import (
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 
+CurrentUser = Annotated[dict, Depends(get_current_user)]
+
 
 @router.post("/feedback")
 async def relay_feedback_telemetry(
     request: TelemetryFeedbackRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: CurrentUser,
 ):
     event = create_chat_feedback_event(
         current_user=current_user,
@@ -44,7 +48,7 @@ async def relay_feedback_telemetry(
 async def relay_generic_telemetry_events(
     request: list[GenericTelemetryEventRequest],
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: CurrentUser,
 ):
     events = [
         create_ui_interact_event(
@@ -64,7 +68,7 @@ async def relay_generic_telemetry_events(
 async def relay_error_telemetry(
     request: TelemetryErrorRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: CurrentUser,
 ):
     event = create_chat_error_event(
         current_user=current_user,

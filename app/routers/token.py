@@ -384,6 +384,74 @@ def _validate_play_integrity_payload(
         )
 
 
+def _parse_auth_request_metadata(request: Optional[AuthRequest]) -> tuple[Dict[str, Any], Optional[str]]:
+    fingerprint_id = request.fingerprint_id if request and request.fingerprint_id else None
+    metadata: Dict[str, Any] = {}
+    if not request or not request.metadata:
+        if fingerprint_id:
+            metadata["fingerprint_id"] = fingerprint_id
+        metadata["surface"] = metadata.get("surface") or "public_chat"
+        return metadata, fingerprint_id
+
+    if isinstance(request.metadata, dict):
+        metadata.update(request.metadata)
+    elif isinstance(request.metadata, str):
+        try:
+            parsed_metadata = json.loads(request.metadata)
+            if isinstance(parsed_metadata, dict):
+                metadata.update(parsed_metadata)
+            else:
+                metadata["raw"] = request.metadata
+        except json.JSONDecodeError:
+            metadata["raw"] = request.metadata
+    else:
+        metadata["raw"] = str(request.metadata)
+
+    if fingerprint_id:
+        metadata["fingerprint_id"] = fingerprint_id
+    metadata["surface"] = metadata.get("surface") or "public_chat"
+    return metadata, fingerprint_id
+
+
+def _build_guest_auth_payload(
+    request: Optional[AuthRequest],
+    metadata: Dict[str, Any],
+    fingerprint_id: Optional[str],
+) -> tuple[Dict[str, Any], int]:
+    mobile = request.mobile if request and request.mobile else None
+    name = request.name if request and request.name else "guest"
+    role = request.role if request and request.role else "public"
+    channel = "BharatVistaar"
+    guest_sub = f"guest:{fingerprint_id}" if fingerprint_id else "guest:anon"
+
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=settings.jwt_expiry_minutes)
+    payload = {
+        "sub": guest_sub,
+        "name": name,
+        "role": role,
+        "channel": channel,
+        "client_code": channel,
+        "auth_source": "guest_token",
+        "is_guest_user": True,
+        "telemetry_context": {
+            "uid": "guest",
+            "did": fingerprint_id,
+            "channel": channel,
+            "pdata_id": "BharatVistaar",
+            "pdata_ver": "v0.1",
+        },
+        "metadata": metadata,
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+    }
+    if mobile:
+        payload["mobile"] = mobile
+
+    expires_in = int(exp.timestamp() - now.timestamp())
+    return payload, expires_in
+
+
 async def _ensure_nonce_not_reused(nonce: str) -> None:
     cache_key = f"integrity_nonce:{nonce}"
     try:
@@ -419,75 +487,11 @@ async def create_auth_token(request: Optional[AuthRequest] = None):
         )
 
     try:
-        fingerprint_id = request.fingerprint_id if request and request.fingerprint_id else None
-        metadata: Dict[str, Any] = {}
-        if request and request.metadata:
-            if isinstance(request.metadata, dict):
-                metadata.update(request.metadata)
-            elif isinstance(request.metadata, str):
-                try:
-                    parsed_metadata = json.loads(request.metadata)
-                    if isinstance(parsed_metadata, dict):
-                        metadata.update(parsed_metadata)
-                    else:
-                        metadata["raw"] = request.metadata
-                except json.JSONDecodeError:
-                    metadata["raw"] = request.metadata
-            else:
-                metadata["raw"] = str(request.metadata)
-        if fingerprint_id:
-            metadata["fingerprint_id"] = fingerprint_id
-        metadata["surface"] = metadata.get("surface") or "public_chat"
-
-        # Use request data if provided, otherwise issue a logged-out guest token.
-        mobile = request.mobile if request and request.mobile else None
-        name = request.name if request and request.name else "guest"
-        role = request.role if request and request.role else "public"
-        channel = "BharatVistaar"
-        guest_sub = f"guest:{fingerprint_id}" if fingerprint_id else "guest:anon"
-
-        # Create JWT payload
-        now = datetime.now(timezone.utc)
-        exp = now + timedelta(minutes=settings.jwt_expiry_minutes)
-
-        payload = {
-            "sub": guest_sub,
-            "name": name,
-            "role": role,
-            "channel": channel,
-            "client_code": channel,
-            "auth_source": "guest_token",
-            "is_guest_user": True,
-            "telemetry_context": {
-                "uid": "guest",
-                "did": fingerprint_id,
-                "channel": channel,
-                "pdata_id": "BharatVistaar",
-                "pdata_ver": "v0.1",
-            },
-            "metadata": metadata,
-            "iat": int(now.timestamp()),
-            "exp": int(exp.timestamp())
-        }
-        if mobile:
-            payload["mobile"] = mobile
-
-        # Encode JWT token using private key
-        token = jwt.encode(
-            payload,
-            private_key,
-            algorithm=settings.jwt_algorithm
-        )
-
+        metadata, fingerprint_id = _parse_auth_request_metadata(request)
+        payload, expires_in = _build_guest_auth_payload(request, metadata, fingerprint_id)
+        token = jwt.encode(payload, private_key, algorithm=settings.jwt_algorithm)
         logger.debug("JWT token created successfully")
-
-        # Calculate expiration time in seconds
-        expires_in = int(exp.timestamp() - now.timestamp())
-
-        return AuthResponse(
-            token=token,
-            expires_in=expires_in
-        )
+        return AuthResponse(token=token, expires_in=expires_in)
 
     except Exception as e:
         logger.error(f"Error creating JWT token: {str(e)}")

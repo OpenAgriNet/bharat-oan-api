@@ -32,10 +32,11 @@ def test_keepalive_waiter_emits_marker_before_string_result(monkeypatch):
 def test_chat_endpoint_returns_backend_owned_qid_header(monkeypatch):
     app = FastAPI()
 
-    async def fake_current_user():
+    def fake_current_user():
         return {"mobile": "9999999999", "channel": "BharatVistaar"}
 
     async def fake_history(_session_id):
+        await asyncio.sleep(0)
         return []
 
     async def fake_stream_chat_messages(**_kwargs):
