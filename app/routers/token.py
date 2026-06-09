@@ -384,17 +384,21 @@ def _validate_play_integrity_payload(
         )
 
 
+def _parse_json_metadata_string(raw_metadata: str) -> Dict[str, Any]:
+    try:
+        parsed_metadata = json.loads(raw_metadata)
+    except json.JSONDecodeError:
+        return {"raw": raw_metadata}
+    if isinstance(parsed_metadata, dict):
+        return dict(parsed_metadata)
+    return {"raw": raw_metadata}
+
+
 def _parse_metadata_field(raw_metadata: Any) -> Dict[str, Any]:
     if isinstance(raw_metadata, dict):
         return dict(raw_metadata)
     if isinstance(raw_metadata, str):
-        try:
-            parsed_metadata = json.loads(raw_metadata)
-            if isinstance(parsed_metadata, dict):
-                return dict(parsed_metadata)
-            return {"raw": raw_metadata}
-        except json.JSONDecodeError:
-            return {"raw": raw_metadata}
+        return _parse_json_metadata_string(raw_metadata)
     return {"raw": str(raw_metadata)}
 
 
