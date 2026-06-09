@@ -2,15 +2,12 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, field_serializer
-import hashlib
-import time
-import random
 import os
+import secrets
 
 
 def generate_telemetry_mid() -> str:
-    random_str = f"{time.time()}{random.random()}"
-    return f"OE_{hashlib.md5(random_str.encode()).hexdigest()}"
+    return f"OE_{secrets.token_hex(16)}"
 
 class EventType(str, Enum):
     """Types of telemetry events"""
