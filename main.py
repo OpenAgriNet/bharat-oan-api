@@ -16,7 +16,7 @@ for _name in ("helpers.transcription", "helpers.tts", "app.tasks.telemetry", "ap
     logging.getLogger(_name).setLevel(_log_level)
 
 # Import all routers
-from app.routers import chat, transcribe, tts, health, file, token
+from app.routers import chat, transcribe, tts, health, file, token, telemetry
 # from app.routers import suggestions  # Commented out: suggestion agent disabled
 
 class TimingAllowOriginMiddleware(BaseHTTPMiddleware):
@@ -55,6 +55,7 @@ app.add_middleware(
     allow_credentials=settings.allowed_credentials,
     allow_methods=settings.allowed_methods,
     allow_headers=settings.allowed_headers,
+    expose_headers=["X-QID"],
 )
 
 # Add Timing-Allow-Origin middleware for cross-origin timing access
@@ -78,4 +79,5 @@ app.include_router(transcribe.router, prefix=settings.api_prefix)
 app.include_router(tts.router, prefix=settings.api_prefix)
 app.include_router(health.router, prefix=settings.api_prefix)
 app.include_router(file.router, prefix=settings.api_prefix)
-app.include_router(token.router, prefix=settings.api_prefix) 
+app.include_router(token.router, prefix=settings.api_prefix)
+app.include_router(telemetry.router, prefix=settings.api_prefix)

@@ -56,7 +56,8 @@ class AuthRequest(BaseModel):
     mobile: Optional[str] = Field(None, description="Mobile number")
     name: Optional[str] = Field(None, description="User name")
     role: Optional[str] = Field(None, description="User role")
-    metadata: Optional[str] = Field(None, description="Additional metadata as string")
+    fingerprint_id: Optional[str] = Field(None, description="Client fingerprint/device identifier")
+    metadata: Optional[Any] = Field(None, description="Additional metadata")
 
 
 class AuthResponse(BaseModel):
@@ -97,10 +98,11 @@ def _issue_jwt_token(
     mobile: Optional[str] = None,
     name: Optional[str] = None,
     role: Optional[str] = None,
-    metadata: Optional[str] = None,
+    metadata: Optional[Any] = None,
     channel: Optional[str] = None,
     expires_minutes: Optional[int] = None,
     include_issued_at: bool = True,
+    extra_claims: Optional[Dict[str, Any]] = None,
 ) -> tuple[str, Optional[int]]:
     if private_key is None:
         raise HTTPException(
@@ -109,7 +111,7 @@ def _issue_jwt_token(
         )
 
     try:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         payload = {}
         if mobile is not None:
             payload["mobile"] = mobile
@@ -121,6 +123,8 @@ def _issue_jwt_token(
             payload["metadata"] = metadata
         if channel is not None:
             payload["channel"] = channel
+        if extra_claims:
+            payload.update(extra_claims)
 
         if include_issued_at:
             payload["iat"] = int(now.timestamp())
@@ -380,6 +384,82 @@ def _validate_play_integrity_payload(
         )
 
 
+def _parse_json_metadata_string(raw_metadata: str) -> Dict[str, Any]:
+    try:
+        parsed_metadata = json.loads(raw_metadata)
+    except json.JSONDecodeError:
+        return {"raw": raw_metadata}
+    if isinstance(parsed_metadata, dict):
+        return dict(parsed_metadata)
+    return {"raw": raw_metadata}
+
+
+def _parse_metadata_field(raw_metadata: Any) -> Dict[str, Any]:
+    if isinstance(raw_metadata, dict):
+        return dict(raw_metadata)
+    if isinstance(raw_metadata, str):
+        return _parse_json_metadata_string(raw_metadata)
+    return {"raw": str(raw_metadata)}
+
+
+def _finalize_auth_metadata(
+    metadata: Dict[str, Any],
+    fingerprint_id: Optional[str],
+) -> Dict[str, Any]:
+    if fingerprint_id:
+        metadata["fingerprint_id"] = fingerprint_id
+    metadata["surface"] = metadata.get("surface") or "public_chat"
+    return metadata
+
+
+def _parse_auth_request_metadata(request: Optional[AuthRequest]) -> tuple[Dict[str, Any], Optional[str]]:
+    fingerprint_id = request.fingerprint_id if request and request.fingerprint_id else None
+    if not request or not request.metadata:
+        return _finalize_auth_metadata({}, fingerprint_id), fingerprint_id
+
+    metadata = _parse_metadata_field(request.metadata)
+    return _finalize_auth_metadata(metadata, fingerprint_id), fingerprint_id
+
+
+def _build_guest_auth_payload(
+    request: Optional[AuthRequest],
+    metadata: Dict[str, Any],
+    fingerprint_id: Optional[str],
+) -> tuple[Dict[str, Any], int]:
+    mobile = request.mobile if request and request.mobile else None
+    name = request.name if request and request.name else "guest"
+    role = request.role if request and request.role else "public"
+    channel = "BharatVistaar"
+    guest_sub = f"guest:{fingerprint_id}" if fingerprint_id else "guest:anon"
+
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=settings.jwt_expiry_minutes)
+    payload = {
+        "sub": guest_sub,
+        "name": name,
+        "role": role,
+        "channel": channel,
+        "client_code": channel,
+        "auth_source": "guest_token",
+        "is_guest_user": True,
+        "telemetry_context": {
+            "uid": "guest",
+            "did": fingerprint_id,
+            "channel": channel,
+            "pdata_id": "BharatVistaar",
+            "pdata_ver": "v0.1",
+        },
+        "metadata": metadata,
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+    }
+    if mobile:
+        payload["mobile"] = mobile
+
+    expires_in = int(exp.timestamp() - now.timestamp())
+    return payload, expires_in
+
+
 async def _ensure_nonce_not_reused(nonce: str) -> None:
     cache_key = f"integrity_nonce:{nonce}"
     try:
@@ -415,41 +495,11 @@ async def create_auth_token(request: Optional[AuthRequest] = None):
         )
 
     try:
-        # Use request data if provided, otherwise use defaults
-        mobile = request.mobile if request and request.mobile else "1111111111"
-        name = request.name if request and request.name else "guest"
-        role = request.role if request and request.role else "public"
-        metadata = request.metadata if request and request.metadata else ""
-
-        # Create JWT payload
-        now = datetime.utcnow()
-        exp = now + timedelta(minutes=settings.jwt_expiry_minutes)
-
-        payload = {
-            "mobile": mobile,
-            "name": name,
-            "role": role,
-            "metadata": metadata,
-            "iat": int(now.timestamp()),
-            "exp": int(exp.timestamp())
-        }
-
-        # Encode JWT token using private key
-        token = jwt.encode(
-            payload,
-            private_key,
-            algorithm=settings.jwt_algorithm
-        )
-
+        metadata, fingerprint_id = _parse_auth_request_metadata(request)
+        payload, expires_in = _build_guest_auth_payload(request, metadata, fingerprint_id)
+        token = jwt.encode(payload, private_key, algorithm=settings.jwt_algorithm)
         logger.debug("JWT token created successfully")
-
-        # Calculate expiration time in seconds
-        expires_in = int(exp.timestamp() - now.timestamp())
-
-        return AuthResponse(
-            token=token,
-            expires_in=expires_in
-        )
+        return AuthResponse(token=token, expires_in=expires_in)
 
     except Exception as e:
         logger.error(f"Error creating JWT token: {str(e)}")
