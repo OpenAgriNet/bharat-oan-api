@@ -2,8 +2,6 @@ import asyncio
 import os
 from typing import AsyncGenerator, Awaitable, Optional, TypeVar
 
-from fastapi import BackgroundTasks
-
 from agents.agrinet import agrinet_agent
 from agents.moderation import moderation_agent
 from helpers.langfuse_trace_schema import (
@@ -51,6 +49,23 @@ SSE_KEEPALIVE_INTERVAL_S = float(os.getenv("CHAT_SSE_KEEPALIVE_INTERVAL_S", "3")
 
 T = TypeVar("T")
 
+_detached_tasks: set = set()
+
+
+def _on_detached_task_done(task: asyncio.Task) -> None:
+    _detached_tasks.discard(task)
+    if not task.cancelled() and task.exception() is not None:
+        exc = task.exception()
+        logger.error(f"Detached task failed: {type(exc).__name__}: {exc}")
+
+
+def _run_detached(coro: Awaitable[T]) -> asyncio.Task:
+    """Run `coro` on a task that survives client disconnects."""
+    task = asyncio.ensure_future(coro)
+    _detached_tasks.add(task)
+    task.add_done_callback(_on_detached_task_done)
+    return task
+
 
 async def _await_with_sse_keepalives(
     coro: Awaitable[T],
@@ -66,12 +81,8 @@ async def _await_with_sse_keepalives(
                 yield task.result()
                 return
             yield SSE_KEEPALIVE
-    except asyncio.CancelledError:
-        if not task.done():
-            task.cancel()
-            await task
-        raise
-    except Exception:
+    except BaseException:
+        # BaseException covers GeneratorExit on client disconnect; otherwise the task leaks
         if not task.done():
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
@@ -86,7 +97,6 @@ async def stream_chat_messages(
     target_lang: str,
     user_id: str,
     history: list,
-    background_tasks: BackgroundTasks,
     channel: str = "BharatVistaar",
     qid: str = "",
     current_user: Optional[dict] = None,
@@ -100,9 +110,10 @@ async def stream_chat_messages(
         question_text=query,
         session_id=session_id,
     )
-    background_tasks.add_task(
-        send_telemetry,
-        TelemetryRequest(events=create_frontend_compatible_item_batch(question_event)).model_dump(),
+    _run_detached(
+        send_telemetry(
+            TelemetryRequest(events=create_frontend_compatible_item_batch(question_event)).model_dump()
+        )
     )
 
     lf_env = get_langfuse_tracing_environment()
@@ -136,16 +147,8 @@ async def stream_chat_messages(
 
             user_message = f"{last_response}{deps.get_user_message()}"
 
-            yield SSE_KEEPALIVE
-
-            moderation_data = None
-            async for item in _await_with_sse_keepalives(
-                _run_moderation(user_message, session_id),
-            ):
-                if isinstance(item, str):
-                    yield item
-                else:
-                    moderation_data = item
+            # Keepalives disabled for testing (OD-1892); re-enable via _await_with_sse_keepalives
+            moderation_data = await _run_moderation(user_message, session_id)
             logger.info(f"Moderation data: {moderation_data}")
             deps.update_moderation_str(str(moderation_data))
 
@@ -155,23 +158,16 @@ async def stream_chat_messages(
             logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
             trimmed_history = filter_thinking_from_history(trimmed_history)
 
-            result = None
             with propagate_attributes(tags=[moderation_data.category]):
-                async for item in _await_with_sse_keepalives(
-                    _run_agrinet(
-                        user_message=deps.get_user_message(),
-                        trimmed_history=trimmed_history,
-                        deps=deps,
-                        session_id=session_id,
-                        user_id=user_id,
-                        query=query,
-                        moderation_category=moderation_data.category,
-                    ),
-                ):
-                    if isinstance(item, str):
-                        yield item
-                    else:
-                        result = item
+                result = await _run_agrinet(
+                    user_message=deps.get_user_message(),
+                    trimmed_history=trimmed_history,
+                    deps=deps,
+                    session_id=session_id,
+                    user_id=user_id,
+                    query=query,
+                    moderation_category=moderation_data.category,
+                )
 
             new_messages = result.new_messages()
             logger.info(f"Agent run complete for session {session_id}")
@@ -185,21 +181,32 @@ async def stream_chat_messages(
                 answer_text=result.output,
                 session_id=session_id,
             )
-            background_tasks.add_task(
-                send_telemetry,
-                TelemetryRequest(events=create_frontend_compatible_item_batch(answer_event)).model_dump(),
+            _run_detached(
+                send_telemetry(
+                    TelemetryRequest(events=create_frontend_compatible_item_batch(answer_event)).model_dump()
+                )
             )
-
-            yield result.output
 
             clean_new_messages = filter_thinking_from_history(list(new_messages or []))
             messages = [*history, *clean_new_messages]
             logger.info(
                 f"Updating message history for session {session_id} with {len(messages)} messages"
             )
-            await update_message_history(session_id, messages)
+            # Started before the final yield so a disconnecting client can't cancel it
+            persist_task = _run_detached(update_message_history(session_id, messages))
 
-            get_client().flush()
+            yield result.output
+
+            await asyncio.shield(persist_task)
+
+            # flush() is synchronous; keep it off the event loop
+            await asyncio.to_thread(get_client().flush)
+        except asyncio.CancelledError:
+            logger.info(
+                f"Chat stream cancelled for session {session_id} (client disconnected); "
+                "detached telemetry/history tasks continue in background"
+            )
+            raise
         except Exception as exc:
             error_event = create_chat_error_event(
                 current_user=telemetry_user,
@@ -208,9 +215,10 @@ async def stream_chat_messages(
                 error_text=f"{type(exc).__name__}: {exc}",
                 question_text=query,
             )
-            background_tasks.add_task(
-                send_telemetry,
-                TelemetryRequest(events=create_frontend_compatible_item_batch(error_event)).model_dump(),
+            _run_detached(
+                send_telemetry(
+                    TelemetryRequest(events=create_frontend_compatible_item_batch(error_event)).model_dump()
+                )
             )
             raise
 

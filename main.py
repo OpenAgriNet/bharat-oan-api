@@ -1,8 +1,8 @@
 import logging
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, status, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.datastructures import MutableHeaders
 from app.config import settings
 from app.core.cache import cache
 from contextlib import asynccontextmanager
@@ -19,13 +19,25 @@ for _name in ("helpers.transcription", "helpers.tts", "app.tasks.telemetry", "ap
 from app.routers import chat, transcribe, tts, health, file, token, telemetry
 # from app.routers import suggestions  # Commented out: suggestion agent disabled
 
-class TimingAllowOriginMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-        # Timing-Allow-Origin accepts "*" or a single origin
-        origin = "*" if "*" in settings.allowed_origins or len(settings.allowed_origins) != 1 else settings.allowed_origins[0]
-        response.headers["Timing-Allow-Origin"] = origin
-        return response
+class TimingAllowOriginMiddleware:
+    """Pure ASGI (BaseHTTPMiddleware turns streaming disconnects into cancel-scope errors)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_timing_header(message):
+            if message["type"] == "http.response.start":
+                # Timing-Allow-Origin accepts "*" or a single origin
+                origin = "*" if "*" in settings.allowed_origins or len(settings.allowed_origins) != 1 else settings.allowed_origins[0]
+                MutableHeaders(scope=message)["Timing-Allow-Origin"] = origin
+            await send(message)
+
+        await self.app(scope, receive, send_with_timing_header)
 
 
 @asynccontextmanager

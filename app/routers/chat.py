@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from app.auth.jwt_auth import get_current_user
 from app.services.chat import stream_chat_messages
@@ -13,7 +13,6 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 @router.get("/")
 async def chat_endpoint(
-    background_tasks: BackgroundTasks,
     request: ChatRequest = Depends(),
     current_user: dict = Depends(get_current_user),  # Authentication required
 ):
@@ -42,7 +41,6 @@ async def chat_endpoint(
             target_lang=request.target_lang,
             user_id=request.user_id,
             history=history,
-            background_tasks=background_tasks,
             channel=channel,
             qid=qid,
             current_user=current_user,
@@ -50,10 +48,8 @@ async def chat_endpoint(
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
             "X-QID": qid,
             "Access-Control-Expose-Headers": "X-QID",
         },
-        background=background_tasks,
     )
