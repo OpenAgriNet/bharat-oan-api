@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from fastapi import APIRouter, Header, HTTPException, status
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2 import service_account
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import get_default_httpx_timeout, settings
 from app.core.cache import cache
@@ -78,6 +78,8 @@ class PlayIntegrityAuthRequest(BaseModel):
 
 
 class ApiKeyAuthRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     client_code: str = Field(..., description="Client code for selecting per-client API key")
 
 
@@ -513,10 +515,12 @@ async def create_auth_token_with_api_key(
             detail="Invalid API key."
         )
 
+    extra_claims = request.model_extra or {}
     token, expires_in = _issue_jwt_token(
         channel=client_code,
         expires_minutes=settings.jwt_expiry_minutes,
         include_issued_at=True,
+        extra_claims=extra_claims if extra_claims else None,
     )
     return StaticAuthResponse(token=token, expires_in=expires_in)
 
