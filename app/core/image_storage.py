@@ -4,10 +4,10 @@ Temporary image storage module for uploaded crop images.
 Handles:
 - Saving uploaded images to a temp directory
 - Serving images via a local URL
-- Cleaning up after NPSS processing
-- Moving processed images to a mounted GCS bucket (optional)
+- Cleaning up expired images
+- Moving expired images to a mounted GCS bucket (optional)
 
-The agent NEVER sees raw image bytes — only a URL string.
+Uploaded images are stored temporarily and served by ID when needed.
 """
 import json
 import os
@@ -177,7 +177,6 @@ async def save_uploaded_image(upload_file: UploadFile) -> Tuple[str, str]:
         "created_at": datetime.utcnow(),
         "mimetype": upload_file.content_type or "application/octet-stream",
         "original_name": upload_file.filename or "unknown",
-        "processed": False,
     }
     _upload_registry[image_id] = entry
     _persist_metadata(image_id, entry)
@@ -239,23 +238,7 @@ def get_image_metadata(image_id: str) -> Optional[dict]:
         "created_at": datetime.utcfromtimestamp(file_path.stat().st_mtime),
         "mimetype": _guess_mimetype_from_path(file_path),
         "original_name": file_path.name,
-        "processed": False,
     }
-
-
-def mark_processed(image_id: str) -> None:
-    """Mark an image as processed by NPSS."""
-    try:
-        safe_id = _normalize_image_id(image_id)
-    except ValueError:
-        return
-
-    entry = get_image_metadata(safe_id)
-    if entry:
-        entry["processed"] = True
-        _upload_registry[safe_id] = entry
-        _persist_metadata(safe_id, entry)
-        logger.info(f"Marked image {safe_id} as processed")
 
 
 def cleanup_image(image_id: str, move_to_gcs: bool = False) -> bool:
@@ -313,7 +296,7 @@ def cleanup_image(image_id: str, move_to_gcs: bool = False) -> bool:
 
 def cleanup_expired_images() -> int:
     """
-    Remove images older than IMAGE_TTL_MINUTES that have been processed.
+    Remove images older than IMAGE_TTL_MINUTES.
     Returns count of cleaned images.
     """
     cutoff = datetime.utcnow() - timedelta(minutes=IMAGE_TTL_MINUTES)
@@ -325,12 +308,12 @@ def cleanup_expired_images() -> int:
         except ValueError:
             continue
         entry = _load_metadata(image_id)
-        if entry and entry.get("processed") and entry["created_at"] < cutoff:
+        if entry and entry["created_at"] < cutoff:
             to_clean.append(image_id)
 
     count = 0
     for image_id in to_clean:
         if cleanup_image(image_id, move_to_gcs=False):
             count += 1
-    logger.info(f"Cleaned up {count} expired processed images")
+    logger.info(f"Cleaned up {count} expired images")
     return count

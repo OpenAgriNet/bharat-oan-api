@@ -79,11 +79,10 @@ async def chat_analyze_image_endpoint(
     current_user: dict[str, Any] = Depends(get_current_user),
 ):
     """
-    DEPRECATED: Use POST /api/image/upload first, then send only the returned image_id
-    in a regular chat message.
+    DEPRECATED compatibility endpoint for uploading an image before chat.
 
-    Convenience endpoint that accepts an image upload, saves it to temp storage,
-    and immediately streams a chat response analyzing it.
+    The backend no longer performs direct image analysis. This endpoint stores
+    the uploaded image temporarily and continues the normal chat flow.
     """
     channel = current_user.get("channel", "BharatVistaar")
     authenticated_user = current_user.get("mobile")

@@ -29,7 +29,6 @@ from app.utils import (
     format_message_pairs,
     filter_thinking_from_history,
 )
-from app.services.npss_response import post_process_npss_response
 from agents.deps import FarmerContext
 from langfuse import get_client, observe, propagate_attributes
 
@@ -114,39 +113,13 @@ async def stream_chat_messages(
             def build_user_message() -> str:
                 base_user_message = deps.get_user_message()
                 if is_image_analysis:
-                    if latitude is not None and longitude is not None:
-                        location_instruction = (
-                            f"Browser coordinates are available for this image upload "
-                            f"(latitude={latitude}, longitude={longitude}). "
-                            "You MUST call `analyze_crop_image` and pass those coordinates directly."
-                        )
-                    else:
-                        location_instruction = (
-                            "No browser coordinates were sent with this image upload. "
-                            "Check the conversation history first for any farmer-provided location. "
-                            "If the farmer already mentioned a place in this conversation, call `forward_geocode` on that place and then call `analyze_crop_image` with the resulting coordinates. "
-                            "If no place is available yet, do NOT call `analyze_crop_image` now. "
-                            "Ask the farmer: 'To get the most accurate pest identification, please share your city, town, or village, along with district and state.' "
-                            "Then wait for their reply before calling the tool. "
-                            "If the farmer explicitly refuses to share location, call `analyze_crop_image` without coordinates."
-                        )
                     base_user_message = (
                         f"[USER UPLOADED A CROP IMAGE]\n\n"
                         f"{base_user_message}\n\n"
-                        f"INSTRUCTION: The user has uploaded a crop image for pest/disease identification. "
-                        f"Use the exact image URL already present in the user's message or recent conversation history when calling `analyze_crop_image`. "
-                        f"{location_instruction} "
-                        f"Do NOT call `search_pests_diseases` automatically. "
-                        f"Present the NPSS result as a clean, farmer-friendly structured card in the Selected Language using this format:\n"
-                        f"**Pest:** <pest name>\n"
-                        f"**Crop:** <crop name>\n"
-                        f"**Cause:** <pathogen class, e.g. fungi / bacteria / virus>\n\n"
-                        f"<short symptoms/identification summary translated into the Selected Language>\n\n"
-                        f"Skip any field that is empty, null, or not present in the tool result. "
-                        f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
-                        f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
-                        f"If the tool returns multiple findings, show only the most relevant one. "
-                        f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
+                        "INSTRUCTION: Direct image-based pest or disease analysis is not available in this backend. "
+                        "Do not claim that you inspected the image or identified anything from the photo. "
+                        "Do not mention internal image URLs or backend implementation details. "
+                        "Briefly tell the farmer that image analysis is unavailable right now, then ask them to describe the crop, visible symptoms, affected plant part, and location in text so you can help using the available tools."
                     )
                 return f"{last_response}{base_user_message}"
 
@@ -175,11 +148,7 @@ async def stream_chat_messages(
             new_messages = result.new_messages()
             logger.info(f"Agent run complete for session {session_id}")
 
-            output_text = post_process_npss_response(
-                text=result.output,
-                target_lang=target_lang,
-                npss_used=deps.npss_used,
-            )
+            output_text = result.output
 
             lf_update_current_span(output=output_text)
 
