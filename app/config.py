@@ -121,24 +121,21 @@ class Settings(BaseSettings):
     # LLM Configuration
     llm_provider: Optional[str] = None
     llm_model_name: Optional[str] = None
+    agrinet_routing_enabled: bool = os.getenv("AGRINET_ROUTING_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+    agrinet_route_gpt41_weight: int = int(os.getenv("AGRINET_ROUTE_GPT41_WEIGHT", "70"))
+    agrinet_route_gemma_weight: int = int(os.getenv("AGRINET_ROUTE_GEMMA_WEIGHT", "30"))
+    agrinet_route_ttl_seconds: int = int(os.getenv("AGRINET_ROUTE_TTL_SECONDS", "7200"))
+    agrinet_model_timeout_seconds: float = float(os.getenv("AGRINET_MODEL_TIMEOUT_SECONDS", "45"))
+    agrinet_gemma_provider: str = os.getenv("AGRINET_GEMMA_PROVIDER", "vllm")
+    agrinet_gemma_model_name: Optional[str] = os.getenv("AGRINET_GEMMA_MODEL_NAME")
+    agrinet_gemma_base_url: Optional[str] = os.getenv("AGRINET_GEMMA_BASE_URL")
+    agrinet_gemma_api_key: str = os.getenv("AGRINET_GEMMA_API_KEY", "not-needed")
     marqo_index_name: Optional[str] = None
     marqo_pests_diseases_index_name: Optional[str] = None
 
     # HTTP client timeouts for outbound API calls (connect and read; read should be > connect)
     default_api_timeout: float = 5.0   # connect timeout (DEFAULT_API_TIMEOUT)
     default_api_read_timeout: float = 10.0  # read timeout (DEFAULT_API_READ_TIMEOUT)
-
-    # NPSS Configuration
-    npss_base_url: Optional[str] = os.getenv("NPSS_BASE_URL")
-    npss_username: Optional[str] = os.getenv("NPSS_USERNAME")
-    npss_password: Optional[str] = os.getenv("NPSS_PASSWORD")
-
-    # Image Storage Configuration
-    temp_upload_dir: str = os.getenv("TEMP_UPLOAD_DIR", str(base_dir / ".oan-uploads"))
-    gcs_mount_path: Optional[str] = os.getenv("GCS_MOUNT_PATH")
-    image_ttl_minutes: int = int(os.getenv("IMAGE_TTL_MINUTES", "60"))
-    base_url: Optional[str] = os.getenv("BASE_URL")
-    gcs_move_after_process: bool = os.getenv("GCS_MOVE_AFTER_PROCESS", "").strip().lower() in ("1", "true", "yes", "on")
 
     class Config:
         env_file = ".env"
