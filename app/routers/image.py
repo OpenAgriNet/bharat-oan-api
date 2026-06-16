@@ -23,11 +23,10 @@ async def upload_image(
     current_user: dict[str, Any] = Depends(get_current_user)
 ):
     """
-    Upload a crop image for pest/disease analysis.
+    Upload a crop image and return a temporary image ID.
 
     The image is stored temporarily on the backend and only the `image_id`
     is returned to the client.
-    After NPSS processing, the image is automatically cleaned up or moved to GCS.
     """
     # Validate mimetype
     allowed = {"image/jpeg", "image/jpg", "image/png"}
@@ -52,11 +51,8 @@ async def serve_image(image_id: UUID):
     """
     Serve an uploaded image by its ID.
 
-    This endpoint is used by the `analyze_crop_image` tool to download
-    the image bytes before forwarding them to the NPSS API.
-
     NOTE: No auth required — image IDs are UUIDs (unguessable) and
-    images are temporary (auto-deleted after processing).
+    images are temporary.
     """
     image_id_str = str(image_id)
     file_path = get_image_path(image_id_str)
