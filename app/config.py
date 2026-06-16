@@ -128,12 +128,6 @@ class Settings(BaseSettings):
     default_api_timeout: float = 5.0   # connect timeout (DEFAULT_API_TIMEOUT)
     default_api_read_timeout: float = 10.0  # read timeout (DEFAULT_API_READ_TIMEOUT)
 
-    # Image Storage Configuration
-    temp_upload_dir: str = os.getenv("TEMP_UPLOAD_DIR", str(base_dir / ".oan-uploads"))
-    gcs_mount_path: Optional[str] = os.getenv("GCS_MOUNT_PATH")
-    image_ttl_minutes: int = int(os.getenv("IMAGE_TTL_MINUTES", "60"))
-    base_url: Optional[str] = os.getenv("BASE_URL")
-
     class Config:
         env_file = ".env"
         extra = 'ignore'  # Ignore extra fields from .env

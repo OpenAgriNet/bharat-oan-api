@@ -53,7 +53,6 @@ async def stream_chat_messages(
     history: list,
     background_tasks: BackgroundTasks,
     channel: str = "BharatVistaar",
-    is_image_analysis: bool = False,
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
     qid: str = "",
@@ -109,26 +108,12 @@ async def stream_chat_messages(
             last_response = (
                 f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
             )
-
-            def build_user_message() -> str:
-                base_user_message = deps.get_user_message()
-                if is_image_analysis:
-                    base_user_message = (
-                        f"[USER UPLOADED A CROP IMAGE]\n\n"
-                        f"{base_user_message}\n\n"
-                        "INSTRUCTION: Direct image-based pest or disease analysis is not available in this backend. "
-                        "Do not claim that you inspected the image or identified anything from the photo. "
-                        "Do not mention internal image URLs or backend implementation details. "
-                        "Briefly tell the farmer that image analysis is unavailable right now, then ask them to describe the crop, visible symptoms, affected plant part, and location in text so you can help using the available tools."
-                    )
-                return f"{last_response}{base_user_message}"
-
-            user_message = build_user_message()
+            user_message = f"{last_response}{deps.get_user_message()}"
 
             moderation_data = await _run_moderation(user_message, session_id)
             logger.info(f"Moderation data: {moderation_data}")
             deps.update_moderation_str(str(moderation_data))
-            user_message = build_user_message()
+            user_message = f"{last_response}{deps.get_user_message()}"
 
             trimmed_history = trim_history(history, max_tokens=64_000)
             logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
