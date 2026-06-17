@@ -79,6 +79,7 @@ class PlayIntegrityAuthRequest(BaseModel):
 
 class ApiKeyAuthRequest(BaseModel):
     client_code: str = Field(..., description="Client code for selecting per-client API key")
+    claims: Optional[Dict[str, Any]] = Field(None, description="Additional claims to include in the JWT")
 
 
 def _normalize_client_code(client_code: str) -> str:
@@ -530,6 +531,7 @@ async def create_auth_token_with_api_key(
         channel=client_code,
         expires_minutes=settings.jwt_expiry_minutes,
         include_issued_at=True,
+        extra_claims=request.claims,
     )
     return StaticAuthResponse(token=token, expires_in=expires_in)
 
