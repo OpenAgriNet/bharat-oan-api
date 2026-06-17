@@ -6,6 +6,7 @@ the agent does not call MCP tools/list on every run. Only tools/call hits the MC
 """
 from __future__ import annotations
 
+import inspect
 import json
 import os
 from pathlib import Path
@@ -86,6 +87,19 @@ def _build_http_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(headers=_mcp_headers(), timeout=timeout)
 
 
+def _streamable_http_kwargs() -> dict[str, Any]:
+    """Build kwargs compatible across pydantic_ai MCP client versions.
+
+    Newer versions reject passing both `headers` and `http_client`, while older
+    versions may not support `http_client` yet. Prefer a preconfigured
+    AsyncClient when available and fall back to plain headers otherwise.
+    """
+    init_params = inspect.signature(MCPServerStreamableHTTP.__init__).parameters
+    if "http_client" in init_params:
+        return {"http_client": _build_http_client()}
+    return {"headers": _mcp_headers()}
+
+
 async def inject_farmer_context(
     ctx: RunContext[FarmerContext],
     call_tool: CallToolFunc,
@@ -139,8 +153,7 @@ def create_vistaar_mcp_toolset() -> ManifestMCPToolset:
     return ManifestMCPToolset(
         manifest_tools=load_vistaar_tool_manifest(),
         url=settings.mcp_server_url,
-        headers=_mcp_headers(),
-        http_client=_build_http_client(),
+        **_streamable_http_kwargs(),
         process_tool_call=inject_farmer_context,
         timeout=settings.mcp_timeout_seconds,
         read_timeout=settings.mcp_timeout_seconds,
