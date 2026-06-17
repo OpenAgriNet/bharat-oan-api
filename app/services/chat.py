@@ -177,10 +177,8 @@ async def stream_chat_messages(
             [
                 f"env:{lf_env}",
                 f"channel:{channel}",
-                f"agrinet-route:{route_decision.route}",
-                f"route-source:{route_decision.source}",
                 f"model:{route_decision.model_name}",
-                f"model:{LANGFUSE_MODERATION_MODEL_NAME}",
+                f"moderation:{LANGFUSE_MODERATION_MODEL_NAME}",
             ]
         )
     )
