@@ -1,6 +1,5 @@
-import asyncio
 import os
-from typing import AsyncGenerator, Awaitable, Optional, TypeVar
+from typing import AsyncGenerator, Optional
 
 from fastapi import BackgroundTasks
 
@@ -46,36 +45,6 @@ CHAT_TRACE_NAME = (
     or "bharat-vistaar-chat"
 )
 CHAT_CHAIN_SPAN_NAME = "chain.chat"
-SSE_KEEPALIVE = "SSE_KEEPALIVE"
-SSE_KEEPALIVE_INTERVAL_S = float(os.getenv("CHAT_SSE_KEEPALIVE_INTERVAL_S", "3"))
-
-T = TypeVar("T")
-
-
-async def _await_with_sse_keepalives(
-    coro: Awaitable[T],
-    *,
-    interval_s: float = SSE_KEEPALIVE_INTERVAL_S,
-) -> AsyncGenerator[str, T]:
-    """Yield SSE comment heartbeats until `coro` completes, then return its result."""
-    task = asyncio.create_task(coro)
-    try:
-        while True:
-            done, _ = await asyncio.wait({task}, timeout=interval_s)
-            if task in done:
-                yield task.result()
-                return
-            yield SSE_KEEPALIVE
-    except asyncio.CancelledError:
-        if not task.done():
-            task.cancel()
-            await task
-        raise
-    except Exception:
-        if not task.done():
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
-        raise
 
 
 @observe(name=CHAT_CHAIN_SPAN_NAME, as_type="chain")
@@ -136,16 +105,7 @@ async def stream_chat_messages(
 
             user_message = f"{last_response}{deps.get_user_message()}"
 
-            yield SSE_KEEPALIVE
-
-            moderation_data = None
-            async for item in _await_with_sse_keepalives(
-                _run_moderation(user_message, session_id),
-            ):
-                if isinstance(item, str):
-                    yield item
-                else:
-                    moderation_data = item
+            moderation_data = await _run_moderation(user_message, session_id)
             logger.info(f"Moderation data: {moderation_data}")
             deps.update_moderation_str(str(moderation_data))
 
@@ -155,23 +115,16 @@ async def stream_chat_messages(
             logger.info(f"Trimmed history length: {len(trimmed_history)} messages")
             trimmed_history = filter_thinking_from_history(trimmed_history)
 
-            result = None
             with propagate_attributes(tags=[moderation_data.category]):
-                async for item in _await_with_sse_keepalives(
-                    _run_agrinet(
-                        user_message=deps.get_user_message(),
-                        trimmed_history=trimmed_history,
-                        deps=deps,
-                        session_id=session_id,
-                        user_id=user_id,
-                        query=query,
-                        moderation_category=moderation_data.category,
-                    ),
-                ):
-                    if isinstance(item, str):
-                        yield item
-                    else:
-                        result = item
+                result = await _run_agrinet(
+                    user_message=deps.get_user_message(),
+                    trimmed_history=trimmed_history,
+                    deps=deps,
+                    session_id=session_id,
+                    user_id=user_id,
+                    query=query,
+                    moderation_category=moderation_data.category,
+                )
 
             new_messages = result.new_messages()
             logger.info(f"Agent run complete for session {session_id}")
