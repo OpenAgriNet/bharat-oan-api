@@ -1,46 +1,7 @@
 services:
-  redis:
-    container_name: sva_redis
-    image: redis/redis-stack:latest
-    ports:
-      - "6379:6379"
-      - "8001:8001"
-    restart: unless-stopped
-    networks:
-      - svanetwork
-
-  mcp:
-    container_name: vistaar_mcp
-    build:
-      context: ../MCP-OAN
-      dockerfile: Dockerfile
-    image: bharat-oan-api-mcp
-    ports:
-      - "3001:3001"
-    env_file:
-      - .env
-    environment:
-      MCP_HOST: 0.0.0.0
-      MCP_PORT: 3001
-      MCP_TRANSPORT: streamable-http
-      REDIS_HOST: sva_redis
-      REDIS_PORT: 6379
-    depends_on:
-      - redis
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1',3001),2); s.close()\""]
-      interval: 10s
-      timeout: 5s
-      retries: 8
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - svanetwork
-
   app:
     container_name: sva_app
     build: .
-    image: bharat-oan-api-app
     ports:
       - "8000:8000"
     expose:
@@ -48,26 +9,11 @@ services:
     volumes:
       - .:/app
     env_file:
-      - .env
-    environment:
-      MCP_SERVER_URL: http://vistaar_mcp:3001/mcp
-      REDIS_HOST: sva_redis
-      REDIS_PORT: 6379
-    depends_on:
-      redis:
-        condition: service_started
-      mcp:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/health/live >/dev/null || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+      - .env  
     restart: unless-stopped
     networks:
       - svanetwork
-
+      
 networks:
   svanetwork:
     external: true
