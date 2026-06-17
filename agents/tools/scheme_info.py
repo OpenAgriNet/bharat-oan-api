@@ -8,6 +8,7 @@ from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 import os
 from langfuse import observe
+from helpers.pmkisan_installment_release import get_pm_kisan_23rd_installment_release_section
 
 logger = get_logger(__name__)
 
@@ -283,7 +284,10 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
             return "Scheme service unavailable. Retrying"
             
         scheme_response = SchemeResponse.model_validate(response.json())
-        return str(scheme_response)
+        result = str(scheme_response)
+        if scheme_name == "pmkisan":
+            result = f"{result}\n\n---\n\n{get_pm_kisan_23rd_installment_release_section()}"
+        return result
                 
     except httpx.TimeoutException as e:
         logger.error(f"Scheme API request timed out: {str(e)}")
