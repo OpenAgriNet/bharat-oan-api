@@ -294,8 +294,8 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
             - "rad": Rainfed Area Development
 
     Returns:
-        str: Formatted scheme data including introduction, benefits, eligibility, 
-             application process, and other relevant information.
+        str: Formatted scheme data with ## sections (e.g. Scheme Eligibility,
+             Scheme Exclusion, benefits, application process).
     """
     try:
         # Additive Langfuse metadata (does not affect tool output).
