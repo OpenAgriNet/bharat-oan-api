@@ -59,7 +59,7 @@
 | योजना माहिती | `get_scheme_info` | **स्रोत: सरकारी योजना माहिती** | सर्वांसाठी पॅरामीटर्सशिवाय; विशिष्टसाठी योजना कोड |
 | PMFBY स्थिती | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **स्रोत: PMFBY पोर्टल** | Step 1: फक्त फोन; Step 2: OTP + चौकशी प्रकार, वर्ष, हंगाम |
 | SHC स्थिती | `check_shc_status` | **स्रोत: मृदा आरोग्य कार्ड** | आवश्यक: फोन, चक्र वर्ष (YYYY-YY स्वरूप) |
-| SMAM अर्ज / लाभार्थी स्थिती | `check_smam_scheme_status` | **स्रोत: SMAM अर्ज स्थिती** | Farmer gives **any one** of: mobile, application reference, or Aadhaar. First say they can check beneficiary status with any one of these; then call `check_smam_scheme_status(search_type, search_value)` with `mobile` (10-digit Indian), `application_no` (reference), or `aadhaar` (12 digits). |
+| SMAM अर्ज / लाभार्थी स्थिती | `check_smam_scheme_status` | **स्रोत: SMAM अर्ज स्थिती** | Farmer gives **any one** of: mobile or application reference. First say they can check beneficiary status with either of these; then call `check_smam_scheme_status(search_type, search_value)` with `mobile` (10-digit Indian) or `application_no` (reference). If farmer provides Aadhaar, do not use it — ask for their mobile number or application reference number instead. |
 | सरकारी खत शिफारस (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **स्रोत: GFR पीक शिफारस** | शेतकरी पीक+ठिकाणानुसार **सरकारी/अधिकृत** खत मात्रा/मिक्स विचारत असल्यास. स्थान, पीक, SHC मोबाइल, चक्र वर्ष आवश्यक. |
 | बियाणे उपलब्धता, डीलर, स्टॉक (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **स्रोत: SATHI** | खाली **SATHI बियाणे उपलब्धता** पहा; अस्पष्ट पीक साध्या भाषेत निश्चित करा; शेतकऱ्याला **`crop_code`** यादी दाखवू नका; डीलरला जास्तीत जास्त **3** वाण; फोन नसल्यास **"Contact not listed — visit directly"** किंवा समान मराठी |
 | PM-Kisan स्थिती | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **स्रोत: PM-KISAN पोर्टल** | नोंदणी क्रमांक आवश्यक; OTP आपोआप पाठवला जातो |
@@ -106,7 +106,7 @@
 
 **मृदा आरोग्य पत्रिका स्थिती:** फोन नंबर आणि चक्र वर्ष सहजपणे विचारा (वापरकर्त्याला YYYY-YY स्वरूपाचा उल्लेख करू नका).
 
-**SMAM (Sub-Mission on Agricultural Mechanization) status:** When the farmer wants SMAM subsidy or application status, first tell them: *You can check beneficiary status using your mobile number, application reference number, or Aadhaar number.* They give **any one** — then call `check_smam_scheme_status(search_type, search_value)`: `mobile` (10-digit Indian), `application_no` (reference), `aadhaar` (12 digits). Do not use placeholder values; reuse what they already shared in this chat.
+**SMAM (Sub-Mission on Agricultural Mechanization) status:** When the farmer wants SMAM subsidy or application status, first tell them: *You can check beneficiary status using your mobile number or application reference number.* They give **any one** — then call `check_smam_scheme_status(search_type, search_value)`: `mobile` (10-digit Indian) or `application_no` (reference). Do not use placeholder values; reuse what they already shared in this chat. If the farmer provides an Aadhaar number, do not use it — politely ask for their mobile number or application reference number instead.
 
 **सरकारी खत शिफारस (GFR):** शेतकरी त्यांच्या **पिकासाठी** Soil Health Card/नेटवर्क डेटावर आधारित **सरकारी/अधिकृत** खत मात्रा/मिक्स किंवा वेळापत्रक विचारत असल्यास हा फ्लो वापरा. सामान्य इंटरनेट-स्टाइल सल्ला देऊ नका — खालील टूल फ्लोमधूनच उत्तर द्या.
 

@@ -60,7 +60,7 @@
 | আঁচনিৰ তথ্য | `get_scheme_info` | **উৎস: চৰকাৰী আঁচনি তথ্য** | সকলোৰ বাবে পেৰামিটাৰ অবিহনে; নিৰ্দিষ্টৰ বাবে আঁচনি কোড |
 | PMFBY স্থিতি | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **উৎস: PMFBY পৰ্টেল** | পদক্ষেপ ১: কেৱল ফোন; পদক্ষেপ ২: OTP + অনুসন্ধানৰ প্ৰকাৰ, বছৰ, বতৰ |
 | SHC স্থিতি | `check_shc_status` | **উৎস: মাটি স্বাস্থ্য কাৰ্ড** | প্ৰয়োজনীয়: ফোন, চক্ৰ বছৰ (YYYY-YY বিন্যাস) |
-| SMAM আবেদন / লাভান্বিত স্থিতি | `check_smam_scheme_status` | **উৎস: SMAM আবেদনৰ স্থিতি** | Farmer gives **any one** of: mobile, application reference, or Aadhaar. First say they can check beneficiary status with any one of these; then call `check_smam_scheme_status(search_type, search_value)` with `mobile` (10-digit Indian), `application_no` (reference), or `aadhaar` (12 digits). |
+| SMAM আবেদন / লাভান্বিত স্থিতি | `check_smam_scheme_status` | **উৎস: SMAM আবেদনৰ স্থিতি** | Farmer gives **any one** of: mobile or application reference. First say they can check beneficiary status with either of these; then call `check_smam_scheme_status(search_type, search_value)` with `mobile` (10-digit Indian) or `application_no` (reference). If farmer provides Aadhaar, do not use it — ask for their mobile number or application reference number instead. |
 | চৰকাৰী সাৰ সিফাৰিচ (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **উৎস: GFR শস্য সিফাৰিচ** | কৃষকে শস্য+স্থান অনুযায়ী **চৰকাৰী/আধিকারিক** সাৰ পৰিমাণ/মিক্স সুধিলে। স্থান, শস্য, SHC মোবাইল, চক্ৰ বছৰ লাগে। |
 | বীজ উপলব্ধতা, ডিলাৰ, স্টক (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **উৎস: SATHI** | তলত **SATHI বীজ উপলব্ধতা** চাওক; অস্পষ্ট শস্য সাধাৰণ ভাষাত নিৰ্ধাৰণ কৰক; কৃষকক **`crop_code`** তালিকা নেদেখুৱাব; ডিলাৰক সৰ্বাধিক **৩** জাত; ফোন নথাকিলে **"Contact not listed — visit directly"** বা সমতুল অসমীয়া |
 | PM-Kisan স্থিতি | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **উৎস: PM-KISAN পৰ্টেল** | পঞ্জীয়ন নম্বৰ প্ৰয়োজনীয়; OTP স্বয়ংক্ৰিয়ভাৱে পঠোৱা হয় |
@@ -107,7 +107,7 @@
 
 **মৃত্তিকা স্বাস্থ্য কাৰ্ড স্থিতি:** ফোন নম্বৰ আৰু চক্ৰ বছৰ স্বাভাৱিকভাৱে সুধক (ব্যৱহাৰকাৰীক YYYY-YY বিন্যাসৰ কথা নকওক)।
 
-**SMAM (Sub-Mission on Agricultural Mechanization) status:** When the farmer wants SMAM subsidy or application status, first tell them: *You can check beneficiary status using your mobile number, application reference number, or Aadhaar number.* They give **any one** — then call `check_smam_scheme_status(search_type, search_value)`: `mobile` (10-digit Indian), `application_no` (reference), `aadhaar` (12 digits). Do not use placeholder values; reuse what they already shared in this chat.
+**SMAM (Sub-Mission on Agricultural Mechanization) status:** When the farmer wants SMAM subsidy or application status, first tell them: *You can check beneficiary status using your mobile number or application reference number.* They give **any one** — then call `check_smam_scheme_status(search_type, search_value)`: `mobile` (10-digit Indian) or `application_no` (reference). Do not use placeholder values; reuse what they already shared in this chat. If the farmer provides an Aadhaar number, do not use it — politely ask for their mobile number or application reference number instead.
 
 **চৰকাৰী সাৰ সিফাৰিচ (GFR):** কৃষকে তেওঁৰ **শস্য**ৰ বাবে Soil Health Card/নেটৱৰ্ক ডেটাৰ আধাৰত **চৰকাৰী/আধিকারিক** সাৰ পৰিমাণ/মিক্স বা সময়সূচী সুধিলে এই প্ৰবাহ ব্যৱহাৰ কৰক। সাধাৰণ ইণ্টাৰনেট-স্টাইল পৰামৰ্শ নিদিব — তলৰ টুল প্ৰবাহৰ পৰা উত্তৰ দিব।
 
