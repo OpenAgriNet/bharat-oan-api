@@ -20,7 +20,7 @@ from helpers.utils import get_logger
 
 logger = get_logger(__name__)
 
-SmamSearchType = Literal["application_no", "mobile", "aadhaar"]
+SmamSearchType = Literal["application_no", "mobile"]
 
 
 class Descriptor(BaseModel):
@@ -243,12 +243,6 @@ def _normalize_search_value(search_type: SmamSearchType, raw: str) -> str:
             )
         return digits
 
-    if search_type == "aadhaar":
-        digits = _digits_only(v)
-        if len(digits) != 12:
-            raise ValueError("Invalid Aadhaar number. Please provide all 12 digits.")
-        return digits
-
     # application_no: preserve alphanumeric refs; for numeric-only inputs, normalize digits.
     if search_type == "application_no" and not re.search(r"[A-Za-z]", v):
         digits = _digits_only(v)
@@ -267,8 +261,8 @@ async def check_smam_scheme_status(
     Use this tool when the farmer wants to check SMAM subsidy or application status.
 
     Args:
-        search_type: Lookup type — `mobile` (10-digit Indian), `application_no` (application reference
-            or numeric id), or `aadhaar` (12 digits).
+        search_type: Lookup type — `mobile` (10-digit Indian) or `application_no` (application reference
+            or numeric id).
         search_value: Identifier shared by the farmer (no placeholders). Numeric values are
             digit-normalized when applicable (e.g. `+91` / leading `0` removed for mobile-shaped inputs).
 
