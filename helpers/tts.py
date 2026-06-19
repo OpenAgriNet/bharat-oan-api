@@ -26,7 +26,7 @@ def get_bhashini_tts_client():
     if _bhashini_client is None:
         _bhashini_client = httpx.Client(
             timeout=httpx.Timeout(
-                connect=60.0,
+                connect=10.0,
                 read=120.0,
                 write=60.0,
                 pool=10.0
