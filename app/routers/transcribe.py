@@ -39,6 +39,7 @@ async def transcribe(
     start_time = time.time()
     success, status_code, error_code, error_message = False, 500, None, None
     transcription, response_lang_code = None, None
+    uid = str(authenticated_user) if authenticated_user is not None else "system"
 
     try:
         if request.service_type == 'bhashini':
@@ -56,20 +57,26 @@ async def transcribe(
         raise
     finally:
         latency_ms = (time.time() - start_time) * 1000
-        telemetry_event = create_asr_event(
-            success=success,
-            latency_ms=latency_ms,
-            status_code=status_code,
-            error_code=error_code,
-            error_message=error_message,
-            language=request.lang_code if request.service_type == 'bhashini' else None,
-            session_id=session_id,
-            text=transcription,
-            qid=request.qid or f"asr_{session_id}",
-            uid=authenticated_user
-        )
-        telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
-        background_tasks.add_task(send_telemetry, telemetry_data)
+        try:
+            telemetry_event = create_asr_event(
+                success=success,
+                latency_ms=latency_ms,
+                status_code=status_code,
+                error_code=error_code,
+                error_message=error_message,
+                language=request.lang_code if request.service_type == 'bhashini' else None,
+                session_id=session_id,
+                text=transcription,
+                qid=request.qid or f"asr_{session_id}",
+                uid=uid
+            )
+            telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
+            background_tasks.add_task(send_telemetry, telemetry_data)
+        except Exception:
+            logger.exception(
+                "Transcribe telemetry event build failed | session_id=%s service_type=%s",
+                session_id, request.service_type
+            )
 
     logger.info(
         "Transcribe output | session_id=%s status=success result_length=%s latency_ms=%.2f",
