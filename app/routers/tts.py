@@ -39,6 +39,7 @@ async def tts(
     start_time = time.time()
     success, status_code, error_code, error_message = False, 500, None, None
     audio_data = None
+    uid = str(authenticated_user) if authenticated_user is not None else "system"
 
     try:
         audio_bytes = text_to_speech_bhashini(
@@ -55,20 +56,26 @@ async def tts(
         raise
     finally:
         latency_ms = (time.time() - start_time) * 1000
-        telemetry_event = create_tts_event(
-            success=success,
-            latency_ms=latency_ms,
-            status_code=status_code,
-            error_code=error_code,
-            error_message=error_message,
-            language=request.target_lang,
-            session_id=session_id,
-            text=request.text,
-            qid=request.qid or f"tts_{session_id}",
-            uid=authenticated_user
-        )
-        telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
-        background_tasks.add_task(send_telemetry, telemetry_data)
+        try:
+            telemetry_event = create_tts_event(
+                success=success,
+                latency_ms=latency_ms,
+                status_code=status_code,
+                error_code=error_code,
+                error_message=error_message,
+                language=request.target_lang,
+                session_id=session_id,
+                text=request.text,
+                qid=request.qid or f"tts_{session_id}",
+                uid=uid
+            )
+            telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
+            background_tasks.add_task(send_telemetry, telemetry_data)
+        except Exception:
+            logger.exception(
+                "TTS telemetry event build failed | session_id=%s target_lang=%s",
+                session_id, request.target_lang
+            )
 
     logger.info(
         "TTS output | session_id=%s status=success audio_base64_len=%s latency_ms=%.2f",
