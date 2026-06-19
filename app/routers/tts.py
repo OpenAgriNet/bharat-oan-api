@@ -23,7 +23,7 @@ async def tts(
 ):
     """Convert text to speech using the specified service."""
     session_id = request.session_id or str(uuid.uuid4())
-    authenticated_user = current_user.get("mobile")
+    authenticated_user = current_user.get("mobile") or "system"
 
     logger.info(
         "TTS input | target_lang=%s session_id=%s text_length=%s",

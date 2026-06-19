@@ -23,7 +23,7 @@ async def transcribe(
 ):
     """Transcribe audio content using the specified service."""
     session_id = request.session_id or str(uuid.uuid4())
-    authenticated_user = current_user.get("mobile")
+    authenticated_user = current_user.get("mobile") or "system"
 
     logger.info(
         "Transcribe input | service_type=%s lang_code=%s session_id=%s audio_content_len=%s",
