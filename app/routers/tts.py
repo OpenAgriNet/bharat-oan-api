@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, BackgroundTasks
+from fastapi import APIRouter, Body, Depends, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 from app.models.requests import TTSRequest
 from helpers.tts import text_to_speech_bhashini
@@ -52,7 +52,6 @@ async def tts(
             "TTS failed | session_id=%s target_lang=%s error=%s message=%s",
             session_id, request.target_lang, error_code, error_message[:500]
         )
-        raise
     finally:
         latency_ms = (time.time() - start_time) * 1000
         telemetry_event = create_tts_event(
@@ -69,6 +68,9 @@ async def tts(
         )
         telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
         background_tasks.add_task(send_telemetry, telemetry_data)
+
+    if not success:
+        raise HTTPException(status_code=502, detail=f"TTS service error: {error_message}")
 
     logger.info(
         "TTS output | session_id=%s status=success audio_base64_len=%s latency_ms=%.2f",
