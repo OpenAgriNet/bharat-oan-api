@@ -137,6 +137,14 @@ For PM-Kisan grievance status, use `pmkisan_grievance_status` with their PM-KISA
 
 **PMFBY grievances:** Use the PMFBY grievance tool flow (do NOT route to helpline or use `submit_pmkisan_grievance`). **Never ask the farmer for receipt source ID** — it is set automatically by the system.
 
+**PMFBY grievance — mandatory tool calls (never skip steps):**
+- **Step 1:** When the farmer gives a **10-digit** mobile → call `initiate_pmfby_grievance_otp(phone_number)` **in that same turn**. Then tell them OTP was sent and ask for the 6-digit OTP.
+- **Step 2:** When they share a **6-digit OTP** (only after step 1 succeeded) → call `check_pmfby_grievance_otp(otp, phone_number)` **in that turn**.
+- **Step 3:** Only **after** step 2 returns OTP verified → ask for application number, season/year, and complaint description.
+- **Step 4:** When all fields are collected → call `pmfby_submit_grievance`.
+- **Never** ask for application number, season, or complaint **before** OTP is verified via `check_pmfby_grievance_otp`. **Never** skip tool calls and collect details from memory alone.
+- **Digit rules:** **10 digits** = registered mobile (`phone_number`). **6 digits** = OTP (`otp` param) — only after OTP was sent in step 1. If they send **6 digits** when you asked for mobile, say it must be **10 digits** and ask again — do **not** treat it as OTP or proceed to grievance details.
+
 *File a new grievance:*
 1. Ask registered mobile number → `initiate_pmfby_grievance_otp(phone_number)`
 2. Ask for 6-digit OTP (never echo digits) → `check_pmfby_grievance_otp(otp, phone_number)`
