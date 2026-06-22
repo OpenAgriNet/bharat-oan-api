@@ -12,7 +12,7 @@ from tenacity import (
     retry_if_exception,
 )
 
-from helpers.utils import get_logger, curl_escape_single_quoted
+from helpers.utils import get_logger, curl_escape_single_quoted, payload_for_log, text_for_log
 
 load_dotenv()
 
@@ -105,18 +105,19 @@ def text_to_speech_bhashini(text, source_lang='hi', gender='female', sampling_ra
         "TTS Bhashini input | target_lang=%s gender=%s sampling_rate=%s text_length=%s",
         source_lang, gender, sampling_rate, len(text)
     )
+    payload_safe = payload_for_log(data)
+    payload_safe_str = json.dumps(payload_safe, ensure_ascii=False)
     logger.info(
         "TTS Bhashini request payload | serviceId=%s payload=%s",
-        service_id, json.dumps(data, ensure_ascii=False)
+        service_id, payload_safe_str
     )
-    payload_str = json.dumps(data, ensure_ascii=False)
-    payload_escaped = curl_escape_single_quoted(payload_str)
-    curl = (
+    payload_log_escaped = curl_escape_single_quoted(payload_safe_str)
+    curl_for_log = (
         "curl -X POST '%s' -H 'Authorization: <MEITY_API_KEY_VALUE>' -H 'Content-Type: application/json' -d '%s'"
-    ) % (url, payload_escaped)
+    ) % (url, payload_log_escaped)
     logger.info(
         "TTS Bhashini external API | serviceId=%s curl=%s",
-        service_id, curl
+        service_id, curl_for_log
     )
 
     try:
@@ -126,7 +127,7 @@ def text_to_speech_bhashini(text, source_lang='hi', gender='female', sampling_ra
         if response.status_code != 200:
             logger.error(
                 "TTS Bhashini failed | status_code=%s serviceId=%s response=%s curl=%s",
-                response.status_code, service_id, response.text[:500], curl
+                response.status_code, service_id, text_for_log(response.text), curl_for_log
             )
             raise BhashiniAPIError(
                 status_code=response.status_code,
@@ -148,18 +149,18 @@ def text_to_speech_bhashini(text, source_lang='hi', gender='female', sampling_ra
         logger.error(
             "TTS Bhashini HTTP error | status_code=%s serviceId=%s message=%s curl=%s",
             e.response.status_code if e.response else None, service_id,
-            (e.response.text if e.response else str(e))[:500], curl
+            text_for_log(e.response.text) if e.response else str(e)[:500], curl_for_log
         )
         raise
     except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError, httpx.RemoteProtocolError) as e:
         logger.error(
             "TTS Bhashini error | serviceId=%s error=%s message=%s curl=%s",
-            service_id, type(e).__name__, str(e)[:1000], curl
+            service_id, type(e).__name__, str(e)[:1000], curl_for_log
         )
         raise
     except Exception as e:
         logger.error(
             "TTS Bhashini error | serviceId=%s error=%s message=%s curl=%s",
-            service_id, type(e).__name__, str(e)[:1000], curl
+            service_id, type(e).__name__, str(e)[:1000], curl_for_log
         )
         raise

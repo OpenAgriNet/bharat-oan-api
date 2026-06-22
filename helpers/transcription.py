@@ -16,7 +16,7 @@ from langcodes import Language
 from openai import OpenAI
 from io import BytesIO
 
-from helpers.utils import get_logger, curl_escape_single_quoted, payload_for_log
+from helpers.utils import get_logger, curl_escape_single_quoted, payload_for_log, text_for_log
 
 load_dotenv()
 
@@ -145,14 +145,14 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
         "Transcribe Bhashini request payload | serviceId=%s payload=%s",
         service_id, json.dumps(payload_safe, ensure_ascii=False)
     )
-    payload_str = json.dumps(data, ensure_ascii=False)
-    payload_escaped = curl_escape_single_quoted(payload_str)
-    curl = (
+    payload_safe_str = json.dumps(payload_safe, ensure_ascii=False)
+    payload_log_escaped = curl_escape_single_quoted(payload_safe_str)
+    curl_for_log = (
         "curl -X POST '%s' -H 'Authorization: <MEITY_API_KEY_VALUE>' -H 'Content-Type: application/json' -d '%s'"
-    ) % (url, payload_escaped)
+    ) % (url, payload_log_escaped)
     logger.info(
         "Transcribe Bhashini external API | serviceId=%s curl=%s",
-        service_id, curl
+        service_id, curl_for_log
     )
 
     client = get_bhashini_client()
@@ -163,7 +163,7 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
         if response.status_code != 200:
             logger.error(
                 "Transcribe Bhashini failed | status_code=%s serviceId=%s response=%s curl=%s",
-                response.status_code, service_id, response.text[:500], curl
+                response.status_code, service_id, text_for_log(response.text), curl_for_log
             )
             raise BhashiniAPIError(
                 status_code=response.status_code,
@@ -184,7 +184,7 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
     except httpx.HTTPStatusError as e:
         logger.error(
             "Transcribe Bhashini HTTP error | status_code=%s serviceId=%s message=%s curl=%s",
-            e.response.status_code, service_id, (e.response.text or str(e))[:500], curl
+            e.response.status_code, service_id, text_for_log(e.response.text or str(e)), curl_for_log
         )
         raise BhashiniAPIError(
             status_code=e.response.status_code,
@@ -194,7 +194,7 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
     except Exception as e:
         logger.error(
             "Transcribe Bhashini error | serviceId=%s error=%s message=%s curl=%s",
-            service_id, type(e).__name__, str(e)[:1000], curl
+            service_id, type(e).__name__, str(e)[:1000], curl_for_log
         )
         raise
 
