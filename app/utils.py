@@ -198,7 +198,13 @@ def format_message_pairs(history: List[ModelMessage], limit: int = None) -> List
     formatted_messages = []
     
     for user_part, assistant_part in pairs:
-        formatted_pair = f"""**User Message**:\n{user_part.content}\n\n**Assistant Message**:\n{assistant_part.content}"""
+        # Strip the injected "**Conversation**\n\n...\n\n---\n\n" prefix from prior turns
+        # so message pairs don't recursively embed previous conversation blocks.
+        user_content = user_part.content
+        separator = "\n\n---\n\n"
+        if separator in user_content:
+            user_content = user_content.split(separator, 1)[1]
+        formatted_pair = f"""**User Message**:\n{user_content}\n\n**Assistant Message**:\n{assistant_part.content}"""
         formatted_messages.append(formatted_pair)
     
     return formatted_messages
