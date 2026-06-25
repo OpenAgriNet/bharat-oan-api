@@ -26,6 +26,7 @@ from app.services.agrinet_routing import (
     resolve_agrinet_route,
     set_session_agrinet_route,
 )
+from app.services.npss_response import post_process_npss_response
 from app.tasks.telemetry import send_telemetry
 from app.utils import (
     filter_thinking_from_history,
@@ -127,6 +128,7 @@ async def stream_chat_messages(
     history: list,
     background_tasks: BackgroundTasks,
     channel: str = "BharatVistaar",
+    is_image_analysis: bool = False,
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
     qid: str = "",
@@ -206,12 +208,50 @@ async def stream_chat_messages(
             last_response = (
                 f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
             )
-            user_message = f"{last_response}{deps.get_user_message()}"
+
+            def build_user_message() -> str:
+                base_user_message = deps.get_user_message()
+                if is_image_analysis:
+                    if latitude is not None and longitude is not None:
+                        location_instruction = (
+                            f"Browser coordinates are available for this image upload "
+                            f"(latitude={latitude}, longitude={longitude}). "
+                            "You MUST call `analyze_crop_image` and pass those coordinates directly."
+                        )
+                    else:
+                        location_instruction = (
+                            "No browser coordinates were sent with this image upload. "
+                            "Do NOT call any geocoding tool or try to provide NPSS state, district, subdistrict, or village IDs. "
+                            "The backend resolves NPSS location IDs from coordinates using geocoding and NPSS master APIs. "
+                            "Do NOT call `analyze_crop_image` until coordinates are available. "
+                            "Ask the farmer to share location access or provide a city, town, or village with district and state so coordinates can be resolved before analysis."
+                        )
+                    base_user_message = (
+                        f"[USER UPLOADED A CROP IMAGE]\n\n"
+                        f"{base_user_message}\n\n"
+                        f"INSTRUCTION: The user has uploaded a crop image for pest/disease identification. "
+                        f"Use the exact image URL already present in the user's message or recent conversation history when calling `analyze_crop_image`. "
+                        f"{location_instruction} "
+                        f"Do NOT call `search_pests_diseases` automatically. "
+                        f"Present the NPSS result as a clean, farmer-friendly structured card in the Selected Language using this format:\n"
+                        f"**Pest:** <pest name>\n"
+                        f"**Crop:** <crop name>\n"
+                        f"**Cause:** <pathogen class, e.g. fungi / bacteria / virus>\n\n"
+                        f"<short symptoms/identification summary translated into the Selected Language>\n\n"
+                        f"Skip any field that is empty, null, or not present in the tool result. "
+                        f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
+                        f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
+                        f"If the tool returns multiple findings, show only the most relevant one. "
+                        f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
+                    )
+                return f"{last_response}{base_user_message}"
+
+            user_message = build_user_message()
 
             moderation_data = await _run_moderation(user_message, session_id)
             logger.info("Moderation data: %s", moderation_data)
             deps.update_moderation_str(str(moderation_data))
-            user_message = f"{last_response}{deps.get_user_message()}"
+            user_message = build_user_message()
 
             trimmed_history = trim_history(history, max_tokens=64_000)
             logger.info("Trimmed history length: %s messages", len(trimmed_history))
@@ -246,7 +286,11 @@ async def stream_chat_messages(
             )
 
             result = completed_run.result
-            output_text = completed_run.output_text
+            output_text = post_process_npss_response(
+                text=completed_run.output_text,
+                target_lang=target_lang,
+                npss_used=deps.npss_used,
+            )
             new_messages = result.new_messages()
             logger.info(
                 "Agent run complete for session %s via route %s (%s)",
