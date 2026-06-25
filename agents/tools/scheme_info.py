@@ -306,6 +306,12 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
             metadata=meta,
         )
         payload = SchemeRequest(scheme_name=scheme_name).get_payload()
+        lf_update_current_observation(
+            metadata={
+                **meta,
+                "transaction_id": payload.get("context", {}).get("transaction_id"),
+            }
+        )
         logger.info(f"SchemeName: {scheme_name}")
         logger.info(f"BAP_ENDPOINT: {os.getenv('BAP_ENDPOINT')}")
         logger.info(f"Payload: {payload}")

@@ -11,6 +11,7 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 import os
 from langfuse import observe
+from helpers.langfuse_tracing import lf_update_current_observation
 
 logger = get_logger(__name__)
 
@@ -486,7 +487,10 @@ def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: st
     try:
         session_id = ctx.deps.session_id
         transaction_id = generate_transaction_id(session_id, phone_number)
-        
+        lf_update_current_observation(
+            metadata={"tool": "pmfby.init", "transaction_id": transaction_id}
+        )
+
         payload = PMfbyInitRequest(
             phone_number=phone_number,
             transaction_id=transaction_id
@@ -579,7 +583,10 @@ def check_pmfby_status_with_otp(
         session_id = ctx.deps.session_id
         # Use same transaction_id key as init (phone_number only)
         transaction_id = generate_transaction_id(session_id, phone_number)
-        
+        lf_update_current_observation(
+            metadata={"tool": "pmfby.status", "transaction_id": transaction_id}
+        )
+
         payload = PMfbyStatusWithOtpRequest(
             order_id=otp_str,
             transaction_id=transaction_id,

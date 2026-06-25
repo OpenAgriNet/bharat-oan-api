@@ -23,6 +23,7 @@ from agents.tools.pmkisan_scheme_status import (
     SchemeStatusResponse,
 )
 from langfuse import observe
+from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger
 
 logger = get_logger(__name__)
@@ -433,6 +434,9 @@ async def _request_pm_kisan_otp(
 
     reg_no_clean = reg_no.strip()
     transaction_id = _generate_pm_kisan_otp_transaction_id(ctx.deps.session_id, reg_no_clean)
+    lf_update_current_observation(
+        metadata={"tool": "pmkisan_grievance.send_otp", "transaction_id": transaction_id}
+    )
     payload = _build_pm_kisan_otp_init_payload(reg_no_clean, transaction_id)
 
     endpoint = f"{BAP_ENDPOINT.rstrip('/')}/init"
@@ -467,6 +471,9 @@ async def _verify_pm_kisan_otp(
 
     reg_no_clean = reg_no.strip()
     transaction_id = _generate_pm_kisan_otp_transaction_id(ctx.deps.session_id, reg_no_clean)
+    lf_update_current_observation(
+        metadata={"tool": "pmkisan_grievance.verify_otp", "transaction_id": transaction_id}
+    )
     payload = _build_pm_kisan_otp_status_payload(
         reg_no_clean,
         otp_clean,
@@ -677,6 +684,9 @@ async def _submit_grievance_init_request(
 ) -> str:
     session_id = ctx.deps.session_id
     transaction_id = generate_transaction_id(session_id, identifier_value)
+    lf_update_current_observation(
+        metadata={"tool": "pmkisan_grievance.submit", "transaction_id": transaction_id}
+    )
     identifier_type: Literal["reg-number"] = "reg-number"
 
     request_obj = GrievanceInitRequest.build(
@@ -849,6 +859,9 @@ async def pmkisan_grievance_status(
 
         session_id = ctx.deps.session_id
         transaction_id = generate_transaction_id(session_id, identifier_value)
+        lf_update_current_observation(
+            metadata={"tool": "pmkisan_grievance.status", "transaction_id": transaction_id}
+        )
 
         payload = {
             "context": Context(action="search", transaction_id=transaction_id).model_dump(by_alias=True),

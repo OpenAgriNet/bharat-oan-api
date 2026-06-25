@@ -19,6 +19,7 @@ from pydantic_ai import ModelRetry
 from app.config import DEFAULT_HTTP_TIMEOUT
 from agents.tools.pmfby_scheme_status import normalize_phone_for_api
 from helpers.utils import get_logger
+from helpers.langfuse_tracing import lf_update_current_observation
 
 load_dotenv()
 
@@ -568,6 +569,12 @@ def gfr_get_crop_registries(
         limit = 50
 
     payload = GfrCropRegistrySearch(latitude=latitude, longitude=longitude).get_payload()
+    lf_update_current_observation(
+        metadata={
+            "tool": "gfr.crop_registries",
+            "transaction_id": payload.get("context", {}).get("transaction_id"),
+        }
+    )
     bap_endpoint = os.getenv("BAP_ENDPOINT")
     if not bap_endpoint:
         raise ModelRetry("BAP_ENDPOINT is not configured for GFR network calls.")
@@ -694,6 +701,12 @@ def gfr_get_recommendations(
         latitude=latitude,
         longitude=longitude,
     ).get_payload()
+    lf_update_current_observation(
+        metadata={
+            "tool": "gfr.recommendations",
+            "transaction_id": payload.get("context", {}).get("transaction_id"),
+        }
+    )
 
     bap_endpoint = os.getenv("BAP_ENDPOINT")
     if not bap_endpoint:

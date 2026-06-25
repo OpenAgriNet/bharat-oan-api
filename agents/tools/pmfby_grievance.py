@@ -17,6 +17,7 @@ import httpx
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.utils import get_logger
 from langfuse import observe
+from helpers.langfuse_tracing import lf_update_current_observation
 from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
@@ -380,6 +381,9 @@ def initiate_pmfby_grievance_otp(ctx: RunContext[FarmerContext], phone_number: s
     """Send OTP to the farmer's registered mobile for PMFBY grievance (`get_otp` /init)."""
     try:
         transaction_id = generate_transaction_id(ctx.deps.session_id, phone_number)
+        lf_update_current_observation(
+            metadata={"tool": "pmfby_grievance.init_otp", "transaction_id": transaction_id}
+        )
         phone = normalize_phone_for_api(phone_number)
         payload = _payload_get_otp_grievance_flow(transaction_id=transaction_id, phone=phone)
         url = _bap_url("init")
@@ -411,6 +415,9 @@ def check_pmfby_grievance_otp(
     try:
         otp_str = _validate_otp(otp)
         transaction_id = generate_transaction_id(ctx.deps.session_id, phone_number)
+        lf_update_current_observation(
+            metadata={"tool": "pmfby_grievance.check_otp", "transaction_id": transaction_id}
+        )
         phone = normalize_phone_for_api(phone_number)
         payload = _payload_status_verify_otp(transaction_id=transaction_id, otp=otp_str, phone=phone)
         url = _bap_url("status")
@@ -468,6 +475,9 @@ def pmfby_grievance_status(
 
         transaction_id = generate_transaction_id(
             ctx.deps.session_id, f"{phone}:{ticket}"
+        )
+        lf_update_current_observation(
+            metadata={"tool": "pmfby_grievance.status", "transaction_id": transaction_id}
         )
         payload = _payload_grievance_status(
             transaction_id=transaction_id,
@@ -538,6 +548,9 @@ def pmfby_submit_grievance(
             raise ModelRetry("Please provide a brief grievance description (at least 10 characters).")
 
         transaction_id = generate_transaction_id(ctx.deps.session_id, phone_number)
+        lf_update_current_observation(
+            metadata={"tool": "pmfby_grievance.submit", "transaction_id": transaction_id}
+        )
         payload = PMfbyGrievanceInitRequest(
             transaction_id=transaction_id,
             phone_number=phone_number,
