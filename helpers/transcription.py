@@ -45,6 +45,7 @@ def get_bhashini_asr_service_id(source_lang: str) -> tuple[str, str]:
         return INDO_ARYAN_ASR_SERVICE_ID, "indo_aryan"
     return MULTILINGUAL_ASR_SERVICE_ID, "multilingual_fallback"
 
+
 def get_bhashini_client():
     global _bhashini_client
     if _bhashini_client is None:
@@ -325,7 +326,7 @@ def detect_audio_language_bhashini(audio_base64: str) -> str:
 
         response_json = response.json()
         lang_prediction = response_json['pipelineResponse'][0]['output'][0]['langPrediction']
-        detected_language_code = lang_prediction[0]['langCode']
+        detected_language_code = (lang_prediction[0]['langCode'] or "").strip().lower()
         selected_service_id, service_reason = get_bhashini_asr_service_id(detected_language_code)
         logger.info(
             "Detect language Bhashini response | payload=%s",

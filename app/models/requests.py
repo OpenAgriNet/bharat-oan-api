@@ -45,7 +45,7 @@ class TranscribeRequest(BaseModel):
     audio_content: str = Field(..., description="Base64 encoded audio content")
     lang_code: Optional[str] = Field(
         None,
-        description="Language code for transcription. Omit or set to 'auto' to auto-detect the spoken language via Bhashini ALD (bhashini service only)."
+        description="Deprecated for bhashini: language is always auto-detected via Bhashini ALD before transcription. Ignored when service_type is 'bhashini'."
     )
     service_type: Literal['bhashini', 'whisper'] = Field('bhashini', description="Transcription service to use")
     session_id: Optional[str] = Field(None, description="Session ID")

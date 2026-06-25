@@ -70,7 +70,11 @@ async def transcribe(
     current_user: dict[str, Any] = Depends(get_current_user),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
-    """Transcribe audio content using the specified service."""
+    """Transcribe audio content using the specified service.
+
+    For bhashini: detect spoken language via ALD, then transcribe with the detected code.
+    For whisper: transcribe directly (Whisper detects language internally).
+    """
     session_id = request.session_id or str(uuid.uuid4())
     authenticated_user = current_user.get("mobile") or "system"
 
@@ -90,16 +94,12 @@ async def transcribe(
     transcription, response_lang_code = None, None
     uid = str(authenticated_user) if authenticated_user is not None else "system"
 
-    requested_lang = (request.lang_code or "").strip().lower()
-    auto_detect = request.service_type == 'bhashini' and requested_lang in ("", "auto")
-
     try:
         if request.service_type == 'bhashini':
-            source_lang = request.lang_code
-            if auto_detect:
-                source_lang = _detect_language(
-                    request.audio_content, session_id, uid, request.qid, background_tasks
-                )
+            # Always detect spoken language first, then transcribe with the detected code.
+            source_lang = _detect_language(
+                request.audio_content, session_id, uid, request.qid, background_tasks
+            )
             transcription = transcribe_bhashini(request.audio_content, source_lang)
             response_lang_code = source_lang
         else:
@@ -136,8 +136,8 @@ async def transcribe(
             )
 
     logger.info(
-        "Transcribe output | session_id=%s status=success result_length=%s latency_ms=%.2f",
-        session_id, len(transcription) if transcription else 0, latency_ms
+        "Transcribe output | session_id=%s status=success lang_code=%s result_length=%s latency_ms=%.2f",
+        session_id, response_lang_code, len(transcription) if transcription else 0, latency_ms
     )
 
     return JSONResponse({
