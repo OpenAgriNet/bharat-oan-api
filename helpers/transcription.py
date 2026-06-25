@@ -199,90 +199,115 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
         raise
 
 
-# Unused: not referenced anywhere in the codebase.
-# @retry(
-#     stop=stop_after_attempt(3),
-#     wait=wait_exponential(multiplier=2, min=2, max=20),
-#     retry=retry_if_exception_type((
-#         httpx.ConnectTimeout,
-#         httpx.ReadTimeout,
-#         httpx.ConnectError,
-#         httpx.RemoteProtocolError
-#     )) | retry_if_exception(is_retryable_status),
-#     before_sleep=lambda retry_state: logger.warning(
-#         f"Bhashini lang-detect retry {retry_state.attempt_number}: {retry_state.outcome.exception()}"
-#     )
-# )
-# def detect_audio_language_bhashini(audio_base64: str):
-#     url = 'https://dhruva-api.bhashini.gov.in/services/inference/pipeline'
-#     headers = {
-#         'Accept': '*/*',
-#         'Authorization': os.getenv('MEITY_API_KEY_VALUE'),
-#         'Content-Type': 'application/json'
-#     }
-#     task_type = "audio-lang-detection"
-#     data = {
-#         "pipelineTasks": [
-#             {
-#                 "taskType": task_type,
-#                 "config": {
-#                     "language": {
-#                         "sourceLanguage": "auto"
-#                     },
-#                     "audioFormat": "wav",
-#                 }
-#             }
-#         ],
-#         "inputData": {
-#             "audio": [{"audioContent": audio_base64}]
-#         }
-#     }
-#
-#     logger.info(
-#         "Detect language Bhashini input | audio_base64_len=%s",
-#         len(audio_base64)
-#     )
-#     curl_redacted = (
-#         "curl -X POST '%s' -H 'Authorization: ***' -H 'Content-Type: application/json' "
-#         "-d '<payload>'"
-#     ) % url
-#     logger.info(
-#         "Detect language Bhashini external API | taskType=%s curl=%s",
-#         task_type, curl_redacted
-#     )
-#
-#     client = get_bhashini_client()
-#
-#     try:
-#         response = client.post(url, headers=headers, content=json.dumps(data))
-#
-#         if response.status_code != 200:
-#             logger.error(
-#                 "Detect language Bhashini failed | status_code=%s response=%s",
-#                 response.status_code, response.text[:500]
-#             )
-#             raise BhashiniAPIError(
-#                 status_code=response.status_code,
-#                 message=response.text,
-#                 response_body=response.text
-#             )
-#
-#         response_json = response.json()
-#         detected_language_code = response_json['pipelineResponse'][0]['output'][0]['langPrediction'][0]['langCode']
-#         out_lang = 'en' if detected_language_code == 'en' else 'hi'
-#         logger.info(
-#             "Detect language Bhashini output | detected_lang=%s",
-#             out_lang
-#         )
-#         return out_lang
-#
-#     except httpx.HTTPStatusError as e:
-#         logger.error(
-#             "Detect language Bhashini HTTP error | status_code=%s message=%s",
-#             e.response.status_code, (e.response.text or str(e))[:500]
-#         )
-#         raise BhashiniAPIError(
-#             status_code=e.response.status_code,
-#             message=str(e),
-#             response_body=e.response.text
-#         )
+# Audio Language Detection (ALD) service id. Configurable via env so dev/prod can differ.
+ALD_SERVICE_ID = os.getenv(
+    'BHASHINI_ALD_SERVICE_ID',
+    'bhashini/iitmandi/audio-lang-detection/gpu'
+)
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=2, max=20),
+    retry=retry_if_exception_type((
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+        httpx.ConnectError,
+        httpx.RemoteProtocolError
+    )) | retry_if_exception(is_retryable_status),
+    before_sleep=lambda retry_state: logger.warning(
+        f"Bhashini lang-detect retry {retry_state.attempt_number}: {retry_state.outcome.exception()}"
+    )
+)
+def detect_audio_language_bhashini(audio_base64: str) -> str:
+    """Detect the spoken language of base64 wav audio via Bhashini ALD.
+
+    Returns the detected ISO language code (e.g. 'hi', 'en', 'bn') which can be
+    fed directly into transcribe_bhashini as the source language.
+    """
+    url = 'https://dhruva-api.bhashini.gov.in/services/inference/pipeline'
+    headers = {
+        'Accept': '*/*',
+        'User-Agent': 'Thunder Client (https://www.thunderclient.com)',
+        'Authorization': os.getenv('MEITY_API_KEY_VALUE'),
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "pipelineTasks": [
+            {
+                "taskType": "audio-lang-detection",
+                "config": {
+                    "serviceId": ALD_SERVICE_ID,
+                    "audioFormat": "wav",
+                }
+            }
+        ],
+        "inputData": {
+            "audio": [
+                {
+                    "audioContent": audio_base64
+                }
+            ]
+        }
+    }
+
+    logger.info(
+        "Detect language Bhashini input | audio_base64_len=%s",
+        len(audio_base64)
+    )
+    payload_safe = payload_for_log(data)
+    payload_safe_str = json.dumps(payload_safe, ensure_ascii=False)
+    payload_log_escaped = curl_escape_single_quoted(payload_safe_str)
+    curl_for_log = (
+        "curl -X POST '%s' -H 'Authorization: <MEITY_API_KEY_VALUE>' -H 'Content-Type: application/json' -d '%s'"
+    ) % (url, payload_log_escaped)
+    logger.info(
+        "Detect language Bhashini external API | serviceId=%s curl=%s",
+        ALD_SERVICE_ID, curl_for_log
+    )
+
+    client = get_bhashini_client()
+
+    try:
+        response = client.post(url, headers=headers, content=json.dumps(data))
+
+        if response.status_code != 200:
+            logger.error(
+                "Detect language Bhashini failed | status_code=%s serviceId=%s response=%s curl=%s",
+                response.status_code, ALD_SERVICE_ID, text_for_log(response.text), curl_for_log
+            )
+            raise BhashiniAPIError(
+                status_code=response.status_code,
+                message=response.text,
+                response_body=response.text
+            )
+
+        response_json = response.json()
+        detected_language_code = (
+            response_json['pipelineResponse'][0]['output'][0]['langPrediction'][0]['langCode']
+        )
+        logger.info(
+            "Detect language Bhashini output | detected_lang=%s",
+            detected_language_code
+        )
+        return detected_language_code
+
+    except BhashiniAPIError:
+        raise
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "Detect language Bhashini HTTP error | status_code=%s serviceId=%s message=%s curl=%s",
+            e.response.status_code, ALD_SERVICE_ID, text_for_log(e.response.text or str(e)), curl_for_log
+        )
+        raise BhashiniAPIError(
+            status_code=e.response.status_code,
+            message=str(e),
+            response_body=e.response.text
+        )
+    except Exception as e:
+        logger.error(
+            "Detect language Bhashini error | serviceId=%s error=%s message=%s curl=%s",
+            ALD_SERVICE_ID, type(e).__name__, str(e)[:1000], curl_for_log
+        )
+        raise
