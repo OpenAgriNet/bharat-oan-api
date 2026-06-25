@@ -16,6 +16,7 @@ from typing import List, Optional, Dict, Any
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
 from langfuse import observe
+from helpers.langfuse_tracing import lf_update_current_observation
 
 load_dotenv()
 
@@ -416,6 +417,12 @@ async def get_mandi_prices(
             commodity_code=commodity_code,
             days_back=days_back,
         ).get_payload()
+        lf_update_current_observation(
+            metadata={
+                "tool": "mandi.prices",
+                "transaction_id": payload.get("context", {}).get("transaction_id"),
+            }
+        )
 
         bap_endpoint = os.getenv("BAP_ENDPOINT")
         if not bap_endpoint:

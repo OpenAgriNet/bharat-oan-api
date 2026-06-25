@@ -13,6 +13,7 @@ from app.core.cache import cache
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
 from langfuse import observe
+from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.inject_pdf_header import inject
 from markdownify import MarkdownConverter
 load_dotenv()
@@ -562,7 +563,13 @@ async def check_shc_status(
             cycle=cycle,
             phone_number=phone_number
         ).get_payload()
-        
+        lf_update_current_observation(
+            metadata={
+                "tool": "shc.status",
+                "transaction_id": payload.get("context", {}).get("transaction_id"),
+            }
+        )
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 os.getenv("BAP_ENDPOINT").rstrip("/") + "/init",

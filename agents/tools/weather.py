@@ -14,6 +14,7 @@ from dateutil.parser import ParserError
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
 from langfuse import observe
+from helpers.langfuse_tracing import lf_update_current_observation
 
 load_dotenv()
 
@@ -366,7 +367,13 @@ async def weather_forecast(latitude: float, longitude: float) -> str:
     """    
     try:        
         payload = WeatherRequest(latitude=latitude, longitude=longitude).get_payload()
-        
+        lf_update_current_observation(
+            metadata={
+                "tool": "weather.forecast",
+                "transaction_id": payload.get("context", {}).get("transaction_id"),
+            }
+        )
+
         bap_endpoint = os.getenv("BAP_ENDPOINT")
         if not bap_endpoint:
             logger.error("BAP_ENDPOINT is not set")
