@@ -4,7 +4,7 @@ using the Vistaar Beckn API.
 """
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from helpers.utils import get_logger, get_today_date_str
 import humanize
 import httpx
@@ -307,19 +307,31 @@ class MandiResponse(BaseModel):
 # -----------------------
 # Mandi Request
 # -----------------------
+def _format_price_date(price_date: Optional[str] = None) -> str:
+    """Return a mandi price date in DD-MM-YYYY (IST), defaulting to today."""
+    if price_date and price_date.strip():
+        return price_date.strip()
+    return datetime.now(_IST).strftime("%d-%m-%Y")
+
+
 class MandiRequest(BaseModel):
     """MandiRequest model for mandi price discovery API.
 
     Args:
-        latitude (float): Latitude of the location, example: 21.6571
-        longitude (float): Longitude of the location, example: 82.1612
-        commodity_code (int): AGMKT commodity code, example: 2 (Paddy)
-        days_back (int): Number of days to look back from today, default 30
+        latitude (float): Latitude of the location, example: 26.9124
+        longitude (float): Longitude of the location, example: 75.7873
+        location_name (str): City or market area name, example: Jaipur
+        commodity_name (str): Commodity name, example: Onion
+        price_date (str): Price date in DD-MM-YYYY format; defaults to today (IST)
     """
     latitude: float = Field(..., description="Latitude of the location")
     longitude: float = Field(..., description="Longitude of the location")
-    commodity_code: int = Field(..., description="AGMKT commodity code")
-    days_back: int = Field(default=30, description="Number of days to look back from today")
+    location_name: str = Field(..., description="City or market area name")
+    commodity_name: str = Field(..., description="Commodity name in English")
+    price_date: Optional[str] = Field(
+        default=None,
+        description="Price date in DD-MM-YYYY format; defaults to today (IST)",
+    )
 
     def get_payload(self) -> Dict[str, Any]:
         """
@@ -329,8 +341,7 @@ class MandiRequest(BaseModel):
             Dict[str, Any]: The dictionary representation of the request payload.
         """
         now = datetime.now(timezone.utc)
-        start_date = (now - timedelta(days=self.days_back)).strftime("%Y-%m-%dT00:00:00.000Z")
-        end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
+        price_date = _format_price_date(self.price_date)
 
         return {
             "context": {
@@ -343,7 +354,7 @@ class MandiRequest(BaseModel):
                 "bpp_uri": os.getenv("BPP_URI"),
                 "transaction_id": str(uuid.uuid4()),
                 "message_id": str(uuid.uuid4()),
-                "timestamp": str(int(now.timestamp())),
+                "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
                 "ttl": "PT10M",
                 "location": {
                     "country": {
@@ -363,26 +374,25 @@ class MandiRequest(BaseModel):
                     },
                     "item": {
                         "descriptor": {
-                            "code": "mandi"
+                            "name": self.commodity_name
                         }
                     },
                     "fulfillment": {
-                        "stops": [
-                            {
-                                "location": {
-                                    "lat": str(self.latitude),
-                                    "lon": str(self.longitude)
+                        "end": {
+                            "location": {
+                                "descriptor": {
+                                    "name": self.location_name
                                 },
-                                "time": {
-                                    "range": {
-                                        "start": start_date,
-                                        "end": end_date
-                                    }
-                                },
-                                "commoditycode": self.commodity_code
+                                "gps": f"{self.latitude},{self.longitude}"
                             }
-                        ]
-                    }
+                        }
+                    },
+                    "tags": [
+                        {
+                            "code": "date",
+                            "value": price_date
+                        }
+                    ]
                 }
             }
         }
@@ -393,19 +403,22 @@ class MandiRequest(BaseModel):
 async def get_mandi_prices(
     latitude: float,
     longitude: float,
-    commodity_code: int,
-    days_back: int = 30,
+    location_name: str,
+    commodity_name: str,
+    price_date: Optional[str] = None,
 ) -> str:
     """Get mandi prices for a specific commodity near a location.
 
     Use this tool to fetch commodity price information from nearby mandis (agricultural markets).
-    You need the commodity code (use search_commodity tool to find it) and the farmer's location.
+    Use forward_geocode for coordinates and location_name (city or district from the query).
+    Use search_commodity to resolve the English commodity name (the name column, e.g. Onion).
 
     Args:
         latitude (float): Latitude of the location
         longitude (float): Longitude of the location
-        commodity_code (int): AGMKT commodity code (use search_commodity tool to find the code)
-        days_back (int): Number of days to look back from today for price data (default 30)
+        location_name (str): City or market area name (e.g. Jaipur, Pune)
+        commodity_name (str): English commodity name from search_commodity (e.g. Onion)
+        price_date (str): Optional price date in DD-MM-YYYY; defaults to today (IST)
 
     Returns:
         str: Formatted mandi price data for the requested commodity and location
@@ -414,8 +427,9 @@ async def get_mandi_prices(
         payload = MandiRequest(
             latitude=latitude,
             longitude=longitude,
-            commodity_code=commodity_code,
-            days_back=days_back,
+            location_name=location_name,
+            commodity_name=commodity_name,
+            price_date=price_date,
         ).get_payload()
         lf_update_current_observation(
             metadata={
