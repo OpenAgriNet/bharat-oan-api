@@ -195,8 +195,9 @@ def format_message_pairs(history: List[ModelMessage], limit: int = None) -> List
         List of formatted strings containing user and assistant messages
     """
     pairs = get_message_pairs(history, limit)
+    pairs = pairs[::-1]  # get_message_pairs returns newest-first; reverse to chronological so the most recent pair sits adjacent to the current user message
     formatted_messages = []
-    
+
     for user_part, assistant_part in pairs:
         # Strip the injected "**Conversation**\n\n...\n\n---\n\n" prefix from prior turns
         # so message pairs don't recursively embed previous conversation blocks.
