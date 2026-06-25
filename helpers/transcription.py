@@ -33,6 +33,85 @@ DRAVIDIAN_LANGS = frozenset({"kn", "ml", "ta", "te"})
 
 _bhashini_client = None
 
+BHASHINI_PIPELINE_URL = os.getenv(
+    "BHASHINI_API_URL",
+    "https://dhruva-api.bhashini.gov.in/services/inference/pipeline",
+)
+
+
+class BhashiniAPIError(Exception):
+    def __init__(self, status_code, message, response_body=None):
+        self.status_code = status_code
+        self.message = message
+        self.response_body = response_body
+        super().__init__(f"Bhashini API Error {status_code}: {message}")
+
+
+def is_retryable_status(exception):
+    """Check if we should retry based on status code"""
+    if isinstance(exception, BhashiniAPIError):
+        return exception.status_code in [500, 502, 503, 504, 429]
+    return False
+
+
+def get_bhashini_timeout() -> httpx.Timeout:
+    """Bhashini outbound timeouts (env-tunable for slow networks / large audio)."""
+    return httpx.Timeout(
+        connect=float(os.getenv("BHASHINI_CONNECT_TIMEOUT", "30")),
+        read=float(os.getenv("BHASHINI_READ_TIMEOUT", "180")),
+        write=float(os.getenv("BHASHINI_WRITE_TIMEOUT", "180")),
+        pool=float(os.getenv("BHASHINI_POOL_TIMEOUT", "30")),
+    )
+
+
+def get_bhashini_request_timeout(audio_base64_len: int) -> httpx.Timeout:
+    """Extend write timeout for large base64 audio uploads."""
+    base = get_bhashini_timeout()
+    extra_write = max(0.0, (audio_base64_len / 50_000) * 10)
+    return httpx.Timeout(
+        connect=base.connect,
+        read=base.read,
+        write=base.write + extra_write,
+        pool=base.pool,
+    )
+
+
+def reset_bhashini_client() -> None:
+    global _bhashini_client
+    if _bhashini_client is not None:
+        try:
+            _bhashini_client.close()
+        except Exception:
+            pass
+        _bhashini_client = None
+
+
+def _get_bhashini_headers() -> dict[str, str]:
+    api_key = (os.getenv("MEITY_API_KEY_VALUE") or "").strip()
+    if not api_key:
+        raise BhashiniAPIError(
+            status_code=500,
+            message="MEITY_API_KEY_VALUE is not configured",
+        )
+    return {
+        "Accept": "*/*",
+        "User-Agent": "Thunder Client (https://www.thunderclient.com)",
+        "Authorization": api_key,
+        "Content-Type": "application/json",
+    }
+
+
+def _bhashini_retry_before_sleep(retry_state, label: str) -> None:
+    exc = retry_state.outcome.exception() if retry_state.outcome else None
+    if isinstance(exc, (httpx.ConnectTimeout, httpx.ConnectError, httpx.RemoteProtocolError)):
+        reset_bhashini_client()
+    logger.warning(
+        "Bhashini %s retry %s: %s",
+        label,
+        retry_state.attempt_number,
+        exc,
+    )
+
 
 def get_bhashini_asr_service_id(source_lang: str) -> tuple[str, str]:
     """Pick the Bhashini ASR serviceId from a detected or requested language code."""
@@ -50,16 +129,11 @@ def get_bhashini_client():
     global _bhashini_client
     if _bhashini_client is None:
         _bhashini_client = httpx.Client(
-            timeout=httpx.Timeout(
-                connect=10.0,
-                read=120.0,
-                write=60.0,
-                pool=10.0
-            ),
+            timeout=get_bhashini_timeout(),
             limits=httpx.Limits(
                 max_connections=20,
-                max_keepalive_connections=10
-            )
+                max_keepalive_connections=10,
+            ),
         )
     return _bhashini_client
 
@@ -99,23 +173,6 @@ def transcribe_whisper(audio_base64: str):
     return lang_code, text
 
 
-# Custom exception for Bhashini errors
-class BhashiniAPIError(Exception):
-    def __init__(self, status_code, message, response_body=None):
-        self.status_code = status_code
-        self.message = message
-        self.response_body = response_body
-        super().__init__(f"Bhashini API Error {status_code}: {message}")
-
-
-def is_retryable_status(exception):
-    """Check if we should retry based on status code"""
-    if isinstance(exception, BhashiniAPIError):
-        # Retry on 500, 502, 503, 504, 429
-        return exception.status_code in [500, 502, 503, 504, 429]
-    return False
-
-
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=2, max=20),
@@ -125,21 +182,15 @@ def is_retryable_status(exception):
         httpx.ConnectError,
         httpx.RemoteProtocolError
     )) | retry_if_exception(is_retryable_status),
-    before_sleep=lambda retry_state: logger.warning(
-        f"Bhashini transcribe retry {retry_state.attempt_number}: {retry_state.outcome.exception()}"
-    )
+    before_sleep=lambda retry_state: _bhashini_retry_before_sleep(retry_state, "transcribe"),
 )
 def transcribe_bhashini(audio_base64: str, source_lang: str):
     source_lang = (source_lang or "").strip().lower()
     service_id, service_reason = get_bhashini_asr_service_id(source_lang)
 
-    url = 'https://dhruva-api.bhashini.gov.in/services/inference/pipeline'
-    headers = {
-        'Accept': '*/*',
-        'User-Agent': 'Thunder Client (https://www.thunderclient.com)',
-        'Authorization': os.getenv('MEITY_API_KEY_VALUE'),
-        'Content-Type': 'application/json'
-    }
+    url = BHASHINI_PIPELINE_URL
+    headers = _get_bhashini_headers()
+    request_timeout = get_bhashini_request_timeout(len(audio_base64))
 
     data = {
         "pipelineTasks": [
@@ -187,7 +238,12 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
     client = get_bhashini_client()
 
     try:
-        response = client.post(url, headers=headers, content=json.dumps(data))
+        response = client.post(
+            url,
+            headers=headers,
+            content=json.dumps(data),
+            timeout=request_timeout,
+        )
 
         if response.status_code != 200:
             logger.error(
@@ -217,6 +273,13 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
         return result
 
     except BhashiniAPIError:
+        raise
+    except httpx.ConnectTimeout:
+        logger.error(
+            "Transcribe Bhashini connect timeout | serviceId=%s audio_base64_len=%s "
+            "hint=check outbound HTTPS to dhruva-api.bhashini.gov.in or raise BHASHINI_CONNECT_TIMEOUT curl=%s",
+            service_id, len(audio_base64), curl_for_log,
+        )
         raise
     except httpx.HTTPStatusError as e:
         logger.error(
@@ -252,9 +315,7 @@ ALD_SERVICE_ID = os.getenv(
         httpx.ConnectError,
         httpx.RemoteProtocolError
     )) | retry_if_exception(is_retryable_status),
-    before_sleep=lambda retry_state: logger.warning(
-        f"Bhashini lang-detect retry {retry_state.attempt_number}: {retry_state.outcome.exception()}"
-    )
+    before_sleep=lambda retry_state: _bhashini_retry_before_sleep(retry_state, "lang-detect"),
 )
 def detect_audio_language_bhashini(audio_base64: str) -> str:
     """Detect the spoken language of base64 wav audio via Bhashini ALD.
@@ -262,13 +323,9 @@ def detect_audio_language_bhashini(audio_base64: str) -> str:
     Returns the detected ISO language code (e.g. 'hi', 'en', 'bn') which can be
     fed directly into transcribe_bhashini as the source language.
     """
-    url = 'https://dhruva-api.bhashini.gov.in/services/inference/pipeline'
-    headers = {
-        'Accept': '*/*',
-        'User-Agent': 'Thunder Client (https://www.thunderclient.com)',
-        'Authorization': os.getenv('MEITY_API_KEY_VALUE'),
-        'Content-Type': 'application/json'
-    }
+    url = BHASHINI_PIPELINE_URL
+    headers = _get_bhashini_headers()
+    request_timeout = get_bhashini_request_timeout(len(audio_base64))
 
     data = {
         "pipelineTasks": [
@@ -311,7 +368,12 @@ def detect_audio_language_bhashini(audio_base64: str) -> str:
     client = get_bhashini_client()
 
     try:
-        response = client.post(url, headers=headers, content=json.dumps(data))
+        response = client.post(
+            url,
+            headers=headers,
+            content=json.dumps(data),
+            timeout=request_timeout,
+        )
 
         if response.status_code != 200:
             logger.error(
@@ -343,6 +405,13 @@ def detect_audio_language_bhashini(audio_base64: str) -> str:
         return detected_language_code
 
     except BhashiniAPIError:
+        raise
+    except httpx.ConnectTimeout:
+        logger.error(
+            "Detect language Bhashini connect timeout | serviceId=%s audio_base64_len=%s "
+            "hint=check outbound HTTPS to dhruva-api.bhashini.gov.in or raise BHASHINI_CONNECT_TIMEOUT curl=%s",
+            ALD_SERVICE_ID, len(audio_base64), curl_for_log,
+        )
         raise
     except httpx.HTTPStatusError as e:
         logger.error(
