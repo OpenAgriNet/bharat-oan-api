@@ -4,14 +4,12 @@ import httpx
 import json
 from dotenv import load_dotenv
 from tenacity import (
-    retry, 
-    stop_after_attempt, 
-    wait_exponential, 
+    retry,
+    stop_after_attempt,
+    wait_exponential,
     retry_if_exception_type,
     retry_if_exception,
-    retry_if_result
 )
-from typing import Dict, Any
 from langcodes import Language
 from openai import OpenAI
 from io import BytesIO
@@ -22,7 +20,30 @@ load_dotenv()
 
 logger = get_logger(__name__)
 
+LOG_TEXT_MAX_CHARS = 500
+
+WHISPER_EN_ASR_SERVICE_ID = "ai4bharat/whisper-medium-en--gpu--t4"
+INDO_ARYAN_ASR_SERVICE_ID = "ai4bharat/conformer-multilingual-indo_aryan-gpu--t4"
+DRAVIDIAN_ASR_SERVICE_ID = "ai4bharat/conformer-multilingual-dravidian-gpu--t4"
+MULTILINGUAL_ASR_SERVICE_ID = "bhashini/ai4bharat/conformer-multilingual-asr"
+
+# ISO 639 codes supported by Bhashini family-specific ASR models (see Bhashini API docs).
+INDO_ARYAN_LANGS = frozenset({"hi", "bn", "mr", "ur", "or", "pa", "gu", "sa"})
+DRAVIDIAN_LANGS = frozenset({"kn", "ml", "ta", "te"})
+
 _bhashini_client = None
+
+
+def get_bhashini_asr_service_id(source_lang: str) -> tuple[str, str]:
+    """Pick the Bhashini ASR serviceId from a detected or requested language code."""
+    lang = (source_lang or "").strip().lower()
+    if lang == "en":
+        return WHISPER_EN_ASR_SERVICE_ID, "english"
+    if lang in DRAVIDIAN_LANGS:
+        return DRAVIDIAN_ASR_SERVICE_ID, "dravidian"
+    if lang in INDO_ARYAN_LANGS:
+        return INDO_ARYAN_ASR_SERVICE_ID, "indo_aryan"
+    return MULTILINGUAL_ASR_SERVICE_ID, "multilingual_fallback"
 
 def get_bhashini_client():
     global _bhashini_client
@@ -56,6 +77,10 @@ def convert_audio_to_base64(filepath: str) -> str:
 
 
 def transcribe_whisper(audio_base64: str):
+    logger.info(
+        "Transcribe Whisper input | audio_base64_len=%s",
+        len(audio_base64),
+    )
     openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
     response = openai_client.audio.transcriptions.create(
         model="whisper-1",
@@ -64,6 +89,12 @@ def transcribe_whisper(audio_base64: str):
     )
     lang_code = Language.find(response.language).language
     text = response.text
+    logger.info(
+        "Transcribe Whisper output | lang_code=%s result_length=%s text=%s",
+        lang_code,
+        len(text) if text else 0,
+        (text or "")[:LOG_TEXT_MAX_CHARS],
+    )
     return lang_code, text
 
 
@@ -98,6 +129,9 @@ def is_retryable_status(exception):
     )
 )
 def transcribe_bhashini(audio_base64: str, source_lang: str):
+    source_lang = (source_lang or "").strip().lower()
+    service_id, service_reason = get_bhashini_asr_service_id(source_lang)
+
     url = 'https://dhruva-api.bhashini.gov.in/services/inference/pipeline'
     headers = {
         'Accept': '*/*',
@@ -105,12 +139,6 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
         'Authorization': os.getenv('MEITY_API_KEY_VALUE'),
         'Content-Type': 'application/json'
     }
-
-    if source_lang == 'en':
-        service_id = "ai4bharat/whisper-medium-en--gpu--t4"  # Alternative English service
-    else:
-        # service_id = "ai4bharat/conformer-multilingual-indo_aryan-gpu--t4"
-        service_id = "bhashini/ai4bharat/conformer-multilingual-asr"
 
     data = {
         "pipelineTasks": [
@@ -137,8 +165,8 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
     }
 
     logger.info(
-        "Transcribe Bhashini input | source_lang=%s audio_base64_len=%s",
-        source_lang, len(audio_base64)
+        "Transcribe Bhashini input | source_lang=%s serviceId=%s service_reason=%s audio_base64_len=%s",
+        source_lang, service_id, service_reason, len(audio_base64),
     )
     payload_safe = payload_for_log(data)
     logger.info(
@@ -174,8 +202,16 @@ def transcribe_bhashini(audio_base64: str, source_lang: str):
         response_json = response.json()
         result = response_json['pipelineResponse'][0]['output'][0]['source']
         logger.info(
-            "Transcribe Bhashini output | source_lang=%s result_length=%s",
-            source_lang, len(result) if result else 0
+            "Transcribe Bhashini response | serviceId=%s payload=%s",
+            service_id,
+            text_for_log(json.dumps(response_json, ensure_ascii=False)),
+        )
+        logger.info(
+            "Transcribe Bhashini output | source_lang=%s serviceId=%s result_length=%s text=%s",
+            source_lang,
+            service_id,
+            len(result) if result else 0,
+            (result or "")[:LOG_TEXT_MAX_CHARS],
         )
         return result
 
@@ -258,6 +294,10 @@ def detect_audio_language_bhashini(audio_base64: str) -> str:
     )
     payload_safe = payload_for_log(data)
     payload_safe_str = json.dumps(payload_safe, ensure_ascii=False)
+    logger.info(
+        "Detect language Bhashini request payload | serviceId=%s payload=%s",
+        ALD_SERVICE_ID, payload_safe_str,
+    )
     payload_log_escaped = curl_escape_single_quoted(payload_safe_str)
     curl_for_log = (
         "curl -X POST '%s' -H 'Authorization: <MEITY_API_KEY_VALUE>' -H 'Content-Type: application/json' -d '%s'"
@@ -284,12 +324,20 @@ def detect_audio_language_bhashini(audio_base64: str) -> str:
             )
 
         response_json = response.json()
-        detected_language_code = (
-            response_json['pipelineResponse'][0]['output'][0]['langPrediction'][0]['langCode']
+        lang_prediction = response_json['pipelineResponse'][0]['output'][0]['langPrediction']
+        detected_language_code = lang_prediction[0]['langCode']
+        selected_service_id, service_reason = get_bhashini_asr_service_id(detected_language_code)
+        logger.info(
+            "Detect language Bhashini response | payload=%s",
+            text_for_log(json.dumps(response_json, ensure_ascii=False)),
         )
         logger.info(
-            "Detect language Bhashini output | detected_lang=%s",
-            detected_language_code
+            "Detect language Bhashini output | detected_lang=%s lang_prediction=%s "
+            "selected_asr_serviceId=%s service_reason=%s",
+            detected_language_code,
+            json.dumps(lang_prediction, ensure_ascii=False),
+            selected_service_id,
+            service_reason,
         )
         return detected_language_code
 
