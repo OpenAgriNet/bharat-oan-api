@@ -12,6 +12,7 @@ from agents.deps import FarmerContext
 import re
 import os
 from langfuse import observe
+from helpers.langfuse_tracing import lf_update_current_observation
 
 logger = get_logger(__name__)
 
@@ -488,6 +489,9 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str =
         identifier = reg_no or phone_number
         transaction_id = generate_transaction_id(session_id, identifier)
         logger.info(f"Transaction ID: {transaction_id}")
+        lf_update_current_observation(
+            metadata={"tool": "pmkisan.init", "transaction_id": transaction_id}
+        )
         payload = SchemeInitRequest(
             registration_number=reg_no,
             transaction_id=transaction_id,
@@ -580,6 +584,9 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
         identifier = reg_no or phone_number
         transaction_id = generate_transaction_id(session_id, identifier)
         logger.info(f"Transaction ID: {transaction_id}")
+        lf_update_current_observation(
+            metadata={"tool": "pmkisan.status", "transaction_id": transaction_id}
+        )
         payload = SchemeStatusRequest(transaction_id=transaction_id,
                                       otp=otp_clean,
                                       registration_number=reg_no,
