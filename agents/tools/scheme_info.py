@@ -28,6 +28,9 @@ _SCHEME_LABELS: Dict[str, str] = {
     "pkvy": "Paramparagat Krishi Vikas Yojana",
     "nfsm": "National Food Security Mission",
     "rad": "Rainfed Area Development",
+    "nfsf": "National Fertilizer Sale Framework",
+    "nbm": "National Bamboo Mission",
+    "nbhm": "National Beekeeping & Honey Mission",
 }
 
 
@@ -219,6 +222,9 @@ class SchemeRequest(BaseModel):
              - "pkvy": Paramparagat Krishi Vikas Yojana
              - "nfsm": National Food Security Mission
              - "rad": Rainfed Area Development
+             - "nfsf": National Fertilizer Sale Framework
+             - "nbm": National Bamboo Mission
+             - "nbhm": National Beekeeping & Honey Mission
     """
     scheme_name: str
     
@@ -271,7 +277,7 @@ class SchemeRequest(BaseModel):
 
 
 @observe(name="tool:get_scheme_info", as_type="tool")
-def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc", "pkvy", "nfsm", "rad"]) -> str:
+def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc", "pkvy", "nfsm", "rad", "nfsf", "nbm", "nbhm"]) -> str:
     """Retrieve detailed information about government agricultural schemes.
     
     This tool fetches comprehensive scheme data including benefits, eligibility criteria, 
@@ -293,6 +299,9 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
             - "pkvy": Paramparagat Krishi Vikas Yojana
             - "nfsm": National Food Security Mission
             - "rad": Rainfed Area Development
+            - "nfsf": National Fertilizer Sale Framework
+            - "nbm": National Bamboo Mission
+            - "nbhm": National Beekeeping & Honey Mission
 
     Returns:
         str: Formatted scheme data with ## sections (e.g. Scheme Eligibility,
