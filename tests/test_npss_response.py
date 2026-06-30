@@ -173,6 +173,56 @@ class TestNPSSToolMetadata(unittest.IsolatedAsyncioTestCase):
             npss._get_cached_npss_token = original_get_token
             npss.resolve_npss_location_ids = original_resolve_location_ids
 
+    async def test_analyze_crop_image_uses_default_ids_when_resolution_fails(self):
+        original_download_image = npss._download_image
+        original_call_npss_analyze = npss._call_npss_analyze
+        original_cleanup_image = npss.cleanup_image
+        original_get_token = npss._get_cached_npss_token
+        original_resolve_location_ids = npss.resolve_npss_location_ids
+        captured_request = {}
+
+        async def fake_download_image(_image_url: str):
+            return b"\xff\xd8\xfffake-jpeg", "image/jpeg"
+
+        async def fake_get_token():
+            return "fake-token"
+
+        async def fake_resolve_location_ids(*_args, **_kwargs):
+            return None
+
+        async def fake_call_npss_analyze(**kwargs):
+            captured_request.update(kwargs)
+            return {
+                "pest": "Pink bollworm",
+                "crop": "Cotton",
+                "pathogenClass": "insect",
+                "description": "Larvae damage cotton bolls.",
+            }
+
+        try:
+            npss._download_image = fake_download_image
+            npss._call_npss_analyze = fake_call_npss_analyze
+            npss.cleanup_image = lambda *_args, **_kwargs: None
+            npss._get_cached_npss_token = fake_get_token
+            npss.resolve_npss_location_ids = fake_resolve_location_ids
+
+            deps = FarmerContext(query="Analyze image", lang_code="en", session_id="test")
+            ctx = SimpleNamespace(deps=deps)
+
+            result = await npss.analyze_crop_image(ctx, "https://example.com/crop.jpg", latitude=18.58, longitude=73.98)
+
+            self.assertIn("**Source:** NPSS", result)
+            self.assertEqual(captured_request["state_id"], "1")
+            self.assertEqual(captured_request["district_id"], "1")
+            self.assertEqual(captured_request["sub_district_id"], "1")
+            self.assertEqual(captured_request["village_id"], "1")
+        finally:
+            npss._download_image = original_download_image
+            npss._call_npss_analyze = original_call_npss_analyze
+            npss.cleanup_image = original_cleanup_image
+            npss._get_cached_npss_token = original_get_token
+            npss.resolve_npss_location_ids = original_resolve_location_ids
+
 
 class TestNPSSGeocodeMapping(unittest.IsolatedAsyncioTestCase):
     def test_lookup_miss_does_not_default_to_location_one(self):
@@ -273,6 +323,66 @@ class TestNPSSGeocodeMapping(unittest.IsolatedAsyncioTestCase):
                     {"villageId": 9002, "villageName": "Y"},
                     {"villageId": 9001, "villageName": "X"},
                 ]
+            return []
+
+        try:
+            npss_geocodes._npss_geocode_map = {}
+            npss_geocodes.ALLOW_DEFAULT_LOCATION = False
+            npss_geocodes._reverse_geocode_properties = fake_reverse
+            npss_geocodes._fetch_master_rows = fake_fetch
+
+            result = await npss_geocodes.resolve_npss_location_ids(18.58, 73.98, bearer_token="token")
+
+            self.assertEqual(
+                result,
+                {
+                    "state_id": "27",
+                    "district_id": "521",
+                    "sub_district_id": "5001",
+                    "village_id": "9001",
+                },
+            )
+        finally:
+            npss_geocodes._reverse_geocode_properties = original_reverse
+            npss_geocodes._fetch_master_rows = original_fetch
+            npss_geocodes._npss_geocode_map = original_map
+            npss_geocodes.ALLOW_DEFAULT_LOCATION = original_allow_default
+
+    async def test_master_api_lookup_degrades_when_state_and_district_names_do_not_match(self):
+        original_reverse = npss_geocodes._reverse_geocode_properties
+        original_fetch = npss_geocodes._fetch_master_rows
+        original_map = npss_geocodes._npss_geocode_map
+        original_allow_default = npss_geocodes.ALLOW_DEFAULT_LOCATION
+
+        async def fake_reverse(_latitude: float, _longitude: float):
+            return {
+                "state": "Unmatched State",
+                "county": "Unmatched District",
+                "city": "Unmatched Taluka",
+                "name": "Unmatched Village",
+            }
+
+        async def fake_fetch(endpoint: str, *, bearer_token: str, params=None):
+            if endpoint == "States":
+                return [
+                    {"stateId": 29, "stateName": "B"},
+                    {"stateId": 27, "stateName": "A"},
+                ]
+            if endpoint == "Districts":
+                self.assertEqual(params, {"stateId": "27"})
+                return [
+                    {"districtId": 522, "districtName": "B"},
+                    {"districtId": 521, "districtName": "A"},
+                ]
+            if endpoint == "SubDistricts":
+                self.assertEqual(params, {"stateId": "27", "districtId": "521"})
+                return [{"subDistrictId": 5001, "subDistrictName": "A"}]
+            if endpoint == "Vilages":
+                self.assertEqual(
+                    params,
+                    {"stateId": "27", "districtId": "521", "subDistrictId": "5001"},
+                )
+                return [{"villageId": 9001, "villageName": "X"}]
             return []
 
         try:
