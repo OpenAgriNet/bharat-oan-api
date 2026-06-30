@@ -289,6 +289,10 @@ async def _resolve_from_master_apis(
         _location_candidates(props, "state"),
         ("stateName", "state", "name"),
     )
+    if not state_row:
+        state_row = _pick_deterministic_child_row(state_rows, ("stateId", "state_id", "id"))
+        if state_row:
+            logger.warning("NPSS state exact match failed; using deterministic master state: %s", state_row)
     state_id = _extract_id(state_row or {}, ("stateId", "state_id", "id"))
     if not state_id:
         return None
@@ -299,6 +303,14 @@ async def _resolve_from_master_apis(
         _location_candidates(props, "district", "county", "city"),
         ("districtName", "district", "name"),
     )
+    if not district_row:
+        district_row = _pick_deterministic_child_row(district_rows, ("districtId", "district_id", "id"))
+        if district_row:
+            logger.warning(
+                "NPSS district exact match failed; using deterministic child within state %s: %s",
+                state_id,
+                district_row,
+            )
     district_id = _extract_id(district_row or {}, ("districtId", "district_id", "id"))
     if not district_id:
         return None
