@@ -237,7 +237,6 @@ async def _reverse_geocode_properties(latitude: float, longitude: float) -> dict
                     "lat": latitude,
                     "lon": longitude,
                     "lang": "en",
-                    "bbox": INDIA_BBOX,
                 },
             )
         response.raise_for_status()

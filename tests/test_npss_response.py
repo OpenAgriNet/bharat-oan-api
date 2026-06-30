@@ -1,5 +1,6 @@
 import unittest
 import importlib.util
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -120,6 +121,48 @@ class TestNPSSResponsePostProcessing(unittest.TestCase):
 
 
 class TestNPSSToolMetadata(unittest.IsolatedAsyncioTestCase):
+    async def test_download_image_resolves_raw_uuid_to_internal_image_url(self):
+        original_async_client = npss.httpx.AsyncClient
+        original_base_url = os.environ.get("BASE_URL")
+        captured = {}
+
+        class FakeResponse:
+            content = b"\xff\xd8\xfffake-jpeg"
+            headers = {"content-type": "image/jpeg"}
+
+            def raise_for_status(self):
+                return None
+
+        class FakeClient:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return None
+
+            async def get(self, url, **_kwargs):
+                captured["url"] = url
+                return FakeResponse()
+
+        try:
+            os.environ["BASE_URL"] = "https://api.example.test"
+            npss.httpx.AsyncClient = lambda *args, **kwargs: FakeClient()
+
+            data, mimetype = await npss._download_image("9b5c8815-772d-46ec-88bf-bbfbd8e6a96e")
+
+            self.assertEqual(data, b"\xff\xd8\xfffake-jpeg")
+            self.assertEqual(mimetype, "image/jpeg")
+            self.assertEqual(
+                captured["url"],
+                "https://api.example.test/api/image/9b5c8815-772d-46ec-88bf-bbfbd8e6a96e",
+            )
+        finally:
+            npss.httpx.AsyncClient = original_async_client
+            if original_base_url is None:
+                os.environ.pop("BASE_URL", None)
+            else:
+                os.environ["BASE_URL"] = original_base_url
+
     async def test_analyze_crop_image_marks_context_with_source_metadata(self):
         original_download_image = npss._download_image
         original_call_npss_analyze = npss._call_npss_analyze

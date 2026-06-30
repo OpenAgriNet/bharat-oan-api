@@ -165,7 +165,10 @@ async def _download_image(image_url: str) -> tuple[bytes, str]:
     Download image bytes from a URL.
     Supports both absolute URLs and relative /api/image/{id} paths.
     """
-    # Resolve relative URLs
+    # Resolve UUIDs and relative URLs
+    if re.fullmatch(r"[a-f0-9\-]{36}", image_url, flags=re.IGNORECASE):
+        image_url = f"/api/image/{image_url}"
+
     if image_url.startswith("/"):
         base_url = os.getenv("BASE_URL", "")
         if base_url:

@@ -18,6 +18,13 @@ UUID_PATTERN = re.compile(
     r"[0-9a-fA-F]{4}-"
     r"[0-9a-fA-F]{12}$"
 )
+UUID_IN_TEXT_PATTERN = re.compile(
+    r"\b([0-9a-fA-F]{8}-"
+    r"[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{12})\b"
+)
 
 IMAGE_URL_ID_PATTERN = re.compile(r"/api/image/([0-9a-fA-F\-]{36})")
 TAGGED_IMAGE_ID_PATTERN = re.compile(r"\[IMAGE_ID:\s*([0-9a-fA-F\-]{36})\]")
@@ -30,6 +37,10 @@ def extract_image_id(query_text: str) -> Optional[str]:
 
     if UUID_PATTERN.fullmatch(query):
         return query
+
+    uuid_match = UUID_IN_TEXT_PATTERN.search(query)
+    if uuid_match:
+        return uuid_match.group(1)
 
     url_match = IMAGE_URL_ID_PATTERN.search(query)
     if url_match:
