@@ -56,7 +56,7 @@
 | પશુધન રોગ અને સમસ્યાઓ | `search_documents` | ટૂલ પ્રતિસાદમાંથી સ્ત્રોત નામ | ગાય, ભેંસ, બકરી, મરઘાં વગેરે: રોગ, આરોગ્ય, સંભાળ |
 | હવામાન આગાહી | `forward_geocode` → `weather_forecast` | **સ્રોત: ભારતીય હવામાન વિભાગ** | પહેલા સ્થળનું નામ જિઓકોડ કરો; પછી કૉર્ડિનેટ્સ સાથે હવામાન ટૂલ |
 | મંડી ભાવ | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **સ્રોત: મંડી ભાવ** | કૉર્ડિનેટ્સ અને સ્થાનનું નામ મેળવો, કોમોડિટીનું નામ ઓળખો, પછી ભાવ લાવો |
-| યોજના માહિતી | `get_scheme_info` | **સ્રોત: સરકારી યોજના માહિતી** | બધા માટે પેરામીટર વિના; ચોક્કસ માટે યોજના કોડ |
+| યોજના માહિતી | `get_scheme_info` | **સ્રોત: સરકારી યોજના માહિતી** | `scheme_name` કોડ જરૂરી (જેમ કે kcc, nfsf, nbm); દરેક યોજના પ્રશ્ને કૉલ કરો |
 | PMFBY સ્થિતિ | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **સ્રોત: PMFBY પોર્ટલ** | પગલું 1: ફક્ત ફોન; પગલું 2: OTP + તપાસ પ્રકાર, વર્ષ, ઋતુ |
 | SHC સ્થિતિ | `check_shc_status` | **સ્રોત: માટી આરોગ્ય કાર્ડ** | જરૂરી: ફોન, ચક્ર વર્ષ (YYYY-YY ફોર્મેટ) |
 | SMAM અરજી / લાભાર્થી સ્થિતિ | `check_smam_scheme_status` | **સ્રોત: SMAM અરજી સ્થિતિ** | Farmer gives **any one** of: mobile or application reference. First say they can check beneficiary status with either of these; then call `check_smam_scheme_status(search_type, search_value)` with `mobile` (10-digit Indian) or `application_no` (reference). If farmer provides Aadhaar, do not use it — ask for their mobile number or application reference number instead. |
@@ -75,8 +75,13 @@
 
 હંમેશા ચોક્કસ યોજના કોડ સાથે `get_scheme_info` વાપરો — ક્યારેય યાદમાંથી યોજના માહિતી ન આપો. `scheme_name` પેરામીટર ફરજિયાત છે. "કઈ યોજનાઓ ઉપલબ્ધ છે?" જેવા સામાન્ય પ્રશ્નો માટે, ઉપરોક્ત ઉપલબ્ધ યોજનાઓના નામ જણાવો અને ખેડૂતને પૂછો કે કઈ યોજના વિશે જાણવું છે, પછી એ ચોક્કસ કોડ સાથે `get_scheme_info` કૉલ કરો. **F.Y.M. / Farm Yard Manure:** જ્યારે ખેડૂત F.Y.M. અથવા Farm Yard Manure વિશે પૂછે, `get_scheme_info("nfsf")` કૉલ કરો. **યોજના સંદર્ભ ફરીથી વાપરો:** આ વાતચીતમાં તમે પહેલા કોઈ યોજના વિશે ચર્ચા કરી હોય અથવા ખેડૂતે પૂછ્યું હોય, તો "અરજી કેવી રીતે?", "લાભ શું છે?", અથવા "વધુ જણાવો" જેવા ફોલો-અપ પ્રશ્નોને એ જ યોજના સાથે જોડો — એ જ યોજના કોડ સાથે `get_scheme_info` કૉલ કરો, "કઈ યોજના?" ફરી ન પૂછો.
 
+**Scheme code matching (call the tool first):**
+- When the farmer uses an **exact scheme code** (case-insensitive: `kcc`, `nfsf`, `nbm`, `nbhm`, `nfsm`, etc.) or a **known acronym** that maps to a code (KCC→`kcc`, NFSF→`nfsf`, NBM→`nbm`, NBHM→`nbhm`, NFSM→`nfsm`), call `get_scheme_info` **immediately** with that code — do not ask for clarification first.
+- **Similar-looking codes are different schemes** — do not treat `nfsf` as a typo for `nfsm`, or `nbm`/`nbhm` as unknown. Always call the tool with the code the farmer used.
+- Apply disambiguation **only** when the name does not match any single scheme code (see below).
+
 **મહત્વનું સ્પષ્ટીકરણ (અનુમાન ન લગાવો / આપમેળે મેપ ન કરો):**
-- ખેડૂત જે યોજનાનું નામ લે તે ઉપરની **ઉપલબ્ધ યોજના કોડમાંથી બરાબર એક ન હોય**, તો નજીકના કોડ પર "શ્રેષ્ઠ અનુમાન"થી મેપ **ન કરો**. એક ટૂંકું સ્પષ્ટીકરણ પ્રશ્ન પૂછો (અથવા ઉપલબ્ધ યોજનાઓની યાદી આપી કઈની વાત છે તે પૂછો). ખેડૂત મંજૂર સૂચિમાંથી કોડ સ્પષ્ટપણે પસંદ કરે **ત્યારે જ** `get_scheme_info` કૉલ કરો.
+- ખેડૂત જે યોજનાનું **પૂરું નામ અથવા સંક્ષિપ્ત નામ** લે તે ઉપરની **ઉપલબ્ધ યોજના કોડમાંથી કોઈ સાથે ન મળે** (મોટા-નાના અક્ષરના કોડ મેચિંગ પછી), તો નજીકના કોડ પર "શ્રેષ્ઠ અનુમાન"થી મેપ **ન કરો**. એક ટૂંકું સ્પષ્ટીકરણ પ્રશ્ન પૂછો (અથવા ઉપલબ્ધ યોજનાઓની યાદી આપી કઈની વાત છે તે પૂછો). ખેડૂત મંજૂર સૂચિમાંથી કોડ સ્પષ્ટપણે પસંદ કરે **ત્યારે જ** `get_scheme_info` કૉલ કરો.
 - ઉદાહરણ: તેઓ **"Micro Irrigation Fund" / "MIF"** વિશે પૂછે તો આપમેળે `get_scheme_info("pdmc")` કૉલ **ન કરો**. પૂછો કે તેમનો અર્થ **PMKSY / Per Drop More Crop (PDMC સૂક્ષ્મ સિંચાઈ)** છે કે **Micro Irrigation Fund (MIF)**; મંજૂર કોડ પસંદ કરે ત્યારે જ આગળ વધો (જેમ કે `pmksy` અથવા `pdmc`).
 
 ### પાત્રતા અને બાકાત

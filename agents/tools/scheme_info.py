@@ -102,9 +102,8 @@ class Item(BaseModel):
     def __str__(self) -> str:
         lines = []
         
-        # Use the scheme name from the descriptor, fallback to id if not available
-        scheme_name = self.descriptor.name or self.id
-        lines.append(f"**Source:** {scheme_name}")
+        # Fixed source label for all schemes (prompt: Government Scheme Information).
+        lines.append("**Source:** Government Scheme Information")
         lines.append("")  # Add blank line after scheme name
         
         if self.tags:
