@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     # Play Integrity Auth Configuration
     play_integrity_package_name: Optional[str] = os.getenv("PLAY_INTEGRITY_PACKAGE_NAME")
     play_integrity_service_account_file: Optional[str] = os.getenv("PLAY_INTEGRITY_SERVICE_ACCOUNT_FILE")
+    play_integrity_service_account_base_path: Optional[str] = os.getenv("PLAY_INTEGRITY_SERVICE_ACCOUNT_BASE_PATH")
     play_integrity_package_name_prefix: str = os.getenv("PLAY_INTEGRITY_PACKAGE_NAME_PREFIX", "PLAY_INTEGRITY_PACKAGE_NAME_")
     play_integrity_private_key_prefix: str = os.getenv("PLAY_INTEGRITY_PRIVATE_KEY_PREFIX", "PLAY_INTEGRITY_PRIVATE_KEY_")
     play_integrity_freshness_seconds: int = int(os.getenv("PLAY_INTEGRITY_FRESHNESS_SECONDS", "120"))
@@ -58,14 +59,14 @@ class Settings(BaseSettings):
     uvicorn_workers: int = os.cpu_count() or 1
 
     # Redis Settings
-    redis_host: str = "localhost"
-    redis_port: int = 6379
-    redis_db: int = 0
-    redis_key_prefix: str = "sva-cache-"
-    redis_socket_connect_timeout: int = 10
-    redis_socket_timeout: int = 10
-    redis_max_connections: int = 100
-    redis_retry_on_timeout: bool = True
+    redis_host: str = os.getenv("REDIS_HOST", "localhost")
+    redis_port: int = int(os.getenv("REDIS_PORT", "6379"))
+    redis_db: int = int(os.getenv("REDIS_DB", "0"))
+    redis_key_prefix: str = os.getenv("REDIS_KEY_PREFIX", "sva-cache-")
+    redis_socket_connect_timeout: int = int(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "10"))
+    redis_socket_timeout: int = int(os.getenv("REDIS_SOCKET_TIMEOUT", "10"))
+    redis_max_connections: int = int(os.getenv("REDIS_MAX_CONNECTIONS", "100"))
+    redis_retry_on_timeout: bool = os.getenv("REDIS_RETRY_ON_TIMEOUT", "true").strip().lower() in ("1", "true", "yes", "on")
 
     # Cache Configuration
     default_cache_ttl: int = 60 * 60 * 24  # 24 hours
