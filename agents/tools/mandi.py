@@ -5,7 +5,7 @@ using the Vistaar Beckn API.
 import os
 import uuid
 from datetime import datetime, timezone
-from helpers.utils import get_logger, get_today_date_str
+from helpers.utils import get_logger
 import humanize
 import httpx
 import pytz
@@ -134,6 +134,17 @@ class Category(BaseModel):
 # Arrival date -> "X days ago"
 # -----------------------
 _IST = pytz.timezone("Asia/Kolkata")
+
+
+def _format_price_date_display(price_date: Optional[str]) -> str:
+    """Format requested price_date for tool output header."""
+    if not price_date or not price_date.strip():
+        return "Latest available"
+    try:
+        dt = dateutil_parser.parse(price_date.strip(), dayfirst=True)
+        return dt.strftime("%A, %d %B %Y")
+    except Exception:
+        return price_date.strip()
 
 
 def _arrival_date_to_days_ago(arrival_date_str: str) -> str:
@@ -291,9 +302,10 @@ class MandiResponse(BaseModel):
                     return True
         return False
 
-    def __str__(self) -> str:
+    def format_output(self, requested_price_date: Optional[str] = None) -> str:
         lines = []
-        lines.append(f"**Mandi Price Discovery** [Today's Date: {get_today_date_str()}]")
+        date_label = _format_price_date_display(requested_price_date)
+        lines.append(f"**Mandi Price Discovery** [Price Date: {date_label}]")
 
         has_mandi_data = self._has_mandi_data()
         if len(self.responses) == 0 or not has_mandi_data:
@@ -304,16 +316,12 @@ class MandiResponse(BaseModel):
             lines.append(str(rsp))
         return "\n".join(lines)
 
+    def __str__(self) -> str:
+        return self.format_output()
+
 # -----------------------
 # Mandi Request
 # -----------------------
-def _format_price_date(price_date: Optional[str] = None) -> str:
-    """Return a mandi price date in DD-MM-YYYY (IST), defaulting to today."""
-    if price_date and price_date.strip():
-        return price_date.strip()
-    return datetime.now(_IST).strftime("%d-%m-%Y")
-
-
 class MandiRequest(BaseModel):
     """MandiRequest model for mandi price discovery API.
 
@@ -322,7 +330,7 @@ class MandiRequest(BaseModel):
         longitude (float): Longitude of the location, example: 75.7873
         location_name (str): City or market area name, example: Jaipur
         commodity_name (str): Commodity name, example: Onion
-        price_date (str): Price date in DD-MM-YYYY format; defaults to today (IST)
+        price_date (str): Optional price date in DD-MM-YYYY; omit only for latest available.
     """
     latitude: float = Field(..., description="Latitude of the location")
     longitude: float = Field(..., description="Longitude of the location")
@@ -330,7 +338,7 @@ class MandiRequest(BaseModel):
     commodity_name: str = Field(..., description="Commodity name in English")
     price_date: Optional[str] = Field(
         default=None,
-        description="Price date in DD-MM-YYYY format; defaults to today (IST)",
+        description="Optional price date in DD-MM-YYYY; pass for today/yesterday/specific dates; omit only for latest available",
     )
 
     def get_payload(self) -> Dict[str, Any]:
@@ -341,7 +349,11 @@ class MandiRequest(BaseModel):
             Dict[str, Any]: The dictionary representation of the request payload.
         """
         now = datetime.now(timezone.utc)
-        price_date = _format_price_date(self.price_date)
+        price_date = (
+            self.price_date.strip()
+            if self.price_date and self.price_date.strip()
+            else None
+        )
 
         return {
             "context": {
@@ -418,7 +430,7 @@ async def get_mandi_prices(
         longitude (float): Longitude of the location
         location_name (str): City or market area name (e.g. Jaipur, Pune)
         commodity_name (str): English commodity name from search_commodity (e.g. Onion)
-        price_date (str): Optional price date in DD-MM-YYYY; defaults to today (IST)
+        price_date (str): Optional price date in DD-MM-YYYY; pass for today/yesterday/specific dates.
 
     Returns:
         str: Formatted mandi price data for the requested commodity and location
@@ -460,7 +472,7 @@ async def get_mandi_prices(
         logger.info("Mandi API response OK")
         data = response.json()
         mandi_response = MandiResponse.model_validate(data)
-        return str(mandi_response)
+        return mandi_response.format_output(requested_price_date=price_date)
 
     except httpx.TimeoutException:
         logger.error("Mandi API request timed out")
