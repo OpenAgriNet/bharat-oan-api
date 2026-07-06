@@ -4,9 +4,8 @@ using the Vistaar Beckn API.
 """
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from helpers.utils import get_logger
-import humanize
 import httpx
 import pytz
 from dateutil import parser as dateutil_parser
@@ -131,13 +130,23 @@ class Category(BaseModel):
         return self.descriptor.name or self.id
 
 # -----------------------
-# Arrival date -> "X days ago"
+# Date formatting and matching
 # -----------------------
 _IST = pytz.timezone("Asia/Kolkata")
 
 
+def _parse_mandi_date(date_str: Optional[str]) -> Optional[date]:
+    """Parse a mandi date string (DD-MM-YYYY or similar) to a calendar date."""
+    if not date_str or not date_str.strip():
+        return None
+    try:
+        return dateutil_parser.parse(date_str.strip(), dayfirst=True).date()
+    except Exception:
+        return None
+
+
 def _format_price_date_display(price_date: Optional[str]) -> str:
-    """Format requested price_date for tool output header."""
+    """Format a price or arrival date for tool output."""
     if not price_date or not price_date.strip():
         return "Latest available"
     try:
@@ -147,20 +156,15 @@ def _format_price_date_display(price_date: Optional[str]) -> str:
         return price_date.strip()
 
 
-def _arrival_date_to_days_ago(arrival_date_str: str) -> str:
-    """Get a relative time string like '10 days ago', '1 day ago', 'today'. Do not use calendar dates."""
-    if not arrival_date_str or not arrival_date_str.strip():
-        return ""
-    try:
-        dt = dateutil_parser.parse(arrival_date_str.strip(), dayfirst=True)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=_IST)
-        now = datetime.now(_IST)
-        if dt > now:
-            return arrival_date_str
-        return humanize.naturaltime(now - dt)
-    except Exception:
-        return arrival_date_str
+def _item_matches_requested_date(item: "MandiItem", requested_price_date: Optional[str]) -> bool:
+    """Return True when no specific date was requested or the item's arrival date matches."""
+    if not requested_price_date or not requested_price_date.strip():
+        return True
+    requested = _parse_mandi_date(requested_price_date)
+    if requested is None:
+        return True
+    arrival = _parse_mandi_date(item._get_tag_value("Arrival Date"))
+    return arrival is not None and arrival == requested
 
 
 def _arrival_date_sort_key(item: "MandiItem") -> datetime:
@@ -222,9 +226,9 @@ class MandiItem(BaseModel):
                 price_str += f" (Min: {min_price}, Max: {max_price})"
             lines.append(f"Price: {price_str}")
         if arrival_date:
-            days_ago = _arrival_date_to_days_ago(arrival_date)
-            if days_ago:
-                lines.append(f"{days_ago}")
+            formatted_date = _format_price_date_display(arrival_date)
+            if formatted_date:
+                lines.append(f"Arrival Date: {formatted_date}")
         extras = []
         if variety:
             extras.append(f"Variety: {variety}")
@@ -302,19 +306,35 @@ class MandiResponse(BaseModel):
                     return True
         return False
 
+    def _collect_items(self, requested_price_date: Optional[str] = None) -> List["MandiItem"]:
+        """Collect items, optionally keeping only those matching the requested date."""
+        items: List[MandiItem] = []
+        for response in self.responses:
+            for provider in response.message.catalog.providers:
+                if not provider.items:
+                    continue
+                for item in provider.items:
+                    if _item_matches_requested_date(item, requested_price_date):
+                        items.append(item)
+        return items
+
     def format_output(self, requested_price_date: Optional[str] = None) -> str:
         lines = []
         date_label = _format_price_date_display(requested_price_date)
         lines.append(f"**Mandi Price Discovery** [Price Date: {date_label}]")
 
-        has_mandi_data = self._has_mandi_data()
-        if len(self.responses) == 0 or not has_mandi_data:
+        if len(self.responses) == 0 or not self._has_mandi_data():
             lines.append("No mandi price data found for the requested location and commodity.")
             return "\n".join(lines)
 
-        for rsp in self.responses:
-            lines.append(str(rsp))
-        return "\n".join(lines)
+        matched_items = self._collect_items(requested_price_date)
+        if not matched_items:
+            lines.append("No mandi price data found for the requested location and commodity.")
+            return "\n".join(lines)
+
+        for item in sorted(matched_items, key=_arrival_date_sort_key, reverse=True):
+            lines.append(str(item))
+        return "\n---\n".join(lines)
 
     def __str__(self) -> str:
         return self.format_output()
