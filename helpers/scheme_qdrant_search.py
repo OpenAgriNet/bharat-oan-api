@@ -86,21 +86,68 @@ _SCHEME_FOCUS_STOPWORDS = ALIAS_STOPWORDS | frozenset({
     "tell", "explain", "know", "need", "want", "there", "this", "that",
 })
 
+FARMER_TERMS = (
+    "farmer", "farmers", "farmer's", "farmers'", "farmers' groups",
+    "farmer groups", "individual farmer", "all farmers",
+    "small and marginal", "land holder", "cultivator",
+    "for selection of areas", "for selection of areas/ farmers",
+)
+
+HOW_TO_APPLY = "how to apply"
+APPLICATION_PROCESS = "application process"
+DOCUMENTS_REQUIRED = "documents required"
+COST_NORM = "cost norm"
+PATTERN_OF_ASSISTANCE = "pattern of assistance"
+REGISTRATION_PROCESS = "registration process"
+
+APPLICATION_CHUNK_TERMS = (
+    HOW_TO_APPLY,
+    APPLICATION_PROCESS,
+    DOCUMENTS_REQUIRED,
+    "registration",
+)
+APPLICATION_RERANK_PHRASES = (
+    HOW_TO_APPLY,
+    APPLICATION_PROCESS,
+    REGISTRATION_PROCESS,
+    DOCUMENTS_REQUIRED,
+    "online portal",
+    "apply through",
+)
+SUPPORT_CHUNK_TERMS = ("support", "subsidy", "assistance", "benefit", COST_NORM)
+SUBSIDY_QUERY_TERMS = ("subsidy", "assistance", COST_NORM, "how much")
+SUPPORT_RERANK_TERMS = ("benefit", "subsidy", "assistance", "support", "incentive")
+
+_HEADING_FARMER_ELIGIBILITY_MARKERS = (
+    "# eligibility", "# eligible", "# criteria",
+    "## eligibility", "## eligible", "## criteria",
+)
+_RE_HEADING_ELIGIBILITY = re.compile(
+    r"#{1,6}\s+(?:eligibility|eligible criteria|who can apply)"
+)
+_RE_HEADING_EXCLUSION = re.compile(
+    r"#{1,6}\s+(?:exclusion|scheme exclusion|who cannot apply)"
+)
+_RE_HEADING_SUPPORT = re.compile(
+    r"#{1,6}\s+(?:benefits|support|pattern of assistance)"
+)
+_RE_NUMBERED_STEPS = re.compile(r"^\s*\d+[.)]\s", re.MULTILINE)
+
 INTENT_TERMS = {
     "eligibility": [
         "eligibility", "eligible", "am i eligible", "who can apply",
         "who is eligible", "qualify", "criteria", "qualifying", "for selection of",
     ],
     "application": [
-        "how to apply", "application process", "application procedure",
+        HOW_TO_APPLY, APPLICATION_PROCESS, "application procedure",
         "application", "apply", "register", "registration", "portal",
-        "documents required", "how do i apply", "apply for", "procedure", "process",
+        DOCUMENTS_REQUIRED, "how do i apply", "apply for", "procedure", "process",
     ],
     "support": [
         "support", "financial support", "government support", "what support",
         "assistance", "financial assistance", "subsidy", "subsidies",
         "benefit", "benefits", "how much", "fund", "incentive",
-        "pattern of assistance", "cost norm", "help available",
+        PATTERN_OF_ASSISTANCE, COST_NORM, "help available",
     ],
 }
 
@@ -116,12 +163,12 @@ QUERY_EXPANSIONS = {
     ),
     "exclusion": "scheme exclusion who cannot apply ineligible not eligible excluded",
     "application": (
-        "application process registration portal documents required how to apply "
+        f"{APPLICATION_PROCESS} registration portal {DOCUMENTS_REQUIRED} {HOW_TO_APPLY} "
         "apply online procedure steps"
     ),
     "support": (
-        "scheme benefits subsidy assistance financial support pattern of assistance "
-        "cost norm incentive fund amount"
+        f"scheme benefits subsidy assistance financial support {PATTERN_OF_ASSISTANCE} "
+        f"{COST_NORM} incentive fund amount"
     ),
 }
 
@@ -140,13 +187,6 @@ APP_UI_NOISE_TERMS = (
     "click on", "logout", "offline record", "sync (offline",
     "registered farmer's list", "user manual", "app video guide",
     "language change", "my profile", "triple bar icon",
-)
-
-FARMER_TERMS = (
-    "farmer", "farmers", "farmer's", "farmers'", "farmers' groups",
-    "farmer groups", "individual farmer", "all farmers",
-    "small and marginal", "land holder", "cultivator",
-    "for selection of areas", "for selection of areas/ farmers",
 )
 
 
@@ -249,12 +289,17 @@ def classify_chunk_section(text: str) -> str:
             r"who can apply", r"who is eligible", r"eligible criteria", r"eligibility criteria",
         ),
         "application": (
-            r"#+\s*application process", r"#+\s*how to apply", r"application process",
-            r"how to apply", r"documents required", r"registration process", r"online portal",
+            rf"#+\s*{re.escape(APPLICATION_PROCESS)}",
+            rf"#+\s*{re.escape(HOW_TO_APPLY)}",
+            re.escape(APPLICATION_PROCESS),
+            re.escape(HOW_TO_APPLY),
+            re.escape(DOCUMENTS_REQUIRED),
+            re.escape(REGISTRATION_PROCESS),
+            r"online portal",
         ),
         "support": (
             r"#+\s*benefits", r"#+\s*support", r"scheme benefits",
-            r"pattern of assistance", r"financial support", r"cost norm",
+            re.escape(PATTERN_OF_ASSISTANCE), r"financial support", re.escape(COST_NORM),
             r"subsidy", r"assistance to farmers",
         ),
     }
@@ -272,18 +317,64 @@ def classify_chunk_section(text: str) -> str:
         return "exclusion"
     if any(term in text_l for term in ("eligibility", "eligible", "who can apply")):
         return "eligibility"
-    if any(term in text_l for term in ("how to apply", "application process", "documents required", "registration")):
+    if any(term in text_l for term in APPLICATION_CHUNK_TERMS):
         return "application"
-    if any(term in text_l for term in ("support", "subsidy", "assistance", "benefit", "cost norm")):
+    if any(term in text_l for term in SUPPORT_CHUNK_TERMS):
         return "support"
     return "other"
+
+
+def _result_key(item: dict[str, Any]) -> str:
+    return str(item.get("chunk_id") or "") or str(id(item))
+
+
+def _try_add_item(
+    item: dict[str, Any],
+    selected: list[dict[str, Any]],
+    seen: set[str],
+) -> bool:
+    key = _result_key(item)
+    if key in seen:
+        return False
+    seen.add(key)
+    selected.append(item)
+    return True
+
+
+def _fill_section_slots(
+    results: list[dict[str, Any]],
+    section: str,
+    slot_count: int,
+    selected: list[dict[str, Any]],
+    seen: set[str],
+) -> None:
+    section_count = 0
+    for item in results:
+        if item.get("section") != section:
+            continue
+        if _try_add_item(item, selected, seen):
+            section_count += 1
+        if section_count >= slot_count:
+            break
+
+
+def _fill_remaining_slots(
+    results: list[dict[str, Any]],
+    top_k: int,
+    selected: list[dict[str, Any]],
+    seen: set[str],
+) -> None:
+    for item in results:
+        if len(selected) >= top_k:
+            break
+        _try_add_item(item, selected, seen)
 
 
 def _dedupe_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     seen: set[str] = set()
     deduped: list[dict[str, Any]] = []
     for item in results:
-        key = str(item.get("chunk_id") or "") or str(id(item))
+        key = _result_key(item)
         if key in seen:
             continue
         seen.add(key)
@@ -301,25 +392,8 @@ def _take_balanced(
     seen: set[str] = set()
 
     for section in sections:
-        for item in results:
-            if item.get("section") != section:
-                continue
-            key = str(item.get("chunk_id") or "") or str(id(item))
-            if key in seen:
-                continue
-            seen.add(key)
-            selected.append(item)
-            if len([i for i in selected if i.get("section") == section]) >= slot_count:
-                break
-
-    for item in results:
-        if len(selected) >= top_k:
-            break
-        key = str(item.get("chunk_id") or "") or str(id(item))
-        if key in seen:
-            continue
-        seen.add(key)
-        selected.append(item)
+        _fill_section_slots(results, section, slot_count, selected, seen)
+    _fill_remaining_slots(results, top_k, selected, seen)
     return selected[:top_k]
 
 
@@ -358,7 +432,7 @@ def chunk_table_score(text: str) -> float:
         score += 0.12
     if "/ha" in text_l or "per ha" in text_l or "per beneficiary" in text_l:
         score += 0.12
-    if "cost norm" in text_l or "pattern of assistance" in text_l:
+    if COST_NORM in text_l or PATTERN_OF_ASSISTANCE in text_l:
         score += 0.18
     if "annexure" in text_l and pipe_density > 0.015:
         score += 0.08
@@ -374,13 +448,76 @@ def chunk_institutional_score(text: str) -> float:
 def chunk_farmer_score(text: str) -> float:
     text_l = text.lower()
     hits = sum(1 for term in FARMER_TERMS if term in text_l)
-    if re.search(r"#+\s*(eligibility|eligible|criteria)", text_l) and "farmer" in text_l:
+    if "farmer" in text_l and any(marker in text_l for marker in _HEADING_FARMER_ELIGIBILITY_MARKERS):
         hits += 2
     if "for selection of" in text_l and "farmer" in text_l:
         hits += 3
-    if re.search(r"#+\s*3\.3\.?\s*criteria", text_l):
+    if "3.3" in text_l and "criteria" in text_l and "#" in text_l:
         hits += 2
     return min(hits * 0.07, 0.4)
+
+
+def _eligibility_rerank_adjustments(
+    text_l: str, inst_s: float, table_s: float
+) -> tuple[float, float]:
+    bonus = 0.0
+    if _RE_HEADING_ELIGIBILITY.search(text_l):
+        bonus += 0.1
+    if _RE_HEADING_EXCLUSION.search(text_l):
+        bonus += 0.12
+    if "regional council" in text_l and "eligible criteria" in text_l:
+        inst_s += 0.35
+    return bonus, inst_s + (table_s * 0.85)
+
+
+def _application_rerank_adjustments(
+    text: str, text_l: str, inst_s: float, table_s: float
+) -> tuple[float, float]:
+    bonus = 0.0
+    if any(phrase in text_l for phrase in APPLICATION_RERANK_PHRASES):
+        bonus += 0.18
+    if _RE_NUMBERED_STEPS.search(text):
+        bonus += 0.05
+    ui_noise = sum(1 for term in APP_UI_NOISE_TERMS if term in text_l)
+    penalty = inst_s * 0.6 + table_s * 0.45 + min(ui_noise * 0.12, 0.45)
+    return bonus, penalty
+
+
+def _support_rerank_adjustments(
+    text_l: str, inst_s: float, table_s: float, wants_subsidy_tables: bool
+) -> tuple[float, float]:
+    bonus = 0.0
+    if any(term in text_l for term in SUPPORT_RERANK_TERMS):
+        bonus += 0.12
+    if _RE_HEADING_SUPPORT.search(text_l):
+        bonus += 0.1
+    penalty = inst_s * 0.25
+    if wants_subsidy_tables:
+        bonus += table_s * 0.15
+    else:
+        penalty += table_s * 0.2
+    return bonus, penalty
+
+
+def _default_rerank_adjustments(inst_s: float, table_s: float) -> tuple[float, float]:
+    return 0.0, inst_s * 0.25 + table_s * 0.25
+
+
+def _rerank_bonus_penalty(
+    intent: Optional[str],
+    text: str,
+    text_l: str,
+    inst_s: float,
+    table_s: float,
+    wants_subsidy_tables: bool,
+) -> tuple[float, float]:
+    if intent == "eligibility":
+        return _eligibility_rerank_adjustments(text_l, inst_s, table_s)
+    if intent == "application":
+        return _application_rerank_adjustments(text, text_l, inst_s, table_s)
+    if intent == "support":
+        return _support_rerank_adjustments(text_l, inst_s, table_s, wants_subsidy_tables)
+    return _default_rerank_adjustments(inst_s, table_s)
 
 
 def rerank_results(query: str, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -390,56 +527,21 @@ def rerank_results(query: str, results: list[dict[str, Any]]) -> list[dict[str, 
     intent = classify_query_intent(query)
     q_lower = query.lower()
     intent_terms = [term for terms in INTENT_TERMS.values() for term in terms if term in q_lower]
-    wants_subsidy_tables = any(
-        term in q_lower for term in ("subsidy", "assistance", "cost norm", "how much")
-    )
+    wants_subsidy_tables = any(term in q_lower for term in SUBSIDY_QUERY_TERMS)
 
     def combined_score(item: dict[str, Any]) -> float:
         text = str(item.get("text", ""))
         text_l = text.lower()
         base = float(item["score"])
-
         keyword_hits = sum(1 for term in intent_terms if term in text_l)
         farmer_s = chunk_farmer_score(text)
         inst_s = chunk_institutional_score(text)
         table_s = chunk_table_score(text)
         bonus = (0.1 * keyword_hits) + farmer_s
-
-        if intent == "eligibility":
-            if re.search(r"#+\s*(eligibility|eligible criteria|who can apply)", text_l):
-                bonus += 0.1
-            if re.search(r"#+\s*(exclusion|scheme exclusion|who cannot apply)", text_l):
-                bonus += 0.12
-            if "regional council" in text_l and "eligible criteria" in text_l:
-                inst_s += 0.35
-            penalty = inst_s + (table_s * 0.85)
-        elif intent == "application":
-            if any(
-                phrase in text_l
-                for phrase in (
-                    "how to apply", "application process", "registration process",
-                    "documents required", "online portal", "apply through",
-                )
-            ):
-                bonus += 0.18
-            if re.search(r"^\s*\d+[\.\)]\s", text, re.MULTILINE):
-                bonus += 0.05
-            ui_noise = sum(1 for term in APP_UI_NOISE_TERMS if term in text_l)
-            penalty = inst_s * 0.6 + table_s * 0.45 + min(ui_noise * 0.12, 0.45)
-        elif intent == "support":
-            if any(term in text_l for term in ("benefit", "subsidy", "assistance", "support", "incentive")):
-                bonus += 0.12
-            if re.search(r"#+\s*(benefits|support|pattern of assistance)", text_l):
-                bonus += 0.1
-            penalty = inst_s * 0.25
-            if wants_subsidy_tables:
-                bonus += table_s * 0.15
-            else:
-                penalty += table_s * 0.2
-        else:
-            penalty = inst_s * 0.25 + table_s * 0.25
-
-        return base + bonus - penalty
+        intent_bonus, penalty = _rerank_bonus_penalty(
+            intent, text, text_l, inst_s, table_s, wants_subsidy_tables
+        )
+        return base + bonus + intent_bonus - penalty
 
     return sorted(results, key=combined_score, reverse=True)
 
@@ -503,6 +605,86 @@ def get_qdrant_client(
     return client
 
 
+def _hit_to_result(hit: Any) -> dict[str, Any]:
+    payload = hit.payload or {}
+    text = str(payload.get("text") or "")
+    return {
+        "score": hit.score,
+        "scheme_code": payload.get("scheme_code"),
+        "scheme_name": payload.get("scheme_name"),
+        "text": text,
+        "doc_id": payload.get("doc_id"),
+        "chunk_id": payload.get("chunk_id"),
+        "section": classify_chunk_section(text),
+    }
+
+
+def _hits_to_results(hits: list) -> list[dict[str, Any]]:
+    return [_hit_to_result(hit) for hit in hits]
+
+
+def _run_scheme_search(
+    client: QdrantClient,
+    collection_name: str,
+    query_vector: list[float],
+    fetch_k: int,
+    code: Optional[str] = None,
+    vector: Optional[list[float]] = None,
+) -> list:
+    query_filter = Filter(must=[FieldCondition(key="type", match=MatchValue(value="scheme"))])
+    if code:
+        query_filter.must.append(
+            FieldCondition(key="scheme_code", match=MatchValue(value=code))
+        )
+    return client.query_points(
+        collection_name=collection_name,
+        query=vector if vector is not None else query_vector,
+        query_filter=query_filter,
+        limit=fetch_k,
+        with_payload=True,
+    ).points
+
+
+def _supplemental_search_config(
+    section_focus: Optional[str],
+    intent: Optional[str],
+) -> Optional[tuple[str, str]]:
+    if section_focus == "eligibility_with_exclusion":
+        return ("exclusion", "exclusion")
+    if intent in INTENT_SECTIONS:
+        return (INTENT_SECTIONS[intent], intent)
+    return None
+
+
+def _merge_supplemental_results(
+    query: str,
+    results: list[dict[str, Any]],
+    supplemental: tuple[str, str],
+    scheme_code: Optional[str],
+    client: QdrantClient,
+    collection_name: str,
+    fetch_k: int,
+    model: SentenceTransformer,
+) -> list[dict[str, Any]]:
+    needed_section, expansion_key = supplemental
+    if any(r.get("section") == needed_section for r in results):
+        return results
+    extra_vector = embed_query(f"{query} {QUERY_EXPANSIONS[expansion_key]}", model)
+    extra_hits = _run_scheme_search(
+        client, collection_name, extra_vector, fetch_k, scheme_code, extra_vector
+    )
+    return _dedupe_results(results + _hits_to_results(extra_hits))
+
+
+def _filter_results_by_scheme(
+    results: list[dict[str, Any]],
+    scheme_code: Optional[str],
+) -> list[dict[str, Any]]:
+    if scheme_code:
+        return [r for r in results if r.get("scheme_code") == scheme_code]
+    return [r for r in results if r.get("scheme_code") in QDRANT_SCHEME_CODES]
+
+
 def search_schemes(
     query: str,
     collection_name: str,
@@ -532,57 +714,18 @@ def search_schemes(
     query_vector = embed_query(expand_query_for_search(query, intent, section_focus), model)
     fetch_k = max(top_k * 8, 40)
 
-    def run_search(code: Optional[str], vector: Optional[list[float]] = None) -> list:
-        query_filter = Filter(must=[FieldCondition(key="type", match=MatchValue(value="scheme"))])
-        if code:
-            query_filter.must.append(
-                FieldCondition(key="scheme_code", match=MatchValue(value=code))
-            )
-        return client.query_points(
-            collection_name=collection_name,
-            query=vector if vector is not None else query_vector,
-            query_filter=query_filter,
-            limit=fetch_k,
-            with_payload=True,
-        ).points
+    hits = _run_scheme_search(client, collection_name, query_vector, fetch_k, scheme_code)
+    results = _hits_to_results(hits)
 
-    def hits_to_results(hits: list) -> list[dict[str, Any]]:
-        return [
-            {
-                "score": hit.score,
-                "scheme_code": (hit.payload or {}).get("scheme_code"),
-                "scheme_name": (hit.payload or {}).get("scheme_name"),
-                "text": str((hit.payload or {}).get("text") or ""),
-                "doc_id": (hit.payload or {}).get("doc_id"),
-                "chunk_id": (hit.payload or {}).get("chunk_id"),
-                "section": classify_chunk_section(str((hit.payload or {}).get("text") or "")),
-            }
-            for hit in hits
-        ]
-
-    hits = run_search(scheme_code)
-    results = hits_to_results(hits)
-
-    supplemental: Optional[tuple[str, str]] = None
-    if section_focus == "eligibility_with_exclusion":
-        supplemental = ("exclusion", "exclusion")
-    elif intent in INTENT_SECTIONS:
-        supplemental = (INTENT_SECTIONS[intent], intent)
-
+    supplemental = _supplemental_search_config(section_focus, intent)
     if supplemental:
-        needed_section, expansion_key = supplemental
-        if not any(r.get("section") == needed_section for r in results):
-            extra_vector = embed_query(f"{query} {QUERY_EXPANSIONS[expansion_key]}", model)
-            extra_hits = run_search(scheme_code, extra_vector)
-            results = _dedupe_results(results + hits_to_results(extra_hits))
+        results = _merge_supplemental_results(
+            query, results, supplemental, scheme_code,
+            client, collection_name, fetch_k, model,
+        )
 
-    if scheme_code:
-        results = [r for r in results if r.get("scheme_code") == scheme_code]
-    else:
-        results = [r for r in results if r.get("scheme_code") in QDRANT_SCHEME_CODES]
-
+    results = _filter_results_by_scheme(results, scheme_code)
     results = rerank_results(query, results)
-
     return _finalize_results(results, section_focus, intent, top_k)
 
 
@@ -598,30 +741,38 @@ def format_scheme_unavailable(_query: str) -> str:
     return "**Scheme not available right now.**\n\n"
 
 
+def _empty_search_message(query: str, scheme_list: list[dict[str, Any]]) -> str:
+    if query_names_unindexed_scheme(query, scheme_list):
+        return format_scheme_unavailable(query)
+    if resolve_scheme_code(query, scheme_list):
+        return "**Could not find this information right now.**\n\n"
+    return format_scheme_unavailable(query)
+
+
+def _format_result_block(item: dict[str, Any]) -> str:
+    scheme_name = str(item.get("scheme_name") or "")
+    scheme_code = str(item.get("scheme_code") or "")
+    text_value = str(item.get("text") or "")
+    section = str(item.get("section") or classify_chunk_section(text_value))
+    text = _process_chunk_text(text_value)
+    score = float(item.get("score") or 0.0)
+    section_label = section.title() if section in LABELED_SECTIONS else "General"
+    return (
+        f"**{scheme_name}** ({scheme_code}, section={section_label}, score={score:.4f})\n"
+        f"```\n{text}\n```"
+    )
+
+
 def format_search_results(
     results: list[dict[str, Any]],
     query: str,
     scheme_list: Optional[list[dict[str, Any]]] = None,
 ) -> str:
     if not results:
-        scheme_list = scheme_list if scheme_list is not None else _BUILTIN_SCHEME_LIST
-        if query_names_unindexed_scheme(query, scheme_list):
-            return format_scheme_unavailable(query)
-        if resolve_scheme_code(query, scheme_list):
-            return "**Could not find this information right now.**\n\n"
-        return format_scheme_unavailable(query)
-    blocks = []
-    for item in results:
-        scheme_name = str(item.get("scheme_name") or "")
-        scheme_code = str(item.get("scheme_code") or "")
-        section = str(item.get("section") or classify_chunk_section(str(item.get("text") or "")))
-        text = _process_chunk_text(str(item.get("text") or ""))
-        score = float(item.get("score") or 0.0)
-        section_label = section.title() if section in LABELED_SECTIONS else "General"
-        blocks.append(
-            f"**{scheme_name}** ({scheme_code}, section={section_label}, score={score:.4f})\n"
-            f"```\n{text}\n```"
-        )
+        active_scheme_list = scheme_list if scheme_list is not None else _BUILTIN_SCHEME_LIST
+        return _empty_search_message(query, active_scheme_list)
+
+    blocks = [_format_result_block(item) for item in results]
     return (
         f"> Scheme Search Results for `{query}`\n\n"
         f"**Source: {SCHEME_SEARCH_SOURCE}**\n\n"
