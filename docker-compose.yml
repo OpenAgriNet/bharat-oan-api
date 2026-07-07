@@ -1,13 +1,17 @@
 services:
   app:
     container_name: sva_app
-    build: .
+    build:
+      context: .
+      args:
+        HF_TOKEN: ${HF_TOKEN:-}
     ports:
       - "8000:8000"
     expose:
       - "8000"
     volumes:
       - .:/app
+      - ./supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:ro
     env_file:
       - .env  
     restart: unless-stopped

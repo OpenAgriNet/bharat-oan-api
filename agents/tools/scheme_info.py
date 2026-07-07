@@ -33,6 +33,8 @@ _SCHEME_LABELS: Dict[str, str] = {
     "nbhm": "National Beekeeping & Honey Mission",
 }
 
+LEGACY_SCHEME_CODES = frozenset(_SCHEME_LABELS.keys())
+
 
 def _scheme_tool_metadata(scheme_name: str) -> Dict[str, str]:
     label = _SCHEME_LABELS.get(scheme_name, scheme_name)
