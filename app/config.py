@@ -145,6 +145,11 @@ class Settings(BaseSettings):
     marqo_index_name: Optional[str] = None
     marqo_pests_diseases_index_name: Optional[str] = None
 
+    # Qdrant vector search (scheme documents)
+    qdrant_url: Optional[str] = os.getenv("QDRANT_URL")
+    qdrant_api_key: Optional[str] = os.getenv("QDRANT_API_KEY")
+    qdrant_collection_name: str = os.getenv("QDRANT_COLLECTION_NAME", "schemes-index")
+
     # HTTP client timeouts for outbound API calls (connect and read; read should be > connect)
     default_api_timeout: float = 5.0   # connect timeout (DEFAULT_API_TIMEOUT)
     default_api_read_timeout: float = 10.0  # read timeout (DEFAULT_API_READ_TIMEOUT)

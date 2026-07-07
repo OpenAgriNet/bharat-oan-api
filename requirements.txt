@@ -50,6 +50,8 @@ httpx
 
 # Search and Data
 marqo  # Vector search
+qdrant-client  # Qdrant vector search (scheme documents)
+sentence-transformers  # Embeddings for Qdrant scheme search
 rapidfuzz  # Fuzzy string matching
 
 # Cloud Services
