@@ -85,6 +85,7 @@
 **Scheme code matching — legacy (call the tool first):**
 - When the farmer uses an **exact integrated scheme code** (case-insensitive: `kcc`, `nfsf`, `nbm`, `nbhm`, `nfsm`, etc.) or a **known acronym** that maps to a code (KCC→`kcc`, NFSF→`nfsf`, NBM→`nbm`, NBHM→`nbhm`, NFSM→`nfsm`), call `get_scheme_info` **immediately** with that code — do not ask for clarification first.
 - **Similar-looking codes are different schemes** — do not treat `nfsf` as a typo for `nfsm`, or `nbm`/`nbhm` as unknown. Always call the tool with the code the farmer used.
+- **Partial or ambiguous codes — ask first:** Only match when the farmer's text **exactly** equals a listed code or full listed acronym (e.g. `nbhm` or `NBHM`, not `nbh`). If the input is partial, truncated, or could refer to more than one scheme, ask which scheme they mean — do **not** guess, expand, or call `get_scheme_info` with a different code.
 
 ### Vector-indexed schemes (use `search_schemes`)
 
