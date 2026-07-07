@@ -60,6 +60,9 @@ def _load_grievance_mapping(path: str) -> Dict[str, str]:
 
 GRIEVANCE_MAPPING: Dict[str, str] = _load_grievance_mapping(_GRIEVANCE_JSON_PATH)
 GRIEVANCE_TYPES: List[str] = list(GRIEVANCE_MAPPING.keys())
+# Literal built from the actual enum values so the LLM's tool schema exposes the
+# exact valid strings instead of a plain str that invites paraphrased guesses.
+GrievanceTypeLiteral = Literal[tuple(GRIEVANCE_TYPES)] if GRIEVANCE_TYPES else str
 
 _REGISTRATION_NUMBER_LABEL = "Registration Number"
 _BAP_ENDPOINT_NOT_CONFIGURED_MSG = "BAP_ENDPOINT is not configured in environment."
@@ -768,7 +771,7 @@ async def pmkisan_submit_grievance(
     ctx: RunContext[FarmerContext],
     reg_no: str,
     grievance_description: str,
-    grievance_type: str,
+    grievance_type: GrievanceTypeLiteral,
     otp: Optional[str] = None,
     phone_number: str = "",
     raw: bool = False,
@@ -782,7 +785,12 @@ async def pmkisan_submit_grievance(
     Args:
         reg_no: PM-KISAN registration number used for OTP verification and grievance submission.
         grievance_description: Detailed description of the grievance.
-        grievance_type: One of GRIEVANCE_TYPES.
+        grievance_type: Must be exactly one of: "ACCOUNT_NUMBER_NOT_CORRECT",
+            "ONLINE_APPLICATION_PENDING_FOR_APPROVAL", "INSTALLMENT_NOT_RECEIVED",
+            "TRANSACTION_FAILED", "PROBLEM_IN_AADHAAR_CORRECTION", "GENDER_NOT_CORRECT",
+            "PAYMENT_RELATED", "PROBLEM_IN_OTP_BASED_EKYC", "PROBLEM_IN_BIO_METRIC_BASED_EKYC",
+            "PROBLEM_IN_FACIAL_BASED_EKYC". Map the farmer's free-text complaint to the
+            closest matching value from this list; never invent a new label.
         otp: 4-digit OTP received on the registered mobile.
         phone_number: Optional registered mobile number to include in OTP verification.
         raw: If True, return the raw response body.
