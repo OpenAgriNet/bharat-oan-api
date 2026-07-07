@@ -15,7 +15,7 @@ from pydantic_ai import ModelRetry
 from langfuse import observe
 from helpers.utils import get_logger
 from agents.deps import FarmerContext
-from app.core.npss_geocodes import resolve_npss_location_ids
+from app.core.npss_geocodes import DEFAULT_LOCATION, resolve_npss_location_ids
 from app.core.cache import cache
 from app.core.image_storage import mark_processed, cleanup_image
 
@@ -165,7 +165,10 @@ async def _download_image(image_url: str) -> tuple[bytes, str]:
     Download image bytes from a URL.
     Supports both absolute URLs and relative /api/image/{id} paths.
     """
-    # Resolve relative URLs
+    # Resolve UUIDs and relative URLs
+    if re.fullmatch(r"[a-f0-9\-]{36}", image_url, flags=re.IGNORECASE):
+        image_url = f"/api/image/{image_url}"
+
     if image_url.startswith("/"):
         base_url = os.getenv("BASE_URL", "")
         if base_url:
@@ -317,11 +320,13 @@ async def analyze_crop_image(
     token = await _get_cached_npss_token()
     geo = await resolve_npss_location_ids(latitude, longitude, bearer_token=token)
     if not geo:
-        raise ModelRetry(
-            "NPSS location IDs could not be resolved for these coordinates. "
-            "The backend geocoding master lookup could not match the location, "
-            "so the image cannot be submitted without risking incorrect location reporting."
+        logger.warning(
+            "NPSS location IDs could not be resolved for lat=%s lon=%s; "
+            "submitting with legacy default IDs as a last resort.",
+            latitude,
+            longitude,
         )
+        geo = DEFAULT_LOCATION.copy()
     state_id = geo["state_id"]
     district_id = geo["district_id"]
     sub_district_id = geo["sub_district_id"]
