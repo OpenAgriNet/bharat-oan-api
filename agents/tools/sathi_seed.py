@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 from langfuse import observe
-
+from helpers.langfuse_tracing import lf_update_current_observation
 from app.config import get_default_httpx_timeout
 from app.core.cache import cache
 from helpers.utils import get_logger
@@ -576,6 +576,12 @@ async def search_sathi_seed_availability(
 
     try:
         payload = _build_beckn_seed_search_payload(cc, latitude, longitude)
+        lf_update_current_observation(
+            metadata={
+                "tool": "sathi.seed_availability",
+                "transaction_id": payload.get("context", {}).get("transaction_id"),
+            }
+        )
         async with httpx.AsyncClient(timeout=get_default_httpx_timeout()) as client:
             response = await client.post(search_url, json=payload)
 

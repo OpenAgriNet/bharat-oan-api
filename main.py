@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import settings
 from app.core.cache import cache
+from agents.models import validate_agrinet_routing_config
 from contextlib import asynccontextmanager
 
 load_dotenv()
@@ -32,6 +33,8 @@ class TimingAllowOriginMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI):
     """Lifespan events for startup and shutdown"""
     # Startup
+    token.validate_multi_provider_auth_config()
+    validate_agrinet_routing_config()
     print(f"🚀 {settings.app_name} starting up...")
     print(f"📍 Environment: {settings.environment}")
     print(f"🔧 Debug mode: {settings.debug}")

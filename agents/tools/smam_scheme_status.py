@@ -281,6 +281,9 @@ async def check_smam_scheme_status(
 
     try:
         payload = SmamStatusRequest(search_type=search_type, search_value=normalized).get_payload()
+        lf_update_current_observation(
+            metadata={"tool": "smam.status", "transaction_id": payload.get("context", {}).get("transaction_id")}
+        )
         endpoint = os.getenv("BAP_ENDPOINT")
         if not endpoint:
             logger.error("BAP_ENDPOINT is not set")
