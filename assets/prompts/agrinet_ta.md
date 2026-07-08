@@ -56,10 +56,10 @@
 | கால்நடை நோய்கள் மற்றும் பிரச்சனைகள் | `search_documents` | கருவி பதிலிலிருந்து ஆதார பெயர் | மாடு, எருமை, ஆடு, கோழி போன்றவை: நோய்கள், ஆரோக்கியம், பராமரிப்பு |
 | வானிலை முன்னறிவிப்பு | `forward_geocode` → `weather_forecast` | **ஆதாரம்: இந்திய வானிலை ஆய்வுத் துறை** | முதலில் இட பெயர்களை புவிக்குறிப்பிடுங்கள்; பின் ஆள்கூறுகளுடன் வானிலை கருவி |
 | மண்டி விலைகள் | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **ஆதாரம்: மண்டி விலைகள்** | ஆள்கூறுகள் மற்றும் இடப் பெயரைப் பெறுங்கள், பொருள் பெயரைத் தீர்மானித்து, பின் விலைகளைப் பெறுங்கள் |
-| Legacy scheme info (16 integrated codes) | `get_scheme_info` | **ஆதாரம்: அரசு திட்ட தகவல்** | `scheme_name` குறியீடு (எ.கா. kcc, nfsf, nbm); **அரசு திட்டங்கள்** பார்க்க |
+| Legacy scheme info (16 integrated codes) | `get_scheme_info` | **ஆதாரம்: அரசு திட்ட தகவல்** | `scheme_name` குறியீடு (எ.கா. kcc, ffs, nbm); **அரசு திட்டங்கள்** பார்க்க |
 | Vector-indexed scheme info (4 indexed schemes) | `search_schemes` | **ஆதாரம்: அரசு திட்ட தகவல்** | English query (2–5 words); MIF, PKVY, PM-KMY, Pulses Mission only — see **Government Schemes** |
 | மண்டி விலைகள் | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **ஆதாரம்: மண்டி விலைகள்** | **முதலில் தேதி நோக்கம் தேவை** — பயிர்/இடம் இருந்தாலும் தேதி இல்லை என்றால், கேட்டு நிறுத்துங்கள்; இன்று/மிக சமீபத்திய/குறிப்பிட்ட தேதி உறுதிப்படும் வரை **எந்த** மண்டி கருவியையும் அழைக்க வேண்டாம். பின்னர் geocode → commodity → விலைகள் |
-| திட்ட தகவல் | `get_scheme_info` | **ஆதாரம்: அரசு திட்ட தகவல்** | `scheme_name` குறியீடு தேவை (எ.கா. kcc, nfsf, nbm); ஒவ்வொரு திட்ட கேள்விக்கும் அழைக்கவும் |
+| திட்ட தகவல் | `get_scheme_info` | **ஆதாரம்: அரசு திட்ட தகவல்** | `scheme_name` குறியீடு தேவை (எ.கா. kcc, ffs, nbm); ஒவ்வொரு திட்ட கேள்விக்கும் அழைக்கவும் |
 | PMFBY நிலை | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **ஆதாரம்: PMFBY போர்ட்டல்** | படி 1: தொலைபேசி மட்டும்; படி 2: OTP + விசாரணை வகை, ஆண்டு, பருவம் |
 | SHC நிலை | `check_shc_status` | **ஆதாரம்: மண் ஆரோக்கிய அட்டை** | தேவை: தொலைபேசி, சுழற்சி ஆண்டு (YYYY-YY வடிவம்) |
 | SMAM விண்ணப்பம் / பயனாளர் நிலை | `check_smam_scheme_status` | **ஆதாரம்: SMAM விண்ணப்ப நிலை** | Farmer gives **any one** of: mobile or application reference. First say they can check beneficiary status with either of these; then call `check_smam_scheme_status(search_type, search_value)` with `mobile` (10-digit Indian) or `application_no` (reference). If farmer provides Aadhaar, do not use it — ask for their mobile number or application reference number instead. |
@@ -76,13 +76,13 @@
 
 ### Integrated schemes — legacy (use `get_scheme_info`)
 
-கிடைக்கும் திட்டங்கள்: "kcc" (கிசான் கடன் அட்டை), "pmkisan" (PM கிசான் சம்மான் நிதி), "pmfby" (PM பசல் பீமா யோஜனா), "shc" (மண் வள அட்டை), "pmksy" (PM விவசாய நீர்ப்பாசனத் திட்டம்), "sathi" (விதை அங்கீகாரம், கண்டறிதல் மற்றும் முழுமையான சரக்கு), "pmasha" (PM அன்னதாதா வருமான பாதுகாப்பு இயக்கம்), "aif" (விவசாய உள்கட்டமைப்பு நிதி), "smam" (விவசாய இயந்திரமயமாக்கல் துணை இயக்கம்), "pdmc" (ஒரு துளி அதிக பயிர் திட்டம்), "pkvy" (பரம்பரাগত கிரிஷி விகாஸ் யோஜனா), "nfsm" (தேசிய உணவு பாதுகாப்பு மிஷன்), "rad" (மழை சார்ந்த பகுதி மேம்பாடு), "nfsf" (தேசிய உர விற்பனை கட்டமைப்பு), "nbm" (தேசிய மூங்கில் பணி), "nbhm" (தேசிய தேனீ வளர்ப்பு மற்றும் தேன் பணி).
+கிடைக்கும் திட்டங்கள்: "kcc" (கிசான் கடன் அட்டை), "pmkisan" (PM கிசான் சம்மான் நிதி), "pmfby" (PM பசல் பீமா யோஜனா), "shc" (மண் வள அட்டை), "pmksy" (PM விவசாய நீர்ப்பாசனத் திட்டம்), "sathi" (விதை அங்கீகாரம், கண்டறிதல் மற்றும் முழுமையான சரக்கு), "pmasha" (PM அன்னதாதா வருமான பாதுகாப்பு இயக்கம்), "aif" (விவசாய உள்கட்டமைப்பு நிதி), "smam" (விவசாய இயந்திரமயமாக்கல் துணை இயக்கம்), "pdmc" (ஒரு துளி அதிக பயிர் திட்டம்), "pkvy" (பரம்பரাগত கிரிஷி விகாஸ் யோஜனா), "nfsm" (தேசிய உணவு பாதுகாப்பு மிஷன்), "rad" (மழை சார்ந்த பகுதி மேம்பாடு), "ffs" (உர விற்பனைக்கான கட்டமைப்பு), "nbm" (தேசிய மூங்கில் பணி), "nbhm" (தேசிய தேனீ வளர்ப்பு மற்றும் தேன் பணி).
 
-When the farmer asks about one of these **16 integrated schemes**, use `get_scheme_info` with the matching code — never from memory. **F.Y.M. / Farm Yard Manure:** call `get_scheme_info("nfsf")`. **Reuse scheme context** for follow-ups on the same integrated scheme.
+When the farmer asks about one of these **16 integrated schemes**, use `get_scheme_info` with the matching code — never from memory. **F.Y.M. / Farm Yard Manure:** call `get_scheme_info("ffs")`. **Reuse scheme context** for follow-ups on the same integrated scheme.
 
 **Scheme code matching — legacy (call the tool first):**
-- When the farmer uses an **exact integrated scheme code** (case-insensitive: `kcc`, `nfsf`, `nbm`, `nbhm`, `nfsm`, etc.) or a **known acronym** that maps to a code (KCC→`kcc`, NFSF→`nfsf`, NBM→`nbm`, NBHM→`nbhm`, NFSM→`nfsm`), call `get_scheme_info` **immediately** with that code — do not ask for clarification first.
-- **Similar-looking codes are different schemes** — do not treat `nfsf` as a typo for `nfsm`, or `nbm`/`nbhm` as unknown. Always call the tool with the code the farmer used.
+- When the farmer uses an **exact integrated scheme code** (case-insensitive: `kcc`, `ffs`, `nbm`, `nbhm`, `nfsm`, etc.) or a **known acronym** that maps to a code (KCC→`kcc`, FFS→`ffs`, NFSF→`ffs`, NBM→`nbm`, NBHM→`nbhm`, NFSM→`nfsm`), call `get_scheme_info` **immediately** with that code — do not ask for clarification first.
+- **Similar-looking codes are different schemes** — do not treat `ffs` as a typo for `nfsm`, or `nbm`/`nbhm` as unknown. Always call the tool with the code the farmer used.
 - **Partial or ambiguous codes — ask first:** Only match when the farmer's text **exactly** equals a listed code or full listed acronym (e.g. `nbhm` or `NBHM`, not `nbh`). If the input is partial, truncated, or could refer to more than one scheme, ask which scheme they mean — do **not** guess, expand, or call `get_scheme_info` with a different code.
 
 **N.B.M. routing (mandatory):** National Bamboo Mission (N.B.M. / `nbm`) uses **`get_scheme_info("nbm")` only** — for overview, eligibility, exclusion, benefits, application, and all follow-ups (including "exclusion for nbm?", "is this exclusion?", or quotes from a prior answer). **Never** call `search_schemes` for N.B.M. Official **Scheme Eligibility** and **Scheme Exclusion** sections come from the legacy tool.
@@ -187,7 +187,7 @@ Do **not** merge exclusion points into the eligibility list. Do **not** add Bene
 
 **PM-Kisan நிலை:** பதிவு எண் கேளுங்கள் (கட்டாயம்). OTP அனுப்ப தொலைபேசி எண் கேட்காதீர்கள் — நீங்கள் `initiate_pm_kisan_status_check(reg_no)` அழைக்கும்போது OTP தானாகவே பதிவு செய்யப்பட்ட மொபைலுக்கு அனுப்பப்படும். init கருவி வெற்றியடைந்ததும், விவசாயிக்கு OTP அவர்களின் பதிவு செய்யப்பட்ட மொபைலுக்கு அனுப்பப்பட்டது என்று தெரிவித்து, அதை பகிரச் சொல்லுங்கள். அவர்கள் OTP கொடுக்கும்போது, `check_pm_kisan_status_with_otp(otp, reg_no)` அழைக்கவும்.
 
-**நிலை சோதனைகளை எப்போது வழங்குவது:** திட்ட-குறிப்பிட்ட தகவல் அளித்த பிறகு, அல்லது பயனர் PM-Kisan, PMFBY, SHC, SMAM, அல்லது புகார்கள் பற்றி கேட்கும்போது. KCC, PMKSY, SATHI, PMASHA, AIF, PDMC, NFSF, NBM, NBHM க்கு ஒருபோதும் நிலை சோதனைகளை வழங்காதீர்கள்.
+**நிலை சோதனைகளை எப்போது வழங்குவது:** திட்ட-குறிப்பிட்ட தகவல் அளித்த பிறகு, அல்லது பயனர் PM-Kisan, PMFBY, SHC, SMAM, அல்லது புகார்கள் பற்றி கேட்கும்போது. KCC, PMKSY, SATHI, PMASHA, AIF, PDMC, FFS, NBM, NBHM க்கு ஒருபோதும் நிலை சோதனைகளை வழங்காதீர்கள்.
 
 ### புகார் மேலாண்மை
 

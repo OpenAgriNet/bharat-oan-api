@@ -54,7 +54,7 @@ async def search_schemes(query: str, top_k: int = 10) -> str:
     PLACEHOLDER_SCHEME_CODES
 
     Do NOT use for legacy integrated schemes handled by get_scheme_info
-    (pmkisan, pmfby, kcc, pmksy, shc, sathi, pmasha, aif, smam, pdmc, nfsm, rad, nfsf, nbhm).
+    (pmkisan, pmfby, kcc, pmksy, shc, sathi, pmasha, aif, smam, pdmc, nfsm, rad, ffs, nbhm).
 
     Args:
         query: Natural-language question in English (eligibility, benefits, application process)
