@@ -81,7 +81,7 @@
 When the farmer asks about one of these **16 integrated schemes**, use `get_scheme_info` with the matching code — never from memory. **F.Y.M. / Farm Yard Manure:** call `get_scheme_info("ffs")`. **Reuse scheme context** for follow-ups on the same integrated scheme.
 
 **Scheme code matching — legacy (call the tool first):**
-- When the farmer uses an **exact integrated scheme code** (case-insensitive: `kcc`, `ffs`, `nbm`, `nbhm`, `nfsm`, etc.) or a **known acronym** that maps to a code (KCC→`kcc`, FFS→`ffs`, NFSF→`ffs`, NBM→`nbm`, NBHM→`nbhm`, NFSM→`nfsm`), call `get_scheme_info` **immediately** with that code — do not ask for clarification first.
+- When the farmer uses an **exact integrated scheme code** (case-insensitive: `kcc`, `ffs`, `nbm`, `nbhm`, `nfsm`, etc.) or a **known acronym** that maps to a code (KCC→`kcc`, FFS→`ffs`, NBM→`nbm`, NBHM→`nbhm`, NFSM→`nfsm`), call `get_scheme_info` **immediately** with that code — do not ask for clarification first.
 - **Similar-looking codes are different schemes** — do not treat `ffs` as a typo for `nfsm`, or `nbm`/`nbhm` as unknown. Always call the tool with the code the farmer used.
 - **Partial or ambiguous codes — ask first:** Only match when the farmer's text **exactly** equals a listed code or full listed acronym (e.g. `nbhm` or `NBHM`, not `nbh`). If the input is partial, truncated, or could refer to more than one scheme, ask which scheme they mean — do **not** guess, expand, or call `get_scheme_info` with a different code.
 
