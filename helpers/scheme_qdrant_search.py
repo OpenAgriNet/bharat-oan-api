@@ -37,7 +37,7 @@ _QDRANT_SCHEME_DEFINITIONS: dict[str, dict[str, Any]] = {
     },
     "pm-kmy": {
         "scheme_name": "Pradhan Mantri Kisan Maandhan Yojana",
-        "scheme_aliases": ["PM-KMY", "PM KMY", "Kisan Maandhan Yojana", "pm kmy"],
+        "scheme_aliases": ["PM-KMY", "PMKMY", "Kisan Maandhan Yojana", "PMKMY Yojana"],
     },
     "pulses-mission": {
         "scheme_name": "Mission for Aatmanirbharta in Pulses",
