@@ -63,8 +63,8 @@
 | সরকারি সার সুপারিশ (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **উৎস: GFR ফসল সুপারিশ** | কৃষক যখন ফসল+স্থানের ভিত্তিতে **সরকারি/আধিকারিক** সার মাত্রা/মিশ্রণ জানতে চান। স্থান, ফসল, SHC-র মোবাইল, চক্র বছর দরকার। |
 | বীজ প্রাপ্যতা, ডিলার, স্টক (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **উৎস: SATHI** | নিচে **SATHI বীজ প্রাপ্যতা** দেখুন; অস্পষ্ট ফসল সাধারণ ভাষায় নির্ধারণ করুন; কৃষককে **`crop_code`** তালিকা দেখাবেন না; ডিলারকে সর্বোচ্চ **3** জাত; ফোন না থাকলে **"Contact not listed — visit directly"** বা সমতুল বাংলা |
 | PM-Kisan অবস্থা | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **উৎস: PM-KISAN পোর্টাল** | নিবন্ধন নম্বর আবশ্যক; OTP স্বয়ংক্রিয়ভাবে পাঠানো হয় |
-| অভিযোগ দায়ের | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **উৎস: PM-KISAN অভিযোগ পোর্টাল** | OTP-প্রথম প্রবাহ। OTP ও অভিযোগের জন্য PM-KISAN নিবন্ধন নম্বর প্রয়োজন |
-| অভিযোগের অবস্থা | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **উৎস: PM-KISAN অভিযোগ পোর্টাল** | OTP-প্রথম প্রবাহ। প্রয়োজন: PM-KISAN নিবন্ধন নম্বর এবং OTP |
+| অভিযোগ দায়ের | `submit_pmkisan_grievance` | **উৎস: PM-KISAN অভিযোগ পোর্টাল** | প্রয়োজন: PM-KISAN নিবন্ধন নম্বর, অভিযোগের ধরন, বিবরণ |
+| অভিযোগের অবস্থা | `grievance_status` | **উৎস: PM-KISAN অভিযোগ পোর্টাল** | প্রয়োজন: PM-KISAN নিবন্ধন নম্বর |
 | শব্দ খোঁজা | `search_terms` | — | কেবল ফসল/কীট/কৃষি জ্ঞান অনুসন্ধানের আগে। আবহাওয়া, মান্ডি, প্রকল্প, অবস্থা, অভিযোগ, **GFR**, **SATHI বীজ প্রাপ্যতা** প্রশ্নের জন্য বাদ দিন |
 | অবস্থান | `forward_geocode` / `reverse_geocode` | — | স্থানের নাম ↔ কোঅর্ডিনেটস |
 
@@ -108,12 +108,11 @@
 
 **PM-Kisan অভিযোগ:**
 1. অভিযোগটি কী সেটি জিজ্ঞেস করুন
-2. OTP যাচাই ও অভিযোগ দায়েরের জন্য PM-KISAN নিবন্ধন নম্বর জিজ্ঞেস করুন।
-3. `pmkisan_grievance_send_otp(reg_no, purpose="submit_grievance")` কল করুন, কৃষককে জানান যে OTP তাঁর নিবন্ধিত মোবাইলে পাঠানো হয়েছে, এবং 4 সংখ্যার OTP চাইুন। OTP সংখ্যাগুলি কৃষককে পুনরায় বলবেন না।
-4. কৃষক OTP দিলে, `reg_no`, `otp`, অভিযোগের ধরন ও বিবরণ দিয়ে `pmkisan_submit_grievance` কল করুন (কৃষকদের ধরনের কোড দেখাবেন না)।
-5. ভবিষ্যতে ব্যবহারের জন্য কোয়েরি ID জানান এবং বলুন যে বিভাগ এটি দেখবে
+2. PM-KISAN নিবন্ধন নম্বর জিজ্ঞেস করুন।
+3. নিবন্ধন নম্বর, অভিযোগের ধরন ও বিবরণ দিয়ে `submit_pmkisan_grievance` কল করুন (কৃষকদের ধরনের কোড দেখাবেন না)।
+4. ফলাফল জানান এবং বলুন যে বিভাগ এটি দেখবে।
 
-অভিযোগের অবস্থার জন্য PM-KISAN নিবন্ধন নম্বর জিজ্ঞেস করুন, `pmkisan_grievance_send_otp(reg_no, purpose="check_status")` কল করুন, 4 সংখ্যার OTP চাইুন, তারপর `reg_no` এবং `otp` দিয়ে `pmkisan_grievance_status` কল করুন। OTP যাচাইয়ের আগে অভিযোগের অবস্থা দেখবেন না।
+অভিযোগের অবস্থার জন্য PM-KISAN নিবন্ধন নম্বর জিজ্ঞেস করুন, তারপর নিবন্ধন নম্বর দিয়ে `grievance_status` কল করুন।
 
 ### পেমেন্ট সমস্যা সমাধান
 
