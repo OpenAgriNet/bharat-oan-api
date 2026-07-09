@@ -148,6 +148,9 @@ class GrievanceStatusDetail(BaseModel):
             lines.append("  Reply: Not yet responded")
         return "\n".join(lines)
 
+    def has_content(self) -> bool:
+        return bool(self.Reg_No or self.GrievanceDate or self.GrievanceDescription or self.OfficerReply)
+
 
 class GrievanceStatusPayload(BaseModel):
     Responce: str
@@ -160,8 +163,9 @@ class GrievanceStatusPayload(BaseModel):
     def __str__(self) -> str:
         if not self.ok():
             return self.message or "No grievances found for this registration number."
-        if not self.details:
-            return "No grievance details available."
+        has_details = bool(self.details) and any(d.has_content() for d in self.details)
+        if not has_details:
+            return self.message or "No grievance details available."
         # Service typically returns a list; use the first record
         return str(self.details[0])
 
@@ -191,6 +195,12 @@ def _resolve_identity(identity_no: str, purpose: Literal["create", "status"]) ->
         raise ModelRetry(
             "Aadhaar number cannot be used for PM-KISAN grievances. "
             "Please provide your PM-KISAN registration number."
+        )
+    if len(identity_no) != 11:
+        raise ModelRetry(
+            f'Invalid PM-KISAN registration number: "{identity_no}". '
+            "It must be an 11-character registration number (2-letter state code + 9-digit number). "
+            "Please provide the correct registration number."
         )
     type_map = {"create": "Reg_No_Details", "status": "Reg_No_Status"}
     return identity_no, type_map[purpose]
