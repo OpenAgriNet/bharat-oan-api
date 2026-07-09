@@ -13,7 +13,9 @@ from helpers.langfuse_tracing import lf_update_current_observation
 
 from app.config import get_default_httpx_timeout
 from app.core.cache import cache
+from agents.deps import FarmerContext
 from helpers.utils import get_logger
+from pydantic_ai.tools import RunContext
 
 load_dotenv()
 
@@ -519,7 +521,11 @@ async def _fetch_crops_for_group_from_api(group_code: str) -> list[dict[str, Any
 
 
 def _build_beckn_seed_search_payload(
-    crop_code: str, latitude: float, longitude: float
+    crop_code: str,
+    latitude: float,
+    longitude: float,
+    session_id: str = "",
+    question_id: str = "",
 ) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     return {
@@ -536,6 +542,10 @@ def _build_beckn_seed_search_payload(
             "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z",
             "ttl": "PT10M",
             "location": {"country": {"code": "IND"}, "city": {"code": "*"}},
+            "tags": {
+                "session_id": session_id,
+                "question_id": question_id,
+            },
         },
         "message": {
             "intent": {
@@ -554,6 +564,7 @@ def _build_beckn_seed_search_payload(
 
 @observe(name="tool:search_sathi_seed_availability", as_type="tool")
 async def search_sathi_seed_availability(
+    ctx: RunContext[FarmerContext],
     crop_code: str,
     latitude: float,
     longitude: float,
@@ -576,7 +587,13 @@ async def search_sathi_seed_availability(
     search_url = bep if bep.endswith("/search") else (bep + "/search")
 
     try:
-        payload = _build_beckn_seed_search_payload(cc, latitude, longitude)
+        payload = _build_beckn_seed_search_payload(
+            cc,
+            latitude,
+            longitude,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
+        )
         lf_update_current_observation(
             metadata={
                 "tool": "sathi.seed_availability",

@@ -165,6 +165,8 @@ class SchemeInitRequest(BaseModel):
     transaction_id: str
     registration_number: str
     phone_number: str = ""
+    session_id: str = ""
+    question_id: str = ""
     
     def get_payload(self) -> Dict[str, Any]:
         """
@@ -199,7 +201,11 @@ class SchemeInitRequest(BaseModel):
                     "city": {
                         "code": "*"
                     }
-                }
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "order": {
@@ -409,6 +415,8 @@ class SchemeStatusRequest(BaseModel):
     # NOTE: These are not used but are retained for future compatibility
     registration_number: str 
     phone_number: str = ""
+    session_id: str = ""
+    question_id: str = ""
     
     def get_payload(self) -> Dict[str, Any]:
         """
@@ -442,7 +450,11 @@ class SchemeStatusRequest(BaseModel):
                     "city": {
                         "code": "*"
                     }
-                }
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "order_id": self.otp,
@@ -495,7 +507,9 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str =
         payload = SchemeInitRequest(
             registration_number=reg_no,
             transaction_id=transaction_id,
-            phone_number=phone_number
+            phone_number=phone_number,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
         ).get_payload()
         
         endpoint = os.getenv("BAP_ENDPOINT").rstrip("/") + "/init"
@@ -587,11 +601,14 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
         lf_update_current_observation(
             metadata={"tool": "pmkisan.status", "transaction_id": transaction_id}
         )
-        payload = SchemeStatusRequest(transaction_id=transaction_id,
-                                      otp=otp_clean,
-                                      registration_number=reg_no,
-                                      phone_number=phone_number,
-                                      ).get_payload()
+        payload = SchemeStatusRequest(
+            transaction_id=transaction_id,
+            otp=otp_clean,
+            registration_number=reg_no,
+            phone_number=phone_number,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
+        ).get_payload()
         
         endpoint = os.getenv("BAP_ENDPOINT").rstrip("/") + "/status"
         logger.info(f"[PM KISAN STATUS] Request URL: {endpoint}")

@@ -13,6 +13,8 @@ from app.core.cache import cache
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
 from langfuse import observe
+from pydantic_ai.tools import RunContext
+from agents.deps import FarmerContext
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.inject_pdf_header import inject
 from markdownify import MarkdownConverter
@@ -426,7 +428,9 @@ class SHCStatusRequest(BaseModel):
         cycle (str): Cycle year in format YYYY-YY (e.g., "2023-24", "2024-25") (required)
     """
     phone_number: str  # Required field, no default
-    cycle: str  # Required field, no default  
+    cycle: str  # Required field, no default
+    session_id: str = ""
+    question_id: str = ""
     
     def validate_phone_number(self) -> None:
         """Validate and format the phone number before using it."""
@@ -457,7 +461,15 @@ class SHCStatusRequest(BaseModel):
                 "bpp_uri": os.getenv("BPP_URI"),
                 "transaction_id": str(uuid.uuid4()),
                 "message_id": str(uuid.uuid4()),
-                "timestamp": now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                "timestamp": now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "location": {
+                    "country": {"code": "IND"},
+                    "city": {"code": "*"},
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "order": {
@@ -544,8 +556,9 @@ async def cache_html_and_replace_urls(response_data: SHCStatusResponse, phone_nu
 
 @observe(name="tool:check_shc_status", as_type="tool")
 async def check_shc_status(
+    ctx: RunContext[FarmerContext],
     phone_number: str,
-    cycle: str
+    cycle: str,
 ) -> str:
     """Check soil health card status.
     
@@ -561,7 +574,9 @@ async def check_shc_status(
     try:
         payload = SHCStatusRequest(
             cycle=cycle,
-            phone_number=phone_number
+            phone_number=phone_number,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
         ).get_payload()
         lf_update_current_observation(
             metadata={

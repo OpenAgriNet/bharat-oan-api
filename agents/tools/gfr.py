@@ -17,9 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from pydantic_ai import ModelRetry
 
 from app.config import DEFAULT_HTTP_TIMEOUT
+from agents.deps import FarmerContext
 from agents.tools.pmfby_scheme_status import normalize_phone_for_api
 from helpers.utils import get_logger
 from helpers.langfuse_tracing import lf_update_current_observation
+from pydantic_ai.tools import RunContext
 
 load_dotenv()
 
@@ -31,6 +33,8 @@ class GfrCropRegistrySearch(BaseModel):
 
     latitude: float = Field(..., description="Farm latitude")
     longitude: float = Field(..., description="Farm longitude")
+    session_id: str = ""
+    question_id: str = ""
 
     def get_payload(self) -> Dict[str, Any]:
         now = datetime.now(timezone.utc)
@@ -48,6 +52,10 @@ class GfrCropRegistrySearch(BaseModel):
                 "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
                 "ttl": "PT10M",
                 "location": {"country": {"code": "IND"}, "city": {"code": "*"}},
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "order": {
@@ -81,6 +89,8 @@ class GfrRecommendationSearch(BaseModel):
     natural_farming: bool = False
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    session_id: str = ""
+    question_id: str = ""
 
     def get_payload(self) -> Dict[str, Any]:
         tags: List[Dict[str, Any]] = []
@@ -113,6 +123,10 @@ class GfrRecommendationSearch(BaseModel):
                 "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
                 "ttl": "PT10M",
                 "location": {"country": {"code": "IND"}, "city": {"code": "*"}},
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "order": {
@@ -556,6 +570,7 @@ class GfrRecommendationItem(BaseModel):
 
 @observe(name="tool:gfr_get_crop_registries", as_type="tool")
 def gfr_get_crop_registries(
+    ctx: RunContext[FarmerContext],
     latitude: float,
     longitude: float,
     only_gfr_available: bool = True,
@@ -568,7 +583,12 @@ def gfr_get_crop_registries(
     if limit > 50:
         limit = 50
 
-    payload = GfrCropRegistrySearch(latitude=latitude, longitude=longitude).get_payload()
+    payload = GfrCropRegistrySearch(
+        latitude=latitude,
+        longitude=longitude,
+        session_id=ctx.deps.session_id,
+        question_id=ctx.deps.question_id,
+    ).get_payload()
     lf_update_current_observation(
         metadata={
             "tool": "gfr.crop_registries",
@@ -655,6 +675,7 @@ def gfr_get_crop_registries(
 
 @observe(name="tool:gfr_get_recommendations", as_type="tool")
 def gfr_get_recommendations(
+    ctx: RunContext[FarmerContext],
     state_id: str,
     crops: List[str],
     phone_no: str,
@@ -700,6 +721,8 @@ def gfr_get_recommendations(
         natural_farming=natural_farming,
         latitude=latitude,
         longitude=longitude,
+        session_id=ctx.deps.session_id,
+        question_id=ctx.deps.question_id,
     ).get_payload()
     lf_update_current_observation(
         metadata={

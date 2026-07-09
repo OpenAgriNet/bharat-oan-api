@@ -199,6 +199,7 @@ async def stream_chat_messages(
                 query=query,
                 lang_code=target_lang,
                 session_id=session_id,
+                question_id=telemetry_qid,
                 latitude=latitude,
                 longitude=longitude,
             )

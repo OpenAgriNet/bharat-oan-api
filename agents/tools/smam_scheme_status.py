@@ -15,8 +15,10 @@ from pydantic import AnyHttpUrl, BaseModel, Field
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 
 from app.config import DEFAULT_HTTP_TIMEOUT
+from agents.deps import FarmerContext
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger
+from pydantic_ai.tools import RunContext
 
 logger = get_logger(__name__)
 
@@ -171,6 +173,8 @@ class SmamStatusApiResponse(BaseModel):
 class SmamStatusRequest(BaseModel):
     search_type: SmamSearchType
     search_value: str
+    session_id: str = ""
+    question_id: str = ""
 
     def get_payload(self) -> Dict[str, Any]:
         now = datetime.now(timezone.utc)
@@ -190,6 +194,10 @@ class SmamStatusRequest(BaseModel):
                 "location": {
                     "country": {"code": "IND"},
                     "city": {"code": "*"},
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
                 },
             },
             "message": {
@@ -253,6 +261,7 @@ def _normalize_search_value(search_type: SmamSearchType, raw: str) -> str:
 
 @observe(name="tool:check_smam_scheme_status", as_type="tool")
 async def check_smam_scheme_status(
+    ctx: RunContext[FarmerContext],
     search_type: SmamSearchType,
     search_value: str,
 ) -> str:
@@ -280,7 +289,12 @@ async def check_smam_scheme_status(
     )
 
     try:
-        payload = SmamStatusRequest(search_type=search_type, search_value=normalized).get_payload()
+        payload = SmamStatusRequest(
+            search_type=search_type,
+            search_value=normalized,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
+        ).get_payload()
         lf_update_current_observation(
             metadata={
                 "tool": "smam.status",

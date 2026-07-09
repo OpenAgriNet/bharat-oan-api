@@ -15,6 +15,8 @@ from typing import List, Optional, Dict, Any
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
 from langfuse import observe
+from pydantic_ai.tools import RunContext
+from agents.deps import FarmerContext
 from helpers.langfuse_tracing import lf_update_current_observation
 
 load_dotenv()
@@ -360,6 +362,8 @@ class MandiRequest(BaseModel):
         default=None,
         description="Optional price date in DD-MM-YYYY; pass for today/yesterday/specific dates; omit only for latest available",
     )
+    session_id: str = ""
+    question_id: str = ""
 
     def get_payload(self) -> Dict[str, Any]:
         """
@@ -395,7 +399,11 @@ class MandiRequest(BaseModel):
                     "city": {
                         "code": "*"
                     }
-                }
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "intent": {
@@ -433,6 +441,7 @@ class MandiRequest(BaseModel):
 
 @observe(name="tool:get_mandi_prices", as_type="tool")
 async def get_mandi_prices(
+    ctx: RunContext[FarmerContext],
     latitude: float,
     longitude: float,
     location_name: str,
@@ -462,6 +471,8 @@ async def get_mandi_prices(
             location_name=location_name,
             commodity_name=commodity_name,
             price_date=price_date,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
         ).get_payload()
         lf_update_current_observation(
             metadata={
