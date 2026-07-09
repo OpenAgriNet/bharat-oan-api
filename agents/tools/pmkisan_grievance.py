@@ -332,7 +332,12 @@ def _generate_pm_kisan_otp_transaction_id(session_id: str, reg_no: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, session_id + reg_no))
 
 
-def _build_pm_kisan_otp_context(action: Literal["init", "status"], transaction_id: str) -> Dict[str, Any]:
+def _build_pm_kisan_otp_context(
+    action: Literal["init", "status"],
+    transaction_id: str,
+    session_id: str = "",
+    question_id: str = "",
+) -> Dict[str, Any]:
     return {
         "domain": "schemes:vistaar",
         "action": action,
@@ -349,12 +354,23 @@ def _build_pm_kisan_otp_context(action: Literal["init", "status"], transaction_i
             "country": {"code": "IND"},
             "city": {"code": "*"},
         },
+        "tags": {
+            "session_id": session_id,
+            "question_id": question_id,
+        },
     }
 
 
-def _build_pm_kisan_otp_init_payload(reg_no: str, transaction_id: str) -> Dict[str, Any]:
+def _build_pm_kisan_otp_init_payload(
+    reg_no: str,
+    transaction_id: str,
+    session_id: str = "",
+    question_id: str = "",
+) -> Dict[str, Any]:
     return {
-        "context": _build_pm_kisan_otp_context("init", transaction_id),
+        "context": _build_pm_kisan_otp_context(
+            "init", transaction_id, session_id=session_id, question_id=question_id
+        ),
         "message": {
             "order": {
                 "provider": {"id": "pmkisan"},
@@ -396,9 +412,13 @@ def _build_pm_kisan_otp_status_payload(
     otp: str,
     transaction_id: str,
     phone_number: str,
+    session_id: str = "",
+    question_id: str = "",
 ) -> Dict[str, Any]:
     return {
-        "context": _build_pm_kisan_otp_context("status", transaction_id),
+        "context": _build_pm_kisan_otp_context(
+            "status", transaction_id, session_id=session_id, question_id=question_id
+        ),
         "message": {
             "order_id": otp,
             "registration_number": reg_no,
@@ -440,7 +460,12 @@ async def _request_pm_kisan_otp(
     lf_update_current_observation(
         metadata={"tool": "pmkisan_grievance.send_otp", "transaction_id": transaction_id}
     )
-    payload = _build_pm_kisan_otp_init_payload(reg_no_clean, transaction_id)
+    payload = _build_pm_kisan_otp_init_payload(
+        reg_no_clean,
+        transaction_id,
+        session_id=ctx.deps.session_id,
+        question_id=ctx.deps.question_id,
+    )
 
     endpoint = f"{BAP_ENDPOINT.rstrip('/')}/init"
     logger.info(f"[PM KISAN GRIEVANCE OTP INIT] Request URL: {endpoint}")
@@ -482,6 +507,8 @@ async def _verify_pm_kisan_otp(
         otp_clean,
         transaction_id,
         phone_number.strip() if phone_number else "",
+        session_id=ctx.deps.session_id,
+        question_id=ctx.deps.question_id,
     )
 
     endpoint = f"{BAP_ENDPOINT.rstrip('/')}/status"
@@ -581,6 +608,7 @@ class Context(BaseModel):
         "country": {"code": "IND"},
         "city": {"code": "*"}
     }
+    tags: Dict[str, str] = Field(default_factory=dict)
 
 class GrievanceInitRequest(BaseModel):
     context: Context
@@ -595,10 +623,19 @@ class GrievanceInitRequest(BaseModel):
         grievance_type_code: str,
         grievance_description: str,
         customer_name: str = "Customer Name",
-        phone: str = ""
+        phone: str = "",
+        session_id: str = "",
+        question_id: str = "",
     ) -> "GrievanceInitRequest":
         return cls(
-            context=Context(action="init", transaction_id=transaction_id),
+            context=Context(
+                action="init",
+                transaction_id=transaction_id,
+                tags={
+                    "session_id": session_id,
+                    "question_id": question_id,
+                },
+            ),
             message={
                 "order": {
                     "provider": {"id": "pmkisan-greviance"},
@@ -699,6 +736,8 @@ async def _submit_grievance_init_request(
         grievance_type_code=GRIEVANCE_MAPPING[grievance_type],
         grievance_description=grievance_description.strip(),
         phone=phone_number.strip() if phone_number else "",
+        session_id=ctx.deps.session_id,
+        question_id=ctx.deps.question_id,
     )
     payload = request_obj.model_dump(by_alias=True)
 
@@ -872,7 +911,14 @@ async def pmkisan_grievance_status(
         )
 
         payload = {
-            "context": Context(action="search", transaction_id=transaction_id).model_dump(by_alias=True),
+            "context": Context(
+                action="search",
+                transaction_id=transaction_id,
+                tags={
+                    "session_id": ctx.deps.session_id,
+                    "question_id": ctx.deps.question_id,
+                },
+            ).model_dump(by_alias=True),
             "message": {
                 "intent": {
                     "category": {

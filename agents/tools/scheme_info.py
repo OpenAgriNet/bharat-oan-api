@@ -8,6 +8,8 @@ from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 import os
 from langfuse import observe
+from pydantic_ai.tools import RunContext
+from agents.deps import FarmerContext
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.pmkisan_installment_release import get_pm_kisan_23rd_installment_release_section
 
@@ -228,6 +230,8 @@ class SchemeRequest(BaseModel):
              - "nbhm": National Beekeeping & Honey Mission
     """
     scheme_name: str
+    session_id: str = ""
+    question_id: str = ""
     
     def get_payload(self) -> Dict[str, Any]:
         """
@@ -258,7 +262,11 @@ class SchemeRequest(BaseModel):
                     "city": {
                         "code": "*"
                     }
-                }
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "intent": {
@@ -278,7 +286,10 @@ class SchemeRequest(BaseModel):
 
 
 @observe(name="tool:get_scheme_info", as_type="tool")
-def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc", "pkvy", "nfsm", "rad", "ffs", "nbm", "nbhm"]) -> str:
+def get_scheme_info(
+    ctx: RunContext[FarmerContext],
+    scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc", "pkvy", "nfsm", "rad", "ffs", "nbm", "nbhm"],
+) -> str:
     """Retrieve detailed information about government agricultural schemes.
     
     This tool fetches comprehensive scheme data including benefits, eligibility criteria, 
@@ -315,7 +326,11 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
             input={"scheme_code": scheme_name, "Scheme_name": meta["Scheme_name"]},
             metadata=meta,
         )
-        payload = SchemeRequest(scheme_name=scheme_name).get_payload()
+        payload = SchemeRequest(
+            scheme_name=scheme_name,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
+        ).get_payload()
         lf_update_current_observation(
             metadata={
                 **meta,

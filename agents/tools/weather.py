@@ -14,6 +14,8 @@ from dateutil.parser import ParserError
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from dotenv import load_dotenv
 from langfuse import observe
+from pydantic_ai.tools import RunContext
+from agents.deps import FarmerContext
 from helpers.langfuse_tracing import lf_update_current_observation
 
 load_dotenv()
@@ -298,6 +300,8 @@ class WeatherRequest(BaseModel):
     """
     latitude: float = Field(..., description="Latitude of the location")
     longitude: float = Field(..., description="Longitude of the location")
+    session_id: str = ""
+    question_id: str = ""
     
     def get_payload(self) -> Dict[str, Any]:
         """
@@ -328,7 +332,11 @@ class WeatherRequest(BaseModel):
                     "city": {
                         "code": "*"
                     }
-                }
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "intent": {
@@ -355,7 +363,11 @@ class WeatherRequest(BaseModel):
 
 
 @observe(name="tool:weather_forecast", as_type="tool")
-async def weather_forecast(latitude: float, longitude: float) -> str:
+async def weather_forecast(
+    ctx: RunContext[FarmerContext],
+    latitude: float,
+    longitude: float,
+) -> str:
     """Get Weather forecast for a specific location.
 
     Args:
@@ -366,7 +378,12 @@ async def weather_forecast(latitude: float, longitude: float) -> str:
         str: The weather forecast for the specific location
     """    
     try:        
-        payload = WeatherRequest(latitude=latitude, longitude=longitude).get_payload()
+        payload = WeatherRequest(
+            latitude=latitude,
+            longitude=longitude,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
+        ).get_payload()
         lf_update_current_observation(
             metadata={
                 "tool": "weather.forecast",

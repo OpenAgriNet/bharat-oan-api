@@ -115,7 +115,13 @@ def _bap_url(path: str) -> str:
     return f"{base}/{path.lstrip('/')}"
 
 
-def _beckn_context(*, transaction_id: str, action: str) -> Dict[str, Any]:
+def _beckn_context(
+    *,
+    transaction_id: str,
+    action: str,
+    session_id: str = "",
+    question_id: str = "",
+) -> Dict[str, Any]:
     return {
         "domain": "schemes:vistaar",
         "action": action,
@@ -129,6 +135,10 @@ def _beckn_context(*, transaction_id: str, action: str) -> Dict[str, Any]:
         "timestamp": str(int(datetime.now(timezone.utc).timestamp())),
         "ttl": "PT10M",
         "location": {"country": {"code": "IND"}, "city": {"code": "*"}},
+        "tags": {
+            "session_id": session_id,
+            "question_id": question_id,
+        },
     }
 
 
@@ -146,9 +156,20 @@ def _post_json_logged(url: str, payload: Dict[str, Any], log_prefix: str) -> htt
 # --------------------------------------------------------------------------------------
 
 
-def _payload_get_otp_grievance_flow(*, transaction_id: str, phone: str) -> Dict[str, Any]:
+def _payload_get_otp_grievance_flow(
+    *,
+    transaction_id: str,
+    phone: str,
+    session_id: str = "",
+    question_id: str = "",
+) -> Dict[str, Any]:
     return {
-        "context": _beckn_context(transaction_id=transaction_id, action="init"),
+        "context": _beckn_context(
+            transaction_id=transaction_id,
+            action="init",
+            session_id=session_id,
+            question_id=question_id,
+        ),
         "message": {
             "order": {
                 "provider": {"id": "pmfby-agri"},
@@ -172,12 +193,22 @@ def _payload_get_otp_grievance_flow(*, transaction_id: str, phone: str) -> Dict[
 
 
 def _payload_grievance_status(
-    *, transaction_id: str, phone: str, grievance_support_ticket_no: str
+    *,
+    transaction_id: str,
+    phone: str,
+    grievance_support_ticket_no: str,
+    session_id: str = "",
+    question_id: str = "",
 ) -> Dict[str, Any]:
     """Beckn `/status` for PMFBY grievance ticket lookup (`status_grievance`)."""
     ticket = str(grievance_support_ticket_no).strip()
     return {
-        "context": _beckn_context(transaction_id=transaction_id, action="status"),
+        "context": _beckn_context(
+            transaction_id=transaction_id,
+            action="status",
+            session_id=session_id,
+            question_id=question_id,
+        ),
         "message": {
             "order_id": ticket,
             "order": {
@@ -211,9 +242,21 @@ def _payload_grievance_status(
     }
 
 
-def _payload_status_verify_otp(*, transaction_id: str, otp: str, phone: str) -> Dict[str, Any]:
+def _payload_status_verify_otp(
+    *,
+    transaction_id: str,
+    otp: str,
+    phone: str,
+    session_id: str = "",
+    question_id: str = "",
+) -> Dict[str, Any]:
     return {
-        "context": _beckn_context(transaction_id=transaction_id, action="status"),
+        "context": _beckn_context(
+            transaction_id=transaction_id,
+            action="status",
+            session_id=session_id,
+            question_id=question_id,
+        ),
         "message": {
             "order_id": otp,
             "order": {
@@ -239,6 +282,8 @@ class PMfbyGrievanceInitRequest(BaseModel):
     request_season: str
     application_no: str
     grievance_description: str
+    session_id: str = ""
+    question_id: str = ""
 
     def get_payload(self) -> Dict[str, Any]:
         phone = normalize_phone_for_api(self.phone_number)
@@ -256,7 +301,12 @@ class PMfbyGrievanceInitRequest(BaseModel):
         ]
         tag_objs = [{"descriptor": {"code": code}, "value": val} for code, val in tags]
         return {
-            "context": _beckn_context(transaction_id=self.transaction_id, action="init"),
+            "context": _beckn_context(
+                transaction_id=self.transaction_id,
+                action="init",
+                session_id=self.session_id,
+                question_id=self.question_id,
+            ),
             "message": {
                 "order": {
                     "provider": {"id": "pmfby-grievance"},
@@ -385,7 +435,12 @@ def initiate_pmfby_grievance_otp(ctx: RunContext[FarmerContext], phone_number: s
             metadata={"tool": "pmfby_grievance.init_otp", "transaction_id": transaction_id}
         )
         phone = normalize_phone_for_api(phone_number)
-        payload = _payload_get_otp_grievance_flow(transaction_id=transaction_id, phone=phone)
+        payload = _payload_get_otp_grievance_flow(
+            transaction_id=transaction_id,
+            phone=phone,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
+        )
         url = _bap_url("init")
         response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_OTP_INIT]")
 
@@ -419,7 +474,13 @@ def check_pmfby_grievance_otp(
             metadata={"tool": "pmfby_grievance.check_otp", "transaction_id": transaction_id}
         )
         phone = normalize_phone_for_api(phone_number)
-        payload = _payload_status_verify_otp(transaction_id=transaction_id, otp=otp_str, phone=phone)
+        payload = _payload_status_verify_otp(
+            transaction_id=transaction_id,
+            otp=otp_str,
+            phone=phone,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
+        )
         url = _bap_url("status")
         response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_OTP_STATUS]")
 
@@ -483,6 +544,8 @@ def pmfby_grievance_status(
             transaction_id=transaction_id,
             phone=phone,
             grievance_support_ticket_no=ticket,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
         )
         url = _bap_url("status")
         response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_STATUS]")
@@ -559,6 +622,8 @@ def pmfby_submit_grievance(
             request_season=season_api,
             application_no=application_no.strip(),
             grievance_description=grievance_description.strip(),
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
         ).get_payload()
 
         url = _bap_url("init")

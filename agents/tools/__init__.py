@@ -53,7 +53,7 @@ from agents.tools.npss import analyze_crop_image
 TOOLS = [
     Tool(
         get_scheme_info,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -78,7 +78,7 @@ TOOLS = [
     ),
     Tool(
         check_shc_status,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -88,7 +88,7 @@ TOOLS = [
     ),
     Tool(
         check_smam_scheme_status,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -148,12 +148,12 @@ TOOLS = [
     ),
     Tool(
         weather_forecast,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
         get_mandi_prices,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -173,12 +173,12 @@ TOOLS = [
     ),
     Tool(
         gfr_get_crop_registries,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
         gfr_get_recommendations,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -193,7 +193,7 @@ TOOLS = [
     ),
     Tool(
         search_sathi_seed_availability,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
