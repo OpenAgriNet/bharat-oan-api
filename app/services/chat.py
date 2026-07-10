@@ -391,15 +391,14 @@ async def stream_chat_messages(
                         location_instruction = (
                             f"Browser coordinates are available for this image upload "
                             f"(latitude={latitude}, longitude={longitude}). "
-                            "You MUST call `analyze_crop_image` and pass those coordinates directly."
+                            "You MUST call `analyze_crop_image`. The backend supplies these coordinates; "
+                            "do not pass or calculate location IDs."
                         )
                     else:
                         location_instruction = (
                             "No browser coordinates were sent with this image upload. "
                             "Do NOT call any geocoding tool or try to provide NPSS state, district, subdistrict, or village IDs. "
-                            "The backend resolves NPSS location IDs from coordinates using geocoding and NPSS master APIs. "
-                            "Do NOT call `analyze_crop_image` until coordinates are available. "
-                            "Ask the farmer to share location access or provide a city, town, or village with district and state so coordinates can be resolved before analysis."
+                            "Call `analyze_crop_image`; the backend will omit unresolved location fields rather than inventing IDs."
                         )
                     base_user_message = (
                         f"[USER UPLOADED A CROP IMAGE]\n\n"
