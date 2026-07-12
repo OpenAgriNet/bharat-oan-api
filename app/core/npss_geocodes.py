@@ -12,6 +12,7 @@ Only verified hierarchy levels are returned. Unresolved levels are omitted so th
 NPSS request never records an arbitrary location.
 """
 import asyncio
+from difflib import SequenceMatcher
 import json
 import os
 import re
@@ -116,6 +117,50 @@ def _location_candidates(props: dict[str, Any], *keys: str) -> list[str]:
     return values
 
 
+def _village_candidates(props: dict[str, Any]) -> list[str]:
+    candidates = _location_candidates(
+        props,
+        "village",
+        "hamlet",
+        "town",
+        "city",
+        "locality",
+        "district",
+    )
+    if props.get("osm_key") == "place":
+        candidates.extend(_location_candidates(props, "name"))
+    return candidates
+
+
+def _pick_similar_subdistrict_scope(
+    hierarchy_rows: list[tuple[dict[str, Any], dict[str, Any]]],
+    candidates: list[str],
+) -> Optional[tuple[dict[str, Any], dict[str, Any]]]:
+    """Use similarity only to narrow the district searched for an exact village."""
+    normalized_candidates = [_normalize_text(candidate) for candidate in candidates if candidate]
+    scored: list[tuple[float, dict[str, Any], dict[str, Any]]] = []
+    for district_row, subdistrict_row in hierarchy_rows:
+        row_name = _normalize_text(
+            _extract_name(
+                subdistrict_row,
+                ("subDistrictName", "subdistrictName", "sub_district_name", "name"),
+            )
+        )
+        if not row_name:
+            continue
+        score = max(
+            (SequenceMatcher(None, row_name, candidate).ratio() for candidate in normalized_candidates),
+            default=0.0,
+        )
+        scored.append((score, district_row, subdistrict_row))
+
+    if not scored:
+        return None
+    best_score = max(score for score, _, _ in scored)
+    best_rows = [(district, subdistrict) for score, district, subdistrict in scored if score == best_score]
+    return best_rows[0] if best_score >= 0.8 and len(best_rows) == 1 else None
+
+
 async def _reverse_geocode_properties(latitude: float, longitude: float) -> dict[str, Any]:
     try:
         async with httpx.AsyncClient(base_url=PHOTON_BASE_URL, timeout=10.0) as client:
@@ -212,8 +257,73 @@ async def _resolve_from_master_apis(
         )
         return district_row, rows
 
+    async def resolve_exact_village_in_district(
+        district_row: dict[str, Any],
+        subdistrict_rows: list[dict[str, Any]],
+    ) -> Optional[dict]:
+        district_id = _extract_id(district_row, ("districtId", "district_id", "id"))
+        if not district_id or not subdistrict_rows:
+            return None
+
+        async def fetch_villages(subdistrict_row: dict[str, Any]):
+            subdistrict_id = _extract_id(
+                subdistrict_row,
+                ("subDistrictId", "subdistrictId", "sub_district_id", "id"),
+            )
+            rows = await _fetch_master_rows(
+                "Vilages",
+                bearer_token=bearer_token,
+                params={
+                    "stateId": state_id,
+                    "districtId": district_id,
+                    "subDistrictId": subdistrict_id,
+                },
+            )
+            return subdistrict_row, rows
+
+        village_hierarchy = await asyncio.gather(*(fetch_villages(row) for row in subdistrict_rows))
+
+        def find_exact(candidates: list[str]):
+            matches: list[tuple[dict[str, Any], dict[str, Any]]] = []
+            for subdistrict_row, village_rows in village_hierarchy:
+                village_row = _pick_best_row(
+                    village_rows,
+                    candidates,
+                    ("villageName", "village", "name"),
+                )
+                if village_row:
+                    matches.append((subdistrict_row, village_row))
+            return matches[0] if len(matches) == 1 else None
+
+        match = find_exact(_village_candidates(props))
+        if not match and props.get("osm_key") != "place":
+            nearest_place = next(
+                (item for item in props.get("_nearby", []) if item.get("osm_key") == "place"),
+                None,
+            )
+            if nearest_place:
+                match = find_exact(_village_candidates(nearest_place))
+        if not match:
+            return None
+
+        subdistrict_row, village_row = match
+        subdistrict_id = _extract_id(
+            subdistrict_row,
+            ("subDistrictId", "subdistrictId", "sub_district_id", "id"),
+        )
+        village_id = _extract_id(village_row, ("villageId", "village_id", "id"))
+        if not subdistrict_id or not village_id:
+            return None
+        return {
+            "state_id": state_id,
+            "district_id": district_id,
+            "sub_district_id": subdistrict_id,
+            "village_id": village_id,
+        }
+
     district_row: Optional[dict[str, Any]] = None
     sub_district_row: Optional[dict[str, Any]] = None
+    direct_subdistrict_rows: list[dict[str, Any]] = []
     direct_district_id = _extract_id(direct_district or {}, ("districtId", "district_id", "id"))
     if direct_district:
         _, direct_subdistrict_rows = await fetch_subdistricts(direct_district)
@@ -233,8 +343,12 @@ async def _resolve_from_master_apis(
     district_subdistrict_rows = []
     if not sub_district_row:
         district_subdistrict_rows = await asyncio.gather(*(fetch_subdistricts(row) for row in remaining_districts))
+    all_district_subdistrict_rows = list(district_subdistrict_rows)
+    if direct_district and direct_subdistrict_rows:
+        all_district_subdistrict_rows.append((direct_district, direct_subdistrict_rows))
+
     hierarchy_matches: list[tuple[dict[str, Any], dict[str, Any]]] = []
-    for possible_district, subdistrict_rows in district_subdistrict_rows:
+    for possible_district, subdistrict_rows in all_district_subdistrict_rows:
         subdistrict = _pick_best_row(
             subdistrict_rows,
             sub_district_candidates,
@@ -267,65 +381,59 @@ async def _resolve_from_master_apis(
         ("subDistrictId", "subdistrictId", "sub_district_id", "id"),
     )
 
+    flattened_hierarchy = [
+        (possible_district, possible_subdistrict)
+        for possible_district, subdistrict_rows in all_district_subdistrict_rows
+        for possible_subdistrict in subdistrict_rows
+    ]
+
+    if not district_id or not sub_district_id:
+        similar_scope = _pick_similar_subdistrict_scope(flattened_hierarchy, sub_district_candidates)
+        if similar_scope:
+            scoped_district, _ = similar_scope
+            scoped_district_id = _extract_id(scoped_district, ("districtId", "district_id", "id"))
+            scoped_subdistricts = next(
+                (
+                    rows
+                    for possible_district, rows in all_district_subdistrict_rows
+                    if _extract_id(possible_district, ("districtId", "district_id", "id")) == scoped_district_id
+                ),
+                [],
+            )
+            exact_result = await resolve_exact_village_in_district(scoped_district, scoped_subdistricts)
+            if exact_result:
+                logger.info("Resolved NPSS hierarchy from exact master village match: %s", exact_result)
+                return exact_result
+
     result = {"state_id": state_id}
     if not district_id:
-        logger.warning("NPSS district could not be verified; submitting state only: %s", result)
+        logger.warning("NPSS district could not be verified: %s", result)
         return result
     result["district_id"] = district_id
     if not sub_district_id:
-        logger.warning("NPSS subdistrict could not be verified; submitting state and district: %s", result)
+        logger.warning("NPSS subdistrict could not be verified: %s", result)
         return result
     result["sub_district_id"] = sub_district_id
 
-    village_rows = await _fetch_master_rows(
-        "Vilages",
-        bearer_token=bearer_token,
-        params={"stateId": state_id, "districtId": district_id, "subDistrictId": sub_district_id},
-    )
-    village_candidates = _location_candidates(
-        props,
-        "village",
-        "hamlet",
-        "town",
-        "city",
-        "locality",
-        "district",
-    )
-    if props.get("osm_key") == "place":
-        village_candidates.extend(_location_candidates(props, "name"))
-    village_row = _pick_best_row(
-        village_rows,
-        village_candidates,
-        ("villageName", "village", "name"),
-    )
-    if not village_row and props.get("osm_key") != "place":
-        nearest_place = next(
-            (item for item in props.get("_nearby", []) if item.get("osm_key") == "place"),
-            None,
-        )
-        if nearest_place:
-            nearby_candidates = _location_candidates(
-                nearest_place,
-                "village",
-                "hamlet",
-                "town",
-                "city",
-                "locality",
-                "district",
-                "name",
-            )
-            village_row = _pick_best_row(
-                village_rows,
-                nearby_candidates,
-                ("villageName", "village", "name"),
-            )
-    village_id = _extract_id(village_row or {}, ("villageId", "village_id", "id"))
-    if not village_id:
-        logger.warning("NPSS village could not be verified; submitting verified parent hierarchy: %s", result)
-        return result
+    selected_village = await resolve_exact_village_in_district(district_row, [sub_district_row])
+    if selected_village:
+        logger.info("Resolved NPSS IDs from background master APIs: %s", selected_village)
+        return selected_village
 
-    result["village_id"] = village_id
-    logger.info("Resolved NPSS IDs from background master APIs: %s", result)
+    sibling_subdistricts = next(
+        (
+            rows
+            for possible_district, rows in all_district_subdistrict_rows
+            if _extract_id(possible_district, ("districtId", "district_id", "id")) == district_id
+        ),
+        [],
+    )
+    sibling_village = await resolve_exact_village_in_district(district_row, sibling_subdistricts)
+    if sibling_village:
+        logger.info("Resolved NPSS hierarchy from exact sibling village match: %s", sibling_village)
+        return sibling_village
+
+    logger.warning("NPSS village could not be verified: %s", result)
     return result
 
 
