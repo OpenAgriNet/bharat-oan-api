@@ -240,7 +240,9 @@ async def _call_npss_analyze(
         if e.response.status_code == 401:
             await cache.delete(NPSS_TOKEN_CACHE_KEY)
             raise ModelRetry("NPSS token expired. Retrying with fresh token.")
-        raise ModelRetry(f"NPSS analyze failed with status {e.response.status_code}")
+        detail = e.response.text.strip()[:300]
+        suffix = f": {detail}" if detail else ""
+        raise ModelRetry(f"NPSS analyze failed with status {e.response.status_code}{suffix}")
     except Exception as e:
         logger.error(f"NPSS analyze-image request failed: {e}")
         raise ModelRetry(f"NPSS analyze request failed: {e}")
@@ -297,6 +299,21 @@ async def analyze_crop_image(
     district_id = geo.get("district_id")
     sub_district_id = geo.get("sub_district_id")
     village_id = geo.get("village_id")
+    if not all((state_id, district_id, sub_district_id, village_id)):
+        logger.error(
+            "NPSS submission skipped because the complete master hierarchy could not be resolved: "
+            "state=%s district=%s subdistrict=%s village=%s lat=%s lon=%s",
+            state_id,
+            district_id,
+            sub_district_id,
+            village_id,
+            latitude,
+            longitude,
+        )
+        return (
+            "The crop image could not be submitted to NPSS because its required village master "
+            "location could not be verified for the supplied coordinates."
+        )
 
     # Download image from URL
     try:

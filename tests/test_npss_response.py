@@ -319,7 +319,7 @@ class TestNPSSToolMetadata(unittest.IsolatedAsyncioTestCase):
             npss._get_cached_npss_token = original_get_token
             npss.resolve_npss_location_ids = original_resolve_location_ids
 
-    async def test_analyze_crop_image_omits_ids_when_resolution_fails(self):
+    async def test_analyze_crop_image_skips_npss_when_complete_hierarchy_is_unavailable(self):
         original_download_image = npss._download_image
         original_call_npss_analyze = npss._call_npss_analyze
         original_cleanup_image = npss.cleanup_image
@@ -363,13 +363,8 @@ class TestNPSSToolMetadata(unittest.IsolatedAsyncioTestCase):
 
             result = await npss.analyze_crop_image(ctx, "https://example.com/crop.jpg")
 
-            self.assertIn("**Source:** NPSS", result)
-            self.assertIsNone(captured_request["state_id"])
-            self.assertIsNone(captured_request["district_id"])
-            self.assertIsNone(captured_request["sub_district_id"])
-            self.assertIsNone(captured_request["village_id"])
-            self.assertEqual(captured_request["latitude"], 18.58)
-            self.assertEqual(captured_request["longitude"], 73.98)
+            self.assertIn("required village master location could not be verified", result)
+            self.assertEqual(captured_request, {})
         finally:
             npss._download_image = original_download_image
             npss._call_npss_analyze = original_call_npss_analyze
@@ -510,7 +505,7 @@ class TestNPSSGeocodeMapping(unittest.IsolatedAsyncioTestCase):
             npss_geocodes._reverse_geocode_properties = original_reverse
             npss_geocodes._fetch_master_rows = original_fetch
 
-    async def test_master_lookup_does_not_assume_old_and_new_place_names_are_equal(self):
+    async def test_exact_village_match_resolves_canonical_bengaluru_hierarchy(self):
         original_reverse = npss_geocodes._reverse_geocode_properties
         original_fetch = npss_geocodes._fetch_master_rows
 
@@ -536,9 +531,16 @@ class TestNPSSGeocodeMapping(unittest.IsolatedAsyncioTestCase):
             if endpoint == "SubDistricts" and params["districtId"] == "290":
                 return [{"id": 3130, "name": "Channapatna"}]
             if endpoint == "SubDistricts" and params["districtId"] == "291":
-                return [{"id": 2996, "name": "Bengaluru South"}]
+                return [
+                    {"id": 2993, "name": "Anekal"},
+                    {"id": 2996, "name": "Bengaluru South"},
+                ]
             if endpoint == "Vilages":
-                return [{"id": 534821, "name": "Adugodi"}]
+                if params["districtId"] == "291" and params["subDistrictId"] == "2993":
+                    return [{"id": 532240, "name": "Kathriguppe"}]
+                if params["districtId"] == "291" and params["subDistrictId"] == "2996":
+                    return [{"id": 534896, "name": "Hosakerehalli"}]
+                return []
             return []
 
         try:
@@ -551,6 +553,9 @@ class TestNPSSGeocodeMapping(unittest.IsolatedAsyncioTestCase):
                 result,
                 {
                     "state_id": "16",
+                    "district_id": "291",
+                    "sub_district_id": "2993",
+                    "village_id": "532240",
                 },
             )
         finally:
