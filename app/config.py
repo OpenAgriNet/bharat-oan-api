@@ -116,13 +116,6 @@ class Settings(BaseSettings):
     npss_base_url: Optional[str] = os.getenv("NPSS_BASE_URL")
     npss_username: Optional[str] = os.getenv("NPSS_USERNAME")
     npss_password: Optional[str] = os.getenv("NPSS_PASSWORD")
-    npss_geocode_map_path: Optional[str] = os.getenv("NPSS_GEOCODE_MAP_PATH")
-    npss_allow_default_location: bool = os.getenv("NPSS_ALLOW_DEFAULT_LOCATION", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    )
 
     # AWS Configuration
     aws_access_key_id: Optional[str] = None

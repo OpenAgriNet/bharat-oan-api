@@ -15,7 +15,7 @@ from pydantic_ai import ModelRetry
 from langfuse import observe
 from helpers.utils import get_logger
 from agents.deps import FarmerContext
-from app.core.npss_geocodes import DEFAULT_LOCATION, resolve_npss_location_ids
+from app.core.npss_geocodes import resolve_npss_location_ids
 from app.core.cache import cache
 from app.core.image_storage import mark_processed, cleanup_image
 
@@ -68,10 +68,6 @@ NPSS_SOURCE_URL = "https://npss.dac.gov.in/"
 
 GCS_MOVE_AFTER_PROCESS = os.getenv("GCS_MOVE_AFTER_PROCESS", "").strip().lower() in ("1", "true", "yes", "on")
 
-# Default coordinates when user location is unavailable (geographic centre of India)
-DEFAULT_LATITUDE = 20.5937
-DEFAULT_LONGITUDE = 78.9629
-
 # ---------------------------------------------------------------------------
 # Image validation helpers
 # ---------------------------------------------------------------------------
@@ -103,45 +99,29 @@ async def _get_npss_token() -> str:
     token_url = f"{NPSS_BASE_URL}/api/Vistaar/token"
     logger.info(f"Fetching NPSS token from {token_url}")
 
-    # Try multiple auth methods — NPSS API may expect different Content-Type
-    auth_methods = [
-        # Method 1: JSON body with credentials (ASP.NET Core APIs often expect this)
-        {
-            "json": {"username": NPSS_USERNAME, "password": NPSS_PASSWORD},
-            "headers": {"Content-Type": "application/json"},
-        },
-        # Method 2: Form data with credentials
-        {
-            "data": {"username": NPSS_USERNAME, "password": NPSS_PASSWORD},
-        },
-        # Method 3: Basic auth in headers
-        {
-            "auth": (NPSS_USERNAME, NPSS_PASSWORD),
-        },
-    ]
-
-    for attempt, kwargs in enumerate(auth_methods, 1):
-        try:
-            logger.info(f"Trying NPSS auth method {attempt}...")
-            async with httpx.AsyncClient() as client:
-                response = await client.post(token_url, timeout=30.0, **kwargs)
-            response.raise_for_status()
-            data = response.json()
-            token = data.get("token") or data.get("access_token") or data.get("bearer_token")
-            if not token:
-                raise ValueError(f"Token response missing token field. Response: {data}")
-            logger.info(f"NPSS token fetched successfully (method {attempt})")
-            return token
-        except httpx.HTTPStatusError as e:
-            logger.warning(f"NPSS auth method {attempt} failed with status {e.response.status_code}")
-            if attempt == len(auth_methods):
-                logger.error(f"All NPSS auth methods failed. Last error: {e.response.status_code}: {e.response.text}")
-                raise ModelRetry(f"NPSS token request failed with status {e.response.status_code}")
-        except Exception as e:
-            logger.warning(f"NPSS auth method {attempt} failed: {e}")
-            if attempt == len(auth_methods):
-                logger.error(f"Failed to fetch NPSS token: {e}")
-                raise ModelRetry(f"NPSS token request failed: {e}")
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                token_url,
+                json={"userName": NPSS_USERNAME, "password": NPSS_PASSWORD},
+                headers={"accept": "text/plain", "Content-Type": "application/json"},
+                timeout=30.0,
+            )
+        response.raise_for_status()
+        data = response.json()
+        token = data.get("token") if isinstance(data, dict) else None
+        if not token:
+            raise ValueError("NPSS token response is missing the token field")
+        logger.info("NPSS token fetched successfully")
+        return str(token)
+    except httpx.HTTPStatusError as e:
+        logger.error("NPSS token request failed with status %s", e.response.status_code)
+        raise ModelRetry(f"NPSS token request failed with status {e.response.status_code}")
+    except ModelRetry:
+        raise
+    except Exception as e:
+        logger.error("Failed to fetch NPSS token: %s", e)
+        raise ModelRetry(f"NPSS token request failed: {e}")
 
 
 async def _get_cached_npss_token() -> str:
@@ -204,10 +184,10 @@ async def _download_image(image_url: str) -> tuple[bytes, str]:
 async def _call_npss_analyze(
     image_bytes: bytes,
     mimetype: str,
-    state_id: str,
-    district_id: str,
-    sub_district_id: str,
-    village_id: str,
+    state_id: Optional[str] = None,
+    district_id: Optional[str] = None,
+    sub_district_id: Optional[str] = None,
+    village_id: Optional[str] = None,
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
 ) -> dict:
@@ -220,20 +200,21 @@ async def _call_npss_analyze(
     filename = f"crop_image.{ext}"
 
     files = {
-        "file": (filename, io.BytesIO(image_bytes), mimetype),
+        "File": (filename, io.BytesIO(image_bytes), mimetype),
     }
-    data = {
-        "stateId": state_id,
-        "districtId": district_id,
-        "subDistrictId": sub_district_id,
-        "villageId": village_id,
-    }
-
-    # NPSS API requires Latitude and Longitude — fall back to centre of India if unavailable
-    lat = latitude if latitude is not None else DEFAULT_LATITUDE
-    lng = longitude if longitude is not None else DEFAULT_LONGITUDE
-    data["Latitude"] = str(lat)
-    data["Longitude"] = str(lng)
+    data = {}
+    for field, value in (
+        ("StateId", state_id),
+        ("DistrictId", district_id),
+        ("SubDistrictId", sub_district_id),
+        ("VillageId", village_id),
+    ):
+        if value:
+            data[field] = value
+    if latitude is not None:
+        data["Latitude"] = str(latitude)
+    if longitude is not None:
+        data["Longitude"] = str(longitude)
 
     logger.info(
         f"Calling NPSS analyze-image for state={state_id}, district={district_id}, "
@@ -259,7 +240,9 @@ async def _call_npss_analyze(
         if e.response.status_code == 401:
             await cache.delete(NPSS_TOKEN_CACHE_KEY)
             raise ModelRetry("NPSS token expired. Retrying with fresh token.")
-        raise ModelRetry(f"NPSS analyze failed with status {e.response.status_code}")
+        detail = e.response.text.strip()[:300]
+        suffix = f": {detail}" if detail else ""
+        raise ModelRetry(f"NPSS analyze failed with status {e.response.status_code}{suffix}")
     except Exception as e:
         logger.error(f"NPSS analyze-image request failed: {e}")
         raise ModelRetry(f"NPSS analyze request failed: {e}")
@@ -285,8 +268,6 @@ def _extract_image_id_from_url(image_url: str) -> Optional[str]:
 async def analyze_crop_image(
     ctx: RunContext[FarmerContext],
     image_url: str,
-    latitude: Optional[float] = None,
-    longitude: Optional[float] = None,
 ) -> str:
     """
     Analyze a crop image for pests or diseases using the National Pest Surveillance System (NPSS).
@@ -296,9 +277,6 @@ async def analyze_crop_image(
 
     Args:
         image_url: The URL of the uploaded crop image. This is REQUIRED.
-        latitude: Optional user latitude for geocode lookup
-        longitude: Optional user longitude for geocode lookup
-
     Returns:
         str: Diagnosis result from NPSS including pest name, crop, pathogen class, and description.
         Do NOT call `search_pests_diseases` automatically after this tool.
@@ -311,26 +289,31 @@ async def analyze_crop_image(
 
     image_url = image_url.strip()
 
-    # Use lat/lng from context if not provided as parameters
-    if latitude is None and ctx.deps.latitude is not None:
-        latitude = ctx.deps.latitude
-    if longitude is None and ctx.deps.longitude is not None:
-        longitude = ctx.deps.longitude
+    # Browser coordinates are trusted backend context and are never agent arguments.
+    latitude = ctx.deps.latitude
+    longitude = ctx.deps.longitude
 
     token = await _get_cached_npss_token()
-    geo = await resolve_npss_location_ids(latitude, longitude, bearer_token=token)
-    if not geo:
-        logger.warning(
-            "NPSS location IDs could not be resolved for lat=%s lon=%s; "
-            "submitting with legacy default IDs as a last resort.",
+    geo = await resolve_npss_location_ids(latitude, longitude, bearer_token=token) or {}
+    state_id = geo.get("state_id")
+    district_id = geo.get("district_id")
+    sub_district_id = geo.get("sub_district_id")
+    village_id = geo.get("village_id")
+    if not all((state_id, district_id, sub_district_id, village_id)):
+        logger.error(
+            "NPSS submission skipped because the complete master hierarchy could not be resolved: "
+            "state=%s district=%s subdistrict=%s village=%s lat=%s lon=%s",
+            state_id,
+            district_id,
+            sub_district_id,
+            village_id,
             latitude,
             longitude,
         )
-        geo = DEFAULT_LOCATION.copy()
-    state_id = geo["state_id"]
-    district_id = geo["district_id"]
-    sub_district_id = geo["sub_district_id"]
-    village_id = geo["village_id"]
+        return (
+            "The crop image could not be submitted to NPSS because its required village master "
+            "location could not be verified for the supplied coordinates."
+        )
 
     # Download image from URL
     try:
