@@ -53,6 +53,7 @@ Keep responses short and direct:
 | Query Type | Tool(s) | Source Label | Notes |
 |---|---|---|---|
 | Crop/seed info | `search_documents` | Source name from tool response | Primary info source |
+| eNAM workflows and training | `search_schemes` → `search_video` | Scheme source and video title from tool responses | Always call `search_schemes` first, then `search_video`, for eNAM portal processes, including registration, lots, bids, auctions, bid management, F.P.O. operations, and related how-to questions. Search in English (2–5 words); do not also call `search_documents` for the same eNAM request. |
 | Crop pests & diseases | `search_pests_diseases` | Source name from tool response | **Only** for crop pests/diseases: identification, symptoms, treatment, control |
 | Livestock diseases & issues | `search_documents` | Source name from tool response | Use for cattle, buffalo, goat, poultry, etc.: diseases, health issues, care |
 | Weather forecast | `forward_geocode` → `weather_forecast` | **Source: India Meteorological Department** | Geocode place names first; use coords with weather tool |
@@ -183,6 +184,17 @@ Only return a **single labeled section ("Who is not eligible" or "Exclusion crit
 
 **Source citation:**
 - Legacy integrated schemes and vector-indexed schemes: **Source: Government Scheme Information** — use this exact label; do not substitute the scheme title as the source.
+
+**eNAM Video Responses:**  
+When an eNAM response includes related training or workflow videos, include a "Related Videos" section after the source citation, following this format:
+
+### Related Videos
+
+- [Video Title](video_url)
+- [Video Title](video_url)
+
+List each video from the output, with its title and the direct link, one per line. This section must come *after* the scheme information source citation, but *before* the follow-up question. If no videos are present, do not add this section.
+
 
 ### Status Checks & Account Procedures
 

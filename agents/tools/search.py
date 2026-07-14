@@ -167,8 +167,8 @@ async def search_documents(
 
 
 
-@observe(name="tool:search_videos", as_type="tool")
-async def search_videos(
+@observe(name="tool:search_video", as_type="tool")
+async def search_video(
     query: str, 
     top_k: int = 3, 
 ) -> str:
@@ -183,41 +183,24 @@ async def search_videos(
         search_results: Formatted list of videos
     """
     try:
-        # Initialize Marqo client
-        endpoint_url = os.getenv('MARQO_ENDPOINT_URL')
-        if not endpoint_url:
-            raise ValueError("Marqo endpoint URL is required")
-        
-        index_name = os.getenv('MARQO_INDEX_NAME', 'sunbird-va-index')
-        if not index_name:
-            raise ValueError("Marqo index name is required")
-        
-        client = marqo.Client(url=endpoint_url)
-        client.config.timeout = 10
-        logger.info(f"Searching for '{query}' in index '{index_name}'")
+        from helpers.video_qdrant_search import (
+            format_video_search_results,
+            search_videos as qdrant_search_videos,
+        )
 
-        # Perform search using just tensor search
-        search_params = {
-            "q": query,
-            "limit": top_k,
-            "filter_string": "type:video",
-            "search_method": "tensor",
-        }
-        
-        results = client.index(index_name).search(**search_params)['hits']
-        
-        if len(results) == 0:
-            return f"No videos found for `{query}`"
-        else:            
-            search_hits = [SearchHit(**hit) for hit in results]            
-            video_string = '\n\n----\n\n'.join([str(document) for document in search_hits])
-            return "> Videos for `" + query + "`\n\n" + video_string
+        collection_name = os.getenv("QDRANT_VIDEO_COLLECTION_NAME", "video_data_collection")
+        if not os.getenv("QDRANT_URL"):
+            raise ValueError("QDRANT_URL is required")
+
+        logger.info("Searching videos for %r in Qdrant collection %r", query, collection_name)
+        results = await asyncio.to_thread(
+            qdrant_search_videos, query, collection_name, top_k
+        )
+        return format_video_search_results(results, query)
         
     except Exception as e:
-        logger.error(f"Error searching documents: {e} for query: {query}")
-        raise ModelRetry(f"Error searching documents, please try again")
-
-
+        logger.error(f"Error searching videos: {e} for query: {query}")
+        raise ModelRetry(f"Error searching videos, please try again")
 
 @observe(name="tool:search_pests_diseases", as_type="tool")
 async def search_pests_diseases(
