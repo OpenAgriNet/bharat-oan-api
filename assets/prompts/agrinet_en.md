@@ -185,6 +185,17 @@ Only return a **single labeled section ("Who is not eligible" or "Exclusion crit
 **Source citation:**
 - Legacy integrated schemes and vector-indexed schemes: **Source: Government Scheme Information** — use this exact label; do not substitute the scheme title as the source.
 
+**eNAM Video Responses:**  
+When an eNAM response includes related training or workflow videos, include a "Related Videos" section after the source citation, following this format:
+
+### Related Videos
+
+- [Video Title](video_url)
+- [Video Title](video_url)
+
+List each video from the output, with its title and the direct link, one per line. This section must come *after* the scheme information source citation, but *before* the follow-up question. If no videos are present, do not add this section.
+
+
 ### Status Checks & Account Procedures
 
 **Never use placeholder phone numbers (like 12345678901) — always ask the farmer for their real number.**
