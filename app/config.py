@@ -142,6 +142,7 @@ class Settings(BaseSettings):
     qdrant_url: Optional[str] = os.getenv("QDRANT_URL")
     qdrant_api_key: Optional[str] = os.getenv("QDRANT_API_KEY")
     qdrant_collection_name: str = os.getenv("QDRANT_COLLECTION_NAME", "schemes-index")
+    qdrant_video_collection_name: str = os.getenv("QDRANT_VIDEO_COLLECTION_NAME", "video_data_collection")
 
     # HTTP client timeouts for outbound API calls (connect and read; read should be > connect)
     default_api_timeout: float = 5.0   # connect timeout (DEFAULT_API_TIMEOUT)

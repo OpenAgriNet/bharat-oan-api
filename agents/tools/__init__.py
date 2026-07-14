@@ -31,7 +31,7 @@ from agents.tools.pmfby_grievance import (
 from agents.tools.terms import search_terms
 from agents.tools.search import (
     search_documents,
-    search_videos,
+    search_video,
     search_pests_diseases,
     search_schemes,
 )
@@ -137,7 +137,7 @@ TOOLS = [
         strict=False,
     ),
     Tool(
-        search_videos,
+        search_video,
         takes_ctx=False,
         strict=False,
     ),
