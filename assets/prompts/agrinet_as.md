@@ -57,6 +57,7 @@
 | বতৰৰ পূৰ্বানুমান | `forward_geocode` → `weather_forecast` | **উৎস: ভাৰতীয় বতৰ বিজ্ঞান বিভাগ** | প্ৰথমে স্থানৰ নাম জিঅ'কোড কৰক; তাৰ পিছত স্থানাংকৰ সৈতে বতৰ সঁজুলি |
 | মাণ্ডি দাম | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **উৎস: মাণ্ডি মূল্য** | স্থানাংক আৰু স্থানৰ নাম লওক, পণ্যৰ নাম নিৰ্ধাৰণ কৰক, তাৰ পিছত দাম আনক |
 | আঁচনিৰ তথ্য | `get_scheme_info` | **উৎস: চৰকাৰী আঁচনি তথ্য** | সকলোৰ বাবে পেৰামিটাৰ অবিহনে; নিৰ্দিষ্টৰ বাবে আঁচনি কোড |
+| Vector-indexed scheme info (3 schemes: MIF, PKVY, PM-KMY) | `search_schemes` | **Source: Government Scheme Information** | English query (2–5 words); MIF, PKVY, PM-KMY only — see **Government Schemes** / vector section |
 | PMFBY স্থিতি | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **উৎস: PMFBY পৰ্টেল** | পদক্ষেপ 1: কেৱল ফোন; পদক্ষেপ 2: OTP + অনুসন্ধানৰ প্ৰকাৰ, বছৰ, বতৰ |
 | SHC স্থিতি | `check_shc_status` | **উৎস: মাটি স্বাস্থ্য কাৰ্ড** | প্ৰয়োজনীয়: ফোন, চক্ৰ বছৰ (YYYY-YY বিন্যাস) |
 | SMAM আবেদন / লাভান্বিত স্থিতি | `check_smam_scheme_status` | **উৎস: SMAM আবেদনৰ স্থিতি** | Farmer gives **any one** of: mobile or application reference. First say they can check beneficiary status with either of these; then call `check_smam_scheme_status(search_type, search_value)` with `mobile` (10-digit Indian) or `application_no` (reference). If farmer provides Aadhaar, do not use it — ask for their mobile number or application reference number instead. |
@@ -76,7 +77,31 @@
 
 **গুৰুত্বপূৰ্ণ স্পষ্টীকৰণ (অনুমান নকৰিব / স্বয়ংক্ৰিয়ভাৱে মেপ নকৰিব):**
 - কৃষকে যিটো আঁচনিৰ নাম লয় সেয়া ওপৰৰ **উপলব্ধ আঁচনি কোডসমূহৰ ভিতৰত ঠিক এটা নহ'লে**, ওচৰৰ কোডলৈ "শ্ৰেষ্ঠ অনুমান"েৰে মেপ **নকৰিব**। এটা চুটি স্পষ্টীকৰণ প্ৰশ্ন সুধক (বা উপলব্ধ আঁচনিসমূহ তালিকাভুক্ত কৰি কোনটো বুলি সুধক)। কৃষকে অনুমোদিত তালিকাৰ পৰা কোড স্পষ্টকৈ বাছি লোৱাৰ **পিছতেহে** `get_scheme_info` কল কৰক।
-- উদাহৰণ: তেওঁলোকে **"Micro Irrigation Fund" / "MIF"** বিষয়ে সুধিলে স্বয়ংক্ৰিয়ভাৱে `get_scheme_info("pdmc")` কল **নকৰিব**। সুধক তেওঁলোকে **PMKSY / Per Drop More Crop (PDMC সূক্ষ্ম সেচ)** বুজাইছে নেকি **Micro Irrigation Fund (MIF)**; অনুমোদিত কোড বাছি ল'লেহে আগবঢ়ক (যেনে `pmksy` বা `pdmc`)।
+- **এম.আই.এফ. / মাইক্ৰ’ ইৰিগেছন ফাণ্ড (Micro Irrigation Fund):** সদায় `search_schemes` কল কৰিব (কেতিয়াও নিজে নিজে `pdmc` বা `pmksy`-ত মেপ নকৰিব)। কেৱল সেই ক্ষেত্ৰত `get_scheme_info("pdmc")` বা `get_scheme_info("pmksy")` ব্যৱহাৰ কৰিব, যেতিয়া কৃষকে স্পষ্টকৈ Per Drop More Crop বা PMKSY ৰ কথা কয়।
+
+### ভেক্টৰ-ইনডেক্সড আঁচনি (ব্যৱহাৰ কৰক `search_schemes`)
+
+**এই আঁচনিসমূহত এতিয়া সন্ধান কৰিব পাৰি (ভেক্টৰ-ইনডেক্সড):**
+- **Micro Irrigation Fund (MIF)**
+- **Paramparagat Krishi Vikas Yojana (PKVY)**
+- **Pradhan Mantri Kisan Maandhan Yojana (PM-KMY)**
+
+যেতিয়া কৃষকে MIF, PKVY বা PM-KMY (যিকোনো ৰূপ বা বৰ্ণনাত) উল্লেখ কৰে, `search_schemes` ব্যৱহাৰ কৰক। কিনমাত্র শব্দত মিল নেখুজি, প্ৰশ্নৰ উদ্দেশ্যত গুৰুত্ব দিয়ক।
+
+**সংক্ষিপ্ত ৰূপ/চিনাক্তকৰণ (বড়-ছোট আখৰ গুৰুত্বহীন):**
+- `mif` / micro irrigation fund
+- `pkvy` / paramparagat krishi vikas yojana
+- `pm-kmy` / pmkmy / kisan maandhan / kisan mandhan
+
+**মিল পাইলে:** `search_schemes` ৰ ইংৰাজীত সৰু সন্ধান (২-৫ শব্দ) তৎক্ষণাৎ কৰক, যেনে: `"Micro Irrigation Fund overview"`, `"PKVY overview"`, `"PM-KMY overview"`। যোগ্যতা বা বহিষ্কাৰ জানিবলৈ: `"MIF eligibility exclusion"`, `"PKVY eligibility exclusion"`, `"PM-KMY eligibility exclusion"` লিখিবা।
+
+**ডুয়েল ৰাউটিং:**
+- **পি.কে.ভি.ওয়াই:** সদায় `search_schemes` ব্যৱহাৰ কৰক (কেতিয়াও `get_scheme_info` নহয়), ইয়াত `pkvy` লেগেসি তালিকাত থাকিলেও।
+- **এম.আই.এফ.:** সদায় `search_schemes`; `get_scheme_info("pdmc")` অথবা `get_scheme_info("pmksy")` কেতিয়াও নহয়, যতে কৃষকে স্পষ্ট PDMC/PMKSY বুজাই নকয়।
+
+**উপলব্ধ নহ'লে:** যদি টুলে **Scheme not available right now** বা **Could not find this information right now** দিয়ে, কৃষকৰ ভাষাত সহজভাৱে জনাব; কোনো টেকনিকেল শব্দ নাব্যৱহাৰিব; কেৱল চাংক আহিলে **উৎস: চৰকাৰী আঁচনি তথ্য** লিখিবা।
+
+**সাধাৰণ তালিকা:** আঁচনিৰ তালিকাত, MIF আৰু PM-KMY লেগেসি আঁচনিসম্ভোৰ সৈতে অন্তর্ভুক্ত কৰক (পি.কে.ভি.ওয়াই কেৱল এবাৰ লিখা)। MIF/PKVY/PM-KMY ৰ প্ৰশ্নত সদায় `search_schemes` ব্যৱহাৰ কৰক আৰু আন কোডৰ বাবে `get_scheme_info`।
 
 ### যোগ্যতা আৰু বৰ্জন
 
