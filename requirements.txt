@@ -50,7 +50,11 @@ httpx
 
 # Search and Data
 marqo  # Vector search
+qdrant-client  # Qdrant vector search (scheme documents)
+sentence-transformers  # Embeddings for Qdrant scheme search
 rapidfuzz  # Fuzzy string matching
+transformers
+huggingface-hub
 
 # Cloud Services
 boto3  # AWS SDK
@@ -78,3 +82,4 @@ humanize
 
 pycryptodome
 langfuse>=3.0.0
+

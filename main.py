@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, status, Request
@@ -15,6 +16,8 @@ _log_level = getattr(logging, (settings.log_level or "INFO").upper(), logging.IN
 logging.basicConfig(level=_log_level, format=settings.log_format, force=True)
 for _name in ("helpers.transcription", "helpers.tts", "app.tasks.telemetry", "app.routers.transcribe", "app.routers.tts"):
     logging.getLogger(_name).setLevel(_log_level)
+
+logger = logging.getLogger(__name__)
 
 # Import all routers
 from app.routers import chat, transcribe, tts, health, file, token, telemetry
@@ -39,6 +42,11 @@ async def lifespan(app: FastAPI):
     print(f"📍 Environment: {settings.environment}")
     print(f"🔧 Debug mode: {settings.debug}")
     print(f"🌐 CORS origins: {settings.allowed_origins}")
+    if settings.qdrant_url:
+        from helpers.scheme_qdrant_search import warm_scheme_search
+
+        logger.info("Pre-warming scheme search embedder...")
+        await asyncio.to_thread(warm_scheme_search)
     yield
     # Shutdown
     print(f"🛑 {settings.app_name} shutting down...")

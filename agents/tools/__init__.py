@@ -12,6 +12,7 @@ from agents.tools.terms import search_terms
 from agents.tools.search import search_documents
 from agents.tools.search import search_videos
 from agents.tools.search import search_pests_diseases
+from agents.tools.search import search_schemes
 from agents.tools.weather import weather_forecast
 from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
@@ -72,6 +73,11 @@ TOOLS = [
     ),
     Tool(
         search_documents,
+        takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        search_schemes,
         takes_ctx=False,
         strict=False,
     ),
