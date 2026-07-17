@@ -170,7 +170,7 @@ async def search_documents(
 @observe(name="tool:search_video", as_type="tool")
 async def search_video(
     query: str, 
-    top_k: int = 3, 
+    top_k: int = 10, 
 ) -> str:
     """
     Semantic search for videos. Use this tool when recommending videos to the farmer.
