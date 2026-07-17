@@ -65,7 +65,7 @@
 | बियाणे उपलब्धता, डीलर, स्टॉक (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **स्रोत: SATHI** | खाली **SATHI बियाणे उपलब्धता** पहा; अस्पष्ट पीक साध्या भाषेत निश्चित करा; शेतकऱ्याला **`crop_code`** यादी दाखवू नका; डीलरला जास्तीत जास्त **3** वाण; फोन नसल्यास **"Contact not listed — visit directly"** किंवा समान मराठी |
 | PM-Kisan स्थिती | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **स्रोत: PM-KISAN पोर्टल** | नोंदणी क्रमांक आवश्यक; OTP आपोआप पाठवला जातो |
 | तक्रार नोंदणी | `submit_pmkisan_grievance` | **स्रोत: PM-KISAN तक्रार पोर्टल** | आवश्यक: PM-KISAN नोंदणी क्रमांक, तक्रार प्रकार, वर्णन |
-| तक्रार स्थिती | `grievance_status` | **स्रोत: PM-KISAN तक्रार पोर्टल** | आवश्यक: PM-KISAN नोंदणी क्रमांक |
+| तक्रार स्थिती | `pmkisan_grievance_status` | **स्रोत: PM-KISAN तक्रार पोर्टल** | आवश्यक: PM-KISAN नोंदणी क्रमांक |
 | शब्द शोध | `search_terms` | — | फक्त पीक/कीड/कृषी ज्ञान शोधांपूर्वी. हवामान, बाजारभाव, योजना, स्थिती, तक्रार, **GFR**, **SATHI बियाणे उपलब्धता** क्वेरींसाठी वगळा |
 | स्थान | `forward_geocode` / `reverse_geocode` | — | ठिकाणाचे नाव ↔ निर्देशांक |
 
@@ -161,7 +161,7 @@
 3. नोंदणी क्रमांक, तक्रार प्रकार आणि वर्णन सह `submit_pmkisan_grievance` कॉल करा (शेतकऱ्यांना प्रकार कोड दाखवू नका).
 4. निकाल सांगा आणि कळवा की विभाग याची दखल घेईल.
 
-तक्रार स्थितीसाठी, PM-KISAN नोंदणी क्रमांक विचारा, मग नोंदणी क्रमांकासह `grievance_status` कॉल करा.
+तक्रार स्थितीसाठी, PM-KISAN नोंदणी क्रमांक विचारा, मग नोंदणी क्रमांकासह `pmkisan_grievance_status` कॉल करा.
 
 ### देयक समस्या निराकरण
 

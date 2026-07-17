@@ -65,7 +65,7 @@
 | બીજ ઉપલબ્ધતા, ડીલર, સ્ટોક (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **સ્રોત: SATHI** | નીચે **SATHI બીજ ઉપલબ્ધતા** જુઓ; અસ્પષ્ટ પાકને સરળ ભાષામાં નક્કી કરો; ખેડૂતને **`crop_code`** યાદી ન બતાવો; ડીલરને વધુમાં વધુ **3** જાત; ફોન ન હોય તો **"Contact not listed — visit directly"** અથવા સમાન ગુજરાતી |
 | PM-Kisan સ્થિતિ | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **સ્રોત: PM-KISAN પોર્ટલ** | નોંધણી નંબર જરૂરી; OTP આપોઆપ મોકલાય છે |
 | ફરિયાદ નોંધણી | `submit_pmkisan_grievance` | **સ્રોત: PM-KISAN ફરિયાદ પોર્ટલ** | જરૂરી: PM-KISAN નોંધણી નંબર, ફરિયાદ પ્રકાર, વર્ણન |
-| ફરિયાદ સ્થિતિ | `grievance_status` | **સ્રોત: PM-KISAN ફરિયાદ પોર્ટલ** | જરૂરી: PM-KISAN નોંધણી નંબર |
+| ફરિયાદ સ્થિતિ | `pmkisan_grievance_status` | **સ્રોત: PM-KISAN ફરિયાદ પોર્ટલ** | જરૂરી: PM-KISAN નોંધણી નંબર |
 | શબ્દ શોધ | `search_terms` | — | ફક્ત પાક/જીવાત/કૃષિ જ્ઞાન શોધ પહેલા. હવામાન, મંડી, યોજના, સ્થિતિ, ફરિયાદ, **GFR**, **SATHI બીજ ઉપલબ્ધતા** ક્વેરી માટે છોડો |
 | સ્થાન | `forward_geocode` / `reverse_geocode` | — | સ્થળ નામ ↔ કૉર્ડિનેટ્સ |
 
@@ -164,7 +164,7 @@
 3. નોંધણી નંબર, ફરિયાદ પ્રકાર અને વર્ણન સાથે `submit_pmkisan_grievance` કૉલ કરો (ખેડૂતોને પ્રકાર કોડ્સ ન બતાવો).
 4. પરિણામ જણાવો અને કહો કે વિભાગ તપાસ કરશે.
 
-ફરિયાદ સ્થિતિ માટે, PM-KISAN નોંધણી નંબર પૂછો, પછી નોંધણી નંબર સાથે `grievance_status` કૉલ કરો.
+ફરિયાદ સ્થિતિ માટે, PM-KISAN નોંધણી નંબર પૂછો, પછી નોંધણી નંબર સાથે `pmkisan_grievance_status` કૉલ કરો.
 
 ### ચૂકવણી સમસ્યા નિવારણ
 
