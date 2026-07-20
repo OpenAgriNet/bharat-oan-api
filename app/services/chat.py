@@ -26,6 +26,7 @@ from app.services.agrinet_routing import (
     resolve_agrinet_route,
     set_session_agrinet_route,
 )
+from app.services.chat_turn_map import write_chat_turn_map
 from app.services.npss_response import post_process_npss_response
 from app.tasks.telemetry import send_telemetry
 from app.utils import (
@@ -118,6 +119,89 @@ def _sanitize_streamed_output(raw_output: str) -> str:
     return cleaned_output.strip()
 
 
+def _queue_telemetry_event(background_tasks: BackgroundTasks, event: Any) -> None:
+    background_tasks.add_task(
+        send_telemetry,
+        TelemetryRequest(events=create_frontend_compatible_item_batch(event)).model_dump(),
+    )
+
+
+async def _record_chat_turn(
+    trace_id: str | None,
+    telemetry_qid: str,
+    session_id: str,
+    decision: AgrinetRouteDecision,
+    channel: str,
+) -> None:
+    """Persist the qid -> Langfuse trace mapping so user feedback can be scored later."""
+    if not trace_id:
+        logger.warning(
+            "No active Langfuse trace id for qid %s; feedback score will be skipped",
+            telemetry_qid,
+        )
+        return
+    await write_chat_turn_map(
+        telemetry_qid,
+        trace_id=trace_id,
+        session_id=session_id,
+        model_name=decision.model_name,
+        agrinet_route=decision.route,
+        channel=channel,
+    )
+
+
+def _wrap_image_analysis_message(
+    base_user_message: str,
+    latitude: Optional[float],
+    longitude: Optional[float],
+) -> str:
+    if latitude is not None and longitude is not None:
+        location_instruction = (
+            f"Browser coordinates are available for this image upload "
+            f"(latitude={latitude}, longitude={longitude}). "
+            "You MUST call `analyze_crop_image`. The backend supplies these coordinates; "
+            "do not pass or calculate location IDs."
+        )
+    else:
+        location_instruction = (
+            "No browser coordinates were sent with this image upload. "
+            "Do NOT call any geocoding tool or try to provide NPSS state, district, subdistrict, or village IDs. "
+            "Call `analyze_crop_image`; the backend will omit unresolved location fields rather than inventing IDs."
+        )
+    return (
+        f"[USER UPLOADED A CROP IMAGE]\n\n"
+        f"{base_user_message}\n\n"
+        f"INSTRUCTION: The user has uploaded a crop image for pest/disease identification. "
+        f"Use the exact image URL already present in the user's message or recent conversation history when calling `analyze_crop_image`. "
+        f"{location_instruction} "
+        f"Do NOT call `search_pests_diseases` automatically. "
+        f"Present the NPSS result as a clean, farmer-friendly structured card in the Selected Language using this format:\n"
+        f"**Pest:** <pest name>\n"
+        f"**Crop:** <crop name>\n"
+        f"**Cause:** <pathogen class, e.g. fungi / bacteria / virus>\n\n"
+        f"<short symptoms/identification summary translated into the Selected Language>\n\n"
+        f"Skip any field that is empty, null, or not present in the tool result. "
+        f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
+        f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
+        f"If the tool returns multiple findings, show only the most relevant one. "
+        f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
+    )
+
+
+def _build_user_message(
+    deps: FarmerContext,
+    last_response: str,
+    *,
+    is_image_analysis: bool,
+    latitude: Optional[float],
+    longitude: Optional[float],
+) -> str:
+    base_user_message = deps.get_user_message()
+    if is_image_analysis:
+        base_user_message = _wrap_image_analysis_message(base_user_message, latitude, longitude)
+    return f"{last_response}{base_user_message}"
+
+
 @observe(name=CHAT_CHAIN_SPAN_NAME, as_type="chain")
 async def stream_chat_messages(
     query: str,
@@ -143,10 +227,7 @@ async def stream_chat_messages(
         question_text=query,
         session_id=session_id,
     )
-    background_tasks.add_task(
-        send_telemetry,
-        TelemetryRequest(events=create_frontend_compatible_item_batch(question_event)).model_dump(),
-    )
+    _queue_telemetry_event(background_tasks, question_event)
 
     route_decision = await resolve_agrinet_route(session_id, has_history=bool(history))
     logger.info(
@@ -165,6 +246,7 @@ async def stream_chat_messages(
         environment=lf_env,
         channel=channel,
         query=query,
+        qid=telemetry_qid,
     )
     trace_meta.update(
         {
@@ -195,6 +277,9 @@ async def stream_chat_messages(
         try:
             lf_update_current_span(input=query, metadata=route_metadata)
 
+            trace_id = get_client().get_current_trace_id()
+            await _record_chat_turn(trace_id, telemetry_qid, session_id, route_decision, channel)
+
             deps = FarmerContext(
                 query=query,
                 lang_code=target_lang,
@@ -210,48 +295,24 @@ async def stream_chat_messages(
                 f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
             )
 
-            def build_user_message() -> str:
-                base_user_message = deps.get_user_message()
-                if is_image_analysis:
-                    if latitude is not None and longitude is not None:
-                        location_instruction = (
-                            f"Browser coordinates are available for this image upload "
-                            f"(latitude={latitude}, longitude={longitude}). "
-                            "You MUST call `analyze_crop_image`. The backend supplies these coordinates; "
-                            "do not pass or calculate location IDs."
-                        )
-                    else:
-                        location_instruction = (
-                            "No browser coordinates were sent with this image upload. "
-                            "Do NOT call any geocoding tool or try to provide NPSS state, district, subdistrict, or village IDs. "
-                            "Call `analyze_crop_image`; the backend will omit unresolved location fields rather than inventing IDs."
-                        )
-                    base_user_message = (
-                        f"[USER UPLOADED A CROP IMAGE]\n\n"
-                        f"{base_user_message}\n\n"
-                        f"INSTRUCTION: The user has uploaded a crop image for pest/disease identification. "
-                        f"Use the exact image URL already present in the user's message or recent conversation history when calling `analyze_crop_image`. "
-                        f"{location_instruction} "
-                        f"Do NOT call `search_pests_diseases` automatically. "
-                        f"Present the NPSS result as a clean, farmer-friendly structured card in the Selected Language using this format:\n"
-                        f"**Pest:** <pest name>\n"
-                        f"**Crop:** <crop name>\n"
-                        f"**Cause:** <pathogen class, e.g. fungi / bacteria / virus>\n\n"
-                        f"<short symptoms/identification summary translated into the Selected Language>\n\n"
-                        f"Skip any field that is empty, null, or not present in the tool result. "
-                        f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
-                        f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
-                        f"If the tool returns multiple findings, show only the most relevant one. "
-                        f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
-                    )
-                return f"{last_response}{base_user_message}"
-
-            user_message = build_user_message()
+            user_message = _build_user_message(
+                deps,
+                last_response,
+                is_image_analysis=is_image_analysis,
+                latitude=latitude,
+                longitude=longitude,
+            )
 
             moderation_data = await _run_moderation(user_message, session_id)
             logger.info("Moderation data: %s", moderation_data)
             deps.update_moderation_str(str(moderation_data))
-            user_message = build_user_message()
+            user_message = _build_user_message(
+                deps,
+                last_response,
+                is_image_analysis=is_image_analysis,
+                latitude=latitude,
+                longitude=longitude,
+            )
 
             trimmed_history = trim_history(history, max_tokens=64_000)
             logger.info("Trimmed history length: %s messages", len(trimmed_history))
@@ -285,6 +346,11 @@ async def stream_chat_messages(
                 fallback_from=route_decision.route if fallback_used else None,
             )
 
+            if trace_id and fallback_used:
+                await _record_chat_turn(
+                    trace_id, telemetry_qid, session_id, final_route_decision, channel
+                )
+
             result = completed_run.result
             output_text = post_process_npss_response(
                 text=completed_run.output_text,
@@ -308,10 +374,7 @@ async def stream_chat_messages(
                 answer_text=output_text,
                 session_id=session_id,
             )
-            background_tasks.add_task(
-                send_telemetry,
-                TelemetryRequest(events=create_frontend_compatible_item_batch(answer_event)).model_dump(),
-            )
+            _queue_telemetry_event(background_tasks, answer_event)
 
             clean_new_messages = filter_thinking_from_history(list(new_messages or []))
             clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
@@ -333,10 +396,7 @@ async def stream_chat_messages(
                 error_text=f"{type(exc).__name__}: {exc}",
                 question_text=query,
             )
-            background_tasks.add_task(
-                send_telemetry,
-                TelemetryRequest(events=create_frontend_compatible_item_batch(error_event)).model_dump(),
-            )
+            _queue_telemetry_event(background_tasks, error_event)
             if "agrinet_task" in locals() and not agrinet_task.done():
                 agrinet_task.cancel()
             raise
