@@ -43,28 +43,36 @@ async def relay_feedback_telemetry(
         TelemetryRequest(events=create_frontend_compatible_item_batch(event)).model_dump(),
     )
 
+    # The turn map stores no user id, so the session check is the only guard
+    # that this feedback belongs to the trace the qid points at.
     chat_turn = await read_chat_turn_map(request.qid)
+    langfuse_score = "skipped"
     if chat_turn and chat_turn.get("trace_id"):
         stored_session_id = chat_turn.get("session_id")
         if stored_session_id and stored_session_id != request.session_id:
             logger.warning(
-                "Feedback session_id %s does not match chat session_id %s for qid %s",
+                "Feedback session_id %s does not match chat session_id %s for qid %s; "
+                "skipping Langfuse score",
                 request.session_id,
                 stored_session_id,
                 request.qid,
             )
-        background_tasks.add_task(
-            create_user_feedback_score,
-            trace_id=chat_turn["trace_id"],
-            qid=request.qid,
-            feedback_type=request.feedback_type,
-            feedback_text=request.feedback_text,
-        )
+        else:
+            background_tasks.add_task(
+                create_user_feedback_score,
+                trace_id=chat_turn["trace_id"],
+                qid=request.qid,
+                feedback_type=request.feedback_type,
+                feedback_text=request.feedback_text,
+            )
+            langfuse_score = "queued"
+
+    if langfuse_score == "queued":
         logger.info("feedback_langfuse_hit qid=%s", request.qid)
     else:
         logger.info("feedback_langfuse_miss qid=%s", request.qid)
 
-    return {"status": "accepted"}
+    return {"status": "accepted", "langfuse_score": langfuse_score}
 
 
 @router.post("/events")
