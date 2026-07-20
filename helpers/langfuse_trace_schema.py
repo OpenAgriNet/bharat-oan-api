@@ -11,6 +11,7 @@ def chat_trace_metadata_strings(
     environment: str,
     channel: str = "",
     query: str = "",
+    qid: str = "",
 ) -> dict[str, str]:
     """Propagated trace metadata (strings ≤200 chars for Langfuse)."""
     out: dict[str, str] = {
@@ -22,4 +23,6 @@ def chat_trace_metadata_strings(
         out["channel"] = channel
     if query:
         out["query"] = query if len(query) <= 200 else f"{query[:197]}..."
+    if qid:
+        out["qid"] = qid
     return out
