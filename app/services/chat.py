@@ -118,6 +118,30 @@ def _sanitize_streamed_output(raw_output: str) -> str:
     return cleaned_output.strip()
 
 
+async def _record_chat_turn(
+    trace_id: Optional[str],
+    telemetry_qid: str,
+    session_id: str,
+    decision: AgrinetRouteDecision,
+    channel: str,
+) -> None:
+    """Persist the qid -> Langfuse trace mapping so user feedback can be scored later."""
+    if not trace_id:
+        logger.warning(
+            "No active Langfuse trace id for qid %s; feedback score will be skipped",
+            telemetry_qid,
+        )
+        return
+    await write_chat_turn_map(
+        telemetry_qid,
+        trace_id=trace_id,
+        session_id=session_id,
+        model_name=decision.model_name,
+        agrinet_route=decision.route,
+        channel=channel,
+    )
+
+
 @observe(name=CHAT_CHAIN_SPAN_NAME, as_type="chain")
 async def stream_chat_messages(
     query: str,
@@ -194,20 +218,7 @@ async def stream_chat_messages(
             lf_update_current_span(input=query, metadata=route_metadata)
 
             trace_id = get_client().get_current_trace_id()
-            if trace_id:
-                await write_chat_turn_map(
-                    telemetry_qid,
-                    trace_id=trace_id,
-                    session_id=session_id,
-                    model_name=route_decision.model_name,
-                    agrinet_route=route_decision.route,
-                    channel=channel,
-                )
-            else:
-                logger.warning(
-                    "No active Langfuse trace id for qid %s; feedback score will be skipped",
-                    telemetry_qid,
-                )
+            await _record_chat_turn(trace_id, telemetry_qid, session_id, route_decision, channel)
 
             deps = FarmerContext(
                 query=query,
@@ -260,14 +271,9 @@ async def stream_chat_messages(
                 fallback_from=route_decision.route if fallback_used else None,
             )
 
-            if trace_id and fallback_used:
-                await write_chat_turn_map(
-                    telemetry_qid,
-                    trace_id=trace_id,
-                    session_id=session_id,
-                    model_name=final_route_decision.model_name,
-                    agrinet_route=final_route_decision.route,
-                    channel=channel,
+            if fallback_used:
+                await _record_chat_turn(
+                    trace_id, telemetry_qid, session_id, final_route_decision, channel
                 )
 
             result = completed_run.result
