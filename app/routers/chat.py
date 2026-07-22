@@ -22,7 +22,7 @@ async def chat_endpoint(
     Requires JWT authentication.
     """
     session_id = request.session_id or str(uuid.uuid4())
-    qid = request.qid or str(uuid.uuid4())
+    qid = str(uuid.uuid4())
     channel = current_user.get("channel", "BharatVistaar")
     authenticated_user = current_user.get("mobile")
     logger.info(
@@ -48,5 +48,9 @@ async def chat_endpoint(
             current_user=current_user,
         ),
         media_type="text/event-stream",
+        headers={
+            "X-QID": qid,
+            "Access-Control-Expose-Headers": "X-QID",
+        },
         background=background_tasks,
     )
