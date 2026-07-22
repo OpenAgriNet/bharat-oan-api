@@ -4,7 +4,7 @@ import uuid
 import base64
 import hashlib
 from datetime import datetime, timezone
-from helpers.utils import get_logger
+from helpers.utils import get_logger, to_ascii_digits
 import httpx
 from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, AnyHttpUrl
@@ -407,8 +407,8 @@ def format_phone_number(phone: str) -> str:
     Returns:
         str: Formatted phone number with +91 prefix
     """
-    # Remove any non-digit characters
-    digits = ''.join(filter(str.isdigit, phone))
+    # Convert local-script digits to ASCII, then remove any remaining non-digit characters
+    digits = ''.join(filter(str.isdigit, to_ascii_digits(phone)))
     
     # Handle different cases
     if len(digits) == 10:  # Just the number
