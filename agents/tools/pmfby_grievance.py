@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 from app.config import DEFAULT_HTTP_TIMEOUT
-from helpers.utils import get_logger
+from helpers.utils import get_logger, to_ascii_digits
 from langfuse import observe
 from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
@@ -60,7 +60,7 @@ def generate_transaction_id(session_id: str, key: str) -> str:
 
 def normalize_phone_for_api(phone: str) -> str:
     """Digits only; 10-digit Indian mobile for BAP (no country code)."""
-    digits = "".join(c for c in str(phone).strip() if c.isdigit())
+    digits = "".join(c for c in to_ascii_digits(phone).strip() if c.isdigit())
     if len(digits) == 12 and digits.startswith("91"):
         return digits[2:]
     if len(digits) == 11 and digits.startswith("0"):
@@ -87,7 +87,7 @@ def _validate_registered_mobile(phone_number: str) -> str:
 
 
 def _validate_otp(otp: str) -> str:
-    otp_str = str(otp).strip() if otp else ""
+    otp_str = to_ascii_digits(otp).strip() if otp else ""
     if not otp_str:
         raise ModelRetry("Invalid OTP. Please provide the 6-digit OTP received via SMS.")
     digits = "".join(c for c in otp_str if c.isdigit())
@@ -758,7 +758,7 @@ def pmfby_submit_grievance(
     """
     try:
         _validate_registered_mobile(phone_number)
-        _require_nonempty(request_year, "Please share the request year.")
+        request_year = to_ascii_digits(_require_nonempty(request_year, "Please share the request year."))
         raw_season = _require_nonempty(request_season, "Please share the request season.")
 
         season_api = _normalize_request_season_for_pmfby_api(raw_season)
@@ -781,6 +781,7 @@ def pmfby_submit_grievance(
 
         if not application_no or not str(application_no).strip():
             raise ModelRetry("Please share your PMFBY application number.")
+        application_no = to_ascii_digits(application_no)
 
         if not grievance_description or len(grievance_description.strip()) < 10:
             raise ModelRetry("Please provide a brief grievance description (at least 10 characters).")

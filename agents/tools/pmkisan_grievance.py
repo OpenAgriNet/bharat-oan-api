@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple, Literal
 import httpx
 from pydantic import BaseModel, Field, AnyUrl, ValidationError
 from pydantic_ai import ModelRetry
-from helpers.utils import get_logger
+from helpers.utils import get_logger, to_ascii_digits
 from helpers.encryption import hex_to_bytes, encrypt_aes_gcm, decrypt_aes_gcm
 from langfuse import observe
 
@@ -191,6 +191,7 @@ def _resolve_identity(identity_no: str, purpose: Literal["create", "status"]) ->
     """
     Returns (registration number, type_field) for PM-KISAN Reg_No flow.
     """
+    identity_no = to_ascii_digits(identity_no)
     if identity_no.isdigit() and len(identity_no) == 12:
         raise ModelRetry(
             "Aadhaar number cannot be used for PM-KISAN grievances. "

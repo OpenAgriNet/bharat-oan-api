@@ -1,7 +1,7 @@
 import uuid
 import json
 from datetime import datetime, timezone
-from helpers.utils import get_logger
+from helpers.utils import get_logger, to_ascii_digits
 import httpx
 from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, AnyHttpUrl, Field
@@ -468,8 +468,8 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str =
     Returns:
         str: Response from the scheme status check service
     """
-    # Normalize inputs: strip spaces, uppercase, and ensure correct field based on format
-    input_val = (reg_no or phone_number).strip().upper().replace(" ", "")
+    # Normalize inputs: convert local-script digits, strip spaces, uppercase, and ensure correct field based on format
+    input_val = to_ascii_digits(reg_no or phone_number).strip().upper().replace(" ", "")
     
     if not input_val:
         return "Please provide either a PM Kisan registration number or a registered phone number to check the status."
@@ -559,8 +559,8 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
     Returns:
         str: Detailed scheme status information including beneficiary details, payment status, and any issues or next steps
     """
-    # Normalize inputs: strip spaces, uppercase, and ensure correct field based on format
-    input_val = (reg_no or phone_number).strip().upper().replace(" ", "")
+    # Normalize inputs: convert local-script digits, strip spaces, uppercase, and ensure correct field based on format
+    input_val = to_ascii_digits(reg_no or phone_number).strip().upper().replace(" ", "")
     
     if not input_val:
         return "Please provide either a PM Kisan registration number or a registered phone number to check the status."
@@ -575,7 +575,7 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
 
     try:
         # Validate OTP format - must be exactly 4 digits
-        otp_clean = str(otp).strip()
+        otp_clean = to_ascii_digits(otp).strip()
         if not otp_clean.isdigit() or len(otp_clean) != 4:
             raise ModelRetry("Invalid OTP format. Please provide a 4-digit OTP received via SMS.")
         # Get session_id from context
