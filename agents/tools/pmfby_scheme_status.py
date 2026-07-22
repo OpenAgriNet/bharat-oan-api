@@ -1,7 +1,7 @@
 import uuid
 import json
 from datetime import datetime, timezone
-from helpers.utils import get_logger
+from helpers.utils import get_logger, to_ascii_digits
 import httpx
 from app.config import DEFAULT_HTTP_TIMEOUT
 from pydantic import BaseModel, AnyHttpUrl
@@ -23,7 +23,7 @@ def generate_transaction_id(session_id: str, key: str) -> str:
 
 def normalize_phone_for_api(phone: str) -> str:
     """Strip to digits only. BAP expects 10-digit Indian number (no country code), e.g. 9953947674."""
-    digits = "".join(c for c in str(phone).strip() if c.isdigit())
+    digits = "".join(c for c in to_ascii_digits(phone).strip() if c.isdigit())
     if len(digits) == 12 and digits.startswith("91"):
         return digits[2:]
     if len(digits) == 11 and digits.startswith("0"):
@@ -583,7 +583,7 @@ def check_pmfby_status_with_otp(
         str: Detailed scheme status information
     """
     try:
-        otp_str = str(otp).strip() if otp else ""
+        otp_str = to_ascii_digits(otp).strip() if otp else ""
         if not otp_str:
             raise ModelRetry("Invalid OTP. Please provide the OTP received via SMS.")
         # PMFBY OTP is 6 digits only

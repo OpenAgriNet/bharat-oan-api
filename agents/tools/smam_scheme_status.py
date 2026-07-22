@@ -17,7 +17,7 @@ from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 from app.config import DEFAULT_HTTP_TIMEOUT
 from agents.deps import FarmerContext
 from helpers.langfuse_tracing import lf_update_current_observation
-from helpers.utils import get_logger
+from helpers.utils import get_logger, to_ascii_digits
 from pydantic_ai.tools import RunContext
 
 logger = get_logger(__name__)
@@ -235,7 +235,7 @@ def _strip_leading_country_or_zero(digits: str) -> str:
 
 
 def _normalize_search_value(search_type: SmamSearchType, raw: str) -> str:
-    v = raw.strip()
+    v = to_ascii_digits(raw).strip()
     if not v:
         raise ValueError("Search value cannot be empty.")
 

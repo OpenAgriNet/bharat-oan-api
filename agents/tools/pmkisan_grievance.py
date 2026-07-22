@@ -24,7 +24,7 @@ from agents.tools.pmkisan_scheme_status import (
 )
 from langfuse import observe
 from helpers.langfuse_tracing import lf_update_current_observation
-from helpers.utils import get_logger
+from helpers.utils import get_logger, to_ascii_digits
 
 logger = get_logger(__name__)
 
@@ -455,7 +455,7 @@ async def _request_pm_kisan_otp(
     if not BAP_ENDPOINT:
         raise ModelRetry(_BAP_ENDPOINT_NOT_CONFIGURED_MSG)
 
-    reg_no_clean = reg_no.strip()
+    reg_no_clean = to_ascii_digits(reg_no).strip()
     transaction_id = _generate_pm_kisan_otp_transaction_id(ctx.deps.session_id, reg_no_clean)
     lf_update_current_observation(
         metadata={"tool": "pmkisan_grievance.send_otp", "transaction_id": transaction_id}
@@ -490,14 +490,14 @@ async def _verify_pm_kisan_otp(
     otp: str,
     phone_number: str,
 ) -> Optional[str]:
-    otp_clean = str(otp).strip()
+    otp_clean = to_ascii_digits(otp).strip()
     if not otp_clean.isdigit() or len(otp_clean) != 4:
         return "Invalid OTP format. Please provide the 4-digit OTP received via SMS."
 
     if not BAP_ENDPOINT:
         raise ModelRetry(_BAP_ENDPOINT_NOT_CONFIGURED_MSG)
 
-    reg_no_clean = reg_no.strip()
+    reg_no_clean = to_ascii_digits(reg_no).strip()
     transaction_id = _generate_pm_kisan_otp_transaction_id(ctx.deps.session_id, reg_no_clean)
     lf_update_current_observation(
         metadata={"tool": "pmkisan_grievance.verify_otp", "transaction_id": transaction_id}
@@ -506,7 +506,7 @@ async def _verify_pm_kisan_otp(
         reg_no_clean,
         otp_clean,
         transaction_id,
-        phone_number.strip() if phone_number else "",
+        to_ascii_digits(phone_number).strip() if phone_number else "",
         session_id=ctx.deps.session_id,
         question_id=ctx.deps.question_id,
     )
@@ -699,13 +699,13 @@ def _validate_submit_grievance_inputs(
     """Return (identifier_value, reg_no_clean) or raise ModelRetry."""
     if not reg_no or not reg_no.strip():
         raise ModelRetry("Please provide the PM-KISAN Registration Number.")
-    identifier_value = reg_no.strip()
+    identifier_value = to_ascii_digits(reg_no).strip()
     if not grievance_type or grievance_type not in GRIEVANCE_MAPPING:
         choices = '", "'.join(GRIEVANCE_TYPES)
         raise ModelRetry(f'Invalid grievance type: "{grievance_type}". Please select from: "{choices}".')
     if not grievance_description or len(grievance_description.strip()) < 10:
         raise ModelRetry("Please provide a brief grievance description (at least 10 characters).")
-    reg_no_clean = reg_no.strip()
+    reg_no_clean = identifier_value
     if not otp or not str(otp).strip():
         raise ModelRetry(
             "OTP verification is required before submitting a grievance. "
@@ -735,7 +735,7 @@ async def _submit_grievance_init_request(
         identifier_type=identifier_type,
         grievance_type_code=GRIEVANCE_MAPPING[grievance_type],
         grievance_description=grievance_description.strip(),
-        phone=phone_number.strip() if phone_number else "",
+        phone=to_ascii_digits(phone_number).strip() if phone_number else "",
         session_id=ctx.deps.session_id,
         question_id=ctx.deps.question_id,
     )
@@ -790,7 +790,7 @@ async def pmkisan_grievance_send_otp(
             raise ModelRetry("Please provide the PM-KISAN Registration Number to send OTP.")
 
         purpose_text = "submit the grievance" if purpose == "submit_grievance" else "check grievance status"
-        return await _request_pm_kisan_otp(ctx, reg_no.strip(), phone_number, purpose_text)
+        return await _request_pm_kisan_otp(ctx, to_ascii_digits(reg_no).strip(), phone_number, purpose_text)
 
     except httpx.TimeoutException:
         logger.error("PM-KISAN grievance OTP request timed out.")
@@ -890,10 +890,10 @@ async def pmkisan_grievance_status(
                 "Please provide the PM-KISAN Registration Number to check grievance status."
             )
 
-        identifier_value = reg_no.strip()
+        identifier_value = to_ascii_digits(reg_no).strip()
         identifier_type: Literal["reg-number"] = "reg-number"
 
-        reg_no_clean = reg_no.strip()
+        reg_no_clean = identifier_value
         if not otp or not str(otp).strip():
             raise ModelRetry(
                 "OTP verification is required before checking grievance status. "
