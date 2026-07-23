@@ -16,6 +16,7 @@ from langfuse import observe
 from helpers.utils import get_logger
 from agents.deps import FarmerContext
 from app.core.npss_geocodes import resolve_npss_location_ids
+from app.core.npss_followup import NPSS_LOCATION_REQUIRED_MARKER
 from app.core.cache import cache
 from app.core.image_storage import mark_processed, cleanup_image
 
@@ -268,6 +269,10 @@ def _extract_image_id_from_url(image_url: str) -> Optional[str]:
 async def analyze_crop_image(
     ctx: RunContext[FarmerContext],
     image_url: str,
+    state: Optional[str] = None,
+    district: Optional[str] = None,
+    sub_district: Optional[str] = None,
+    village: Optional[str] = None,
 ) -> str:
     """
     Analyze a crop image for pests or diseases using the National Pest Surveillance System (NPSS).
@@ -277,9 +282,17 @@ async def analyze_crop_image(
 
     Args:
         image_url: The URL of the uploaded crop image. This is REQUIRED.
+        state: Farmer-provided state name. Use only when a previous call requested location details.
+        district: Farmer-provided district name. Use only when a previous call requested location details.
+        sub_district: Farmer-provided sub-district, tehsil, or taluka name.
+        village: Farmer-provided village name.
     Returns:
         str: Diagnosis result from NPSS including pest name, crop, pathogen class, and description.
         Do NOT call `search_pests_diseases` automatically after this tool.
+
+    If a previous call asked for location details, call this tool again with the
+    same image_url and all four location names collected from the conversation.
+    Never invent a location name or an NPSS location ID.
     """
     if not image_url or not image_url.strip():
         return (
@@ -294,15 +307,23 @@ async def analyze_crop_image(
     longitude = ctx.deps.longitude
 
     token = await _get_cached_npss_token()
-    geo = await resolve_npss_location_ids(latitude, longitude, bearer_token=token) or {}
+    geo = await resolve_npss_location_ids(
+        latitude,
+        longitude,
+        bearer_token=token,
+        state=state,
+        district=district,
+        sub_district=sub_district,
+        village=village,
+    ) or {}
     state_id = geo.get("state_id")
     district_id = geo.get("district_id")
     sub_district_id = geo.get("sub_district_id")
     village_id = geo.get("village_id")
     if not all((state_id, district_id, sub_district_id, village_id)):
-        logger.error(
-            "NPSS submission skipped because the complete master hierarchy could not be resolved: "
-            "state=%s district=%s subdistrict=%s village=%s lat=%s lon=%s",
+        logger.info(
+            "NPSS analysis is waiting for farmer location details: "
+            "state_id=%s district_id=%s subdistrict_id=%s village_id=%s lat=%s lon=%s",
             state_id,
             district_id,
             sub_district_id,
@@ -310,9 +331,30 @@ async def analyze_crop_image(
             latitude,
             longitude,
         )
+        supplied_location = {
+            "state": state,
+            "district": district,
+            "sub-district/tehsil": sub_district,
+            "village": village,
+        }
+        missing = [label for label, value in supplied_location.items() if not value]
+        ctx.deps.mark_npss_location_required(
+            missing,
+            needs_confirmation=not missing,
+        )
+        if missing:
+            detail_request = "Please ask the farmer for: " + ", ".join(missing) + "."
+        else:
+            detail_request = (
+                "Please ask the farmer to confirm the official state, district, "
+                "sub-district/tehsil, and village names, including their spellings."
+            )
         return (
-            "The crop image could not be submitted to NPSS because its required village master "
-            "location could not be verified for the supplied coordinates."
+            f"{NPSS_LOCATION_REQUIRED_MARKER}\n"
+            f"[IMAGE_URL: {image_url}]\n"
+            "The image is saved and ready for NPSS analysis. "
+            f"{detail_request} Once provided, call `analyze_crop_image` again with this same "
+            "image URL and all four names. Do not describe this as an analysis failure."
         )
 
     # Download image from URL
