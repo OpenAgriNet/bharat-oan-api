@@ -194,6 +194,78 @@ def test_farmer_location_falls_back_when_coordinates_are_incomplete(monkeypatch)
     assert calls == [(0.0, 0.0), (28.5648, 76.9822)]
 
 
+def test_typed_location_fills_ids_but_preserves_browser_coordinates(monkeypatch):
+    calls = []
+
+    async def fake_master_lookup(latitude, longitude, *, bearer_token):
+        del bearer_token
+        calls.append((latitude, longitude))
+        if len(calls) == 1:
+            return {"state_id": "9"}
+        return {
+            "state_id": "9",
+            "district_id": "172",
+            "sub_district_id": "1868",
+            "village_id": "65534",
+        }
+
+    async def fake_forward_geocode(location):
+        assert location == "Rewla Khanpur, Delhi"
+        return [(28.5648, 76.9822)]
+
+    monkeypatch.setattr(npss_geocodes, "_resolve_from_master_apis", fake_master_lookup)
+    monkeypatch.setattr(npss_geocodes, "_forward_geocode_coordinates", fake_forward_geocode)
+
+    result = asyncio.run(
+        npss_geocodes.resolve_npss_location_ids(
+            28.6307647223,
+            77.0899123838,
+            bearer_token="token",
+            location="Rewla Khanpur, Delhi",
+        )
+    )
+
+    assert result == {
+        "state_id": "9",
+        "district_id": "172",
+        "sub_district_id": "1868",
+        "village_id": "65534",
+        "latitude": 28.6307647223,
+        "longitude": 77.0899123838,
+    }
+    assert calls == [(28.6307647223, 77.0899123838), (28.5648, 76.9822)]
+
+
+def test_unresolved_typed_location_does_not_replace_browser_coordinates(monkeypatch):
+    calls = []
+
+    async def fake_master_lookup(latitude, longitude, *, bearer_token):
+        del bearer_token, longitude
+        calls.append(latitude)
+        if len(calls) == 1:
+            return {"state_id": "9"}
+        return {"state_id": "9", "district_id": "163"}
+
+    async def fake_forward_geocode(location):
+        assert location == "110058"
+        return [(28.6398522, 77.2130306)]
+
+    monkeypatch.setattr(npss_geocodes, "_resolve_from_master_apis", fake_master_lookup)
+    monkeypatch.setattr(npss_geocodes, "_forward_geocode_coordinates", fake_forward_geocode)
+
+    result = asyncio.run(
+        npss_geocodes.resolve_npss_location_ids(
+            28.6307647223,
+            77.0899123838,
+            bearer_token="token",
+            location="110058",
+        )
+    )
+
+    assert result == {"state_id": "9"}
+    assert calls == [28.6307647223, 28.6398522]
+
+
 def test_ambiguous_location_does_not_choose_between_two_hierarchies(monkeypatch):
     async def fake_forward_geocode(location):
         assert location == "Rampur"
