@@ -317,7 +317,8 @@ async def analyze_crop_image(
     village_id = geo.get("village_id")
     effective_latitude = geo.get("latitude", latitude)
     effective_longitude = geo.get("longitude", longitude)
-    if effective_latitude is None or effective_longitude is None:
+    has_farmer_location = bool(str(location or "").strip())
+    if (effective_latitude is None or effective_longitude is None) and not has_farmer_location:
         logger.info(
             "NPSS analysis is waiting for one geocodable farmer location: "
             "state_id=%s district_id=%s subdistrict_id=%s village_id=%s lat=%s lon=%s location=%s",
@@ -343,6 +344,12 @@ async def analyze_crop_image(
             "The image is saved and ready for NPSS analysis. "
             f"{detail_request} Once provided, call `analyze_crop_image` again with this same "
             "image URL and one location string. Do not describe this as an analysis failure."
+        )
+    if effective_latitude is None or effective_longitude is None:
+        logger.warning(
+            "Farmer supplied location %r but it did not geocode; submitting to NPSS without "
+            "asking again to avoid a location loop.",
+            location,
         )
 
     # Download image from URL

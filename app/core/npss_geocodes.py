@@ -616,6 +616,12 @@ async def resolve_npss_location_ids(
     first_geocoded_result: Optional[dict[str, Any]] = None
     seen_hierarchies: set[tuple[str, str, str, str]] = set()
     for candidate_latitude, candidate_longitude in candidates:
+        geocoded_result: dict[str, Any] = {
+            "latitude": candidate_latitude,
+            "longitude": candidate_longitude,
+        }
+        if first_geocoded_result is None:
+            first_geocoded_result = geocoded_result
         try:
             result = await _resolve_from_master_apis(
                 candidate_latitude,
@@ -632,13 +638,7 @@ async def resolve_npss_location_ids(
             )
             continue
 
-        geocoded_result = {
-            **(result or {}),
-            "latitude": candidate_latitude,
-            "longitude": candidate_longitude,
-        }
-        if first_geocoded_result is None:
-            first_geocoded_result = geocoded_result
+        geocoded_result.update(result or {})
         if not result or not all(
             result.get(key)
             for key in ("state_id", "district_id", "sub_district_id", "village_id")
