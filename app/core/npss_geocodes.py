@@ -595,9 +595,20 @@ async def resolve_npss_location_ids(
     bearer_token: Optional[str] = None,
     location: Optional[str] = None,
 ) -> Optional[dict]:
-    """Resolve NPSS IDs, prioritizing browser coordinates over a single place name."""
+    """Resolve NPSS IDs, prioritizing browser coordinates over a single place name.
+
+    A typed place may fill missing NPSS IDs, but a valid browser coordinate is
+    retained as the effective latitude/longitude for the image request.
+    """
+    coordinates_provided = latitude is not None and longitude is not None
+    # A (0, 0) pair is the historical sentinel used when browser geolocation
+    # was unavailable. It must not prevent a legitimate typed-location fallback
+    # from supplying coordinates.
+    browser_coordinates_are_authoritative = coordinates_provided and not (
+        float(latitude) == 0.0 and float(longitude) == 0.0
+    )
     coordinate_result: Optional[dict] = None
-    if latitude is not None and longitude is not None:
+    if coordinates_provided:
         try:
             coordinate_result = await _resolve_from_master_apis(
                 latitude,
@@ -667,7 +678,26 @@ async def resolve_npss_location_ids(
                 "Farmer location matched multiple NPSS hierarchies; using Photon's top-ranked complete result: %r",
                 location,
             )
-        logger.info("Resolved NPSS hierarchy from one farmer location: %s", complete_results[0])
-        return complete_results[0]
+        selected_result = complete_results[0]
+        if browser_coordinates_are_authoritative:
+            # Typed place names may fill missing NPSS IDs, but they must never
+            # replace the coordinates supplied by the browser. The original
+            # coordinates are the strongest location signal and are what NPSS
+            # should receive for the image.
+            selected_result["latitude"] = latitude
+            selected_result["longitude"] = longitude
+            logger.info(
+                "Resolved NPSS hierarchy from one farmer location while retaining "
+                "browser coordinates: %s",
+                selected_result,
+            )
+        else:
+            logger.info("Resolved NPSS hierarchy from one farmer location: %s", selected_result)
+        return selected_result
     logger.warning("Farmer location did not resolve to a complete NPSS hierarchy: %r", location)
+    if browser_coordinates_are_authoritative:
+        # Never return the first forward-geocoded coordinate when browser
+        # coordinates exist. That coordinate may be a bad postcode/place hit;
+        # keep the original partial master result and its browser context.
+        return coordinate_result
     return first_geocoded_result or coordinate_result
