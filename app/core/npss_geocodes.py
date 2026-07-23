@@ -117,6 +117,23 @@ def _location_candidates(props: dict[str, Any], *keys: str) -> list[str]:
     return values
 
 
+def _all_reverse_geocode_properties(props: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the primary Photon result followed by valid nearby results."""
+    return [props, *(item for item in props.get("_nearby", []) if isinstance(item, dict))]
+
+
+def _location_candidates_from_sources(
+    sources: list[dict[str, Any]],
+    *keys: str,
+) -> list[str]:
+    candidates: list[str] = []
+    for source in sources:
+        for candidate in _location_candidates(source, *keys):
+            if candidate not in candidates:
+                candidates.append(candidate)
+    return candidates
+
+
 def _village_candidates(props: dict[str, Any]) -> list[str]:
     candidates = _location_candidates(
         props,
@@ -221,10 +238,14 @@ async def _resolve_from_master_apis(
     if not props:
         return None
 
+    reverse_sources = _all_reverse_geocode_properties(props)
     state_rows = await _fetch_master_rows("States", bearer_token=bearer_token)
     state_row = _pick_best_row(
         state_rows,
-        _location_candidates(props, "state"),
+        # Some Photon results (notably Delhi localities) put the state only on a
+        # nearby address feature. Including city is safe because the NPSS master
+        # still has to contain one unique exact match.
+        _location_candidates_from_sources(reverse_sources, "state", "city"),
         ("stateName", "state", "name"),
     )
     state_id = _extract_id(state_row or {}, ("stateId", "state_id", "id"))
@@ -233,15 +254,26 @@ async def _resolve_from_master_apis(
         return None
 
     district_rows = await _fetch_master_rows("Districts", bearer_token=bearer_token, params={"stateId": state_id})
-    admin_source = props
-    if not props.get("county"):
-        admin_source = next(
-            (item for item in props.get("_nearby", []) if item.get("county")),
-            props,
-        )
-    sub_district_candidates = _location_candidates(admin_source, "county")
-
-    district_candidates = _location_candidates(admin_source, "state_district")
+    # Photon is not consistent across India: administrative levels may be
+    # emitted as state_district/county or as district/name on nearby boundary
+    # features. NPSS exact master matching remains the final authority.
+    district_candidates = _location_candidates_from_sources(
+        reverse_sources,
+        "state_district",
+        "district",
+    )
+    sub_district_candidates = _location_candidates_from_sources(
+        reverse_sources,
+        "county",
+        "district",
+    )
+    sub_district_candidates.extend(
+        candidate
+        for source in reverse_sources
+        if source.get("osm_value") == "administrative" or source.get("type") == "district"
+        for candidate in _location_candidates(source, "name")
+        if candidate not in sub_district_candidates
+    )
     direct_district = _pick_best_row(
         district_rows,
         district_candidates,
@@ -437,17 +469,130 @@ async def _resolve_from_master_apis(
     return result
 
 
+async def _resolve_from_location_names(
+    *,
+    state: Optional[str],
+    district: Optional[str],
+    sub_district: Optional[str],
+    village: Optional[str],
+    bearer_token: Optional[str],
+) -> Optional[dict]:
+    """Resolve farmer-provided location names against the NPSS master hierarchy."""
+    if not bearer_token or not all((state, district, sub_district, village)):
+        return None
+
+    state_rows = await _fetch_master_rows("States", bearer_token=bearer_token)
+    state_row = _pick_best_row(state_rows, [state], ("stateName", "state", "name"))
+    state_id = _extract_id(state_row or {}, ("stateId", "state_id", "id"))
+    if not state_id:
+        logger.warning("Farmer-provided NPSS state could not be verified: %s", state)
+        return None
+
+    district_rows = await _fetch_master_rows(
+        "Districts",
+        bearer_token=bearer_token,
+        params={"stateId": state_id},
+    )
+    district_row = _pick_best_row(
+        district_rows,
+        [district],
+        ("districtName", "district", "name"),
+    )
+    district_id = _extract_id(district_row or {}, ("districtId", "district_id", "id"))
+    if not district_id:
+        logger.warning(
+            "Farmer-provided NPSS district could not be verified: state=%s district=%s",
+            state,
+            district,
+        )
+        return None
+
+    subdistrict_rows = await _fetch_master_rows(
+        "SubDistricts",
+        bearer_token=bearer_token,
+        params={"stateId": state_id, "districtId": district_id},
+    )
+    subdistrict_row = _pick_best_row(
+        subdistrict_rows,
+        [sub_district],
+        ("subDistrictName", "subdistrictName", "sub_district_name", "name"),
+    )
+    subdistrict_id = _extract_id(
+        subdistrict_row or {},
+        ("subDistrictId", "subdistrictId", "sub_district_id", "id"),
+    )
+    if not subdistrict_id:
+        logger.warning(
+            "Farmer-provided NPSS subdistrict could not be verified: state=%s district=%s subdistrict=%s",
+            state,
+            district,
+            sub_district,
+        )
+        return None
+
+    village_rows = await _fetch_master_rows(
+        "Vilages",
+        bearer_token=bearer_token,
+        params={
+            "stateId": state_id,
+            "districtId": district_id,
+            "subDistrictId": subdistrict_id,
+        },
+    )
+    village_row = _pick_best_row(village_rows, [village], ("villageName", "village", "name"))
+    village_id = _extract_id(village_row or {}, ("villageId", "village_id", "id"))
+    if not village_id:
+        logger.warning(
+            "Farmer-provided NPSS village could not be verified: state=%s district=%s subdistrict=%s village=%s",
+            state,
+            district,
+            sub_district,
+            village,
+        )
+        return None
+
+    result = {
+        "state_id": state_id,
+        "district_id": district_id,
+        "sub_district_id": subdistrict_id,
+        "village_id": village_id,
+    }
+    logger.info("Resolved NPSS hierarchy from farmer-provided location names: %s", result)
+    return result
+
+
 async def resolve_npss_location_ids(
     latitude: Optional[float],
     longitude: Optional[float],
     *,
     bearer_token: Optional[str] = None,
+    state: Optional[str] = None,
+    district: Optional[str] = None,
+    sub_district: Optional[str] = None,
+    village: Optional[str] = None,
 ) -> Optional[dict]:
+    coordinate_result: Optional[dict] = None
     try:
-        master_result = await _resolve_from_master_apis(latitude, longitude, bearer_token=bearer_token)
-        if master_result:
-            return master_result
+        coordinate_result = await _resolve_from_master_apis(latitude, longitude, bearer_token=bearer_token)
+        if coordinate_result and all(
+            coordinate_result.get(key)
+            for key in ("state_id", "district_id", "sub_district_id", "village_id")
+        ):
+            return coordinate_result
     except Exception as exc:
         logger.warning("NPSS background master lookup failed: %s", exc)
 
-    return None
+    try:
+        named_result = await _resolve_from_location_names(
+            state=state,
+            district=district,
+            sub_district=sub_district,
+            village=village,
+            bearer_token=bearer_token,
+        )
+        if named_result:
+            return named_result
+    except Exception as exc:
+        logger.warning("NPSS farmer-provided location lookup failed: %s", exc)
+
+    return coordinate_result

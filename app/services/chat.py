@@ -19,6 +19,7 @@ from agents.models import (
 )
 from agents.moderation import moderation_agent
 from app.config import settings
+from app.core.npss_followup import build_npss_location_request, find_pending_npss_image_url
 from app.services.agrinet_routing import (
     AgrinetRouteDecision,
     get_alternate_agrinet_route,
@@ -154,8 +155,19 @@ def _wrap_image_analysis_message(
     base_user_message: str,
     latitude: Optional[float],
     longitude: Optional[float],
+    pending_npss_image_url: Optional[str] = None,
 ) -> str:
-    if latitude is not None and longitude is not None:
+    if pending_npss_image_url:
+        location_instruction = (
+            "A previous NPSS call saved this image and requested location details. "
+            f"The pending image URL is {pending_npss_image_url}. "
+            "If the user's current message provides any requested location information, "
+            "collect the state, district, sub-district/tehsil, and village from this message "
+            "and recent conversation history, then call `analyze_crop_image` again with the "
+            "pending image URL and every location name collected so far. Never invent missing "
+            "names or IDs. If one or more names are still missing, ask only for those names."
+        )
+    elif latitude is not None and longitude is not None:
         location_instruction = (
             f"Browser coordinates are available for this image upload "
             f"(latitude={latitude}, longitude={longitude}). "
@@ -184,7 +196,9 @@ def _wrap_image_analysis_message(
         f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
         f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
         f"If the tool returns multiple findings, show only the most relevant one. "
-        f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
+        f"If the tool returns `[NPSS_LOCATION_REQUIRED]`, do not present an analysis result; "
+        f"ask the farmer for the requested location names in the Selected Language and explain that the image is saved. "
+        f"Otherwise, do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
     )
 
 
@@ -195,10 +209,16 @@ def _build_user_message(
     is_image_analysis: bool,
     latitude: Optional[float],
     longitude: Optional[float],
+    pending_npss_image_url: Optional[str] = None,
 ) -> str:
     base_user_message = deps.get_user_message()
-    if is_image_analysis:
-        base_user_message = _wrap_image_analysis_message(base_user_message, latitude, longitude)
+    if is_image_analysis or pending_npss_image_url:
+        base_user_message = _wrap_image_analysis_message(
+            base_user_message,
+            latitude,
+            longitude,
+            pending_npss_image_url,
+        )
     return f"{last_response}{base_user_message}"
 
 
@@ -291,6 +311,7 @@ async def stream_chat_messages(
 
             message_pairs = "\n\n".join(format_message_pairs(history, 3))
             logger.info("Message pairs: %s", message_pairs)
+            pending_npss_image_url = find_pending_npss_image_url(history)
             last_response = (
                 f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
             )
@@ -301,6 +322,7 @@ async def stream_chat_messages(
                 is_image_analysis=is_image_analysis,
                 latitude=latitude,
                 longitude=longitude,
+                pending_npss_image_url=pending_npss_image_url,
             )
 
             moderation_data = await _run_moderation(user_message, session_id)
@@ -312,6 +334,7 @@ async def stream_chat_messages(
                 is_image_analysis=is_image_analysis,
                 latitude=latitude,
                 longitude=longitude,
+                pending_npss_image_url=pending_npss_image_url,
             )
 
             trimmed_history = trim_history(history, max_tokens=64_000)
@@ -319,6 +342,7 @@ async def stream_chat_messages(
             trimmed_history = filter_thinking_from_history(trimmed_history)
 
             chunk_queue: asyncio.Queue[str | None] = asyncio.Queue()
+            defer_npss_output = bool(is_image_analysis or pending_npss_image_url)
             with propagate_attributes(tags=[moderation_data.category]):
                 agrinet_task = asyncio.create_task(
                     _run_agrinet_with_failover_streaming(
@@ -336,7 +360,8 @@ async def stream_chat_messages(
                     chunk = await chunk_queue.get()
                     if chunk is None:
                         break
-                    yield chunk
+                    if not defer_npss_output:
+                        yield chunk
 
                 completed_run, final_route_decision, fallback_used = await agrinet_task
 
@@ -352,11 +377,20 @@ async def stream_chat_messages(
                 )
 
             result = completed_run.result
-            output_text = post_process_npss_response(
-                text=completed_run.output_text,
-                target_lang=target_lang,
-                npss_used=deps.npss_used,
-            )
+            if deps.npss_location_required:
+                output_text = build_npss_location_request(
+                    target_lang,
+                    deps.npss_missing_location_fields,
+                    needs_confirmation=deps.npss_location_needs_confirmation,
+                )
+            else:
+                output_text = post_process_npss_response(
+                    text=completed_run.output_text,
+                    target_lang=target_lang,
+                    npss_used=deps.npss_used,
+                )
+            if defer_npss_output:
+                yield output_text
             new_messages = result.new_messages()
             logger.info(
                 "Agent run complete for session %s via route %s (%s)",
