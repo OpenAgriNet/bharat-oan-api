@@ -305,8 +305,11 @@ def _wrap_image_analysis_message(
             "If the user's current message provides any requested location information, "
             "collect the state, district, sub-district/tehsil, and village from this message "
             "and recent conversation history, then call `analyze_crop_image` again with the "
-            "pending image URL and every location name collected so far. Never invent missing "
-            "names or IDs. If one or more names are still missing, ask only for those names."
+            "pending image URL and every location name collected so far. When names are written "
+            "in a non-English language or script, translate or transliterate those same names "
+            "into English tool arguments for NPSS lookup; do not ask the user to repeat them in "
+            "English. Never invent missing names or IDs. If one or more names are still missing, "
+            "ask only for those names."
         )
     elif latitude is not None and longitude is not None:
         location_instruction = (

@@ -44,18 +44,18 @@ DELHI_PROPS = {
 async def _fake_master_rows(endpoint, *, bearer_token, params=None):
     del bearer_token
     rows = {
-        "States": [{"stateId": "7", "stateName": "Delhi"}],
-        "Districts": [{"districtId": "97", "districtName": "South West Delhi"}],
-        "SubDistricts": [{"subDistrictId": "453", "subDistrictName": "Kapashera"}],
-        "Vilages": [{"villageId": "64099", "villageName": "Rewla Khanpur"}],
+        "States": [{"stateId": "9", "stateName": "Delhi"}],
+        "Districts": [{"districtId": "172", "districtName": "South West"}],
+        "SubDistricts": [{"subDistrictId": "1868", "subDistrictName": "Kapeshera"}],
+        "Vilages": [{"villageId": "65534", "villageName": "Rewla Kham Pur"}],
     }
     assert endpoint in rows
     if endpoint == "Districts":
-        assert params == {"stateId": "7"}
+        assert params == {"stateId": "9"}
     elif endpoint == "SubDistricts":
-        assert params == {"stateId": "7", "districtId": "97"}
+        assert params == {"stateId": "9", "districtId": "172"}
     elif endpoint == "Vilages":
-        assert params == {"stateId": "7", "districtId": "97", "subDistrictId": "453"}
+        assert params == {"stateId": "9", "districtId": "172", "subDistrictId": "1868"}
     return rows[endpoint]
 
 
@@ -76,10 +76,10 @@ def test_resolves_delhi_when_photon_admin_fields_are_split_across_nearby_results
     )
 
     assert result == {
-        "state_id": "7",
-        "district_id": "97",
-        "sub_district_id": "453",
-        "village_id": "64099",
+        "state_id": "9",
+        "district_id": "172",
+        "sub_district_id": "1868",
+        "village_id": "65534",
     }
 
 
@@ -99,11 +99,104 @@ def test_resolves_farmer_provided_location_names_against_master_hierarchy(monkey
     )
 
     assert result == {
-        "state_id": "7",
-        "district_id": "97",
-        "sub_district_id": "453",
-        "village_id": "64099",
+        "state_id": "9",
+        "district_id": "172",
+        "sub_district_id": "1868",
+        "village_id": "65534",
     }
+
+
+def test_verified_matching_handles_parent_suffix_and_unique_spelling_drift():
+    district = npss_geocodes._pick_verified_row(
+        [{"districtId": "172", "districtName": "South West"}],
+        ["South West Delhi District"],
+        ("districtName", "name"),
+        parent_names=["Delhi"],
+    )
+    subdistrict = npss_geocodes._pick_verified_row(
+        [
+            {"subDistrictId": "1868", "subDistrictName": "Kapeshera"},
+            {"subDistrictId": "1869", "subDistrictName": "Najafgarh"},
+        ],
+        ["Kapashera Tehsil"],
+        ("subDistrictName", "name"),
+        similarity_threshold=0.84,
+    )
+
+    assert district == {"districtId": "172", "districtName": "South West"}
+    assert subdistrict == {"subDistrictId": "1868", "subDistrictName": "Kapeshera"}
+
+
+def test_verified_matching_rejects_a_close_ambiguous_location():
+    match = npss_geocodes._pick_verified_row(
+        [
+            {"villageId": "1", "villageName": "Rampur Kalan"},
+            {"villageId": "2", "villageName": "Rampur Khurd"},
+        ],
+        ["Rampur"],
+        ("villageName", "name"),
+        similarity_threshold=0.5,
+    )
+
+    assert match is None
+
+
+def test_duplicate_subdistrict_names_are_disambiguated_by_village(monkeypatch):
+    async def duplicate_master_rows(endpoint, *, bearer_token, params=None):
+        del bearer_token
+        if endpoint == "States":
+            return [{"stateId": "9", "stateName": "Delhi"}]
+        if endpoint == "Districts":
+            return [{"districtId": "172", "districtName": "South West"}]
+        if endpoint == "SubDistricts":
+            return [
+                {"subDistrictId": "1867", "subDistrictName": "Dwarka"},
+                {"subDistrictId": "7321", "subDistrictName": "Dwarka"},
+            ]
+        if endpoint == "Vilages" and params["subDistrictId"] == "1867":
+            return [{"villageId": "10", "villageName": "Amber Hai"}]
+        if endpoint == "Vilages" and params["subDistrictId"] == "7321":
+            return [{"villageId": "11", "villageName": "Bamnoli"}]
+        raise AssertionError((endpoint, params))
+
+    monkeypatch.setattr(npss_geocodes, "_fetch_master_rows", duplicate_master_rows)
+
+    result = asyncio.run(
+        npss_geocodes.resolve_npss_location_ids(
+            None,
+            None,
+            bearer_token="token",
+            state="Delhi",
+            district="South West Delhi",
+            sub_district="Dwarka",
+            village="Amberhai",
+        )
+    )
+
+    assert result == {
+        "state_id": "9",
+        "district_id": "172",
+        "sub_district_id": "1867",
+        "village_id": "10",
+    }
+
+
+def test_wrong_village_is_not_forced_to_nearest_master_match(monkeypatch):
+    monkeypatch.setattr(npss_geocodes, "_fetch_master_rows", _fake_master_rows)
+
+    result = asyncio.run(
+        npss_geocodes.resolve_npss_location_ids(
+            None,
+            None,
+            bearer_token="token",
+            state="Delhi",
+            district="South West Delhi",
+            sub_district="Kapashera",
+            village="Completely Different Village",
+        )
+    )
+
+    assert result is None
 
 
 def test_finds_pending_npss_image_url_from_tool_history():
