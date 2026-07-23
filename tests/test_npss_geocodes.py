@@ -448,6 +448,58 @@ def test_image_analysis_uses_forward_geocoded_coordinates_for_npss(monkeypatch):
     assert "**NPSS Analysis Result**" in result
 
 
+def test_image_analysis_uses_zero_village_for_verified_urban_hierarchy(monkeypatch):
+    captured = {}
+
+    async def fake_token():
+        return "token"
+
+    async def resolved_without_village(*args, **kwargs):
+        assert args == (28.6307647223, 77.0899123838)
+        assert kwargs == {"bearer_token": "token", "location": None}
+        return {
+            "state_id": "9",
+            "district_id": "173",
+            "sub_district_id": "7323",
+        }
+
+    async def fake_download(image_url):
+        assert image_url == "https://example.test/cotton.jpg"
+        return b"\xff\xd8\xffimage", "image/jpeg"
+
+    async def fake_analyze(**kwargs):
+        captured.update(kwargs)
+        return {"pest": "Test pest", "crop": "Cotton"}
+
+    monkeypatch.setattr(npss, "_get_cached_npss_token", fake_token)
+    monkeypatch.setattr(npss, "resolve_npss_location_ids", resolved_without_village)
+    monkeypatch.setattr(npss, "_download_image", fake_download)
+    monkeypatch.setattr(npss, "_call_npss_analyze", fake_analyze)
+    deps = FarmerContext(
+        query="Analyze",
+        lang_code="hi",
+        session_id="session",
+        latitude=28.6307647223,
+        longitude=77.0899123838,
+    )
+    ctx = SimpleNamespace(deps=deps)
+
+    result = asyncio.run(
+        npss.analyze_crop_image(
+            ctx,
+            "https://example.test/cotton.jpg",
+        )
+    )
+
+    assert captured["state_id"] == "9"
+    assert captured["district_id"] == "173"
+    assert captured["sub_district_id"] == "7323"
+    assert captured["village_id"] == "0"
+    assert captured["latitude"] == 28.6307647223
+    assert captured["longitude"] == 77.0899123838
+    assert "**NPSS Analysis Result**" in result
+
+
 def test_hindi_location_request_starts_a_conversation_without_failure_language():
     result = build_npss_location_request(
         "hi",

@@ -315,6 +315,18 @@ async def analyze_crop_image(
     district_id = geo.get("district_id")
     sub_district_id = geo.get("sub_district_id")
     village_id = geo.get("village_id")
+    if not village_id and all((state_id, district_id, sub_district_id)):
+        # NPSS accepts VillageId=0 as its unspecified-village sentinel. This is
+        # required for urban sub-districts whose NPSS master contains no village
+        # rows, and avoids asking the farmer for a value that cannot be resolved.
+        village_id = "0"
+        logger.info(
+            "Using NPSS unspecified-village sentinel for verified hierarchy: "
+            "state_id=%s district_id=%s subdistrict_id=%s",
+            state_id,
+            district_id,
+            sub_district_id,
+        )
     effective_latitude = geo.get("latitude", latitude)
     effective_longitude = geo.get("longitude", longitude)
     has_farmer_location = bool(str(location or "").strip())
