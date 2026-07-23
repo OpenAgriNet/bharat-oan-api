@@ -613,6 +613,7 @@ async def resolve_npss_location_ids(
         return coordinate_result
 
     complete_results: list[dict[str, Any]] = []
+    first_geocoded_result: Optional[dict[str, Any]] = None
     seen_hierarchies: set[tuple[str, str, str, str]] = set()
     for candidate_latitude, candidate_longitude in candidates:
         try:
@@ -631,6 +632,13 @@ async def resolve_npss_location_ids(
             )
             continue
 
+        geocoded_result = {
+            **(result or {}),
+            "latitude": candidate_latitude,
+            "longitude": candidate_longitude,
+        }
+        if first_geocoded_result is None:
+            first_geocoded_result = geocoded_result
         if not result or not all(
             result.get(key)
             for key in ("state_id", "district_id", "sub_district_id", "village_id")
@@ -643,19 +651,15 @@ async def resolve_npss_location_ids(
         if hierarchy in seen_hierarchies:
             continue
         seen_hierarchies.add(hierarchy)
-        complete_results.append(
-            {
-                **result,
-                "latitude": candidate_latitude,
-                "longitude": candidate_longitude,
-            }
-        )
+        complete_results.append(geocoded_result)
 
-    if len(complete_results) == 1:
+    if complete_results:
+        if len(complete_results) > 1:
+            logger.info(
+                "Farmer location matched multiple NPSS hierarchies; using Photon's top-ranked complete result: %r",
+                location,
+            )
         logger.info("Resolved NPSS hierarchy from one farmer location: %s", complete_results[0])
         return complete_results[0]
-    if len(complete_results) > 1:
-        logger.warning("Farmer location is ambiguous across NPSS hierarchies: %r", location)
-    else:
-        logger.warning("Farmer location did not resolve to a complete NPSS hierarchy: %r", location)
-    return coordinate_result
+    logger.warning("Farmer location did not resolve to a complete NPSS hierarchy: %r", location)
+    return first_geocoded_result or coordinate_result

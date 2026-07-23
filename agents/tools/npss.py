@@ -315,16 +315,19 @@ async def analyze_crop_image(
     district_id = geo.get("district_id")
     sub_district_id = geo.get("sub_district_id")
     village_id = geo.get("village_id")
-    if not all((state_id, district_id, sub_district_id, village_id)):
+    effective_latitude = geo.get("latitude", latitude)
+    effective_longitude = geo.get("longitude", longitude)
+    if effective_latitude is None or effective_longitude is None:
         logger.info(
-            "NPSS analysis is waiting for farmer location details: "
-            "state_id=%s district_id=%s subdistrict_id=%s village_id=%s lat=%s lon=%s",
+            "NPSS analysis is waiting for one geocodable farmer location: "
+            "state_id=%s district_id=%s subdistrict_id=%s village_id=%s lat=%s lon=%s location=%s",
             state_id,
             district_id,
             sub_district_id,
             village_id,
             latitude,
             longitude,
+            location,
         )
         ctx.deps.mark_npss_location_required(
             ["location"],
@@ -341,9 +344,6 @@ async def analyze_crop_image(
             f"{detail_request} Once provided, call `analyze_crop_image` again with this same "
             "image URL and one location string. Do not describe this as an analysis failure."
         )
-
-    effective_latitude = geo.get("latitude", latitude)
-    effective_longitude = geo.get("longitude", longitude)
 
     # Download image from URL
     try:
