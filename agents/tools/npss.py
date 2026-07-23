@@ -318,9 +318,10 @@ async def analyze_crop_image(
     effective_latitude = geo.get("latitude", latitude)
     effective_longitude = geo.get("longitude", longitude)
     has_farmer_location = bool(str(location or "").strip())
-    if (effective_latitude is None or effective_longitude is None) and not has_farmer_location:
+    complete_master_hierarchy = all((state_id, district_id, sub_district_id, village_id))
+    if not complete_master_hierarchy and not has_farmer_location:
         logger.info(
-            "NPSS analysis is waiting for one geocodable farmer location: "
+            "NPSS master lookup was incomplete; waiting for one farmer location: "
             "state_id=%s district_id=%s subdistrict_id=%s village_id=%s lat=%s lon=%s location=%s",
             state_id,
             district_id,
@@ -345,11 +346,21 @@ async def analyze_crop_image(
             f"{detail_request} Once provided, call `analyze_crop_image` again with this same "
             "image URL and one location string. Do not describe this as an analysis failure."
         )
-    if effective_latitude is None or effective_longitude is None:
-        logger.warning(
-            "Farmer supplied location %r but it did not geocode; submitting to NPSS without "
-            "asking again to avoid a location loop.",
+    if not complete_master_hierarchy:
+        logger.error(
+            "NPSS master hierarchy remained incomplete after the one location follow-up: "
+            "state_id=%s district_id=%s subdistrict_id=%s village_id=%s lat=%s lon=%s location=%r",
+            state_id,
+            district_id,
+            sub_district_id,
+            village_id,
+            effective_latitude,
+            effective_longitude,
             location,
+        )
+        return (
+            "The provided location could not be matched to the NPSS administrative master. "
+            "The image analysis cannot continue right now."
         )
 
     # Download image from URL

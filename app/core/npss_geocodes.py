@@ -43,6 +43,9 @@ def _normalize_text(value: Any) -> str:
     text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii")
     text = re.sub(r"[^a-z0-9]+", " ", text.lower())
     text = re.sub(r"\s+", " ", text).strip()
+    # Photon and government masters may use the current and former Bengaluru
+    # spellings interchangeably at district and sub-district levels.
+    text = re.sub(r"\bbangalore\b", "bengaluru", text)
     return re.sub(r"\s+(subdistrict|sub district|tehsil|taluka|taluk|district)$", "", text).strip()
 
 
@@ -366,6 +369,7 @@ async def _resolve_from_master_apis(
         "state_district",
         "county",
         "district",
+        "city",
     )
     sub_district_candidates = _location_candidates_from_sources(
         reverse_sources,
@@ -550,7 +554,11 @@ async def _resolve_from_master_apis(
 
     result = {"state_id": state_id}
     if not district_id:
-        logger.warning("NPSS district could not be verified: %s", result)
+        logger.warning(
+            "NPSS district could not be verified: result=%s reverse_candidates=%s",
+            result,
+            district_candidates,
+        )
         return result
     result["district_id"] = district_id
     if not sub_district_id:
