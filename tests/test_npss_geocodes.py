@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from app.core import npss_geocodes
 from app.core.npss_followup import build_npss_location_request, find_pending_npss_image_url
+from app.services.chat import _wrap_image_analysis_message
 from agents.deps import FarmerContext
 from agents.tools import npss
 
@@ -83,7 +84,17 @@ def test_resolves_delhi_when_photon_admin_fields_are_split_across_nearby_results
     }
 
 
-def test_resolves_farmer_provided_location_names_against_master_hierarchy(monkeypatch):
+def test_resolves_one_farmer_location_by_forward_then_reverse_geocoding(monkeypatch):
+    async def fake_forward_geocode(location):
+        assert location == "Rewla Khanpur, Delhi"
+        return [(28.5648, 76.9822)]
+
+    async def fake_reverse_geocode(latitude, longitude):
+        assert (latitude, longitude) == (28.5648, 76.9822)
+        return DELHI_PROPS
+
+    monkeypatch.setattr(npss_geocodes, "_forward_geocode_coordinates", fake_forward_geocode)
+    monkeypatch.setattr(npss_geocodes, "_reverse_geocode_properties", fake_reverse_geocode)
     monkeypatch.setattr(npss_geocodes, "_fetch_master_rows", _fake_master_rows)
 
     result = asyncio.run(
@@ -91,10 +102,7 @@ def test_resolves_farmer_provided_location_names_against_master_hierarchy(monkey
             None,
             None,
             bearer_token="token",
-            state="Delhi",
-            district="South West Delhi District",
-            sub_district="Kapashera Tehsil",
-            village="Rewla Khanpur",
+            location="Rewla Khanpur, Delhi",
         )
     )
 
@@ -103,96 +111,113 @@ def test_resolves_farmer_provided_location_names_against_master_hierarchy(monkey
         "district_id": "172",
         "sub_district_id": "1868",
         "village_id": "65534",
+        "latitude": 28.5648,
+        "longitude": 76.9822,
     }
 
 
-def test_verified_matching_handles_parent_suffix_and_unique_spelling_drift():
-    district = npss_geocodes._pick_verified_row(
-        [{"districtId": "172", "districtName": "South West"}],
-        ["South West Delhi District"],
-        ("districtName", "name"),
-        parent_names=["Delhi"],
-    )
-    subdistrict = npss_geocodes._pick_verified_row(
-        [
-            {"subDistrictId": "1868", "subDistrictName": "Kapeshera"},
-            {"subDistrictId": "1869", "subDistrictName": "Najafgarh"},
-        ],
-        ["Kapashera Tehsil"],
-        ("subDistrictName", "name"),
-        similarity_threshold=0.84,
-    )
+def test_browser_coordinates_take_priority_over_farmer_location(monkeypatch):
+    calls = []
 
-    assert district == {"districtId": "172", "districtName": "South West"}
-    assert subdistrict == {"subDistrictId": "1868", "subDistrictName": "Kapeshera"}
+    async def fake_master_lookup(latitude, longitude, *, bearer_token):
+        calls.append((latitude, longitude, bearer_token))
+        return {
+            "state_id": "1",
+            "district_id": "2",
+            "sub_district_id": "3",
+            "village_id": "4",
+        }
 
+    async def unexpected_forward_geocode(location):
+        raise AssertionError(location)
 
-def test_verified_matching_rejects_a_close_ambiguous_location():
-    match = npss_geocodes._pick_verified_row(
-        [
-            {"villageId": "1", "villageName": "Rampur Kalan"},
-            {"villageId": "2", "villageName": "Rampur Khurd"},
-        ],
-        ["Rampur"],
-        ("villageName", "name"),
-        similarity_threshold=0.5,
-    )
-
-    assert match is None
-
-
-def test_duplicate_subdistrict_names_are_disambiguated_by_village(monkeypatch):
-    async def duplicate_master_rows(endpoint, *, bearer_token, params=None):
-        del bearer_token
-        if endpoint == "States":
-            return [{"stateId": "9", "stateName": "Delhi"}]
-        if endpoint == "Districts":
-            return [{"districtId": "172", "districtName": "South West"}]
-        if endpoint == "SubDistricts":
-            return [
-                {"subDistrictId": "1867", "subDistrictName": "Dwarka"},
-                {"subDistrictId": "7321", "subDistrictName": "Dwarka"},
-            ]
-        if endpoint == "Vilages" and params["subDistrictId"] == "1867":
-            return [{"villageId": "10", "villageName": "Amber Hai"}]
-        if endpoint == "Vilages" and params["subDistrictId"] == "7321":
-            return [{"villageId": "11", "villageName": "Bamnoli"}]
-        raise AssertionError((endpoint, params))
-
-    monkeypatch.setattr(npss_geocodes, "_fetch_master_rows", duplicate_master_rows)
+    monkeypatch.setattr(npss_geocodes, "_resolve_from_master_apis", fake_master_lookup)
+    monkeypatch.setattr(npss_geocodes, "_forward_geocode_coordinates", unexpected_forward_geocode)
 
     result = asyncio.run(
         npss_geocodes.resolve_npss_location_ids(
-            None,
-            None,
+            19.076,
+            72.8777,
             bearer_token="token",
-            state="Delhi",
-            district="South West Delhi",
-            sub_district="Dwarka",
-            village="Amberhai",
+            location="A conflicting typed place",
+        )
+    )
+
+    assert result == {
+        "state_id": "1",
+        "district_id": "2",
+        "sub_district_id": "3",
+        "village_id": "4",
+    }
+    assert calls == [(19.076, 72.8777, "token")]
+
+
+def test_farmer_location_falls_back_when_coordinates_are_incomplete(monkeypatch):
+    calls = []
+
+    async def fake_master_lookup(latitude, longitude, *, bearer_token):
+        del bearer_token
+        calls.append((latitude, longitude))
+        if len(calls) == 1:
+            return {"state_id": "9"}
+        return {
+            "state_id": "9",
+            "district_id": "172",
+            "sub_district_id": "1868",
+            "village_id": "65534",
+        }
+
+    async def fake_forward_geocode(location):
+        assert location == "Rewla Khanpur, Delhi"
+        return [(28.5648, 76.9822)]
+
+    monkeypatch.setattr(npss_geocodes, "_resolve_from_master_apis", fake_master_lookup)
+    monkeypatch.setattr(npss_geocodes, "_forward_geocode_coordinates", fake_forward_geocode)
+
+    result = asyncio.run(
+        npss_geocodes.resolve_npss_location_ids(
+            0.0,
+            0.0,
+            bearer_token="token",
+            location="Rewla Khanpur, Delhi",
         )
     )
 
     assert result == {
         "state_id": "9",
         "district_id": "172",
-        "sub_district_id": "1867",
-        "village_id": "10",
+        "sub_district_id": "1868",
+        "village_id": "65534",
+        "latitude": 28.5648,
+        "longitude": 76.9822,
     }
+    assert calls == [(0.0, 0.0), (28.5648, 76.9822)]
 
 
-def test_wrong_village_is_not_forced_to_nearest_master_match(monkeypatch):
-    monkeypatch.setattr(npss_geocodes, "_fetch_master_rows", _fake_master_rows)
+def test_ambiguous_location_does_not_choose_between_two_hierarchies(monkeypatch):
+    async def fake_forward_geocode(location):
+        assert location == "Rampur"
+        return [(10.0, 70.0), (20.0, 80.0)]
+
+    async def fake_master_lookup(latitude, longitude, *, bearer_token):
+        del bearer_token, longitude
+        suffix = "1" if latitude == 10.0 else "2"
+        return {
+            "state_id": suffix,
+            "district_id": suffix,
+            "sub_district_id": suffix,
+            "village_id": suffix,
+        }
+
+    monkeypatch.setattr(npss_geocodes, "_forward_geocode_coordinates", fake_forward_geocode)
+    monkeypatch.setattr(npss_geocodes, "_resolve_from_master_apis", fake_master_lookup)
 
     result = asyncio.run(
         npss_geocodes.resolve_npss_location_ids(
             None,
             None,
             bearer_token="token",
-            state="Delhi",
-            district="South West Delhi",
-            sub_district="Kapashera",
-            village="Completely Different Village",
+            location="Rampur",
         )
     )
 
@@ -245,6 +270,34 @@ def test_completed_npss_result_clears_older_pending_image():
     assert find_pending_npss_image_url(history) is None
 
 
+def test_failed_npss_attempt_does_not_leave_location_conversation_looping():
+    history = [
+        SimpleNamespace(
+            parts=[
+                SimpleNamespace(
+                    part_kind="tool-return",
+                    tool_name="analyze_crop_image",
+                    content=(
+                        "[NPSS_LOCATION_REQUIRED]\n"
+                        "[IMAGE_URL: http://localhost:8000/api/image/9964ff75-cfe1-42bc-a6b7-55249920a38a]"
+                    ),
+                )
+            ]
+        ),
+        SimpleNamespace(
+            parts=[
+                SimpleNamespace(
+                    part_kind="tool-return",
+                    tool_name="analyze_crop_image",
+                    content="The pest analysis service encountered an unexpected error.",
+                )
+            ]
+        ),
+    ]
+
+    assert find_pending_npss_image_url(history) is None
+
+
 def test_image_analysis_requests_location_without_reporting_failure(monkeypatch):
     async def fake_token():
         return "token"
@@ -268,26 +321,93 @@ def test_image_analysis_requests_location_without_reporting_failure(monkeypatch)
 
     assert "[NPSS_LOCATION_REQUIRED]" in result
     assert f"[IMAGE_URL: {image_url}]" in result
-    assert "state, district, sub-district/tehsil, village" in result
+    assert "one village/locality or PIN code" in result
+    assert "all four" not in result
     assert "failed" not in result.lower()
     assert deps.npss_location_required is True
-    assert deps.npss_missing_location_fields == [
-        "state",
-        "district",
-        "sub-district/tehsil",
-        "village",
-    ]
+    assert deps.npss_missing_location_fields == ["location"]
+    assert deps.npss_location_needs_confirmation is False
+
+
+def test_image_analysis_uses_forward_geocoded_coordinates_for_npss(monkeypatch):
+    captured = {}
+
+    async def fake_token():
+        return "token"
+
+    async def resolved_location(*args, **kwargs):
+        assert args == (None, None)
+        assert kwargs == {"bearer_token": "token", "location": "Rewla Khanpur, Delhi"}
+        return {
+            "state_id": "9",
+            "district_id": "172",
+            "sub_district_id": "1868",
+            "village_id": "65534",
+            "latitude": 28.5648,
+            "longitude": 76.9822,
+        }
+
+    async def fake_download(image_url):
+        assert image_url == "https://example.test/cotton.jpg"
+        return b"\xff\xd8\xffimage", "image/jpeg"
+
+    async def fake_analyze(**kwargs):
+        captured.update(kwargs)
+        return {"pest": "Test pest", "crop": "Cotton"}
+
+    monkeypatch.setattr(npss, "_get_cached_npss_token", fake_token)
+    monkeypatch.setattr(npss, "resolve_npss_location_ids", resolved_location)
+    monkeypatch.setattr(npss, "_download_image", fake_download)
+    monkeypatch.setattr(npss, "_call_npss_analyze", fake_analyze)
+    deps = FarmerContext(query="Analyze", lang_code="hi", session_id="session")
+    ctx = SimpleNamespace(deps=deps)
+
+    result = asyncio.run(
+        npss.analyze_crop_image(
+            ctx,
+            "https://example.test/cotton.jpg",
+            location="Rewla Khanpur, Delhi",
+        )
+    )
+
+    assert captured["latitude"] == 28.5648
+    assert captured["longitude"] == 76.9822
+    assert captured["village_id"] == "65534"
+    assert "**NPSS Analysis Result**" in result
 
 
 def test_hindi_location_request_starts_a_conversation_without_failure_language():
     result = build_npss_location_request(
         "hi",
-        ["state", "district", "sub-district/tehsil", "village"],
+        ["location"],
     )
 
-    assert "राज्य" in result
-    assert "जिला" in result
-    assert "तहसील" in result
-    assert "गांव" in result
+    assert "गांव/इलाका या पिन कोड" in result
+    assert "राज्य, जिला" not in result
     assert "छवि सुरक्षित है" in result
     assert "नहीं किया जा सका" not in result
+
+
+def test_hindi_retry_asks_for_one_more_specific_location_not_four_fields():
+    result = build_npss_location_request(
+        "hi",
+        ["location"],
+        needs_confirmation=True,
+    )
+
+    assert "एक अधिक स्पष्ट स्थान" in result
+    assert "पिन कोड" in result
+    assert "राज्य, जिला, उप-जिला" not in result
+
+
+def test_pending_image_instruction_collects_one_location_not_four_fields():
+    wrapped = _wrap_image_analysis_message(
+        "Rewla Khanpur, Delhi",
+        None,
+        None,
+        pending_npss_image_url="http://localhost:8000/api/image/pending",
+    )
+
+    assert "that single location string" in wrapped
+    assert "Do not ask separately for state, district, sub-district, and village" in wrapped
+    assert "every location name collected" not in wrapped

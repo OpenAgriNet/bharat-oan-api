@@ -1,12 +1,13 @@
 """
 NPSS geocode mapping module.
 
-Maps latitude/longitude coordinates to NPSS location hierarchy IDs
-(state_id, district_id, sub_district_id, village_id).
+Maps browser coordinates, or one farmer-provided place name when coordinates
+are unavailable, to NPSS location hierarchy IDs.
 
 Resolution order:
-1. Backend-only Photon reverse geocode
-2. Verified name matching through the NPSS state, district, subdistrict, and village masters
+1. Reverse geocode browser coordinates when supplied
+2. Otherwise forward geocode one place name, then reverse geocode that result
+3. Verify the derived hierarchy against NPSS masters
 
 Exact names are preferred. Small, uniquely separated spelling differences are
 accepted only within the verified parent hierarchy. Unresolved or ambiguous
@@ -35,6 +36,7 @@ _parsed_photon = urlparse(PHOTON_URL or "")
 PHOTON_HOST = _parsed_photon.hostname or "10.128.188.19"
 PHOTON_PORT = _parsed_photon.port or 2322
 PHOTON_BASE_URL = f"http://{PHOTON_HOST}:{PHOTON_PORT}"
+INDIA_BBOX = (68.0, 6.0, 98.0, 36.0)
 
 
 def _normalize_text(value: Any) -> str:
@@ -265,6 +267,44 @@ async def _reverse_geocode_properties(latitude: float, longitude: float) -> dict
     except Exception as exc:
         logger.warning("NPSS background reverse geocode failed for %s,%s: %s", latitude, longitude, exc)
         return {}
+
+
+async def _forward_geocode_coordinates(location: str) -> list[tuple[float, float]]:
+    """Return unique in-India Photon candidates for one human-friendly place name."""
+    query = str(location or "").strip()
+    if not query:
+        return []
+
+    try:
+        async with httpx.AsyncClient(base_url=PHOTON_BASE_URL, timeout=10.0) as client:
+            response = await client.get(
+                "/api",
+                params={
+                    "q": query,
+                    "limit": 10,
+                    "lang": "en",
+                    "bbox": ",".join(str(value) for value in INDIA_BBOX),
+                },
+            )
+        response.raise_for_status()
+        candidates: list[tuple[float, float]] = []
+        for feature in response.json().get("features", []):
+            coordinates = feature.get("geometry", {}).get("coordinates", [])
+            if len(coordinates) < 2:
+                continue
+            longitude, latitude = float(coordinates[0]), float(coordinates[1])
+            if not (
+                INDIA_BBOX[1] <= latitude <= INDIA_BBOX[3]
+                and INDIA_BBOX[0] <= longitude <= INDIA_BBOX[2]
+            ):
+                continue
+            candidate = (latitude, longitude)
+            if candidate not in candidates:
+                candidates.append(candidate)
+        return candidates
+    except Exception as exc:
+        logger.warning("NPSS background forward geocode failed for %r: %s", query, exc)
+        return []
 
 
 async def _fetch_master_rows(
@@ -539,167 +579,82 @@ async def _resolve_from_master_apis(
     return result
 
 
-async def _resolve_from_location_names(
-    *,
-    state: Optional[str],
-    district: Optional[str],
-    sub_district: Optional[str],
-    village: Optional[str],
-    bearer_token: Optional[str],
-) -> Optional[dict]:
-    """Resolve farmer-provided location names against the NPSS master hierarchy."""
-    if not bearer_token or not all((state, district, sub_district, village)):
-        return None
-
-    state_rows = await _fetch_master_rows("States", bearer_token=bearer_token)
-    state_row = _pick_verified_row(
-        state_rows,
-        [state],
-        ("stateName", "state", "name"),
-        similarity_threshold=0.9,
-    )
-    state_id = _extract_id(state_row or {}, ("stateId", "state_id", "id"))
-    if not state_id:
-        logger.warning("Farmer-provided NPSS state could not be verified: %s", state)
-        return None
-
-    district_rows = await _fetch_master_rows(
-        "Districts",
-        bearer_token=bearer_token,
-        params={"stateId": state_id},
-    )
-    canonical_state = _extract_name(state_row or {}, ("stateName", "state", "name"))
-    district_row = _pick_verified_row(
-        district_rows,
-        [district],
-        ("districtName", "district", "name"),
-        parent_names=[state, canonical_state],
-    )
-    district_id = _extract_id(district_row or {}, ("districtId", "district_id", "id"))
-    if not district_id:
-        logger.warning(
-            "Farmer-provided NPSS district could not be verified: state=%s district=%s",
-            state,
-            district,
-        )
-        return None
-
-    subdistrict_rows = await _fetch_master_rows(
-        "SubDistricts",
-        bearer_token=bearer_token,
-        params={"stateId": state_id, "districtId": district_id},
-    )
-    canonical_district = _extract_name(
-        district_row or {},
-        ("districtName", "district", "name"),
-    )
-    subdistrict_matches = _find_verified_rows(
-        subdistrict_rows,
-        [sub_district],
-        ("subDistrictName", "subdistrictName", "sub_district_name", "name"),
-        parent_names=[district, canonical_district],
-        similarity_threshold=0.84,
-    )
-    if not subdistrict_matches:
-        logger.warning(
-            "Farmer-provided NPSS subdistrict could not be verified: state=%s district=%s subdistrict=%s",
-            state,
-            district,
-            sub_district,
-        )
-        return None
-
-    async def fetch_villages(subdistrict_row: dict[str, Any]):
-        subdistrict_id = _extract_id(
-            subdistrict_row,
-            ("subDistrictId", "subdistrictId", "sub_district_id", "id"),
-        )
-        village_rows = await _fetch_master_rows(
-            "Vilages",
-            bearer_token=bearer_token,
-            params={
-                "stateId": state_id,
-                "districtId": district_id,
-                "subDistrictId": subdistrict_id,
-            },
-        )
-        return subdistrict_row, subdistrict_id, village_rows
-
-    village_scopes = await asyncio.gather(*(fetch_villages(row) for row in subdistrict_matches))
-    hierarchy_matches: list[dict[str, str]] = []
-    for subdistrict_row, subdistrict_id, village_rows in village_scopes:
-        canonical_subdistrict = _extract_name(
-            subdistrict_row,
-            ("subDistrictName", "subdistrictName", "sub_district_name", "name"),
-        )
-        village_matches = _find_verified_rows(
-            village_rows,
-            [village],
-            ("villageName", "village", "name"),
-            parent_names=[sub_district, canonical_subdistrict],
-            similarity_threshold=0.84,
-        )
-        for village_row in village_matches:
-            village_id = _extract_id(village_row, ("villageId", "village_id", "id"))
-            if subdistrict_id and village_id:
-                hierarchy_matches.append(
-                    {
-                        "state_id": state_id,
-                        "district_id": district_id,
-                        "sub_district_id": subdistrict_id,
-                        "village_id": village_id,
-                    }
-                )
-
-    if len(hierarchy_matches) != 1:
-        logger.warning(
-            "Farmer-provided NPSS hierarchy could not be uniquely verified: "
-            "state=%s district=%s subdistrict=%s village=%s matches=%s",
-            state,
-            district,
-            sub_district,
-            village,
-            len(hierarchy_matches),
-        )
-        return None
-
-    result = hierarchy_matches[0]
-    logger.info("Resolved NPSS hierarchy from farmer-provided location names: %s", result)
-    return result
-
-
 async def resolve_npss_location_ids(
     latitude: Optional[float],
     longitude: Optional[float],
     *,
     bearer_token: Optional[str] = None,
-    state: Optional[str] = None,
-    district: Optional[str] = None,
-    sub_district: Optional[str] = None,
-    village: Optional[str] = None,
+    location: Optional[str] = None,
 ) -> Optional[dict]:
+    """Resolve NPSS IDs, prioritizing browser coordinates over a single place name."""
     coordinate_result: Optional[dict] = None
-    try:
-        coordinate_result = await _resolve_from_master_apis(latitude, longitude, bearer_token=bearer_token)
-        if coordinate_result and all(
-            coordinate_result.get(key)
+    if latitude is not None and longitude is not None:
+        try:
+            coordinate_result = await _resolve_from_master_apis(
+                latitude,
+                longitude,
+                bearer_token=bearer_token,
+            )
+            if coordinate_result and all(
+                coordinate_result.get(key)
+                for key in ("state_id", "district_id", "sub_district_id", "village_id")
+            ):
+                return coordinate_result
+        except Exception as exc:
+            logger.warning("NPSS browser-coordinate master lookup failed: %s", exc)
+
+    if not location:
+        return coordinate_result
+
+    candidates = await _forward_geocode_coordinates(location)
+    if not candidates:
+        logger.warning("NPSS location text could not be geocoded: %r", location)
+        return coordinate_result
+
+    complete_results: list[dict[str, Any]] = []
+    seen_hierarchies: set[tuple[str, str, str, str]] = set()
+    for candidate_latitude, candidate_longitude in candidates:
+        try:
+            result = await _resolve_from_master_apis(
+                candidate_latitude,
+                candidate_longitude,
+                bearer_token=bearer_token,
+            )
+        except Exception as exc:
+            logger.warning(
+                "NPSS master lookup failed for forward-geocoded %r at %s,%s: %s",
+                location,
+                candidate_latitude,
+                candidate_longitude,
+                exc,
+            )
+            continue
+
+        if not result or not all(
+            result.get(key)
             for key in ("state_id", "district_id", "sub_district_id", "village_id")
         ):
-            return coordinate_result
-    except Exception as exc:
-        logger.warning("NPSS background master lookup failed: %s", exc)
-
-    try:
-        named_result = await _resolve_from_location_names(
-            state=state,
-            district=district,
-            sub_district=sub_district,
-            village=village,
-            bearer_token=bearer_token,
+            continue
+        hierarchy = tuple(
+            str(result[key])
+            for key in ("state_id", "district_id", "sub_district_id", "village_id")
         )
-        if named_result:
-            return named_result
-    except Exception as exc:
-        logger.warning("NPSS farmer-provided location lookup failed: %s", exc)
+        if hierarchy in seen_hierarchies:
+            continue
+        seen_hierarchies.add(hierarchy)
+        complete_results.append(
+            {
+                **result,
+                "latitude": candidate_latitude,
+                "longitude": candidate_longitude,
+            }
+        )
 
+    if len(complete_results) == 1:
+        logger.info("Resolved NPSS hierarchy from one farmer location: %s", complete_results[0])
+        return complete_results[0]
+    if len(complete_results) > 1:
+        logger.warning("Farmer location is ambiguous across NPSS hierarchies: %r", location)
+    else:
+        logger.warning("Farmer location did not resolve to a complete NPSS hierarchy: %r", location)
     return coordinate_result
