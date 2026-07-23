@@ -159,16 +159,14 @@ def _wrap_image_analysis_message(
 ) -> str:
     if pending_npss_image_url:
         location_instruction = (
-            "A previous NPSS call saved this image and requested location details. "
+            "A previous NPSS call saved this image and requested one location. "
             f"The pending image URL is {pending_npss_image_url}. "
-            "If the user's current message provides any requested location information, "
-            "collect the state, district, sub-district/tehsil, and village from this message "
-            "and recent conversation history, then call `analyze_crop_image` again with the "
-            "pending image URL and every location name collected so far. When names are written "
-            "in a non-English language or script, translate or transliterate those same names "
-            "into English tool arguments for NPSS lookup; do not ask the user to repeat them in "
-            "English. Never invent missing names or IDs. If one or more names are still missing, "
-            "ask only for those names."
+            "If the user's current message provides a village, locality, town, or PIN code, "
+            "collect that single location string, including any district/state context they "
+            "volunteered, then call `analyze_crop_image` again with the pending image URL and "
+            "that location. Translate or transliterate the same place into English tool arguments "
+            "when needed; do not ask the user to repeat it in English. Never invent a place or IDs. "
+            "Do not ask separately for state, district, sub-district, and village."
         )
     elif latitude is not None and longitude is not None:
         location_instruction = (
@@ -200,7 +198,7 @@ def _wrap_image_analysis_message(
         f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
         f"If the tool returns multiple findings, show only the most relevant one. "
         f"If the tool returns `[NPSS_LOCATION_REQUIRED]`, do not present an analysis result; "
-        f"ask the farmer for the requested location names in the Selected Language and explain that the image is saved. "
+        f"ask the farmer for one village/locality or PIN code in the Selected Language and explain that the image is saved. "
         f"Otherwise, do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
     )
 

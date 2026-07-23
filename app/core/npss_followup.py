@@ -6,16 +6,16 @@ NPSS_LOCATION_REQUIRED_MARKER = "[NPSS_LOCATION_REQUIRED]"
 INTERNAL_IMAGE_URL_PATTERN = re.compile(r"\[IMAGE_URL:\s*([^\]\s]+)\s*\]")
 
 LOCATION_FIELD_LABELS = {
-    "en": {"state": "state", "district": "district", "sub-district/tehsil": "sub-district/tehsil", "village": "village"},
-    "hi": {"state": "राज्य", "district": "जिला", "sub-district/tehsil": "उप-जिला/तहसील", "village": "गांव"},
-    "as": {"state": "ৰাজ্য", "district": "জিলা", "sub-district/tehsil": "উপ-জিলা/তহচিল", "village": "গাঁও"},
-    "bn": {"state": "রাজ্য", "district": "জেলা", "sub-district/tehsil": "উপজেলা/তহসিল", "village": "গ্রাম"},
-    "gu": {"state": "રાજ્ય", "district": "જિલ્લો", "sub-district/tehsil": "પેટા-જિલ્લો/તહેસીલ", "village": "ગામ"},
-    "kn": {"state": "ರಾಜ್ಯ", "district": "ಜಿಲ್ಲೆ", "sub-district/tehsil": "ಉಪಜಿಲ್ಲೆ/ತಾಲೂಕು", "village": "ಗ್ರಾಮ"},
-    "ml": {"state": "സംസ്ഥാനം", "district": "ജില്ല", "sub-district/tehsil": "ഉപജില്ല/താലൂക്ക്", "village": "ഗ്രാമം"},
-    "mr": {"state": "राज्य", "district": "जिल्हा", "sub-district/tehsil": "उपजिल्हा/तहसील", "village": "गाव"},
-    "ta": {"state": "மாநிலம்", "district": "மாவட்டம்", "sub-district/tehsil": "துணை மாவட்டம்/தாலுகா", "village": "கிராமம்"},
-    "te": {"state": "రాష్ట్రం", "district": "జిల్లా", "sub-district/tehsil": "ఉప జిల్లా/తహసీల్", "village": "గ్రామం"},
+    "en": {"location": "village/locality or PIN code"},
+    "hi": {"location": "गांव/इलाका या पिन कोड"},
+    "as": {"location": "গাঁও/স্থান বা পিন ক'ড"},
+    "bn": {"location": "গ্রাম/এলাকা বা পিন কোড"},
+    "gu": {"location": "ગામ/વિસ્તાર અથવા પિન કોડ"},
+    "kn": {"location": "ಗ್ರಾಮ/ಸ್ಥಳ ಅಥವಾ ಪಿನ್ ಕೋಡ್"},
+    "ml": {"location": "ഗ്രാമം/പ്രദേശം അല്ലെങ്കിൽ പിൻ കോഡ്"},
+    "mr": {"location": "गाव/परिसर किंवा पिन कोड"},
+    "ta": {"location": "கிராமம்/பகுதி அல்லது அஞ்சல் குறியீடு"},
+    "te": {"location": "గ్రామం/ప్రాంతం లేదా పిన్ కోడ్"},
 }
 
 LOCATION_REQUEST_TEMPLATES = {
@@ -32,8 +32,8 @@ LOCATION_REQUEST_TEMPLATES = {
 }
 
 LOCATION_CONFIRMATION_TEMPLATES = {
-    "en": "Please confirm the official spelling of your state, district, sub-district/tehsil, and village. The image is saved, and I’ll continue the NPSS analysis once those details are confirmed.",
-    "hi": "कृपया अपने राज्य, जिला, उप-जिला/तहसील और गांव के आधिकारिक नाम व वर्तनी की पुष्टि करें। छवि सुरक्षित है; पुष्टि मिलते ही मैं NPSS विश्लेषण जारी रखूंगा।",
+    "en": "I couldn’t identify that place precisely. Please share one more specific location, such as your village/locality with district or state, or a PIN code. The image is still saved.",
+    "hi": "उस स्थान की सटीक पहचान नहीं हो पाई। कृपया एक अधिक स्पष्ट स्थान बताएं—जैसे जिले या राज्य के साथ गांव/इलाका, या पिन कोड। छवि अभी भी सुरक्षित है।",
 }
 
 
@@ -49,7 +49,7 @@ def build_npss_location_request(
         return LOCATION_CONFIRMATION_TEMPLATES.get(lang, LOCATION_CONFIRMATION_TEMPLATES["en"])
 
     labels = LOCATION_FIELD_LABELS.get(lang, LOCATION_FIELD_LABELS["en"])
-    requested = missing_fields or ["state", "district", "sub-district/tehsil", "village"]
+    requested = missing_fields or ["location"]
     localized_fields = ", ".join(labels.get(field, field) for field in requested)
     template = LOCATION_REQUEST_TEMPLATES.get(lang, LOCATION_REQUEST_TEMPLATES["en"])
     return template.format(fields=localized_fields)
@@ -64,10 +64,12 @@ def find_pending_npss_image_url(history: list[Any]) -> Optional[str]:
             content = getattr(part, "content", "")
             if not isinstance(content, str):
                 continue
-            if "**NPSS Analysis Result**" in content:
+            if NPSS_LOCATION_REQUIRED_MARKER in content:
+                match = INTERNAL_IMAGE_URL_PATTERN.search(content)
+                return match.group(1) if match else None
+            if (
+                "**NPSS Analysis Result**" in content
+                or getattr(part, "tool_name", "") == "analyze_crop_image"
+            ):
                 return None
-            if NPSS_LOCATION_REQUIRED_MARKER not in content:
-                continue
-            match = INTERNAL_IMAGE_URL_PATTERN.search(content)
-            return match.group(1) if match else None
     return None
