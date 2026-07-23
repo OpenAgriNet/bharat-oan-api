@@ -31,7 +31,7 @@ class FarmerContext(BaseModel):
     npss_raw_result: Optional[dict[str, Any]] = Field(default=None, description="Raw NPSS API result for this turn.")
     npss_location_required: bool = Field(
         default=False,
-        description="Whether NPSS needs farmer-provided location names before image analysis can continue.",
+        description="Whether NPSS needs one farmer-provided place before image analysis can continue.",
     )
     npss_missing_location_fields: list[str] = Field(default_factory=list)
     npss_location_needs_confirmation: bool = False
