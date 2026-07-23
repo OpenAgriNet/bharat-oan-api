@@ -6,10 +6,11 @@ Maps latitude/longitude coordinates to NPSS location hierarchy IDs
 
 Resolution order:
 1. Backend-only Photon reverse geocode
-2. Exact name matching through the NPSS state, district, subdistrict, and village masters
+2. Verified name matching through the NPSS state, district, subdistrict, and village masters
 
-Only verified hierarchy levels are returned. Unresolved levels are omitted so the
-NPSS request never records an arbitrary location.
+Exact names are preferred. Small, uniquely separated spelling differences are
+accepted only within the verified parent hierarchy. Unresolved or ambiguous
+levels are omitted so the NPSS request never records an arbitrary location.
 """
 import asyncio
 from difflib import SequenceMatcher
@@ -86,21 +87,82 @@ def _unwrap_rows(body: Any) -> list[dict[str, Any]]:
     return [body] if any(str(k).lower().endswith("id") for k in body) else []
 
 
-def _pick_best_row(rows: list[dict[str, Any]], candidates: list[str], name_keys: tuple[str, ...]) -> Optional[dict[str, Any]]:
-    normalized_candidates = [_normalize_text(candidate) for candidate in candidates if candidate]
-    normalized_candidates = [candidate for candidate in normalized_candidates if candidate and candidate != "unknown location"]
-    if not rows or not normalized_candidates:
-        return None
-
-    exact_rows: list[dict[str, Any]] = []
-    for row in rows:
-        row_name = _normalize_text(_extract_name(row, name_keys))
-        if not row_name:
+def _candidate_variants(candidates: list[str], parent_names: Optional[list[str]] = None) -> list[str]:
+    """Normalize names and remove an explicitly supplied parent prefix/suffix."""
+    variants: list[str] = []
+    normalized_parents = [_normalize_text(parent) for parent in (parent_names or [])]
+    normalized_parents = [parent for parent in normalized_parents if parent]
+    for candidate in candidates:
+        normalized = _normalize_text(candidate)
+        if not normalized:
             continue
-        if row_name in normalized_candidates:
-            exact_rows.append(row)
+        if normalized not in variants:
+            variants.append(normalized)
+        for parent in normalized_parents:
+            for prefix, suffix in ((f"{parent} ", ""), ("", f" {parent}")):
+                if prefix and normalized.startswith(prefix):
+                    stripped = normalized[len(prefix):].strip()
+                elif suffix and normalized.endswith(suffix):
+                    stripped = normalized[:-len(suffix)].strip()
+                else:
+                    continue
+                if stripped and stripped not in variants:
+                    variants.append(stripped)
+    return variants
 
-    return exact_rows[0] if len(exact_rows) == 1 else None
+
+def _find_verified_rows(
+    rows: list[dict[str, Any]],
+    candidates: list[str],
+    name_keys: tuple[str, ...],
+    *,
+    parent_names: Optional[list[str]] = None,
+    similarity_threshold: float = 0.86,
+    minimum_margin: float = 0.08,
+) -> list[dict[str, Any]]:
+    """Return exact or uniquely separated fuzzy master matches within one hierarchy level."""
+    variants = _candidate_variants(candidates, parent_names)
+    if not rows or not variants:
+        return []
+
+    named_rows = [
+        (row, _normalize_text(_extract_name(row, name_keys)))
+        for row in rows
+    ]
+    named_rows = [(row, name) for row, name in named_rows if name]
+    exact_rows = [row for row, name in named_rows if name in variants]
+    if exact_rows:
+        return exact_rows
+
+    scored = [
+        (
+            max(SequenceMatcher(None, name, candidate).ratio() for candidate in variants),
+            row,
+        )
+        for row, name in named_rows
+    ]
+    if not scored:
+        return []
+
+    best_score = max(score for score, _ in scored)
+    if best_score < similarity_threshold:
+        return []
+    best_rows = [row for score, row in scored if score == best_score]
+    lower_scores = [score for score, _ in scored if score < best_score]
+    next_score = max(lower_scores, default=0.0)
+    if next_score and best_score - next_score < minimum_margin:
+        return []
+    return best_rows
+
+
+def _pick_verified_row(
+    rows: list[dict[str, Any]],
+    candidates: list[str],
+    name_keys: tuple[str, ...],
+    **kwargs: Any,
+) -> Optional[dict[str, Any]]:
+    matches = _find_verified_rows(rows, candidates, name_keys, **kwargs)
+    return matches[0] if len(matches) == 1 else None
 
 
 def _location_candidates(props: dict[str, Any], *keys: str) -> list[str]:
@@ -240,13 +302,15 @@ async def _resolve_from_master_apis(
 
     reverse_sources = _all_reverse_geocode_properties(props)
     state_rows = await _fetch_master_rows("States", bearer_token=bearer_token)
-    state_row = _pick_best_row(
+    state_candidates = _location_candidates_from_sources(reverse_sources, "state", "city")
+    state_row = _pick_verified_row(
         state_rows,
         # Some Photon results (notably Delhi localities) put the state only on a
         # nearby address feature. Including city is safe because the NPSS master
         # still has to contain one unique exact match.
-        _location_candidates_from_sources(reverse_sources, "state", "city"),
+        state_candidates,
         ("stateName", "state", "name"),
+        similarity_threshold=0.9,
     )
     state_id = _extract_id(state_row or {}, ("stateId", "state_id", "id"))
     if not state_id:
@@ -274,10 +338,12 @@ async def _resolve_from_master_apis(
         for candidate in _location_candidates(source, "name")
         if candidate not in sub_district_candidates
     )
-    direct_district = _pick_best_row(
+    canonical_state = _extract_name(state_row or {}, ("stateName", "state", "name"))
+    direct_district = _pick_verified_row(
         district_rows,
         district_candidates,
         ("districtName", "district", "name"),
+        parent_names=[*state_candidates, canonical_state],
     )
 
     async def fetch_subdistricts(district_row: dict[str, Any]):
@@ -318,10 +384,11 @@ async def _resolve_from_master_apis(
         def find_exact(candidates: list[str]):
             matches: list[tuple[dict[str, Any], dict[str, Any]]] = []
             for subdistrict_row, village_rows in village_hierarchy:
-                village_row = _pick_best_row(
+                village_row = _pick_verified_row(
                     village_rows,
                     candidates,
                     ("villageName", "village", "name"),
+                    similarity_threshold=0.84,
                 )
                 if village_row:
                     matches.append((subdistrict_row, village_row))
@@ -359,10 +426,11 @@ async def _resolve_from_master_apis(
     direct_district_id = _extract_id(direct_district or {}, ("districtId", "district_id", "id"))
     if direct_district:
         _, direct_subdistrict_rows = await fetch_subdistricts(direct_district)
-        direct_subdistrict = _pick_best_row(
+        direct_subdistrict = _pick_verified_row(
             direct_subdistrict_rows,
             sub_district_candidates,
             ("subDistrictName", "subdistrictName", "sub_district_name", "name"),
+            similarity_threshold=0.84,
         )
         if direct_subdistrict:
             district_row, sub_district_row = direct_district, direct_subdistrict
@@ -381,10 +449,11 @@ async def _resolve_from_master_apis(
 
     hierarchy_matches: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for possible_district, subdistrict_rows in all_district_subdistrict_rows:
-        subdistrict = _pick_best_row(
+        subdistrict = _pick_verified_row(
             subdistrict_rows,
             sub_district_candidates,
             ("subDistrictName", "subdistrictName", "sub_district_name", "name"),
+            similarity_threshold=0.84,
         )
         if subdistrict:
             hierarchy_matches.append((possible_district, subdistrict))
@@ -392,10 +461,11 @@ async def _resolve_from_master_apis(
     if not sub_district_row and len(hierarchy_matches) == 1:
         district_row, sub_district_row = hierarchy_matches[0]
     elif not sub_district_row and hierarchy_matches:
-        matched_district = _pick_best_row(
+        matched_district = _pick_verified_row(
             [match[0] for match in hierarchy_matches],
             district_candidates,
             ("districtName", "district", "name"),
+            parent_names=[*state_candidates, canonical_state],
         )
         if matched_district:
             district_id = _extract_id(matched_district, ("districtId", "district_id", "id"))
@@ -482,7 +552,12 @@ async def _resolve_from_location_names(
         return None
 
     state_rows = await _fetch_master_rows("States", bearer_token=bearer_token)
-    state_row = _pick_best_row(state_rows, [state], ("stateName", "state", "name"))
+    state_row = _pick_verified_row(
+        state_rows,
+        [state],
+        ("stateName", "state", "name"),
+        similarity_threshold=0.9,
+    )
     state_id = _extract_id(state_row or {}, ("stateId", "state_id", "id"))
     if not state_id:
         logger.warning("Farmer-provided NPSS state could not be verified: %s", state)
@@ -493,10 +568,12 @@ async def _resolve_from_location_names(
         bearer_token=bearer_token,
         params={"stateId": state_id},
     )
-    district_row = _pick_best_row(
+    canonical_state = _extract_name(state_row or {}, ("stateName", "state", "name"))
+    district_row = _pick_verified_row(
         district_rows,
         [district],
         ("districtName", "district", "name"),
+        parent_names=[state, canonical_state],
     )
     district_id = _extract_id(district_row or {}, ("districtId", "district_id", "id"))
     if not district_id:
@@ -512,16 +589,18 @@ async def _resolve_from_location_names(
         bearer_token=bearer_token,
         params={"stateId": state_id, "districtId": district_id},
     )
-    subdistrict_row = _pick_best_row(
+    canonical_district = _extract_name(
+        district_row or {},
+        ("districtName", "district", "name"),
+    )
+    subdistrict_matches = _find_verified_rows(
         subdistrict_rows,
         [sub_district],
         ("subDistrictName", "subdistrictName", "sub_district_name", "name"),
+        parent_names=[district, canonical_district],
+        similarity_threshold=0.84,
     )
-    subdistrict_id = _extract_id(
-        subdistrict_row or {},
-        ("subDistrictId", "subdistrictId", "sub_district_id", "id"),
-    )
-    if not subdistrict_id:
+    if not subdistrict_matches:
         logger.warning(
             "Farmer-provided NPSS subdistrict could not be verified: state=%s district=%s subdistrict=%s",
             state,
@@ -530,33 +609,61 @@ async def _resolve_from_location_names(
         )
         return None
 
-    village_rows = await _fetch_master_rows(
-        "Vilages",
-        bearer_token=bearer_token,
-        params={
-            "stateId": state_id,
-            "districtId": district_id,
-            "subDistrictId": subdistrict_id,
-        },
-    )
-    village_row = _pick_best_row(village_rows, [village], ("villageName", "village", "name"))
-    village_id = _extract_id(village_row or {}, ("villageId", "village_id", "id"))
-    if not village_id:
+    async def fetch_villages(subdistrict_row: dict[str, Any]):
+        subdistrict_id = _extract_id(
+            subdistrict_row,
+            ("subDistrictId", "subdistrictId", "sub_district_id", "id"),
+        )
+        village_rows = await _fetch_master_rows(
+            "Vilages",
+            bearer_token=bearer_token,
+            params={
+                "stateId": state_id,
+                "districtId": district_id,
+                "subDistrictId": subdistrict_id,
+            },
+        )
+        return subdistrict_row, subdistrict_id, village_rows
+
+    village_scopes = await asyncio.gather(*(fetch_villages(row) for row in subdistrict_matches))
+    hierarchy_matches: list[dict[str, str]] = []
+    for subdistrict_row, subdistrict_id, village_rows in village_scopes:
+        canonical_subdistrict = _extract_name(
+            subdistrict_row,
+            ("subDistrictName", "subdistrictName", "sub_district_name", "name"),
+        )
+        village_matches = _find_verified_rows(
+            village_rows,
+            [village],
+            ("villageName", "village", "name"),
+            parent_names=[sub_district, canonical_subdistrict],
+            similarity_threshold=0.84,
+        )
+        for village_row in village_matches:
+            village_id = _extract_id(village_row, ("villageId", "village_id", "id"))
+            if subdistrict_id and village_id:
+                hierarchy_matches.append(
+                    {
+                        "state_id": state_id,
+                        "district_id": district_id,
+                        "sub_district_id": subdistrict_id,
+                        "village_id": village_id,
+                    }
+                )
+
+    if len(hierarchy_matches) != 1:
         logger.warning(
-            "Farmer-provided NPSS village could not be verified: state=%s district=%s subdistrict=%s village=%s",
+            "Farmer-provided NPSS hierarchy could not be uniquely verified: "
+            "state=%s district=%s subdistrict=%s village=%s matches=%s",
             state,
             district,
             sub_district,
             village,
+            len(hierarchy_matches),
         )
         return None
 
-    result = {
-        "state_id": state_id,
-        "district_id": district_id,
-        "sub_district_id": subdistrict_id,
-        "village_id": village_id,
-    }
+    result = hierarchy_matches[0]
     logger.info("Resolved NPSS hierarchy from farmer-provided location names: %s", result)
     return result
 

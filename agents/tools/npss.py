@@ -292,6 +292,9 @@ async def analyze_crop_image(
 
     If a previous call asked for location details, call this tool again with the
     same image_url and all four location names collected from the conversation.
+    If the farmer writes the names in a non-English language or script, translate
+    or transliterate those same administrative names into English tool arguments
+    for NPSS master lookup; do not require the farmer to repeat them in English.
     Never invent a location name or an NPSS location ID.
     """
     if not image_url or not image_url.strip():
