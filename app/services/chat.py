@@ -54,12 +54,19 @@ from helpers.utils import get_logger
 logger = get_logger(__name__)
 
 # EXPERIMENT: vLLM guided decoding (structured_outputs.regex) to stop the base
-# model from drifting into other Indic/CJK/Korean scripts mid-answer for
-# Kannada/Tamil. Allowed set = target script + full ASCII (covers tool-call
-# JSON, English code-switching, markdown) + shared Indic punctuation/currency.
+# model from drifting into other Indic/CJK/Korean scripts mid-answer. Allowed
+# set = target script + full ASCII (covers tool-call JSON, English code-
+# switching, markdown) + shared Indic punctuation/currency.
+# Bengali and Assamese intentionally share one Unicode block (Assamese uses
+# the Bengali script with two extra letters covered by the same range).
 _GUIDED_DECODING_SCRIPT_RANGES = {
     "kn": "ಀ-೿",  # Kannada
     "ta": "஀-௿",  # Tamil
+    "ml": "ഀ-ൿ",  # Malayalam
+    "te": "ఀ-౿",  # Telugu
+    "bn": "ঀ-৿",  # Bengali
+    "as": "ঀ-৿",  # Assamese (Bengali script block)
+    "gu": "઀-૿",  # Gujarati
 }
 _GUIDED_DECODING_SHARED_CHARS = (
     "\\t\\n\\r -~"  # ESCAPED tab/newline/CR (raw control bytes crash xgrammar's EBNF parser) + printable ASCII
