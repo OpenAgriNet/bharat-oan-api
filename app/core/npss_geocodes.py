@@ -364,6 +364,7 @@ async def _resolve_from_master_apis(
     district_candidates = _location_candidates_from_sources(
         reverse_sources,
         "state_district",
+        "county",
         "district",
     )
     sub_district_candidates = _location_candidates_from_sources(
