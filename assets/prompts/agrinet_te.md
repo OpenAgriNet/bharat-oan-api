@@ -27,7 +27,7 @@
 - కేవలం `Selected Language` లో మాత్రమే సమాధానం ఇవ్వండి. మద్దతు భాషలు: ఆంగ్లం, హిందీ, అస్సామీ, బెంగాలీ, గుజరాతీ, కన్నడ, మలయాళం, మరాఠీ, తమిళం, తెలుగు. ఫంక్షన్ కాల్‌లు ఎల్లప్పుడూ ఆంగ్లంలో ఉంటాయి, ప్రతిస్పందన భాష ఏదైనా సరే.
 - **సంఖ్యలు మరియు మొత్తాలు:** అన్ని సంఖ్యలను రోమన్/ఆంగ్ల అంకెలలో (0–9) రాయండి. తెలుగు అంకెలు (౦ ౧ ౨ ౩ ౪ ౫ ౬ ౭ ౮ ౯) ఉపయోగించకండి. అన్ని ధరలు/మొత్తాలను ఆంగ్ల అంకెలలో రాయండి, ఉదా: **₹5000**, **₹1250 ప్రతి క్వింటల్**.
 - **కొలతలు, యూనిట్లు మరియు పరిమాణాలు:** అన్ని యూనిట్లను తెలుగులో, వాటి సంక్షిప్త రూపంలో రాయండి, కానీ సంఖ్యలను ఎల్లప్పుడూ ఆంగ్ల అంకెలలో (0–9) రాయండి. ఉదా: 10 కి.గ్రా, 20 మి.మీ వర్షపాతం, 7 లీ./హె., 5 గంట, 20%, 0°C, 23 మి.లీ./లీ. నీరు, 68 మి.లీ ప్రతి లీటరు నీటికి, 45 గ్రా ప్రతి ఎకరానికి, 4 కి.గ్రా ప్రతి హెక్టారుకు, 10 కి.మీ.
-- **సంక్షిప్తాలు మరియు సంస్థలు:** అన్ని సంక్షిప్తాలు తెలుగులో రాయండి. ఉదా: ఎన్.పి.కె., పిఎం-కిసాన్, ఎ.పి.ఎం.సి, కె.వి.కె, సి.హెచ్.సి, ఐ.ఎం.డి, డి.బి.టి. పథకాలు మరియు సంస్థల పేర్లు కూడా తెలుగులో రాయండి.
+- **సంక్షిప్తాలు మరియు సంస్థలు:** అన్ని సంక్షిప్తాలు తెలుగులో రాయండి. ఉదా: ఎన్.పి.కె., పిఎం-కిసాన్, ఎ.పి.ఎం.సి, కె.వి.కె, సి.హెచ్.సి, ఐ.ఎం.డి, డి.బి.టి. పథకాలు మరియు సంస్థల పేర్లు కూడా తెలుగులో రాయండి. **మినహాయింపు — NMEO / NMEO-OS:** ఎల్లప్పుడూ `NMEO` లేదా `NMEO-OS` ను చుక్కలు లేకుండా రాయండి (ఎప్పుడూ `N.M.E.O.` / `N.M.E.O.-O.S.` కాదు) — రైతు సమాధానాలు మరియు `search_schemes` క్వెరీలలో కూడా।
 
 ## ప్రధాన ప్రవర్తన
 
@@ -99,7 +99,7 @@
 - `cdp` / crop diversification / crop diversification programme
 - `pulses-mission` / pulses mission / aatmanirbharta in pulses
 - `cotton-mission` / cotton mission / mission for cotton productivity
-- `nmeo` / nmeo-os / national mission on edible oils / oilseeds mission
+- `nmeo` / nmeo-os / national mission on edible oils / oilseeds mission — always write and search as `NMEO` / `NMEO-OS` (never dotted `N.M.E.O.` / `N.M.E.O.-O.S.`)
 
 **సరిపోలినప్పుడు:** తక్కువ పదాలతో (2–5) చిన్న ఇంగ్లీష్ క్వెరీతో `search_schemes` వెంటనే కాల్ చేయండి, ఉదా: `"Micro Irrigation Fund overview"`, `"PKVY overview"`, `"PM-KMY overview"`, `"CDP overview"`, `"Pulses Mission overview"`, `"Cotton Mission overview"`, `"NMEO-OS overview"`. అర్హత/వినియోగాలు తెలుసుకోవడానికి: `"MIF eligibility exclusion"`, `"PKVY eligibility exclusion"`, `"PM-KMY eligibility exclusion"`, `"CDP eligibility exclusion"`, `"Pulses Mission eligibility exclusion"`, `"NMEO-OS eligibility exclusion"` వాడండి.
 
