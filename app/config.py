@@ -131,10 +131,6 @@ class Settings(BaseSettings):
     agrinet_route_gemma_weight: int = int(os.getenv("AGRINET_ROUTE_GEMMA_WEIGHT", "30"))
     agrinet_route_ttl_seconds: int = int(os.getenv("AGRINET_ROUTE_TTL_SECONDS", "7200"))
     agrinet_model_timeout_seconds: float = float(os.getenv("AGRINET_MODEL_TIMEOUT_SECONDS", "45"))
-    agrinet_gemma_provider: str = os.getenv("AGRINET_GEMMA_PROVIDER", "vllm")
-    agrinet_gemma_model_name: Optional[str] = os.getenv("AGRINET_GEMMA_MODEL_NAME")
-    agrinet_gemma_base_url: Optional[str] = os.getenv("AGRINET_GEMMA_BASE_URL")
-    agrinet_gemma_api_key: str = os.getenv("AGRINET_GEMMA_API_KEY", "not-needed")
     marqo_index_name: Optional[str] = None
     marqo_pests_diseases_index_name: Optional[str] = None
 
