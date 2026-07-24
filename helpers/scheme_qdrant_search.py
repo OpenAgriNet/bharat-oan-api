@@ -21,7 +21,7 @@ _embedder_cache: dict[str, SentenceTransformer] = {}
 _qdrant_client_cache: dict[tuple[str, Optional[str]], QdrantClient] = {}
 
 # scheme_code -> scheme_name + aliases.
-# Prod release: only MIF, PKVY, PM-KMY (scheme_code must match Qdrant payload).
+# scheme_code must match Qdrant payload.
 _QDRANT_SCHEME_DEFINITIONS: dict[str, dict[str, Any]] = {
     "mif": {
         "scheme_name": "Micro Irrigation Fund",
@@ -50,6 +50,47 @@ _QDRANT_SCHEME_DEFINITIONS: dict[str, dict[str, Any]] = {
             "Kisan Mandhan Yojana",
             "kisan mandhan",
             "PMKMY Yojana",
+        ],
+    },
+    "cdp": {
+        "scheme_name": "Crop Diversification Programme",
+        "scheme_aliases": [
+            "CDP",
+            "crop diversification programme",
+            "crop diversification program",
+            "crop diversification",
+        ],
+    },
+    "pulses-mission": {
+        "scheme_name": "Mission for Aatmanirbharta in Pulses",
+        "scheme_aliases": [
+            "pulses mission",
+            "aatmanirbharta in pulses",
+            "mission for aatmanirbharta in pulses",
+            "nfsm pulses",
+            "pulses scheme",
+            "self reliance in pulses",
+        ],
+    },
+    "cotton-mission": {
+        "scheme_name": "Mission for Cotton Productivity",
+        "scheme_aliases": [
+            "cotton mission",
+            "mission for cotton productivity",
+            "cotton productivity mission",
+            "nfsnm cotton",
+            "nfsm cotton",
+        ],
+    },
+    "nmeo": {
+        "scheme_name": "National Mission on Edible Oils – Oilseeds",
+        "scheme_aliases": [
+            "NMEO",
+            "NMEO-OS",
+            "NMEO OS",
+            "edible oils oilseeds",
+            "oilseeds mission",
+            "national mission on edible oils",
         ],
     },
 }

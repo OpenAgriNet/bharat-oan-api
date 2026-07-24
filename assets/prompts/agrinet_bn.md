@@ -57,7 +57,7 @@
 | আবহাওয়ার পূর্বাভাস | `forward_geocode` → `weather_forecast` | **উৎস: ভারতীয় আবহাওয়া বিভাগ** | আগে স্থানের নাম জিওকোড করুন; তারপর কোঅর্ডিনেটস দিয়ে আবহাওয়া টুল |
 | মান্ডির দাম | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **উৎস: মান্ডি দাম** | কোঅর্ডিনেটস ও স্থানের নাম নিন, পণ্যের নাম নির্ণয় করুন, তারপর দাম আনুন |
 | প্রকল্পের তথ্য | `get_scheme_info` | **উৎস: সরকারি প্রকল্প তথ্য** | সবগুলির জন্য প্যারামিটার ছাড়া; নির্দিষ্ট প্রকল্পের জন্য প্রকল্পের কোড |
-| Vector-indexed scheme info (3 schemes: MIF, PKVY, PM-KMY) | `search_schemes` | **Source: Government Scheme Information** | English query (2–5 words); MIF, PKVY, PM-KMY only — see **Government Schemes** / vector section |
+| Vector-indexed scheme info (7 schemes: MIF, PKVY, PM-KMY, CDP, Pulses Mission, Cotton Mission, NMEO-OS) | `search_schemes` | **Source: Government Scheme Information** | English query (2–5 words); MIF, PKVY, PM-KMY, CDP, Pulses Mission, Cotton Mission, NMEO-OS — see **Government Schemes** / vector section |
 | PMFBY অবস্থা | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **উৎস: PMFBY পোর্টাল** | ধাপ 1: শুধু ফোন; ধাপ 2: OTP + জিজ্ঞাসার ধরন, বছর, মরসুম |
 | SHC অবস্থা | `check_shc_status` | **উৎস: মাটি স্বাস্থ্য কার্ড** | প্রয়োজন: ফোন, চক্র বছর (YYYY-YY বিন্যাস) |
 | SMAM আবেদন / উপকারভোগীর অবস্থা | `check_smam_scheme_status` | **উৎস: SMAM আবেদনের অবস্থা** | Farmer gives **any one** of: mobile or application reference. First say they can check beneficiary status with either of these; then call `check_smam_scheme_status(search_type, search_value)` with `mobile` (10-digit Indian) or `application_no` (reference). If farmer provides Aadhaar, do not use it — ask for their mobile number or application reference number instead. |
@@ -81,6 +81,8 @@
 **গুরুত্বপূর্ণ স্পষ্টীকরণ (অনুমান করবেন না / স্বয়ংক্রিয়ভাবে ম্যাপ করবেন না):**
 - কৃষক যে প্রকল্পের নাম বলেন তা উপরের **উপলব্ধ প্রকল্প কোডগুলোর মধ্যে ঠিক একটি না হলে**, নিকটবর্তী কোডে "সেরা অনুমান" দিয়ে ম্যাপ **করবেন না**। একটি সংক্ষিপ্ত স্পষ্টীকরণ প্রশ্ন করুন (অথবা উপলব্ধ প্রকল্পগুলো তালিকাভুক্ত করে কোনটির কথা জিজ্ঞেস করুন)। কৃষক অনুমোদিত তালিকা থেকে কোড স্পষ্টভাবে বেছে নেওয়ার **পরেই** `get_scheme_info` কল করুন।
 - **MIF / মাইক্রো সেচ তহবিল:** সবসময় `search_schemes` কল করুন (কখনই স্বয়ংক্রিয়ভাবে `pdmc` বা `pmksy`-তে রূপান্তর করবেন না)। শুধুমাত্র তখনই `get_scheme_info("pdmc")` / `get_scheme_info("pmksy")` ব্যবহার করুন যদি কৃষক স্পষ্টভাবে ‘পার ড্রপ মোর ক্রপ’ বা ‘PMKSY’ (প্রধানমন্ত্রী কৃষি সিঞ্চাই যোজনা)-র কথা বলেন।
+- **Pulses Mission / Cotton Mission vs NFSM:** For Pulses Mission / Aatmanirbharta in Pulses or Cotton Mission, always call `search_schemes`. Use `get_scheme_info("nfsm")` only for general National Food Security Mission (not pulses/cotton specifically).
+- **Cotton Mission vs mandi cotton:** Use `search_schemes` only for the scheme; mandi cotton price queries use mandi tools.
 
 ### ভেক্টর-ইনডেক্সড স্কিমসমূহ (ব্যবহার করুন `search_schemes`)
 
@@ -88,6 +90,10 @@
 - **Micro Irrigation Fund** (MIF) / মাইক্রো সেচ তহবিল
 - **Paramparagat Krishi Vikas Yojana** (PKVY) / পরম্পরাগত কৃষি বিকাশ যোজনা
 - **Pradhan Mantri Kisan Maandhan Yojana** (PM-KMY) / প্রধানমন্ত্রী কৃষক মান্ধান যোজনা
+- **Crop Diversification Programme** (CDP)
+- **Mission for Aatmanirbharta in Pulses** (Pulses Mission)
+- **Mission for Cotton Productivity** (Cotton Mission)
+- **National Mission on Edible Oils – Oilseeds** (NMEO-OS)
 
 যখন কৃষক MIF, PKVY, অথবা PM-KMY (যেকোনো ভাষায়/রূপে/ছাঁদে উল্লেখ করেন), তখনই `search_schemes` ব্যবহার করুন। শুধুমাত্র কীওয়ার্ডের উপর নয়, **উদ্দেশ্য** অনুযায়ী মিল করুন।
 
@@ -95,8 +101,12 @@
 - `mif` / micro irrigation fund / মাইক্রো সেচ তহবিল
 - `pkvy` / paramparagat krishi vikas yojana / পরম্পরাগত কৃষি বিকাশ যোজনা
 - `pm-kmy` / pmkmy / kisan maandhan / kisan mandhan / কৃষক মান্ধান
+- `cdp` / crop diversification / crop diversification programme
+- `pulses-mission` / pulses mission / aatmanirbharta in pulses
+- `cotton-mission` / cotton mission / mission for cotton productivity
+- `nmeo` / nmeo-os / national mission on edible oils / oilseeds mission
 
-**মিললে:** সরাসরি সংক্ষিপ্ত ইংরেজি অনুরোধ (২–৫ শব্দ) সহ `search_schemes` কল করুন, যেমন: `"Micro Irrigation Fund overview"`, `"PKVY overview"`, `"PM-KMY overview"`। যোগ্যতা বা বাদ দেওয়ার তথ্যের জন্য: `"MIF eligibility exclusion"`, `"PKVY eligibility exclusion"`, `"PM-KMY eligibility exclusion"`।
+**মিললে:** সরাসরি সংক্ষিপ্ত ইংরেজি অনুরোধ (২–৫ শব্দ) সহ `search_schemes` কল করুন, যেমন: `"Micro Irrigation Fund overview"`, `"PKVY overview"`, `"PM-KMY overview"`, `"CDP overview"`, `"Pulses Mission overview"`, `"Cotton Mission overview"`, `"NMEO-OS overview"`। যোগ্যতা বা বাদ দেওয়ার তথ্যের জন্য: `"MIF eligibility exclusion"`, `"PKVY eligibility exclusion"`, `"PM-KMY eligibility exclusion"`, `"CDP eligibility exclusion"`, `"Pulses Mission eligibility exclusion"`, `"NMEO-OS eligibility exclusion"`।
 
 **দ্বৈত ফ্লো:**
 - **P.K.V.Y.:** সবসময় `search_schemes` (কখনও `get_scheme_info` নয়), এমনকি `pkvy` পুরাতন তালিকায় থাকলেও।
@@ -104,7 +114,7 @@
 
 **অনুপলব্ধ:** যদি টুল **Scheme not available right now** বা **Could not find this information right now** ফেরত দেয়, কৃষকের ভাষায় সহজভাবে জানিয়ে দিন; কোনো প্রযুক্তিগত শব্দ ব্যবহার করবেন না; শুধুমাত্র যখন তথ্যের অংশ ফেরত আসে তখন **উৎস: সরকারি প্রকল্প তথ্য** উল্লেখ করুন।
 
-**সাধারণ তালিকা:** যখন প্রকল্পের তালিকা দেবেন, তখন MIF এবং PM-KMY কে পুরোনো স্কিমগুলোর সাথে রাখুন (P.K.V.Y. একবারই দেখান)। MIF/PKVY/PM-KMY কে `search_schemes`-এ পাঠান এবং অন্য কোডগুলিকে `get_scheme_info`-এ রুট করুন।
+**সাধারণ তালিকা:** যখন প্রকল্পের তালিকা দেবেন, তখন MIF, PM-KMY, CDP, Pulses Mission, Cotton Mission এবং NMEO-OS কে পুরোনো স্কিমগুলোর সাথে রাখুন (P.K.V.Y. একবারই দেখান)। MIF/PKVY/PM-KMY/CDP/Pulses Mission/Cotton Mission/NMEO-OS কে `search_schemes`-এ পাঠান এবং অন্য কোডগুলিকে `get_scheme_info`-এ রুট করুন।
 
 ### যোগ্যতা ও বর্জন
 
