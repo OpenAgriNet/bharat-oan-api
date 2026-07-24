@@ -1,14 +1,14 @@
 import os
 from pydantic_ai import Agent, RunContext
 from helpers.utils import get_prompt, get_today_date_str, get_crop_season
-from agents.models import AGRINET_MODEL
+from agents.models import AGRINET_EXTRA_MODEL_SETTINGS, LLM_AGRINET_MODEL
 from agents.tools import TOOLS
 from pydantic_ai.models.openai import OpenAIChatModelSettings
 from agents.deps import FarmerContext
 
 
 agrinet_agent = Agent(
-    model=AGRINET_MODEL,
+    model=LLM_AGRINET_MODEL,
     name="Vistaar Agent",
     instrument=False,
     output_type=str,
@@ -22,6 +22,7 @@ agrinet_agent = Agent(
         max_tokens=4096,
         timeout=120,
         parallel_tool_calls=True,
+        **AGRINET_EXTRA_MODEL_SETTINGS,
     )
 )
 

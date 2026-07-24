@@ -4,6 +4,9 @@ FROM python:3.11-slim
 # Set work directory
 WORKDIR /app
 
+# Debian's mirrors now reject plain HTTP (403) — force HTTPS before apt-get update
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     supervisor \

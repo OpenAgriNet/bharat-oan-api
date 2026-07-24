@@ -5,7 +5,7 @@ from helpers.utils import get_prompt
 from dotenv import load_dotenv
 import os
 from pydantic_ai.models import ModelSettings
-from agents.models import MODERATION_MODEL
+from agents.models import MODERATION_EXTRA_MODEL_SETTINGS, MODERATION_MODEL
 
 # TODO: Add tools from tools/scheme.py
 load_dotenv()
@@ -38,4 +38,5 @@ moderation_agent = Agent(
         top_p=1.0,
         timeout=float(os.getenv("LLM_MODERATION_TIMEOUT_SECONDS", "20")),
         # openai_reasoning_effort='low',
+        **MODERATION_EXTRA_MODEL_SETTINGS,
     ))

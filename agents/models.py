@@ -1,12 +1,13 @@
+import json
 import os
 from functools import lru_cache
 from typing import Literal
 
 from dotenv import load_dotenv
-from openai import AsyncAzureOpenAI
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
+import agents.providers as providers
 from app.config import settings
 
 load_dotenv()
@@ -15,90 +16,87 @@ AgrinetRoute = Literal["gpt41", "gemma"]
 AGRINET_DEFAULT_ROUTE: AgrinetRoute = "gpt41"
 
 
-@lru_cache(maxsize=1)
-def _get_default_azure_client() -> AsyncAzureOpenAI:
-    azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    azure_api_key = os.getenv("AZURE_OPENAI_API_KEY")
-    azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION")
-
-    if not azure_endpoint:
-        raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
-    if not azure_api_key:
-        raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
-    if not azure_api_version:
-        raise ValueError("AZURE_OPENAI_API_VERSION environment variable is required")
-
-    return AsyncAzureOpenAI(
-        azure_endpoint=azure_endpoint.rstrip("/"),
-        api_version=azure_api_version,
-        api_key=azure_api_key,
-    )
-
-
-# Keep the primary agrinet + moderation wiring close to the original layout so
-# the new routing behavior adds as little mental overhead as possible.
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
-
-if LLM_PROVIDER == "vllm":
-    agrinet_model_name = os.getenv("LLM_AGRINET_MODEL_NAME", "agrinet-model")
-    moderation_model_name = os.getenv("LLM_MODERATION_MODEL_NAME", "moderation-model")
-    vllm_agrinet_url = os.getenv("VLLM_AGRINET_MODEL_URL")
-    vllm_moderation_url = os.getenv("VLLM_MODERATION_MODEL_URL", vllm_agrinet_url)
-
-    if not vllm_agrinet_url:
-        raise ValueError("VLLM_AGRINET_MODEL_URL is required when using vllm provider")
-
-    AGRINET_MODEL = OpenAIChatModel(
-        agrinet_model_name,
-        provider=OpenAIProvider(
-            base_url=vllm_agrinet_url,
-            api_key="not-needed",
-        ),
-    )
-    MODERATION_MODEL = OpenAIChatModel(
-        moderation_model_name,
-        provider=OpenAIProvider(
-            base_url=vllm_moderation_url,
-            api_key="not-needed",
-        ),
-    )
-elif LLM_PROVIDER == "openai":
-    AGRINET_MODEL = OpenAIChatModel(
-        os.getenv("LLM_AGRINET_MODEL_NAME", "gpt-3.5-turbo"),
-        provider=OpenAIProvider(
+# One place to decide which provider kind + config values back each role
+# ("AGRINET" or "MODERATION"). All the actual client-construction logic lives
+# in agents/providers.py; this function only resolves env vars and dispatches.
+def _resolve_role(role: str) -> tuple[OpenAIChatModel, dict]:
+    if LLM_PROVIDER == "openai":
+        return providers.openai_compatible_model(
+            os.getenv(f"LLM_{role}_MODEL_NAME", "gpt-3.5-turbo"),
             api_key=os.getenv("OPENAI_API_KEY"),
-        ),
-    )
-    MODERATION_MODEL = OpenAIChatModel(
-        os.getenv("LLM_MODERATION_MODEL_NAME", "gpt-3.5-turbo"),
-        provider=OpenAIProvider(
-            api_key=os.getenv("OPENAI_API_KEY"),
-        ),
-    )
-elif LLM_PROVIDER == "azure-openai":
-    azure_deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+        )
 
-    if not azure_deployment_name:
-        raise ValueError("AZURE_OPENAI_DEPLOYMENT_NAME environment variable is required")
+    if LLM_PROVIDER == "vllm":
+        agrinet_url = os.getenv("VLLM_AGRINET_MODEL_URL")
+        if not agrinet_url:
+            raise ValueError("VLLM_AGRINET_MODEL_URL is required when using vllm provider")
+        base_url = agrinet_url if role == "AGRINET" else os.getenv("VLLM_MODERATION_MODEL_URL", agrinet_url)
+        return providers.openai_compatible_model(
+            os.getenv(f"LLM_{role}_MODEL_NAME", f"{role.lower()}-model"),
+            base_url=base_url,
+            api_key="not-needed",
+        )
 
-    agrinet_deployment = os.getenv("LLM_AGRINET_MODEL_NAME", azure_deployment_name)
-    moderation_deployment = os.getenv("LLM_MODERATION_MODEL_NAME", azure_deployment_name)
-    azure_client = _get_default_azure_client()
+    if LLM_PROVIDER == "external":
+        agrinet_model_name = os.getenv("EXTERNAL_AGRINET_MODEL_NAME")
+        agrinet_base_url = os.getenv("EXTERNAL_AGRINET_BASE_URL")
+        if not agrinet_model_name or not agrinet_base_url:
+            raise ValueError(
+                "EXTERNAL_AGRINET_MODEL_NAME and EXTERNAL_AGRINET_BASE_URL are required when using external provider"
+            )
+        if role == "AGRINET":
+            model_name, base_url = agrinet_model_name, agrinet_base_url
+            api_key = os.getenv("EXTERNAL_AGRINET_API_KEY", "not-needed")
+            extra_headers = json.loads(os.getenv("EXTERNAL_AGRINET_EXTRA_HEADERS_JSON", "{}") or "{}")
+            extra_body = json.loads(os.getenv("EXTERNAL_AGRINET_EXTRA_BODY_JSON", "{}") or "{}")
+        else:
+            model_name = os.getenv(f"EXTERNAL_{role}_MODEL_NAME", agrinet_model_name)
+            base_url = os.getenv(f"EXTERNAL_{role}_BASE_URL", agrinet_base_url)
+            api_key = os.getenv(f"EXTERNAL_{role}_API_KEY", os.getenv("EXTERNAL_AGRINET_API_KEY", "not-needed"))
+            extra_headers = json.loads(
+                os.getenv(f"EXTERNAL_{role}_EXTRA_HEADERS_JSON", os.getenv("EXTERNAL_AGRINET_EXTRA_HEADERS_JSON", "{}")) or "{}"
+            )
+            extra_body = json.loads(
+                os.getenv(f"EXTERNAL_{role}_EXTRA_BODY_JSON", os.getenv("EXTERNAL_AGRINET_EXTRA_BODY_JSON", "{}")) or "{}"
+            )
+        disable_streaming = os.getenv("EXTERNAL_DISABLE_STREAMING", "").strip().lower() in ("1", "true", "yes", "on")
+        return providers.openai_compatible_model(
+            model_name,
+            base_url=base_url,
+            api_key=api_key,
+            extra_headers=extra_headers,
+            extra_body=extra_body,
+            disable_streaming=disable_streaming,
+        )
 
-    AGRINET_MODEL = OpenAIChatModel(
-        agrinet_deployment,
-        provider=OpenAIProvider(openai_client=azure_client),
-    )
-    MODERATION_MODEL = OpenAIChatModel(
-        moderation_deployment,
-        provider=OpenAIProvider(
-            openai_client=azure_client,
-        ),
-    )
-else:
+    if LLM_PROVIDER == "azure-openai":
+        azure_deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+        if not azure_deployment_name:
+            raise ValueError("AZURE_OPENAI_DEPLOYMENT_NAME environment variable is required")
+        azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        azure_api_key = os.getenv("AZURE_OPENAI_API_KEY")
+        azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION")
+        if not azure_endpoint:
+            raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
+        if not azure_api_key:
+            raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
+        if not azure_api_version:
+            raise ValueError("AZURE_OPENAI_API_VERSION environment variable is required")
+        return providers.azure_openai_model(
+            os.getenv(f"LLM_{role}_MODEL_NAME", azure_deployment_name),
+            endpoint=azure_endpoint,
+            api_key=azure_api_key,
+            api_version=azure_api_version,
+        )
+
     raise ValueError(
-        f"Invalid LLM_PROVIDER: {LLM_PROVIDER}. Must be one of: 'vllm', 'openai', 'azure-openai'"
+        f"Invalid LLM_PROVIDER: {LLM_PROVIDER}. Must be one of: 'openai', 'vllm', 'external', 'azure-openai'"
     )
+
+
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
+LLM_AGRINET_MODEL, AGRINET_EXTRA_MODEL_SETTINGS = _resolve_role("AGRINET")
+MODERATION_MODEL, MODERATION_EXTRA_MODEL_SETTINGS = _resolve_role("MODERATION")
 
 
 @lru_cache(maxsize=1)
@@ -130,7 +128,7 @@ def _build_gemma_agrinet_model() -> OpenAIChatModel:
 
 def get_agrinet_route_model(route: AgrinetRoute) -> OpenAIChatModel:
     if route == "gpt41":
-        return AGRINET_MODEL
+        return LLM_AGRINET_MODEL
     if route == "gemma":
         return _build_gemma_agrinet_model()
     raise ValueError(f"Unsupported agrinet route: {route}")
@@ -160,5 +158,5 @@ def validate_agrinet_routing_config() -> None:
 
 
 # Langfuse generation `model` field (providedModelName) for dashboard model breakdown.
-LANGFUSE_AGRINET_MODEL_NAME = AGRINET_MODEL.model_name
+LANGFUSE_AGRINET_MODEL_NAME = LLM_AGRINET_MODEL.model_name
 LANGFUSE_MODERATION_MODEL_NAME = MODERATION_MODEL.model_name
