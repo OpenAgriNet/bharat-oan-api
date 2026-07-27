@@ -4,7 +4,7 @@ using the Vistaar Beckn API.
 """
 import os
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from helpers.utils import get_logger
 import httpx
 import pytz
@@ -136,6 +136,9 @@ class Category(BaseModel):
 # -----------------------
 _IST = pytz.timezone("Asia/Kolkata")
 
+# The Vistaar mandi search API only supports a from_date/to_date window of up to 30 days.
+MAX_DATE_RANGE_DAYS = 30
+
 
 def _parse_mandi_date(date_str: Optional[str]) -> Optional[date]:
     """Parse a mandi date string (DD-MM-YYYY or similar) to a calendar date."""
@@ -145,6 +148,26 @@ def _parse_mandi_date(date_str: Optional[str]) -> Optional[date]:
         return dateutil_parser.parse(date_str.strip(), dayfirst=True).date()
     except Exception:
         return None
+
+
+def _resolve_date_range(price_date: Optional[str]) -> tuple[str, str]:
+    """Resolve the from_date/to_date window (DD-MM-YYYY) for the mandi search payload.
+
+    to_date is always today (IST). from_date is the requested date, clamped to at
+    most MAX_DATE_RANGE_DAYS before today since the API rejects wider ranges; when no
+    date was requested (latest available), from_date is pushed back the full window
+    to maximize the chance of finding the most recent arrivals.
+    """
+    today_ist = datetime.now(_IST).date()
+    earliest_allowed = today_ist - timedelta(days=MAX_DATE_RANGE_DAYS)
+
+    requested = _parse_mandi_date(price_date)
+    if requested is None:
+        from_date = earliest_allowed
+    else:
+        from_date = max(requested, earliest_allowed)
+
+    return from_date.strftime("%d-%m-%Y"), today_ist.strftime("%d-%m-%Y")
 
 
 def _format_price_date_display(price_date: Optional[str]) -> str:
@@ -170,15 +193,28 @@ def _item_matches_requested_date(item: "MandiItem", requested_price_date: Option
 
 
 def _arrival_date_sort_key(item: "MandiItem") -> datetime:
-    """Return a comparable datetime for sorting; items without date sort last (max datetime)."""
+    """Return a comparable datetime for sorting newest-first (callers sort with reverse=True);
+    items without a date get the minimum datetime so they sort last."""
     arrival_date = item._get_tag_value("Arrival Date") or ""
     if not arrival_date or not arrival_date.strip():
-        return datetime.max.replace(tzinfo=_IST)
+        return datetime.min.replace(tzinfo=_IST)
     try:
         dt = dateutil_parser.parse(arrival_date.strip(), dayfirst=True)
         return dt.replace(tzinfo=_IST) if dt.tzinfo is None else dt
     except Exception:
-        return datetime.max.replace(tzinfo=_IST)
+        return datetime.min.replace(tzinfo=_IST)
+
+
+def _closest_available_date(items: List["MandiItem"], target: date) -> Optional[date]:
+    """Find the item arrival date closest to target; ties prefer the more recent date."""
+    candidates = [
+        _parse_mandi_date(item._get_tag_value("Arrival Date"))
+        for item in items
+    ]
+    candidates = [d for d in candidates if d is not None]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda d: (abs((d - target).days), -d.toordinal()))
 
 
 # -----------------------
@@ -321,20 +357,49 @@ class MandiResponse(BaseModel):
         return items
 
     def format_output(self, requested_price_date: Optional[str] = None) -> str:
-        lines = []
-        date_label = _format_price_date_display(requested_price_date)
-        lines.append(f"**Mandi Price Discovery** [Price Date: {date_label}]")
-
         if len(self.responses) == 0 or not self._has_mandi_data():
-            lines.append("No mandi price data found for the requested location and commodity.")
-            return "\n".join(lines)
+            date_label = _format_price_date_display(requested_price_date)
+            return (
+                f"**Mandi Price Discovery** [Price Date: {date_label}]\n"
+                "No mandi price data found for the requested location and commodity."
+            )
 
-        matched_items = self._collect_items(requested_price_date)
-        if not matched_items:
-            lines.append("No mandi price data found for the requested location and commodity.")
-            return "\n".join(lines)
+        all_items = self._collect_items()
+        requested_date = _parse_mandi_date(requested_price_date)
 
-        for item in sorted(matched_items, key=_arrival_date_sort_key, reverse=True):
+        if requested_date is None:
+            # "Latest available" — narrow the searched window down to the single most recent
+            # arrival date found, rather than mixing every date in the window together.
+            latest = _closest_available_date(all_items, datetime.now(_IST).date())
+            if latest is None:
+                header = "**Mandi Price Discovery** [Price Date: Latest available]"
+                display_items = all_items
+            else:
+                latest_str = latest.strftime("%d-%m-%Y")
+                display_items = [item for item in all_items if _item_matches_requested_date(item, latest_str)]
+                header = f"**Mandi Price Discovery** [Price Date: {_format_price_date_display(latest_str)}]"
+        else:
+            exact_matches = [item for item in all_items if _item_matches_requested_date(item, requested_price_date)]
+            if exact_matches:
+                display_items = exact_matches
+                header = f"**Mandi Price Discovery** [Price Date: {_format_price_date_display(requested_price_date)}]"
+            else:
+                closest = _closest_available_date(all_items, requested_date)
+                if closest is None:
+                    date_label = _format_price_date_display(requested_price_date)
+                    return (
+                        f"**Mandi Price Discovery** [Price Date: {date_label}]\n"
+                        "No mandi price data found for the requested location and commodity."
+                    )
+                closest_str = closest.strftime("%d-%m-%Y")
+                display_items = [item for item in all_items if _item_matches_requested_date(item, closest_str)]
+                header = (
+                    f"**Mandi Price Discovery** [Requested date: {_format_price_date_display(requested_price_date)} "
+                    f"not available — showing closest available date: {_format_price_date_display(closest_str)}]"
+                )
+
+        lines = [header]
+        for item in sorted(display_items, key=_arrival_date_sort_key, reverse=True):
             lines.append(str(item))
         return "\n---\n".join(lines)
 
@@ -378,6 +443,7 @@ class MandiRequest(BaseModel):
             if self.price_date and self.price_date.strip()
             else None
         )
+        from_date, to_date = _resolve_date_range(price_date)
 
         return {
             "context": {
@@ -429,8 +495,12 @@ class MandiRequest(BaseModel):
                     },
                     "tags": [
                         {
-                            "code": "date",
-                            "value": price_date
+                            "code": "from_date",
+                            "value": from_date
+                        },
+                        {
+                            "code": "to_date",
+                            "value": to_date
                         }
                     ]
                 }
@@ -474,7 +544,19 @@ async def get_mandi_prices(
             session_id=ctx.deps.session_id,
             question_id=ctx.deps.question_id,
         ).get_payload()
+        intent_tags = payload.get("message", {}).get("intent", {}).get("tags", [])
+        from_date = next((t["value"] for t in intent_tags if t.get("code") == "from_date"), None)
+        to_date = next((t["value"] for t in intent_tags if t.get("code") == "to_date"), None)
         lf_update_current_observation(
+            input={
+                "latitude": latitude,
+                "longitude": longitude,
+                "location_name": location_name,
+                "commodity_name": commodity_name,
+                "price_date": price_date,
+                "from_date": from_date,
+                "to_date": to_date,
+            },
             metadata={
                 "tool": "mandi.prices",
                 "transaction_id": payload.get("context", {}).get("transaction_id"),
