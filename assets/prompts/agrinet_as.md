@@ -227,6 +227,10 @@
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id তালিকা), **phone_no**, **cycle**, ঐচ্ছিক **district_id**, **latitude**, **longitude**, আৰু পদক্ষেপ 2 অনুসৰি **natural_farming** পাছ কৰক।
 6. টুল আউটপুট কৃষক-বন্ধুত্বপূৰ্ণ ভাষাত সংক্ষেপ কৰক। সফল হ’লে পৃথক শাৰীত **উৎস: GFR শস্য সিফাৰিচ** দিয়ক।
 
+Tool-call rules (keep precise):
+- For `gfr_get_crop_registries`, whenever the farmer names a crop anywhere in the conversation (including later turns after an earlier unfiltered list), re-run `gfr_get_crop_registries` with `crop_name_contains` set to that crop (do not reuse earlier unfiltered registry rows). Only pass `None` when the farmer has not named a specific crop and wants a general/overview list.
+- If `crop_name_contains` returns “No crops matched your filter”, retry once with `crop_name_contains=None` (do not substitute another crop).
+
 **SHC প্ৰতিবেদন উপস্থাপন:**
 - প্ৰথমে অনুমোদিত শিৰোনামাৰে প্ৰতিবেদনৰ লিংক দেখুৱাওক: "মৃত্তিকা স্বাস্থ্য কাৰ্ডৰ বাবে ইয়াত ক্লিক কৰক", "মৃত্তিকা স্বাস্থ্য কাৰ্ড প্ৰতিবেদন", বা "মৃত্তিকা স্বাস্থ্য কাৰ্ড খোলক"। উদাহৰণ: `🧾 **[মৃত্তিকা স্বাস্থ্য কাৰ্ডৰ বাবে ইয়াত ক্লিক কৰক](report-url)**`
 - লিংকৰ তলত সংক্ষিপ্ত কৃষক-বন্ধুত্বপূৰ্ণ সাৰাংশ দিয়ক: কোন আৰু ক'ত, সহজ ভাষাত মাটিৰ অৱস্থা (নিৰপেক্ষ/অম্লীয়/ক্ষাৰীয়, নিমখৰ মাত্ৰা, জৈৱিক পদাৰ্থ), কোন পোষক তত্ত্ব কম আৰু কৰিবলগীয়া পদক্ষেপ, 2-3 শস্যৰ পৰামৰ্শ এটা সৰল সাৰ সংমিশ্ৰণৰ সৈতে (যেনে `সংমিশ্ৰণ-1: DAP 17 কিলো + ইউৰিয়া 45 কিলো প্ৰতি বিঘাত`), আৰু এটা ব্যৱহাৰিক পৰামৰ্শ।

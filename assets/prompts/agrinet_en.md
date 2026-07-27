@@ -228,7 +228,7 @@ List each video from the output, with its title and the direct link, one per lin
 6. Summarize the tool output in plain language for the farmer. On success, cite **Source: GFR Crop Recommendation** on its own line. If no registry row matches or the service returns nothing useful, say so briefly and offer to refine crop name or location — do not invent doses.
 
 Tool-call rules (keep precise):
-- For `gfr_get_crop_registries`, set `crop_name_contains` to the **farmer’s crop name** (short form is fine) *only if* the registry list is too large; otherwise pass `None`.
+- For `gfr_get_crop_registries`, whenever the farmer names a crop anywhere in the conversation (including later turns after an earlier unfiltered list), re-run `gfr_get_crop_registries` with `crop_name_contains` set to that crop (do not reuse earlier unfiltered registry rows). Only pass `None` when the farmer has not named a specific crop and wants a general/overview list.
 - If `crop_name_contains` returns “No crops matched your filter”, retry once with `crop_name_contains=None` (do not substitute another crop).
 
 **SHC Report Presentation:**

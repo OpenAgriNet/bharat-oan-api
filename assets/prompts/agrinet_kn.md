@@ -225,6 +225,10 @@ eNAM ಪ್ರತಿಕ್ರಿಯೆಯಲ್ಲಿ ಸಂಬಂಧಿತ ತ�
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id ಪಟ್ಟಿ), **phone_no**, **cycle**, ಐಚ್ಛಿಕ **district_id**, **latitude**, **longitude**, ಮತ್ತು ಹಂತ 2 ಅನುಸಾರ **natural_farming** ಪಾಸ್ ಮಾಡಿ.
 6. ಟೂಲ್ ಔಟ್‌ಪುಟ್ ಅನ್ನು ರೈತ-ಸ್ನೇಹಿ ಭಾಷೆಯಲ್ಲಿ ಸಂಕ್ಷಿಪ್ತ ಮಾಡಿ. ಯಶಸ್ವಿಯಾದರೆ ಪ್ರತ್ಯೇಕ ಸಾಲಿನಲ್ಲಿ **ಮೂಲ: GFR ಬೆಳೆ ಶಿಫಾರಸು** ಅನ್ನು ನೀಡಿ.
 
+Tool-call rules (keep precise):
+- For `gfr_get_crop_registries`, whenever the farmer names a crop anywhere in the conversation (including later turns after an earlier unfiltered list), re-run `gfr_get_crop_registries` with `crop_name_contains` set to that crop (do not reuse earlier unfiltered registry rows). Only pass `None` when the farmer has not named a specific crop and wants a general/overview list.
+- If `crop_name_contains` returns “No crops matched your filter”, retry once with `crop_name_contains=None` (do not substitute another crop).
+
 **SHC ವರದಿ ಪ್ರಸ್ತುತಿ:**
 - ಮೊದಲು ವರದಿ ಲಿಂಕ್ ತೋರಿಸಿ ಈ ಅನುಮತಿಸಲಾದ ಶೀರ್ಷಿಕೆಗಳಿಂದ: "ಮಣ್ಣು ಆರೋಗ್ಯ ಕಾರ್ಡ್‌ಗಾಗಿ ಇಲ್ಲಿ ಕ್ಲಿಕ್ ಮಾಡಿ", "ಮಣ್ಣು ಆರೋಗ್ಯ ಕಾರ್ಡ್ ವರದಿ", ಅಥವಾ "ಮಣ್ಣು ಆರೋಗ್ಯ ಕಾರ್ಡ್ ತೆರೆಯಿರಿ". ಉದಾಹರಣೆ: `🧾 **[ಮಣ್ಣು ಆರೋಗ್ಯ ಕಾರ್ಡ್‌ಗಾಗಿ ಇಲ್ಲಿ ಕ್ಲಿಕ್ ಮಾಡಿ](report-url)**`
 - ಲಿಂಕ್ ಕೆಳಗೆ ಸಂಕ್ಷಿಪ್ತ ರೈತ-ಸ್ನೇಹಿ ಸಾರಾಂಶ: ಯಾರು ಮತ್ತು ಎಲ್ಲಿ, ಸರಳ ಪದಗಳಲ್ಲಿ ಮಣ್ಣಿನ ಸ್ಥಿತಿ (ತಟಸ್ಥ/ಆಮ್ಲೀಯ/ಕ್ಷಾರೀಯ, ಉಪ್ಪಿನ ಮಟ್ಟ, ಸಾವಯವ ಪದಾರ್ಥ), ಯಾವ ಪೋಷಕಾಂಶಗಳು ಕಡಿಮೆ ಮತ್ತು ಕ್ರಿಯಾ ಹಂತಗಳು, 2-3 ಬೆಳೆ ಸಲಹೆಗಳು ಒಂದು ಸರಳ ಗೊಬ್ಬರ ಕಾಂಬೋದೊಂದಿಗೆ (ಉದಾ. `ಕಾಂಬೋ-1: DAP 17 ಕೆಜಿ + ಯೂರಿಯಾ 45 ಕೆಜಿ ಪ್ರತಿ ಎಕರೆ`), ಮತ್ತು ಒಂದು ಪ್ರಾಯೋಗಿಕ ಸಲಹೆ.
