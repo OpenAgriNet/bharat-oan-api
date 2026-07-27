@@ -1,9 +1,10 @@
+import json
 import os
 from functools import lru_cache
 from typing import Literal
 
 from dotenv import load_dotenv
-from openai import AsyncAzureOpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -44,24 +45,23 @@ if LLM_PROVIDER == "vllm":
     moderation_model_name = os.getenv("LLM_MODERATION_MODEL_NAME", "moderation-model")
     vllm_agrinet_url = os.getenv("VLLM_AGRINET_MODEL_URL")
     vllm_moderation_url = os.getenv("VLLM_MODERATION_MODEL_URL", vllm_agrinet_url)
+    # Optional: only needed to point "vllm" mode at a gateway that requires
+    # auth (e.g. the Bharat Grid gateway) instead of a plain self-hosted vLLM
+    # server. Unset, behavior is identical to before (no api key, no headers).
+    vllm_api_key = os.getenv("VLLM_API_KEY", "not-needed")
+    vllm_extra_headers = json.loads(os.getenv("VLLM_EXTRA_HEADERS_JSON", "{}") or "{}")
 
     if not vllm_agrinet_url:
         raise ValueError("VLLM_AGRINET_MODEL_URL is required when using vllm provider")
 
-    AGRINET_MODEL = OpenAIChatModel(
-        agrinet_model_name,
-        provider=OpenAIProvider(
-            base_url=vllm_agrinet_url,
-            api_key="not-needed",
-        ),
-    )
-    MODERATION_MODEL = OpenAIChatModel(
-        moderation_model_name,
-        provider=OpenAIProvider(
-            base_url=vllm_moderation_url,
-            api_key="not-needed",
-        ),
-    )
+    def _vllm_provider(base_url: str) -> OpenAIProvider:
+        if vllm_extra_headers:
+            client = AsyncOpenAI(base_url=base_url, api_key=vllm_api_key, default_headers=vllm_extra_headers)
+            return OpenAIProvider(openai_client=client)
+        return OpenAIProvider(base_url=base_url, api_key=vllm_api_key)
+
+    AGRINET_MODEL = OpenAIChatModel(agrinet_model_name, provider=_vllm_provider(vllm_agrinet_url))
+    MODERATION_MODEL = OpenAIChatModel(moderation_model_name, provider=_vllm_provider(vllm_moderation_url))
 elif LLM_PROVIDER == "openai":
     AGRINET_MODEL = OpenAIChatModel(
         os.getenv("LLM_AGRINET_MODEL_NAME", "gpt-3.5-turbo"),
