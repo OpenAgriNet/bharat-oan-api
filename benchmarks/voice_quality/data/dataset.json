@@ -1,0 +1,870 @@
+{
+  "seed": 20260728,
+  "per_language": 10,
+  "eligible_pool": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    74,
+    75,
+    76,
+    77,
+    79,
+    80,
+    81,
+    82,
+    83,
+    85,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130,
+    131,
+    132,
+    133,
+    134,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    146,
+    147,
+    148,
+    149,
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159
+  ],
+  "excluded_qdrant_routed": [
+    34,
+    42,
+    53,
+    64,
+    73,
+    78,
+    84,
+    86,
+    111,
+    112,
+    145
+  ],
+  "excluded_multi_turn": ">159",
+  "items": [
+    {
+      "session_id": 27,
+      "language": "as",
+      "category": "pest_disease",
+      "question": "নান্দেদ জিলাত জাবুতলীৰ পাতত হালধীয়া দাগ কিয় দেখা যায়?",
+      "question_en": "Why do yellow spots appear on leaves of guava in Nanded district?"
+    },
+    {
+      "session_id": 29,
+      "language": "as",
+      "category": "mandi",
+      "question": "কোচি মণ্ডীত টাপিয়োকাৰ বৰ্তমান ন্যূনতম মূল্য কিমান?",
+      "question_en": "What is the current minimum price of tapioca in Kochi mandi?"
+    },
+    {
+      "session_id": 38,
+      "language": "as",
+      "category": "crop_advisory",
+      "question": "আমৰাৱতী অঞ্চলৰ বাবে কমলাৰ সাৰ প্ৰয়োগ সূচী পৰামৰ্শ কৰক।",
+      "question_en": "Suggest fertilizer schedule for orange in Amravati area."
+    },
+    {
+      "session_id": 41,
+      "language": "as",
+      "category": "mandi",
+      "question": "চণ্ডীগড় মান্ডীত আজি টাপিঅ'কাৰ বৰ্তমান মূল্য কিমান?",
+      "question_en": "What is the current price of tapioca in Chandigarh mandi today?"
+    },
+    {
+      "session_id": 95,
+      "language": "as",
+      "category": "pest_disease",
+      "question": "হিংগোলী জিলাত চনাৰ ছাই ব্লাইটৰ প্ৰাকৃতিক শত্ৰুসমূহ কি কি?",
+      "question_en": "What are natural enemies of blight on chickpea in Hingoli district?"
+    },
+    {
+      "session_id": 126,
+      "language": "as",
+      "category": "mandi",
+      "question": "মুম্বাই মাণ্ডীত আজকে কপাহৰ বৰ্তমান বজাৰ দৰ কিমান?",
+      "question_en": "What are the current market prices for cotton in the Mumbai mandi today?"
+    },
+    {
+      "session_id": 130,
+      "language": "as",
+      "category": "crop_advisory",
+      "question": "ৰত্নাগিৰি জিলাত ছয়াবিন বীজ বোৱাৰ বাবে এইটো সঠিক সময় নেকি?",
+      "question_en": "Is this the right time for soybean seed sowing in Ratnagiri district?"
+    },
+    {
+      "session_id": 132,
+      "language": "as",
+      "category": "crop_advisory",
+      "question": "লাটুৰত ডালিম খেতিৰ বীজৰ হাৰ কিমান?",
+      "question_en": "What is the seed rate for pomegranate crop in Latur?"
+    },
+    {
+      "session_id": 133,
+      "language": "as",
+      "category": "weather",
+      "question": "এই সপ্তাহত ৱাশিম জিলাত প্ৰচণ্ড বৰষুণ হোৱাৰ সম্ভাৱনা আছে নে?",
+      "question_en": "Is there a possibility of heavy rainfall this week in Washim district?"
+    },
+    {
+      "session_id": 157,
+      "language": "as",
+      "category": "weather",
+      "question": "ৱৰ্ধা জিলাত আগন্তুক কেইদিনৰ বাবে বতাহে শুকানেই থাকিব নেকি?",
+      "question_en": "Will the weather remain dry for the next few days in Wardha district?"
+    },
+    {
+      "session_id": 2,
+      "language": "bn",
+      "category": "scheme",
+      "question": "পারভাণী অঞ্চলে ফসল বিমা স্কিমের জন্য কোন কোন নথি প্রয়োজন?",
+      "question_en": "What documents are required for crop insurance scheme in Parbhani area?"
+    },
+    {
+      "session_id": 12,
+      "language": "bn",
+      "category": "crop_advisory",
+      "question": "আমরাবতীতে আদা ফসলে সেচ দেওয়ার সঠিক সময় কখন?",
+      "question_en": "What is the right time to water the ginger crop in Amravati?"
+    },
+    {
+      "session_id": 29,
+      "language": "bn",
+      "category": "mandi",
+      "question": "কোচি মান্ডিতে টাপিওকার বর্তমান ন্যূনতম মূল্য কত?",
+      "question_en": "What is the current minimum price of tapioca in Kochi mandi?"
+    },
+    {
+      "session_id": 39,
+      "language": "bn",
+      "category": "crop_advisory",
+      "question": "বীড জেলায় বাজরা চাষের সঠিক সময় কখন?",
+      "question_en": "What is the right time for pearl millet planting in Beed district?"
+    },
+    {
+      "session_id": 51,
+      "language": "bn",
+      "category": "mandi",
+      "question": "কোজিকোড় মাণ্ডিতে আজকের ট্যাপিওকার দর কত?",
+      "question_en": "What are today's rates of tapioca in Kozhikode mandi?"
+    },
+    {
+      "session_id": 65,
+      "language": "bn",
+      "category": "crop_advisory",
+      "question": "নাগপুর জেলায় মরিচ ফসলের জন্য কোন ধরনের মাটি উপযুক্ত?",
+      "question_en": "What type of soil is suitable for chili crop in Nagpur district?"
+    },
+    {
+      "session_id": 75,
+      "language": "bn",
+      "category": "mandi",
+      "question": "কোজিকোড় মাণ্ডিতে আলুর বর্তমান বাজারদর কত?",
+      "question_en": "What are the current market prices for potatoes in Kozhikode mandi?"
+    },
+    {
+      "session_id": 81,
+      "language": "bn",
+      "category": "mandi",
+      "question": "চণ্ডীগড়ে আজ আপেলের বর্তমান বাজারদর কত?",
+      "question_en": "What are the current market prices for apples in Chandigarh today?"
+    },
+    {
+      "session_id": 108,
+      "language": "bn",
+      "category": "weather",
+      "question": "এই সপ্তাহে বীড জেলায় ভারী বৃষ্টিপাতের সম্ভাবনা আছে কি?",
+      "question_en": "Is there a possibility of heavy rainfall this week in Beed district?"
+    },
+    {
+      "session_id": 152,
+      "language": "bn",
+      "category": "livestock",
+      "question": "থানে জেলায় কেন মহিষের দুধ উৎপাদন কমে যায়?",
+      "question_en": "Why does buffalo milk production decrease in Thane district?"
+    },
+    {
+      "session_id": 5,
+      "language": "en",
+      "category": "crop_advisory",
+      "question": "What intercrops to take with cauliflower in Buldhana area?",
+      "question_en": "What intercrops to take with cauliflower in Buldhana area?"
+    },
+    {
+      "session_id": 11,
+      "language": "en",
+      "category": "mandi",
+      "question": "What are the current market prices for selling apples in the Kozhikode market?",
+      "question_en": "What are the current market prices for selling apples in the Kozhikode market?"
+    },
+    {
+      "session_id": 25,
+      "language": "en",
+      "category": "pest_disease",
+      "question": "Suggest chemical pesticide for powdery mildew on turmeric in Chandrapur.",
+      "question_en": "Suggest chemical pesticide for powdery mildew on turmeric in Chandrapur."
+    },
+    {
+      "session_id": 27,
+      "language": "en",
+      "category": "pest_disease",
+      "question": "Why do yellow spots appear on leaves of guava in Nanded district?",
+      "question_en": "Why do yellow spots appear on leaves of guava in Nanded district?"
+    },
+    {
+      "session_id": 40,
+      "language": "en",
+      "category": "mandi",
+      "question": "What is the current market price for selling cotton in Mumbai mandi?",
+      "question_en": "What is the current market price for selling cotton in Mumbai mandi?"
+    },
+    {
+      "session_id": 71,
+      "language": "en",
+      "category": "mandi",
+      "question": "What is the current market price of tapioca in Bangalore?",
+      "question_en": "What is the current market price of tapioca in Bangalore?"
+    },
+    {
+      "session_id": 81,
+      "language": "en",
+      "category": "mandi",
+      "question": "What are the current market prices for apples in Chandigarh today?",
+      "question_en": "What are the current market prices for apples in Chandigarh today?"
+    },
+    {
+      "session_id": 82,
+      "language": "en",
+      "category": "weather",
+      "question": "What will be the wind speed for the next few days in Bhandara area?",
+      "question_en": "What will be the wind speed for the next few days in Bhandara area?"
+    },
+    {
+      "session_id": 93,
+      "language": "en",
+      "category": "weather",
+      "question": "What will be the temperature for the next few days in Solapur area?",
+      "question_en": "What will be the temperature for the next few days in Solapur area?"
+    },
+    {
+      "session_id": 149,
+      "language": "en",
+      "category": "livestock",
+      "question": "When to deworm calves in Kolhapur?",
+      "question_en": "When to deworm calves in Kolhapur?"
+    },
+    {
+      "session_id": 11,
+      "language": "gu",
+      "category": "mandi",
+      "question": "કોઝિકોડ બજારમાં સફરજન વેચવાના હાલના બજાર ભાવ શું છે?",
+      "question_en": "What are the current market prices for selling apples in the Kozhikode market?"
+    },
+    {
+      "session_id": 33,
+      "language": "gu",
+      "category": "crop_advisory",
+      "question": "યવતમાળ વિસ્તારમાં ટામેટાં માટે કયું જૈવિક ખાતર વાપરવું?",
+      "question_en": "Which organic fertilizer to use for tomato in Yavatmal area?"
+    },
+    {
+      "session_id": 37,
+      "language": "gu",
+      "category": "weather",
+      "question": "આવતીકાલે અકોલા જિલ્લામાં વરસાદ પડશે?",
+      "question_en": "Will it rain tomorrow in Akola district?"
+    },
+    {
+      "session_id": 61,
+      "language": "gu",
+      "category": "pest_disease",
+      "question": "ધુલે વિસ્તારમાં મરચાંના પાકમાં આર્મીવોર્મને કેવી રીતે નિયંત્રિત કરવું?",
+      "question_en": "How to control armyworm on chili crop in Dhule area?"
+    },
+    {
+      "session_id": 70,
+      "language": "gu",
+      "category": "livestock",
+      "question": "પરભણી જિલ્લામાં કૂકૂટમાં ન્યૂકાસલ રોગ કેવી રીતે અટકાવવો?",
+      "question_en": "How to prevent Newcastle disease in poultry in Parbhani district?"
+    },
+    {
+      "session_id": 110,
+      "language": "gu",
+      "category": "livestock",
+      "question": "વાશિમ જિલ્લામાં દૂધ આપતાં પશુઓનો આહાર કેવો હોવો જોઈએ?",
+      "question_en": "What should be the diet of milch animals in Washim district?"
+    },
+    {
+      "session_id": 116,
+      "language": "gu",
+      "category": "mandi",
+      "question": "કોચી બજારમાં બટાટા વેચવાના હાલના બજાર ભાવ શું છે?",
+      "question_en": "What are the current market prices for selling potatoes in the Kochi market?"
+    },
+    {
+      "session_id": 121,
+      "language": "gu",
+      "category": "mandi",
+      "question": "કોઝિકોડે મંડીમાં બટાટાના હાલના બજાર ભાવ શું છે?",
+      "question_en": "What are the current market prices for potatoes in the Kozhikode mandi?"
+    },
+    {
+      "session_id": 140,
+      "language": "gu",
+      "category": "pest_disease",
+      "question": "હિંગોલી વિસ્તારમાં મગફળીમાં આર્મીવર્મ માટે જૈવિક નિયંત્રણ સૂચવો.",
+      "question_en": "Suggest biological control for armyworm on groundnut in Hingoli area."
+    },
+    {
+      "session_id": 143,
+      "language": "gu",
+      "category": "crop_advisory",
+      "question": "અકોલા જિલ્લામાં ડુંગળી વાવણી માટે યોગ્ય સમય કયો છે?",
+      "question_en": "What is the right time for onion planting in Akola district?"
+    },
+    {
+      "session_id": 27,
+      "language": "hi",
+      "category": "pest_disease",
+      "question": "नांदेड़ जिले में अमरूद की पत्तियों पर पीले धब्बे क्यों दिखाई देते हैं?",
+      "question_en": "Why do yellow spots appear on leaves of guava in Nanded district?"
+    },
+    {
+      "session_id": 30,
+      "language": "hi",
+      "category": "mandi",
+      "question": "कोच्चि मंडी में कसावा के लिए वर्तमान बाजार मूल्य क्या हैं?",
+      "question_en": "What are the current market prices for tapioca in the Kochi mandi?"
+    },
+    {
+      "session_id": 44,
+      "language": "hi",
+      "category": "weather",
+      "question": "क्या अगले सप्ताह जलगांव में भारी बारिश की संभावना है?",
+      "question_en": "Is there a possibility of heavy rain next week in Jalgaon?"
+    },
+    {
+      "session_id": 59,
+      "language": "hi",
+      "category": "weather",
+      "question": "क्या जलगाँव में सोयाबीन की बुवाई के लिए मौसम अनुकूल है?",
+      "question_en": "Is the weather favorable for soybean planting in Jalgaon?"
+    },
+    {
+      "session_id": 98,
+      "language": "hi",
+      "category": "crop_advisory",
+      "question": "नंदुरबार जिले में मक्का की बुवाई का सही समय क्या है?",
+      "question_en": "What is the right time for maize planting in Nandurbar district?"
+    },
+    {
+      "session_id": 99,
+      "language": "hi",
+      "category": "mandi",
+      "question": "मुंबई मंडी में सेब के आज के दाम क्या हैं?",
+      "question_en": "What are today's rates of apples in Mumbai mandi?"
+    },
+    {
+      "session_id": 113,
+      "language": "hi",
+      "category": "scheme",
+      "question": "अमरावती में पीएम-किसान के लिए पात्रता क्या है?",
+      "question_en": "What is the eligibility for PM-KISAN in Amravati?"
+    },
+    {
+      "session_id": 124,
+      "language": "hi",
+      "category": "mandi",
+      "question": "कोच्चि मंडी में सेब की वर्तमान बाजार कीमतें क्या हैं?",
+      "question_en": "What are the current market prices for apples in the Kochi market?"
+    },
+    {
+      "session_id": 132,
+      "language": "hi",
+      "category": "crop_advisory",
+      "question": "लातूर में अनार की फसल के लिए बीज दर क्या है?",
+      "question_en": "What is the seed rate for pomegranate crop in Latur?"
+    },
+    {
+      "session_id": 151,
+      "language": "hi",
+      "category": "crop_advisory",
+      "question": "जलगांव जिले में संतरे की कटाई का सही समय कैसे पहचानें?",
+      "question_en": "How to identify the right time for orange harvesting in Jalgaon district?"
+    },
+    {
+      "session_id": 13,
+      "language": "kn",
+      "category": "crop_advisory",
+      "question": "ಚಂದ್ರಾಪುರ ಪ್ರದೇಶದಲ್ಲಿ ಟೊಮೆಟೊಗೆ ರಸಗೊಬ್ಬರ ವೇಳಾಪಟ್ಟಿ ಸಲಹೆ ನೀಡಿ.",
+      "question_en": "Suggest fertilizer schedule for tomato in Chandrapur area."
+    },
+    {
+      "session_id": 54,
+      "language": "kn",
+      "category": "crop_advisory",
+      "question": "ಚಂದ್ರಾಪುರ ಜಿಲ್ಲೆಯಲ್ಲಿ ಬಾಳೆ ಹೂ ಬೀಳುವ ಸಂದರ್ಭದಲ್ಲಿ ಯಾವ ಕಾಳಜಿ ತೆಗೆದುಕೊಳ್ಳಬೇಕು?",
+      "question_en": "What care to take during flowering of banana in Chandrapur district?"
+    },
+    {
+      "session_id": 65,
+      "language": "kn",
+      "category": "crop_advisory",
+      "question": "ನಾಗ್ಪುರ ಜಿಲ್ಲೆಯಲ್ಲಿ ಮೆಣಸಿನಕಾಯಿ ಬೆಳೆಗೆ ಯಾವ ರೀತಿಯ ಮಣ್ಣು ಸೂಕ್ತವಾಗಿದೆ?",
+      "question_en": "What type of soil is suitable for chili crop in Nagpur district?"
+    },
+    {
+      "session_id": 81,
+      "language": "kn",
+      "category": "mandi",
+      "question": "ಚಂಡೀಗಢದಲ್ಲಿ ಇಂದು ಸೇಬುಗಳ ಪ್ರಸ್ತುತ ಮಾರುಕಟ್ಟೆ ಬೆಲೆಗಳು ಯಾವುವು?",
+      "question_en": "What are the current market prices for apples in Chandigarh today?"
+    },
+    {
+      "session_id": 96,
+      "language": "kn",
+      "category": "crop_advisory",
+      "question": "ವಾಶಿಮ್ ಪ್ರದೇಶದಲ್ಲಿ ಮೆಕ್ಕೆಜೋಳಕ್ಕೆ ಬೀಜ ಸಂಸ್ಕರಣೆ ಹೇಗೆ ಮಾಡುವುದು?",
+      "question_en": "How to do seed treatment for maize in Washim area?"
+    },
+    {
+      "session_id": 97,
+      "language": "kn",
+      "category": "crop_advisory",
+      "question": "ಅಮರಾವತಿ ಜಿಲ್ಲೆಯಲ್ಲಿ ಸಜ್ಜೆ ಬೆಳೆಗೆ ಯಾವಾಗ ನೀರಾವರಿ ಮಾಡಬೇಕು?",
+      "question_en": "When to irrigate pearl millet crop in Amravati district?"
+    },
+    {
+      "session_id": 131,
+      "language": "kn",
+      "category": "weather",
+      "question": "ರಾಯಗಢ ಪ್ರದೇಶದಲ್ಲಿ ಮುಂದಿನ ಕೆಲವು ದಿನಗಳು ಹವಾಮಾನ ಮೋಡಮಯವಾಗಿಯೇ ಇರುತ್ತದೆಯೇ?",
+      "question_en": "Will the weather remain cloudy for the next few days in Raigad area?"
+    },
+    {
+      "session_id": 138,
+      "language": "kn",
+      "category": "livestock",
+      "question": "ಸತಾರಾ ಜಿಲ್ಲೆಯಲ್ಲಿ ಕೋಳಿಗಳಲ್ಲಿ ನ್ಯೂಕ್ಯಾಸಲ್ ರೋಗವನ್ನು ಹೇಗೆ ತಡೆಯುವುದು?",
+      "question_en": "How to prevent Newcastle disease in poultry in Satara district?"
+    },
+    {
+      "session_id": 142,
+      "language": "kn",
+      "category": "livestock",
+      "question": "ಹಿಂಗೋಳಿಯಲ್ಲಿ ಹಸುವಿನ ಕೆಚ್ಚಲು ಊದಿಕೊಂಡಿದ್ದರೆ ಚಿಕಿತ್ಸೆ ಏನು?",
+      "question_en": "What is the treatment if cow's udder is swollen in Hingoli?"
+    },
+    {
+      "session_id": 159,
+      "language": "kn",
+      "category": "mandi",
+      "question": "ಕೋഴിക്കೋಡಿನಲ್ಲಿ ಟಪಿಯೋಕಾದ ಪ್ರಸ್ತುತ ಮಂಡಿ ಬೆಲೆಗಳು ಯಾವುವು?",
+      "question_en": "What are the current mandi prices for tapioca in Kozhikode?"
+    },
+    {
+      "session_id": 10,
+      "language": "ml",
+      "category": "livestock",
+      "question": "ഗോണ്ടിയയിൽ പശുവിന്റെ അകിട് വീർന്നാൽ ചികിത്സ എന്താണ്?",
+      "question_en": "What is the treatment if cow's udder is swollen in Gondia?"
+    },
+    {
+      "session_id": 17,
+      "language": "ml",
+      "category": "scheme",
+      "question": "ബീഡിൽ PMFBY അപേക്ഷ സമർപ്പിക്കാനുള്ള അവസാന തീയതി ഏതാണ്?",
+      "question_en": "What is the last date for PMFBY application in Beed?"
+    },
+    {
+      "session_id": 28,
+      "language": "ml",
+      "category": "scheme",
+      "question": "നാഗ്പൂർ പ്രദേശത്ത് വിള ഇൻഷുറൻസ് പദ്ധതിക്ക് ആവശ്യമായ രേഖകൾ എന്തെല്ലാമാണ്?",
+      "question_en": "What documents are required for crop insurance scheme in Nagpur area?"
+    },
+    {
+      "session_id": 50,
+      "language": "ml",
+      "category": "crop_advisory",
+      "question": "അക്കോള ജില്ലയിൽ വങ്കയിവിത്തുകളുടെ മുളപ്പിക്കൽ എങ്ങനെ പരിശോധിക്കാം?",
+      "question_en": "How to test germination of brinjal seeds in Akola district?"
+    },
+    {
+      "session_id": 72,
+      "language": "ml",
+      "category": "mandi",
+      "question": "കൊച്ചി മണ്ടിയിൽ ഉരുളക്കിഴങ്ങിന്റെ നിലവിലെ വിപണി വിലകൾ എന്തൊക്കെയാണ്?",
+      "question_en": "What are the current market prices for potatoes in Kochi mandi?"
+    },
+    {
+      "session_id": 81,
+      "language": "ml",
+      "category": "mandi",
+      "question": "ചണ്ഡീഗഢിൽ ഇന്ന് ആപ്പിളുകളുടെ നിലവിലെ വിപണി വില എത്രയാണ്?",
+      "question_en": "What are the current market prices for apples in Chandigarh today?"
+    },
+    {
+      "session_id": 97,
+      "language": "ml",
+      "category": "crop_advisory",
+      "question": "അമരാവതി ജില്ലയിൽ ചെറുചോളം വിളയ്ക്ക് എപ്പോൾ ജലസേചനം നടത്തണം?",
+      "question_en": "When to irrigate pearl millet crop in Amravati district?"
+    },
+    {
+      "session_id": 110,
+      "language": "ml",
+      "category": "livestock",
+      "question": "വാഷിം ജില്ലയിൽ പാലുത്പാദക മൃഗങ്ങളുടെ ആഹാരം എന്തായിരിക്കണം?",
+      "question_en": "What should be the diet of milch animals in Washim district?"
+    },
+    {
+      "session_id": 149,
+      "language": "ml",
+      "category": "livestock",
+      "question": "കൊൽഹാപൂരിൽ കിടാക്കളെ എപ്പോൾ പുഴുനശീകരണം നടത്തണം?",
+      "question_en": "When to deworm calves in Kolhapur?"
+    },
+    {
+      "session_id": 150,
+      "language": "ml",
+      "category": "crop_advisory",
+      "question": "ചന്ദ്രാപൂർ ജില്ലയിൽ പാടത്തിന് ഫോസ്ഫറസ് എപ്പോൾ പ്രയോഗിക്കണം?",
+      "question_en": "When to apply phosphorus to paddy crop in Chandrapur district?"
+    },
+    {
+      "session_id": 10,
+      "language": "mr",
+      "category": "livestock",
+      "question": "गोंदिया येथे गायीचे कास सुजले असल्यास उपचार काय आहे?",
+      "question_en": "What is the treatment if cow's udder is swollen in Gondia?"
+    },
+    {
+      "session_id": 24,
+      "language": "mr",
+      "category": "weather",
+      "question": "या आठवड्यात गडचिरोली जिल्ह्यात जोरदार पावसाची शक्यता आहे का?",
+      "question_en": "Is there a possibility of heavy rainfall this week in Gadchiroli district?"
+    },
+    {
+      "session_id": 44,
+      "language": "mr",
+      "category": "weather",
+      "question": "जळगावमध्ये पुढील आठवड्यात मुसळधार पाऊस पडण्याची शक्यता आहे का?",
+      "question_en": "Is there a possibility of heavy rain next week in Jalgaon?"
+    },
+    {
+      "session_id": 59,
+      "language": "mr",
+      "category": "weather",
+      "question": "जळगावमध्ये सोयाबीन लागवडीसाठी हवामान अनुकूल आहे का?",
+      "question_en": "Is the weather favorable for soybean planting in Jalgaon?"
+    },
+    {
+      "session_id": 66,
+      "language": "mr",
+      "category": "scheme",
+      "question": "नागपूरमध्ये पीएम-किसानसाठी पात्रता काय आहे?",
+      "question_en": "What is the eligibility for PM-KISAN in Nagpur?"
+    },
+    {
+      "session_id": 101,
+      "language": "mr",
+      "category": "scheme",
+      "question": "वाशिम परिसरात ज्वारी पिकासाठी विमा योजना उपलब्ध आहे का?",
+      "question_en": "Is insurance scheme available for sorghum crop in Washim area?"
+    },
+    {
+      "session_id": 121,
+      "language": "mr",
+      "category": "mandi",
+      "question": "कोझिकोड मंडीमध्ये बटाट्यांचे सध्याचे बाजारभाव काय आहेत?",
+      "question_en": "What are the current market prices for potatoes in the Kozhikode mandi?"
+    },
+    {
+      "session_id": 126,
+      "language": "mr",
+      "category": "mandi",
+      "question": "आज मुंबई मंडीमध्ये कापसाचे सध्याचे बाजारभाव काय आहेत?",
+      "question_en": "What are the current market prices for cotton in the Mumbai mandi today?"
+    },
+    {
+      "session_id": 128,
+      "language": "mr",
+      "category": "mandi",
+      "question": "बंगळुरू मंडीमध्ये बटाट्यांचे सध्याचे बाजारभाव काय आहेत?",
+      "question_en": "What are the current market prices for potatoes in the Bangalore mandi?"
+    },
+    {
+      "session_id": 158,
+      "language": "mr",
+      "category": "crop_advisory",
+      "question": "या आठवड्यात सांगलीमध्ये सिंचन वाढवावे का?",
+      "question_en": "Should irrigation be increased this week in Sangli?"
+    },
+    {
+      "session_id": 6,
+      "language": "ta",
+      "category": "mandi",
+      "question": "பெங்களூரு சந்தையில் ஆப்பிள்களின் தற்போதைய சந்தை விலைகள் என்ன?",
+      "question_en": "What are the current market prices for apples in the Bangalore market?"
+    },
+    {
+      "session_id": 35,
+      "language": "ta",
+      "category": "pest_disease",
+      "question": "வாஷிம் மாவட்டத்தில் சூரியகாந்திப் பயிரில் வெள்ளை ஈயின் இயற்கை எதிரிகள் என்ன?",
+      "question_en": "What are natural enemies of whitefly on sunflower in Washim district?"
+    },
+    {
+      "session_id": 38,
+      "language": "ta",
+      "category": "crop_advisory",
+      "question": "அமராவதி பகுதியில் ஆரஞ்சு பயிருக்கான உர திட்டத்தை பரிந்துரைக்கவும்.",
+      "question_en": "Suggest fertilizer schedule for orange in Amravati area."
+    },
+    {
+      "session_id": 57,
+      "language": "ta",
+      "category": "crop_advisory",
+      "question": "சந்திரபூரில் ஆரஞ்சு பயிருக்கான விதை வீதம் என்ன?",
+      "question_en": "What is the seed rate for orange crop in Chandrapur?"
+    },
+    {
+      "session_id": 68,
+      "language": "ta",
+      "category": "mandi",
+      "question": "பெங்களூரு சந்தையில் பருத்தியின் தற்போதைய சந்தை விலைகள் என்ன?",
+      "question_en": "What are the current market prices for cotton in the Bangalore market?"
+    },
+    {
+      "session_id": 92,
+      "language": "ta",
+      "category": "scheme",
+      "question": "சதாராவில் டிராக்டர் மானியத் திட்டம் கிடைக்கிறதா?",
+      "question_en": "Is tractor subsidy scheme available in Satara?"
+    },
+    {
+      "session_id": 114,
+      "language": "ta",
+      "category": "mandi",
+      "question": "சண்டிகரில் பருத்தியின் தற்போதைய சந்தை விலை என்ன?",
+      "question_en": "What is the current market price for cotton in Chandigarh?"
+    },
+    {
+      "session_id": 118,
+      "language": "ta",
+      "category": "mandi",
+      "question": "கோழிக்கோடு மண்டியில் உருளைக்கிழங்கின் தற்போதைய சந்தை விலைகள் என்ன?",
+      "question_en": "What are the current market prices for potatoes in the Kozhikode mandi?"
+    },
+    {
+      "session_id": 133,
+      "language": "ta",
+      "category": "weather",
+      "question": "இந்த வாரம் வாஷிம் மாவட்டத்தில் கனமழை பெய்ய வாய்ப்பு உள்ளதா?",
+      "question_en": "Is there a possibility of heavy rainfall this week in Washim district?"
+    },
+    {
+      "session_id": 146,
+      "language": "ta",
+      "category": "crop_advisory",
+      "question": "பந்தாராவில் கத்தரிக்காய் பயிருக்கு விதை அளவு எ是多少?",
+      "question_en": "What is the seed rate for brinjal crop in Bhandara?"
+    },
+    {
+      "session_id": 24,
+      "language": "te",
+      "category": "weather",
+      "question": "గడ్చిరోలి జిల్లాలో ఈ వారం భారీ వర్షాలు పడే అవకాశం ఉందా?",
+      "question_en": "Is there a possibility of heavy rainfall this week in Gadchiroli district?"
+    },
+    {
+      "session_id": 43,
+      "language": "te",
+      "category": "mandi",
+      "question": "కోజికోడ్ మండీలో నేటి బంగాళాదుంప ధరలు ఏమిటి?",
+      "question_en": "What are today's rates of potato in Kozhikode mandi?"
+    },
+    {
+      "session_id": 51,
+      "language": "te",
+      "category": "mandi",
+      "question": "ఈరోజు కోഴിക്കోడ్ మార్కెట్‌లో టపియోకా ధరలు ఎంత?",
+      "question_en": "What are today's rates of tapioca in Kozhikode mandi?"
+    },
+    {
+      "session_id": 54,
+      "language": "te",
+      "category": "crop_advisory",
+      "question": "చంద్రాపూర్ జిల్లాలో అరటి పుష్పించే దశలో ఎలాంటి జాగ్రత్తలు తీసుకోవాలి?",
+      "question_en": "What care to take during flowering of banana in Chandrapur district?"
+    },
+    {
+      "session_id": 56,
+      "language": "te",
+      "category": "weather",
+      "question": "ఈ వారం చంద్రాపూర్‌లో వ్యవసాయ పనుల కోసం వాతావరణం ఎలా ఉంటుంది?",
+      "question_en": "How will the weather be for farming activities this week in Chandrapur?"
+    },
+    {
+      "session_id": 83,
+      "language": "te",
+      "category": "mandi",
+      "question": "బెంగళూరులో పత్తి ప్రస్తుత మార్కెట్ ధరలు ఏమిటి?",
+      "question_en": "What are the current market prices for cotton in Bangalore?"
+    },
+    {
+      "session_id": 87,
+      "language": "te",
+      "category": "mandi",
+      "question": "కోజికోడ్ మండీలో ప్రస్తుతం పత్తి మార్కెట్ ధరలు ఏమిటి?",
+      "question_en": "What are the current market prices for cotton in Kozhikode mandi?"
+    },
+    {
+      "session_id": 99,
+      "language": "te",
+      "category": "mandi",
+      "question": "ముంబై మండీలో ఈరోజు యాపిళ్ల ధరలు ఎంత ఉన్నాయి?",
+      "question_en": "What are today's rates of apples in Mumbai mandi?"
+    },
+    {
+      "session_id": 103,
+      "language": "te",
+      "category": "crop_advisory",
+      "question": "హింగోలి జిల్లాలో జొన్న పంటకు ఏ రకమైన నేల అనుకూలంగా ఉంటుంది?",
+      "question_en": "What type of soil is suitable for sorghum crop in Hingoli district?"
+    },
+    {
+      "session_id": 150,
+      "language": "te",
+      "category": "crop_advisory",
+      "question": "చంద్రపూర్ జిల్లాలో వరి పంటకు ఫాస్ఫరస్‌ను ఎప్పుడు వేయాలి?",
+      "question_en": "When to apply phosphorus to paddy crop in Chandrapur district?"
+    }
+  ]
+}
