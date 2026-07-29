@@ -1,8 +1,6 @@
 """
 Marqo client implementation for vector search + network scheme document search.
 """
-from __future__ import annotations
-
 import asyncio
 import os
 import re
@@ -13,7 +11,7 @@ from typing import Any, Dict, List, Literal, Optional
 import httpx
 import marqo
 from langfuse import observe
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
 
@@ -64,173 +62,205 @@ class SearchHit(BaseModel):
             return f"**[{self.name}]({self.source})**\n" + "```\n" + self.processed_text + "\n```\n"
 
 
-# -----------------------
-# Scheme document search (BAP /search, category scheme-agri-qdrant)
-# Same Beckn shape as SMAM / scheme_info: request.get_payload() + Pydantic response.
-# -----------------------
-class SchemeDocDescriptor(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    code: Optional[str] = None
-    name: Optional[str] = None
-    short_desc: Optional[str] = None
-    long_desc: Optional[str] = None
+def _tag_list_to_map(entries: Any) -> Dict[str, str]:
+    """Flatten Beckn tag list entries to {descriptor.code: value}."""
+    out: Dict[str, str] = {}
+    if not isinstance(entries, list):
+        return out
+    for ent in entries:
+        if not isinstance(ent, dict):
+            continue
+        desc = ent.get("descriptor") if isinstance(ent.get("descriptor"), dict) else {}
+        code = str(desc.get("code") or "").strip().lower().replace("-", "_")
+        if not code:
+            continue
+        value = ent.get("value")
+        if value is None:
+            continue
+        out[code] = str(value)
+    return out
 
 
-class SchemeDocTagEntry(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    descriptor: SchemeDocDescriptor
-    value: str
-    display: Optional[bool] = None
-
-
-class SchemeDocTagGroup(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    descriptor: SchemeDocDescriptor
-    list: List[SchemeDocTagEntry] = Field(default_factory=list)
-    display: Optional[bool] = None
-
-
-class SchemeDocItem(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str
-    descriptor: SchemeDocDescriptor
-    tags: List[SchemeDocTagGroup] = Field(default_factory=list)
-
-
-class SchemeDocProvider(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: Optional[str] = None
-    descriptor: Optional[SchemeDocDescriptor] = None
-    items: List[SchemeDocItem] = Field(default_factory=list)
-
-
-class SchemeDocCatalog(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    descriptor: Optional[SchemeDocDescriptor] = None
-    tags: Optional[List[SchemeDocTagGroup]] = None
-    providers: List[SchemeDocProvider] = Field(default_factory=list)
-
-
-class SchemeDocMessage(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    catalog: SchemeDocCatalog
-
-
-class SchemeDocResponseItem(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    context: Optional[Dict[str, Any]] = None
-    message: SchemeDocMessage
-
-
-def _flatten_tag_values(tag_groups: Optional[List[SchemeDocTagGroup]]) -> Dict[str, str]:
-    """Same pattern as SMAM `_flatten_catalog_tag_values`: code → value."""
-    merged: Dict[str, str] = {}
-    if not tag_groups:
-        return merged
-    for grp in tag_groups:
-        for ent in grp.list:
-            key = (ent.descriptor.code or "").strip().lower().replace("-", "_")
-            if key:
-                merged[key] = ent.value
-    return merged
-
-
-class SchemeDocApiResponse(BaseModel):
-    """BAP client JSON: optional `context` + `responses[].message.catalog`."""
-
-    model_config = ConfigDict(extra="ignore")
-    context: Optional[Dict[str, Any]] = None
-    responses: List[SchemeDocResponseItem] = Field(default_factory=list)
-
-    def search_context(self) -> Dict[str, str]:
-        for rsp in self.responses:
-            ctx = _flatten_tag_values(rsp.message.catalog.tags)
-            if ctx:
-                return ctx
+def _catalog_search_context_map(catalog: Dict[str, Any]) -> Dict[str, str]:
+    """Parse catalog.tags search-context group (status, resolved-scheme-code, source, …)."""
+    tags = catalog.get("tags")
+    if not isinstance(tags, list):
         return {}
+    for tag in tags:
+        if not isinstance(tag, dict):
+            continue
+        desc = tag.get("descriptor") if isinstance(tag.get("descriptor"), dict) else {}
+        code = str(desc.get("code") or "").strip().lower().replace("-", "_")
+        name = str(desc.get("name") or "").strip().lower()
+        if code != "search_context" and name != "search context":
+            continue
+        return _tag_list_to_map(tag.get("list"))
+    return {}
 
-    def chunk_results(self) -> List[Dict[str, Any]]:
-        """Map providers/items/chunk-details tags into format_search_results rows."""
+
+def _item_chunk_details_map(item: Dict[str, Any]) -> Dict[str, str]:
+    """Parse item.tags chunk-details group into a flat map."""
+    tags = item.get("tags")
+    if not isinstance(tags, list):
+        return {}
+    for tag in tags:
+        if not isinstance(tag, dict):
+            continue
+        desc = tag.get("descriptor") if isinstance(tag.get("descriptor"), dict) else {}
+        code = str(desc.get("code") or "").strip().lower().replace("-", "_")
+        name = str(desc.get("name") or "").strip().lower()
+        if code != "chunk_details" and name != "chunk details":
+            continue
+        return _tag_list_to_map(tag.get("list"))
+    return {}
+
+
+def _chunk_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Map one Beckn catalog item to the format expected by format_search_results."""
+    if not isinstance(item, dict):
+        return None
+    details = _item_chunk_details_map(item)
+    desc = item.get("descriptor") if isinstance(item.get("descriptor"), dict) else {}
+
+    text = (details.get("text") or desc.get("long_desc") or "").strip()
+    if not text:
+        return None
+
+    scheme_code = (
+        details.get("scheme_code")
+        or desc.get("code")
+        or ""
+    ).strip()
+    scheme_name = (
+        details.get("scheme_name")
+        or desc.get("name")
+        or ""
+    ).strip()
+    section = (details.get("section") or "").strip().lower() or "other"
+    doc_id = (details.get("doc_id") or "").strip()
+    chunk_id = (details.get("chunk_id") or item.get("id") or "").strip()
+
+    score_raw = details.get("score") or "0"
+    try:
+        score = float(score_raw)
+    except (TypeError, ValueError):
+        score = 0.0
+
+    return {
+        "score": score,
+        "scheme_code": scheme_code,
+        "scheme_name": scheme_name,
+        "text": text,
+        "doc_id": doc_id,
+        "chunk_id": chunk_id,
+        "section": section,
+    }
+
+
+def _parse_scheme_network_response(data: Dict[str, Any]) -> tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """
+    Parse BAP client /search response for scheme-agri-qdrant.
+
+    Returns (chunk_results, search_context) from the first successful catalog
+    (or the first catalog when status is absent).
+    """
+    responses = data.get("responses") if isinstance(data, dict) else None
+    if not isinstance(responses, list) or not responses:
+        return [], {}
+
+    selected_ctx: Dict[str, str] = {}
+    selected_results: List[Dict[str, Any]] = []
+
+    for rsp in responses:
+        if not isinstance(rsp, dict):
+            continue
+        message = rsp.get("message") if isinstance(rsp.get("message"), dict) else {}
+        catalog = message.get("catalog") if isinstance(message.get("catalog"), dict) else {}
+        if not catalog:
+            continue
+
+        ctx = _catalog_search_context_map(catalog)
+        status = str(ctx.get("status") or "").strip().lower()
+        # Prefer a successful catalog when multiple responses exist.
+        if status and status != "success" and selected_results:
+            continue
+
         results: List[Dict[str, Any]] = []
-        for rsp in self.responses:
-            for provider in rsp.message.catalog.providers:
-                for item in provider.items:
-                    details = _flatten_tag_values(item.tags)
-                    text = (details.get("text") or item.descriptor.long_desc or "").strip()
-                    if not text:
-                        continue
-                    try:
-                        score = float(details.get("score") or 0)
-                    except (TypeError, ValueError):
-                        score = 0.0
-                    results.append(
-                        {
-                            "score": score,
-                            "scheme_code": (
-                                details.get("scheme_code") or item.descriptor.code or ""
-                            ).strip(),
-                            "scheme_name": (
-                                details.get("scheme_name") or item.descriptor.name or ""
-                            ).strip(),
-                            "text": text,
-                            "doc_id": (details.get("doc_id") or "").strip(),
-                            "chunk_id": (details.get("chunk_id") or item.id or "").strip(),
-                            "section": (details.get("section") or "other").strip().lower(),
-                        }
-                    )
-        return results
+        providers = catalog.get("providers")
+        if isinstance(providers, list):
+            for prov in providers:
+                if not isinstance(prov, dict):
+                    continue
+                items = prov.get("items")
+                if not isinstance(items, list):
+                    continue
+                for item in items:
+                    parsed = _chunk_result_from_item(item)
+                    if parsed:
+                        results.append(parsed)
+
+        if status == "success" or (not status and results):
+            return results, ctx
+
+        # Keep first non-empty / first catalog as fallback.
+        if not selected_ctx:
+            selected_ctx = ctx
+            selected_results = results
+        elif results and not selected_results:
+            selected_ctx = ctx
+            selected_results = results
+
+    return selected_results, selected_ctx
 
 
-class SchemeDocSearchRequest(BaseModel):
-    """Beckn /search request for scheme-agri-qdrant (mirrors SchemeRequest / SmamStatusRequest)."""
+def _build_scheme_qdrant_search_payload(
+    query: str,
+    scheme_code: Optional[str] = None,
+    session_id: str = "",
+    question_id: str = "",
+) -> Dict[str, Any]:
+    """Beckn /search body for scheme guideline document search (scheme-agri-qdrant)."""
+    now = datetime.now(timezone.utc)
+    item_descriptor: Dict[str, str] = {"name": query}
+    if scheme_code:
+        item_descriptor["code"] = scheme_code
 
-    query: str
-    scheme_code: Optional[str] = None
-    session_id: str = ""
-    question_id: str = ""
-
-    def get_payload(self) -> Dict[str, Any]:
-        now = datetime.now(timezone.utc)
-        item_descriptor: Dict[str, str] = {"name": self.query}
-        if self.scheme_code:
-            item_descriptor["code"] = self.scheme_code
-
-        return {
-            "context": {
-                "domain": "schemes:vistaar",
-                "action": "search",
-                "version": "1.1.0",
-                "bap_id": os.getenv("BAP_ID"),
-                "bap_uri": os.getenv("BAP_URI"),
-                "bpp_id": os.getenv("BPP_ID"),
-                "bpp_uri": os.getenv("BPP_URI"),
-                "transaction_id": str(uuid.uuid4()),
-                "message_id": str(uuid.uuid4()),
-                "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
-                "ttl": "PT10M",
-                "location": {
-                    "country": {"code": "IND"},
-                    "city": {"code": "*"},
-                },
-                "tags": {
-                    "session_id": self.session_id,
-                    "question_id": self.question_id,
-                },
+    return {
+        "context": {
+            "domain": "schemes:vistaar",
+            "action": "search",
+            "version": "1.1.0",
+            "bap_id": os.getenv("BAP_ID"),
+            "bap_uri": os.getenv("BAP_URI"),
+            "bpp_id": os.getenv("BPP_ID"),
+            "bpp_uri": os.getenv("BPP_URI"),
+            "transaction_id": str(uuid.uuid4()),
+            "message_id": str(uuid.uuid4()),
+            "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+            "ttl": "PT10M",
+            "location": {
+                "country": {"code": "IND"},
+                "city": {"code": "*"},
             },
-            "message": {
-                "intent": {
-                    "category": {
-                        "descriptor": {
-                            "code": SCHEME_AGRI_QDRANT_CATEGORY,
-                            "name": SCHEME_AGRI_QDRANT_CATEGORY,
-                        }
-                    },
-                    "item": {
-                        "descriptor": item_descriptor,
-                    },
-                }
+            "tags": {
+                "session_id": session_id,
+                "question_id": question_id,
             },
-        }
+        },
+        "message": {
+            "intent": {
+                "category": {
+                    "descriptor": {
+                        "code": SCHEME_AGRI_QDRANT_CATEGORY,
+                        "name": SCHEME_AGRI_QDRANT_CATEGORY,
+                    }
+                },
+                "item": {
+                    "descriptor": item_descriptor,
+                },
+            }
+        },
+    }
 
 
 @observe(name="tool:search_schemes", as_type="tool")
@@ -261,12 +291,12 @@ async def search_schemes(
         return format_scheme_unavailable(query)
 
     scheme_code = resolve_scheme_code(query, scheme_list)
-    payload = SchemeDocSearchRequest(
+    payload = _build_scheme_qdrant_search_payload(
         query=query,
         scheme_code=scheme_code,
         session_id=ctx.deps.session_id,
         question_id=ctx.deps.question_id,
-    ).get_payload()
+    )
     transaction_id = payload.get("context", {}).get("transaction_id")
     lf_update_current_observation(
         input={"query": query, "top_k": top_k, "scheme_code": scheme_code},
@@ -313,12 +343,47 @@ async def search_schemes(
             )
             return "Scheme search service is unavailable. Please try again later."
 
-        parsed = SchemeDocApiResponse.model_validate(response.json())
-        search_ctx = parsed.search_context()
-        results = parsed.chunk_results()
-        status = (search_ctx.get("status") or "").strip().lower()
-        message = (search_ctx.get("message") or "").strip()
-        resolved = (search_ctx.get("resolved_scheme_code") or "").strip()
+        data = response.json()
+        if not isinstance(data, dict):
+            logger.error("Scheme network search returned non-object JSON: %s", type(data))
+            return "Scheme search returned an unexpected response. Please try again later."
+
+        results, search_ctx = _parse_scheme_network_response(data)
+        status = str(search_ctx.get("status") or "").strip().lower()
+        message = str(search_ctx.get("message") or "").strip()
+        resolved = str(search_ctx.get("resolved_scheme_code") or "").strip()
+
+        if status and status != "success" and not results:
+            logger.info(
+                "Scheme network search non-success status=%s message=%r hits=%s",
+                status,
+                message,
+                len(results),
+            )
+            lf_update_current_observation(
+                metadata={
+                    "tool": "scheme.search",
+                    "category": SCHEME_AGRI_QDRANT_CATEGORY,
+                    "transaction_id": transaction_id,
+                    "network_status": status or None,
+                    "resolved_scheme_code": resolved or scheme_code,
+                    "hit_count": 0,
+                    "doc_ids": [],
+                    "chunk_ids": [],
+                    "providers_source": search_ctx.get("source"),
+                    "search_backend": search_ctx.get("search_backend"),
+                }
+            )
+            return message or format_scheme_unavailable(query)
+
+        if top_k and top_k > 0:
+            results = results[:top_k]
+
+        # From network chunk-details tags — shown in Langfuse tool metadata.
+        doc_ids = list(
+            dict.fromkeys(str(r.get("doc_id") or "") for r in results if r.get("doc_id"))
+        )
+        chunk_ids = [str(r.get("chunk_id") or "") for r in results if r.get("chunk_id")]
 
         lf_update_current_observation(
             metadata={
@@ -328,21 +393,22 @@ async def search_schemes(
                 "network_status": status or None,
                 "resolved_scheme_code": resolved or scheme_code,
                 "hit_count": len(results),
+                "doc_ids": doc_ids,
+                "chunk_ids": chunk_ids,
+                "chunks": [
+                    {
+                        "doc_id": r.get("doc_id") or "",
+                        "chunk_id": r.get("chunk_id") or "",
+                        "scheme_code": r.get("scheme_code") or "",
+                        "section": r.get("section") or "",
+                        "score": r.get("score"),
+                    }
+                    for r in results
+                ],
                 "providers_source": search_ctx.get("source"),
                 "search_backend": search_ctx.get("search_backend"),
             }
         )
-
-        if status and status != "success" and not results:
-            logger.info(
-                "Scheme network search non-success status=%s message=%r",
-                status,
-                message,
-            )
-            return message or format_scheme_unavailable(query)
-
-        if top_k and top_k > 0:
-            results = results[:top_k]
 
         return format_search_results(results, query, scheme_list)
 
