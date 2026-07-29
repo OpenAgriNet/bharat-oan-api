@@ -150,6 +150,24 @@ def _parse_mandi_date(date_str: Optional[str]) -> Optional[date]:
         return None
 
 
+def _normalize_requested_range(
+    price_date: Optional[str],
+    price_date_to: Optional[str],
+) -> tuple[Optional[date], Optional[date], bool]:
+    """Parse both ends of a requested window, swapping them when given back to front.
+
+    Returns (start, end, is_range). is_range is True only when two *distinct* dates were
+    given — a range whose ends are equal is just a single requested date.
+    """
+    start = _parse_mandi_date(price_date)
+    end = _parse_mandi_date(price_date_to)
+    if start is None or end is None:
+        return start, end, False
+    if start > end:
+        start, end = end, start
+    return start, end, start != end
+
+
 def _resolve_date_range(price_date: Optional[str], price_date_to: Optional[str] = None) -> tuple[str, str]:
     """Resolve the from_date/to_date window (DD-MM-YYYY) for the mandi search payload.
 
@@ -164,10 +182,7 @@ def _resolve_date_range(price_date: Optional[str], price_date_to: Optional[str] 
     """
     today_ist = datetime.now(_IST).date()
 
-    start = _parse_mandi_date(price_date)
-    end = _parse_mandi_date(price_date_to)
-    if start is not None and end is not None and start > end:
-        start, end = end, start
+    start, end, _ = _normalize_requested_range(price_date, price_date_to)
 
     to_date = min(end, today_ist) if end is not None else today_ist
     if start is not None:
@@ -208,6 +223,16 @@ def _item_in_date_range(item: "MandiItem", start: date, end: date) -> bool:
     return arrival is not None and start <= arrival <= end
 
 
+def _display_date(day: date) -> str:
+    """Format a calendar date the way it is shown in tool output."""
+    return _format_price_date_display(day.strftime("%d-%m-%Y"))
+
+
+def _items_on_date(items: List["MandiItem"], day: date) -> List["MandiItem"]:
+    """Keep only the items whose arrival date is exactly `day`."""
+    return [item for item in items if _item_matches_requested_date(item, day.strftime("%d-%m-%Y"))]
+
+
 def _arrival_date_sort_key(item: "MandiItem") -> datetime:
     """Return a comparable datetime for sorting newest-first (callers sort with reverse=True);
     items without a date get the minimum datetime so they sort last."""
@@ -231,6 +256,48 @@ def _closest_available_date(items: List["MandiItem"], target: date) -> Optional[
     if not candidates:
         return None
     return min(candidates, key=lambda d: (abs((d - target).days), -d.toordinal()))
+
+
+# A selection is the items to display plus the header describing them, or None when the
+# response holds no dated item to fall back on.
+Selection = Optional[tuple[List["MandiItem"], str]]
+
+
+def _closest_date_selection(items: List["MandiItem"], target: date, requested_label: str, noun: str) -> Selection:
+    """Fall back to the dated items nearest `target`, labelled as a substitute for what was asked."""
+    closest = _closest_available_date(items, target)
+    if closest is None:
+        return None
+    header = (
+        f"**Mandi Price Discovery** [{noun}: {requested_label} "
+        f"not available — showing closest available date: {_display_date(closest)}]"
+    )
+    return _items_on_date(items, closest), header
+
+
+def _select_for_range(items: List["MandiItem"], start: date, end: date, requested_label: str) -> Selection:
+    """Every arrival date inside the requested window, or the closest date to its end."""
+    in_range = [item for item in items if _item_in_date_range(item, start, end)]
+    if in_range:
+        return in_range, f"**Mandi Price Discovery** [Price Date Range: {requested_label}]"
+    return _closest_date_selection(items, end, requested_label, "Requested date range")
+
+
+def _select_for_latest(items: List["MandiItem"]) -> Selection:
+    """Latest available: narrow the searched window down to the single most recent arrival
+    date found, rather than mixing every date in the window together."""
+    latest = _closest_available_date(items, datetime.now(_IST).date())
+    if latest is None:
+        return items, "**Mandi Price Discovery** [Price Date: Latest available]"
+    return _items_on_date(items, latest), f"**Mandi Price Discovery** [Price Date: {_display_date(latest)}]"
+
+
+def _select_for_date(items: List["MandiItem"], requested: date, requested_label: str) -> Selection:
+    """The items arriving on the requested date, or the closest date to it."""
+    exact_matches = _items_on_date(items, requested)
+    if exact_matches:
+        return exact_matches, f"**Mandi Price Discovery** [Price Date: {requested_label}]"
+    return _closest_date_selection(items, requested, requested_label, "Requested date")
 
 
 # -----------------------
@@ -377,73 +444,32 @@ class MandiResponse(BaseModel):
         requested_price_date: Optional[str] = None,
         requested_price_date_to: Optional[str] = None,
     ) -> str:
-        range_start = _parse_mandi_date(requested_price_date)
-        range_end = _parse_mandi_date(requested_price_date_to)
-        if range_start is not None and range_end is not None and range_start > range_end:
-            range_start, range_end = range_end, range_start
-        is_range = range_start is not None and range_end is not None and range_start != range_end
-
-        if is_range:
-            requested_label = (
-                f"{_format_price_date_display(range_start.strftime('%d-%m-%Y'))} to "
-                f"{_format_price_date_display(range_end.strftime('%d-%m-%Y'))}"
-            )
-        else:
-            requested_label = _format_price_date_display(requested_price_date)
-
+        start, end, is_range = _normalize_requested_range(requested_price_date, requested_price_date_to)
+        requested_label = (
+            f"{_display_date(start)} to {_display_date(end)}"
+            if is_range
+            else _format_price_date_display(requested_price_date)
+        )
         no_data = (
             f"**Mandi Price Discovery** [Price Date: {requested_label}]\n"
             "No mandi price data found for the requested location and commodity."
         )
-        if len(self.responses) == 0 or not self._has_mandi_data():
+
+        if not self.responses or not self._has_mandi_data():
             return no_data
 
         all_items = self._collect_items()
-        requested_date = _parse_mandi_date(requested_price_date)
-
         if is_range:
-            in_range = [item for item in all_items if _item_in_date_range(item, range_start, range_end)]
-            if in_range:
-                display_items = in_range
-                header = f"**Mandi Price Discovery** [Price Date Range: {requested_label}]"
-            else:
-                # Nothing in the window — fall back to the date nearest its end, same as a single date.
-                closest = _closest_available_date(all_items, range_end)
-                if closest is None:
-                    return no_data
-                closest_str = closest.strftime("%d-%m-%Y")
-                display_items = [item for item in all_items if _item_matches_requested_date(item, closest_str)]
-                header = (
-                    f"**Mandi Price Discovery** [Requested date range: {requested_label} "
-                    f"not available — showing closest available date: {_format_price_date_display(closest_str)}]"
-                )
-        elif requested_date is None:
-            # "Latest available" — narrow the searched window down to the single most recent
-            # arrival date found, rather than mixing every date in the window together.
-            latest = _closest_available_date(all_items, datetime.now(_IST).date())
-            if latest is None:
-                header = "**Mandi Price Discovery** [Price Date: Latest available]"
-                display_items = all_items
-            else:
-                latest_str = latest.strftime("%d-%m-%Y")
-                display_items = [item for item in all_items if _item_matches_requested_date(item, latest_str)]
-                header = f"**Mandi Price Discovery** [Price Date: {_format_price_date_display(latest_str)}]"
+            selection = _select_for_range(all_items, start, end, requested_label)
+        elif start is None:
+            selection = _select_for_latest(all_items)
         else:
-            exact_matches = [item for item in all_items if _item_matches_requested_date(item, requested_price_date)]
-            if exact_matches:
-                display_items = exact_matches
-                header = f"**Mandi Price Discovery** [Price Date: {_format_price_date_display(requested_price_date)}]"
-            else:
-                closest = _closest_available_date(all_items, requested_date)
-                if closest is None:
-                    return no_data
-                closest_str = closest.strftime("%d-%m-%Y")
-                display_items = [item for item in all_items if _item_matches_requested_date(item, closest_str)]
-                header = (
-                    f"**Mandi Price Discovery** [Requested date: {_format_price_date_display(requested_price_date)} "
-                    f"not available — showing closest available date: {_format_price_date_display(closest_str)}]"
-                )
+            selection = _select_for_date(all_items, start, requested_label)
 
+        if selection is None:
+            return no_data
+
+        display_items, header = selection
         lines = [header]
         for item in sorted(display_items, key=_arrival_date_sort_key, reverse=True):
             lines.append(str(item))
