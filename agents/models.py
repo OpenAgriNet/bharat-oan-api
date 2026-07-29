@@ -154,6 +154,10 @@ def validate_agrinet_routing_config() -> None:
         raise ValueError("AGRINET routing weights must sum to 100")
     if settings.agrinet_route_ttl_seconds <= 0:
         raise ValueError("AGRINET_ROUTE_TTL_SECONDS must be a positive integer")
+    if settings.agrinet_gemma_max_concurrency <= 0:
+        raise ValueError("AGRINET_GEMMA_MAX_CONCURRENCY must be a positive integer")
+    if settings.agrinet_gemma_metrics_cache_ttl <= 0:
+        raise ValueError("AGRINET_GEMMA_METRICS_CACHE_TTL must be a positive integer")
 
     # Force Gemma config validation during startup when routing is enabled.
     get_agrinet_route_model("gemma")
