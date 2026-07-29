@@ -150,24 +150,34 @@ def _parse_mandi_date(date_str: Optional[str]) -> Optional[date]:
         return None
 
 
-def _resolve_date_range(price_date: Optional[str]) -> tuple[str, str]:
+def _resolve_date_range(price_date: Optional[str], price_date_to: Optional[str] = None) -> tuple[str, str]:
     """Resolve the from_date/to_date window (DD-MM-YYYY) for the mandi search payload.
 
-    to_date is always today (IST). from_date is the requested date, clamped to at
-    most MAX_DATE_RANGE_DAYS before today since the API rejects wider ranges; when no
-    date was requested (latest available), from_date is pushed back the full window
-    to maximize the chance of finding the most recent arrivals.
+    When the farmer asks for an explicit range ("01-07-2026 to 10-07-2026"), both ends are
+    honoured: from_date is the start and to_date the end, capped at today (IST).
+
+    For a single requested date, to_date stays today so the closest-available-date fallback
+    still has newer arrivals to choose from; when no date was requested (latest available),
+    from_date is pushed back the full window to maximize the chance of finding recent arrivals.
+
+    Either way the window is clamped to MAX_DATE_RANGE_DAYS, since the API rejects wider ranges.
     """
     today_ist = datetime.now(_IST).date()
-    earliest_allowed = today_ist - timedelta(days=MAX_DATE_RANGE_DAYS)
 
-    requested = _parse_mandi_date(price_date)
-    if requested is None:
-        from_date = earliest_allowed
+    start = _parse_mandi_date(price_date)
+    end = _parse_mandi_date(price_date_to)
+    if start is not None and end is not None and start > end:
+        start, end = end, start
+
+    to_date = min(end, today_ist) if end is not None else today_ist
+    if start is not None:
+        from_date = min(start, to_date)
     else:
-        from_date = max(requested, earliest_allowed)
+        # No start date: search back the full window so the latest/closest fallback has data.
+        from_date = to_date - timedelta(days=MAX_DATE_RANGE_DAYS)
 
-    return from_date.strftime("%d-%m-%Y"), today_ist.strftime("%d-%m-%Y")
+    from_date = max(from_date, to_date - timedelta(days=MAX_DATE_RANGE_DAYS))
+    return from_date.strftime("%d-%m-%Y"), to_date.strftime("%d-%m-%Y")
 
 
 def _format_price_date_display(price_date: Optional[str]) -> str:
@@ -190,6 +200,12 @@ def _item_matches_requested_date(item: "MandiItem", requested_price_date: Option
         return True
     arrival = _parse_mandi_date(item._get_tag_value("Arrival Date"))
     return arrival is not None and arrival == requested
+
+
+def _item_in_date_range(item: "MandiItem", start: date, end: date) -> bool:
+    """Return True when the item's arrival date falls inside the requested range (inclusive)."""
+    arrival = _parse_mandi_date(item._get_tag_value("Arrival Date"))
+    return arrival is not None and start <= arrival <= end
 
 
 def _arrival_date_sort_key(item: "MandiItem") -> datetime:
@@ -356,18 +372,52 @@ class MandiResponse(BaseModel):
                         items.append(item)
         return items
 
-    def format_output(self, requested_price_date: Optional[str] = None) -> str:
-        if len(self.responses) == 0 or not self._has_mandi_data():
-            date_label = _format_price_date_display(requested_price_date)
-            return (
-                f"**Mandi Price Discovery** [Price Date: {date_label}]\n"
-                "No mandi price data found for the requested location and commodity."
+    def format_output(
+        self,
+        requested_price_date: Optional[str] = None,
+        requested_price_date_to: Optional[str] = None,
+    ) -> str:
+        range_start = _parse_mandi_date(requested_price_date)
+        range_end = _parse_mandi_date(requested_price_date_to)
+        if range_start is not None and range_end is not None and range_start > range_end:
+            range_start, range_end = range_end, range_start
+        is_range = range_start is not None and range_end is not None and range_start != range_end
+
+        if is_range:
+            requested_label = (
+                f"{_format_price_date_display(range_start.strftime('%d-%m-%Y'))} to "
+                f"{_format_price_date_display(range_end.strftime('%d-%m-%Y'))}"
             )
+        else:
+            requested_label = _format_price_date_display(requested_price_date)
+
+        no_data = (
+            f"**Mandi Price Discovery** [Price Date: {requested_label}]\n"
+            "No mandi price data found for the requested location and commodity."
+        )
+        if len(self.responses) == 0 or not self._has_mandi_data():
+            return no_data
 
         all_items = self._collect_items()
         requested_date = _parse_mandi_date(requested_price_date)
 
-        if requested_date is None:
+        if is_range:
+            in_range = [item for item in all_items if _item_in_date_range(item, range_start, range_end)]
+            if in_range:
+                display_items = in_range
+                header = f"**Mandi Price Discovery** [Price Date Range: {requested_label}]"
+            else:
+                # Nothing in the window — fall back to the date nearest its end, same as a single date.
+                closest = _closest_available_date(all_items, range_end)
+                if closest is None:
+                    return no_data
+                closest_str = closest.strftime("%d-%m-%Y")
+                display_items = [item for item in all_items if _item_matches_requested_date(item, closest_str)]
+                header = (
+                    f"**Mandi Price Discovery** [Requested date range: {requested_label} "
+                    f"not available — showing closest available date: {_format_price_date_display(closest_str)}]"
+                )
+        elif requested_date is None:
             # "Latest available" — narrow the searched window down to the single most recent
             # arrival date found, rather than mixing every date in the window together.
             latest = _closest_available_date(all_items, datetime.now(_IST).date())
@@ -386,11 +436,7 @@ class MandiResponse(BaseModel):
             else:
                 closest = _closest_available_date(all_items, requested_date)
                 if closest is None:
-                    date_label = _format_price_date_display(requested_price_date)
-                    return (
-                        f"**Mandi Price Discovery** [Price Date: {date_label}]\n"
-                        "No mandi price data found for the requested location and commodity."
-                    )
+                    return no_data
                 closest_str = closest.strftime("%d-%m-%Y")
                 display_items = [item for item in all_items if _item_matches_requested_date(item, closest_str)]
                 header = (
@@ -418,6 +464,7 @@ class MandiRequest(BaseModel):
         location_name (str): City or market area name, example: Jaipur
         commodity_name (str): Commodity name, example: Onion
         price_date (str): Optional price date in DD-MM-YYYY; omit only for latest available.
+        price_date_to (str): Optional end of a date range in DD-MM-YYYY; price_date is the start.
     """
     latitude: float = Field(..., description="Latitude of the location")
     longitude: float = Field(..., description="Longitude of the location")
@@ -426,6 +473,10 @@ class MandiRequest(BaseModel):
     price_date: Optional[str] = Field(
         default=None,
         description="Optional price date in DD-MM-YYYY; pass for today/yesterday/specific dates; omit only for latest available",
+    )
+    price_date_to: Optional[str] = Field(
+        default=None,
+        description="Optional end date in DD-MM-YYYY for a date range; pass with price_date (the start date) when the farmer asks for prices between two dates",
     )
     session_id: str = ""
     question_id: str = ""
@@ -443,7 +494,12 @@ class MandiRequest(BaseModel):
             if self.price_date and self.price_date.strip()
             else None
         )
-        from_date, to_date = _resolve_date_range(price_date)
+        price_date_to = (
+            self.price_date_to.strip()
+            if self.price_date_to and self.price_date_to.strip()
+            else None
+        )
+        from_date, to_date = _resolve_date_range(price_date, price_date_to)
 
         return {
             "context": {
@@ -517,6 +573,7 @@ async def get_mandi_prices(
     location_name: str,
     commodity_name: str,
     price_date: Optional[str] = None,
+    price_date_to: Optional[str] = None,
 ) -> str:
     """Get mandi prices for a specific commodity near a location.
 
@@ -530,6 +587,9 @@ async def get_mandi_prices(
         location_name (str): City or market area name (e.g. Jaipur, Pune)
         commodity_name (str): English commodity name from search_commodity (e.g. Onion)
         price_date (str): Optional price date in DD-MM-YYYY; pass for today/yesterday/specific dates.
+            For a date range ("from 01-07-2026 to 10-07-2026") pass the start date here.
+        price_date_to (str): Optional end date in DD-MM-YYYY; pass only for a date range, together
+            with price_date as the start date (e.g. price_date=01-07-2026, price_date_to=10-07-2026).
 
     Returns:
         str: Formatted mandi price data for the requested commodity and location
@@ -541,6 +601,7 @@ async def get_mandi_prices(
             location_name=location_name,
             commodity_name=commodity_name,
             price_date=price_date,
+            price_date_to=price_date_to,
             session_id=ctx.deps.session_id,
             question_id=ctx.deps.question_id,
         ).get_payload()
@@ -554,6 +615,7 @@ async def get_mandi_prices(
                 "location_name": location_name,
                 "commodity_name": commodity_name,
                 "price_date": price_date,
+                "price_date_to": price_date_to,
                 "from_date": from_date,
                 "to_date": to_date,
             },
@@ -585,7 +647,10 @@ async def get_mandi_prices(
         logger.info("Mandi API response OK")
         data = response.json()
         mandi_response = MandiResponse.model_validate(data)
-        return mandi_response.format_output(requested_price_date=price_date)
+        return mandi_response.format_output(
+            requested_price_date=price_date,
+            requested_price_date_to=price_date_to,
+        )
 
     except httpx.TimeoutException:
         logger.error("Mandi API request timed out")
