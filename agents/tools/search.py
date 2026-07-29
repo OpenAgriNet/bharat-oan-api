@@ -1,24 +1,42 @@
 """
-Marqo client implementation for vector search.
+Marqo client implementation for vector search + network scheme document search.
 """
+from __future__ import annotations
+
 import asyncio
 import os
 import re
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Literal, Optional
+
+import httpx
 import marqo
-from typing import Optional, Literal
-from pydantic import BaseModel, Field
-from pydantic_ai import ModelRetry
 from langfuse import observe
-from helpers.utils import get_logger
-from agents.tools.terms import normalize_text_with_glossary
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic_ai import ModelRetry
+from pydantic_ai.tools import RunContext
+
+from agents.deps import FarmerContext
+from app.config import DEFAULT_HTTP_TIMEOUT
+from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.scheme_qdrant_search import (
     format_qdrant_scheme_codes_for_doc,
+    format_scheme_unavailable,
     format_search_results,
+    get_builtin_scheme_list,
+    query_names_unindexed_scheme,
+    resolve_scheme_code,
 )
+from helpers.utils import get_logger
+from agents.tools.terms import normalize_text_with_glossary
 
 logger = get_logger(__name__)
 
-DocumentType = Literal['video', 'document']
+DocumentType = Literal["video", "document"]
+
+SCHEME_AGRI_QDRANT_CATEGORY = "scheme-agri-qdrant"
+
 
 class SearchHit(BaseModel):
     """Individual search hit from elasticsearch"""
@@ -34,22 +52,196 @@ class SearchHit(BaseModel):
     def processed_text(self) -> str:
         """Returns the text with cleaned up whitespace and newlines"""
         # Replace multiple newlines with a single line
-        cleaned = re.sub(r'\n{2,}', '\n\n', self.text)
-        cleaned = re.sub(r'\t+', '\t', cleaned)
+        cleaned = re.sub(r"\n{2,}", "\n\n", self.text)
+        cleaned = re.sub(r"\t+", "\t", cleaned)
         cleaned = normalize_text_with_glossary(cleaned)
         return cleaned
 
     def __str__(self) -> str:
-        if self.type == 'document':
-            return f"**{self.name}**\n" + "```\n" + self.processed_text +  "\n```\n" 
+        if self.type == "document":
+            return f"**{self.name}**\n" + "```\n" + self.processed_text + "\n```\n"
         else:
             return f"**[{self.name}]({self.source})**\n" + "```\n" + self.processed_text + "\n```\n"
 
 
+# -----------------------
+# Scheme document search (BAP /search, category scheme-agri-qdrant)
+# Same Beckn shape as SMAM / scheme_info: request.get_payload() + Pydantic response.
+# -----------------------
+class SchemeDocDescriptor(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    code: Optional[str] = None
+    name: Optional[str] = None
+    short_desc: Optional[str] = None
+    long_desc: Optional[str] = None
+
+
+class SchemeDocTagEntry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    descriptor: SchemeDocDescriptor
+    value: str
+    display: Optional[bool] = None
+
+
+class SchemeDocTagGroup(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    descriptor: SchemeDocDescriptor
+    list: List[SchemeDocTagEntry] = Field(default_factory=list)
+    display: Optional[bool] = None
+
+
+class SchemeDocItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    descriptor: SchemeDocDescriptor
+    tags: List[SchemeDocTagGroup] = Field(default_factory=list)
+
+
+class SchemeDocProvider(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: Optional[str] = None
+    descriptor: Optional[SchemeDocDescriptor] = None
+    items: List[SchemeDocItem] = Field(default_factory=list)
+
+
+class SchemeDocCatalog(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    descriptor: Optional[SchemeDocDescriptor] = None
+    tags: Optional[List[SchemeDocTagGroup]] = None
+    providers: List[SchemeDocProvider] = Field(default_factory=list)
+
+
+class SchemeDocMessage(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    catalog: SchemeDocCatalog
+
+
+class SchemeDocResponseItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    context: Optional[Dict[str, Any]] = None
+    message: SchemeDocMessage
+
+
+def _flatten_tag_values(tag_groups: Optional[List[SchemeDocTagGroup]]) -> Dict[str, str]:
+    """Same pattern as SMAM `_flatten_catalog_tag_values`: code → value."""
+    merged: Dict[str, str] = {}
+    if not tag_groups:
+        return merged
+    for grp in tag_groups:
+        for ent in grp.list:
+            key = (ent.descriptor.code or "").strip().lower().replace("-", "_")
+            if key:
+                merged[key] = ent.value
+    return merged
+
+
+class SchemeDocApiResponse(BaseModel):
+    """BAP client JSON: optional `context` + `responses[].message.catalog`."""
+
+    model_config = ConfigDict(extra="ignore")
+    context: Optional[Dict[str, Any]] = None
+    responses: List[SchemeDocResponseItem] = Field(default_factory=list)
+
+    def search_context(self) -> Dict[str, str]:
+        for rsp in self.responses:
+            ctx = _flatten_tag_values(rsp.message.catalog.tags)
+            if ctx:
+                return ctx
+        return {}
+
+    def chunk_results(self) -> List[Dict[str, Any]]:
+        """Map providers/items/chunk-details tags into format_search_results rows."""
+        results: List[Dict[str, Any]] = []
+        for rsp in self.responses:
+            for provider in rsp.message.catalog.providers:
+                for item in provider.items:
+                    details = _flatten_tag_values(item.tags)
+                    text = (details.get("text") or item.descriptor.long_desc or "").strip()
+                    if not text:
+                        continue
+                    try:
+                        score = float(details.get("score") or 0)
+                    except (TypeError, ValueError):
+                        score = 0.0
+                    results.append(
+                        {
+                            "score": score,
+                            "scheme_code": (
+                                details.get("scheme_code") or item.descriptor.code or ""
+                            ).strip(),
+                            "scheme_name": (
+                                details.get("scheme_name") or item.descriptor.name or ""
+                            ).strip(),
+                            "text": text,
+                            "doc_id": (details.get("doc_id") or "").strip(),
+                            "chunk_id": (details.get("chunk_id") or item.id or "").strip(),
+                            "section": (details.get("section") or "other").strip().lower(),
+                        }
+                    )
+        return results
+
+
+class SchemeDocSearchRequest(BaseModel):
+    """Beckn /search request for scheme-agri-qdrant (mirrors SchemeRequest / SmamStatusRequest)."""
+
+    query: str
+    scheme_code: Optional[str] = None
+    session_id: str = ""
+    question_id: str = ""
+
+    def get_payload(self) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc)
+        item_descriptor: Dict[str, str] = {"name": self.query}
+        if self.scheme_code:
+            item_descriptor["code"] = self.scheme_code
+
+        return {
+            "context": {
+                "domain": "schemes:vistaar",
+                "action": "search",
+                "version": "1.1.0",
+                "bap_id": os.getenv("BAP_ID"),
+                "bap_uri": os.getenv("BAP_URI"),
+                "bpp_id": os.getenv("BPP_ID"),
+                "bpp_uri": os.getenv("BPP_URI"),
+                "transaction_id": str(uuid.uuid4()),
+                "message_id": str(uuid.uuid4()),
+                "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+                "ttl": "PT10M",
+                "location": {
+                    "country": {"code": "IND"},
+                    "city": {"code": "*"},
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
+            },
+            "message": {
+                "intent": {
+                    "category": {
+                        "descriptor": {
+                            "code": SCHEME_AGRI_QDRANT_CATEGORY,
+                            "name": SCHEME_AGRI_QDRANT_CATEGORY,
+                        }
+                    },
+                    "item": {
+                        "descriptor": item_descriptor,
+                    },
+                }
+            },
+        }
+
+
 @observe(name="tool:search_schemes", as_type="tool")
-async def search_schemes(query: str, top_k: int = 10) -> str:
+async def search_schemes(
+    ctx: RunContext[FarmerContext],
+    query: str,
+    top_k: int = 10,
+) -> str:
     """
-    Semantic search for Bharat Vistaar scheme guideline PDFs stored in Qdrant.
+    Semantic search for Bharat Vistaar scheme guideline PDFs via the Vistaar network layer
+    (BAP /search, category scheme-agri-qdrant).
 
     PLACEHOLDER_SCHEME_CODES
 
@@ -63,40 +255,116 @@ async def search_schemes(query: str, top_k: int = 10) -> str:
     Returns:
         Formatted scheme document chunks with scheme names and relevance scores
     """
+    scheme_list = get_builtin_scheme_list()
+    if query_names_unindexed_scheme(query, scheme_list):
+        logger.info("Scheme not in indexed list for query %r", query)
+        return format_scheme_unavailable(query)
+
+    scheme_code = resolve_scheme_code(query, scheme_list)
+    payload = SchemeDocSearchRequest(
+        query=query,
+        scheme_code=scheme_code,
+        session_id=ctx.deps.session_id,
+        question_id=ctx.deps.question_id,
+    ).get_payload()
+    transaction_id = payload.get("context", {}).get("transaction_id")
+    lf_update_current_observation(
+        input={"query": query, "top_k": top_k, "scheme_code": scheme_code},
+        metadata={
+            "tool": "scheme.search",
+            "category": SCHEME_AGRI_QDRANT_CATEGORY,
+            "transaction_id": transaction_id,
+            "resolved_scheme_code": scheme_code,
+        },
+    )
+
+    bap_endpoint = os.getenv("BAP_ENDPOINT")
+    if not bap_endpoint:
+        logger.error("BAP_ENDPOINT is not set")
+        return "Scheme search service is not configured. Please try again later."
+
+    search_url = bap_endpoint.rstrip("/") + "/search"
+    logger.info(
+        "Scheme network search: query=%r scheme_code=%s url=%s",
+        query,
+        scheme_code,
+        search_url,
+    )
+
     try:
-        from helpers.scheme_qdrant_search import (
-            format_scheme_unavailable,
-            format_search_results,
-            get_builtin_scheme_list,
-            query_names_unindexed_scheme,
-            search_schemes as qdrant_search_schemes,
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                search_url,
+                json=payload,
+                timeout=DEFAULT_HTTP_TIMEOUT,
+            )
+
+        if response.status_code != 200:
+            logger.error(
+                "Scheme network search returned status %s — %s",
+                response.status_code,
+                (response.text or "")[:500],
+            )
+            lf_update_current_observation(
+                metadata={
+                    "tool": "scheme.search",
+                    "http_status": int(response.status_code),
+                }
+            )
+            return "Scheme search service is unavailable. Please try again later."
+
+        parsed = SchemeDocApiResponse.model_validate(response.json())
+        search_ctx = parsed.search_context()
+        results = parsed.chunk_results()
+        status = (search_ctx.get("status") or "").strip().lower()
+        message = (search_ctx.get("message") or "").strip()
+        resolved = (search_ctx.get("resolved_scheme_code") or "").strip()
+
+        lf_update_current_observation(
+            metadata={
+                "tool": "scheme.search",
+                "category": SCHEME_AGRI_QDRANT_CATEGORY,
+                "transaction_id": transaction_id,
+                "network_status": status or None,
+                "resolved_scheme_code": resolved or scheme_code,
+                "hit_count": len(results),
+                "providers_source": search_ctx.get("source"),
+                "search_backend": search_ctx.get("search_backend"),
+            }
         )
 
-        collection_name = os.getenv("QDRANT_COLLECTION_NAME", "schemes-index")
-        if not os.getenv("QDRANT_URL"):
-            raise ValueError("QDRANT_URL is required")
+        if status and status != "success" and not results:
+            logger.info(
+                "Scheme network search non-success status=%s message=%r",
+                status,
+                message,
+            )
+            return message or format_scheme_unavailable(query)
 
-        logger.info("Searching schemes for %r in collection %r", query, collection_name)
-
-        scheme_list = get_builtin_scheme_list()
-        if query_names_unindexed_scheme(query, scheme_list):
-            logger.info("Scheme not in indexed list for query %r", query)
-            return format_scheme_unavailable(query)
-
-        results = await asyncio.to_thread(
-            qdrant_search_schemes,
-            query,
-            collection_name,
-            None,
-            top_k,
-            None,
-            None,
-        )
+        if top_k and top_k > 0:
+            results = results[:top_k]
 
         return format_search_results(results, query, scheme_list)
 
+    except httpx.TimeoutException as e:
+        logger.error("Scheme network search timed out: %s", e)
+        lf_update_current_observation(
+            metadata={"tool": "scheme.search", "error_type": "timeout"}
+        )
+        return "Scheme search request timed out. Please try again later."
+
+    except httpx.RequestError as e:
+        logger.error("Scheme network search request failed: %s", e)
+        lf_update_current_observation(
+            metadata={"tool": "scheme.search", "error_type": "request_error"}
+        )
+        return f"Scheme search request failed: {e!s}"
+
     except Exception as e:
         logger.error("Error searching schemes: %s for query: %s", e, query)
+        lf_update_current_observation(
+            metadata={"tool": "scheme.search", "error_type": "exception"}
+        )
         raise ModelRetry("Error searching schemes, please try again") from e
 
 
