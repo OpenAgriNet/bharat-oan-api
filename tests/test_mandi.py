@@ -101,6 +101,33 @@ class TestResolveDateRange:
         assert from_date == _days_ago_str(MAX_DATE_RANGE_DAYS)
         assert to_date == _today_ist_str()
 
+    def test_explicit_range_uses_both_ends(self):
+        start, end = _days_ago_str(20), _days_ago_str(10)
+        from_date, to_date = _resolve_date_range(start, end)
+        assert (from_date, to_date) == (start, end)
+
+    def test_reversed_range_is_swapped(self):
+        start, end = _days_ago_str(10), _days_ago_str(20)
+        from_date, to_date = _resolve_date_range(start, end)
+        assert (from_date, to_date) == (end, start)
+
+    def test_range_end_in_the_future_is_capped_at_today(self):
+        start = _days_ago_str(5)
+        from_date, to_date = _resolve_date_range(start, _days_ago_str(-10))
+        assert (from_date, to_date) == (start, _today_ist_str())
+
+    def test_range_wider_than_max_is_clamped_from_the_end(self):
+        start, end = _days_ago_str(MAX_DATE_RANGE_DAYS + 40), _days_ago_str(5)
+        from_date, to_date = _resolve_date_range(start, end)
+        assert from_date == _days_ago_str(MAX_DATE_RANGE_DAYS + 5)
+        assert to_date == end
+
+    def test_range_end_without_start_searches_back_from_the_end(self):
+        end = _days_ago_str(10)
+        from_date, to_date = _resolve_date_range(None, end)
+        assert from_date == _days_ago_str(MAX_DATE_RANGE_DAYS + 10)
+        assert to_date == end
+
 
 class TestMandiRequestPayload:
     def _make_request(self, **overrides):
@@ -130,6 +157,30 @@ class TestMandiRequestPayload:
         tags = payload["message"]["intent"]["tags"]
         assert tags == [
             {"code": "from_date", "value": "25-07-2026"},
+            {"code": "to_date", "value": _today_ist_str()},
+        ]
+
+    def test_payload_uses_the_requested_range_ends(self, monkeypatch):
+        self._set_bap_env(monkeypatch)
+        start, end = _days_ago_str(20), _days_ago_str(10)
+
+        payload = self._make_request(price_date=start, price_date_to=end).get_payload()
+
+        tags = payload["message"]["intent"]["tags"]
+        assert tags == [
+            {"code": "from_date", "value": start},
+            {"code": "to_date", "value": end},
+        ]
+
+    def test_blank_price_date_to_is_treated_as_no_range(self, monkeypatch):
+        self._set_bap_env(monkeypatch)
+        start = _days_ago_str(5)
+
+        payload = self._make_request(price_date=start, price_date_to="   ").get_payload()
+
+        tags = payload["message"]["intent"]["tags"]
+        assert tags == [
+            {"code": "from_date", "value": start},
             {"code": "to_date", "value": _today_ist_str()},
         ]
 
@@ -293,6 +344,69 @@ class TestMandiResponseFormatOutput:
         output = response.format_output(requested_price_date="20-07-2026")
 
         assert "No mandi price data found" in output
+
+    def test_date_range_keeps_every_date_inside_the_window(self):
+        inside_start = _make_item("1", arrival_date="01-07-2026")
+        inside_middle = _make_item("2", arrival_date="05-07-2026")
+        inside_end = _make_item("3", arrival_date="10-07-2026")
+        outside = _make_item("4", arrival_date="11-07-2026")
+        provider = Provider(
+            id="p1",
+            descriptor=Descriptor(name="Provider"),
+            items=[inside_start, inside_middle, inside_end, outside],
+        )
+        response = self._make_response(providers=[provider])
+
+        output = response.format_output(
+            requested_price_date="01-07-2026",
+            requested_price_date_to="10-07-2026",
+        )
+
+        assert "Price Date Range: Wednesday, 01 July 2026 to Friday, 10 July 2026" in output
+        assert output.count("Commodity: Onion") == 3
+        assert "Saturday, 11 July 2026" not in output
+        # Newest arrival first (skip the header, which names both ends of the range).
+        body = output.split("\n---\n", 1)[1]
+        assert body.index("Friday, 10 July 2026") < body.index("Sunday, 05 July 2026") < body.index("Wednesday, 01 July 2026")
+
+    def test_date_range_with_no_data_inside_falls_back_to_closest_date(self):
+        item = _make_item("1", arrival_date="20-07-2026")
+        provider = Provider(id="p1", descriptor=Descriptor(name="Provider"), items=[item])
+        response = self._make_response(providers=[provider])
+
+        output = response.format_output(
+            requested_price_date="01-07-2026",
+            requested_price_date_to="10-07-2026",
+        )
+
+        assert "Requested date range: Wednesday, 01 July 2026 to Friday, 10 July 2026 not available" in output
+        assert "closest available date: Monday, 20 July 2026" in output
+        assert "Lasalgaon" in output
+
+    def test_date_range_with_no_providers_reports_the_range(self):
+        response = self._make_response(providers=[])
+
+        output = response.format_output(
+            requested_price_date="01-07-2026",
+            requested_price_date_to="10-07-2026",
+        )
+
+        assert "Wednesday, 01 July 2026 to Friday, 10 July 2026" in output
+        assert "No mandi price data found" in output
+
+    def test_range_with_identical_ends_behaves_like_a_single_date(self):
+        matching = _make_item("1", arrival_date="20-07-2026")
+        other = _make_item("2", arrival_date="19-07-2026")
+        provider = Provider(id="p1", descriptor=Descriptor(name="Provider"), items=[matching, other])
+        response = self._make_response(providers=[provider])
+
+        output = response.format_output(
+            requested_price_date="20-07-2026",
+            requested_price_date_to="20-07-2026",
+        )
+
+        assert "Price Date: Monday, 20 July 2026" in output
+        assert output.count("Commodity: Onion") == 1
 
     def test_no_requested_date_returns_only_the_latest_available_date(self):
         newer = _make_item("1", arrival_date="20-07-2026")
