@@ -165,6 +165,107 @@ def _spawn_detached(coro) -> None:
 
 
 
+@dataclass
+class _ChatTurnContext:
+    route_decision: AgrinetRouteDecision
+    trace_id: Optional[str]
+    telemetry_qid: str
+    session_id: str
+    channel: str
+    telemetry_user: dict
+    query: str
+    background_tasks: BackgroundTasks
+    history: list
+
+
+async def _finalize_chat_turn(
+    ctx: _ChatTurnContext,
+    completed_run: _AgrinetCompletedRun,
+    final_route_decision: AgrinetRouteDecision,
+    fallback_used: bool,
+    output_text: str,
+    *,
+    detached: bool = False,
+) -> None:
+    final_route_metadata = _agrinet_route_metadata(
+        final_route_decision,
+        fallback_used=fallback_used,
+        fallback_from=ctx.route_decision.route if fallback_used else None,
+    )
+
+    if ctx.trace_id and fallback_used:
+        await _record_chat_turn(
+            ctx.trace_id, ctx.telemetry_qid, ctx.session_id, final_route_decision, ctx.channel
+        )
+
+    logger.info(
+        "Agent run complete for session %s via route %s (%s)",
+        ctx.session_id,
+        final_route_decision.route,
+        final_route_decision.model_name,
+    )
+
+    if detached:
+        logger.info("Finalizing session %s turn after client disconnect", ctx.session_id)
+    else:
+        lf_update_current_span(output=output_text, metadata=final_route_metadata)
+
+    answer_event = create_chat_answer_event(
+        current_user=ctx.telemetry_user,
+        qid=ctx.telemetry_qid,
+        question_text=ctx.query,
+        answer_text=output_text,
+        session_id=ctx.session_id,
+    )
+    if detached:
+        await _send_telemetry_event(answer_event)
+    else:
+        _queue_telemetry_event(ctx.background_tasks, answer_event)
+
+    new_messages = completed_run.result.new_messages()
+    clean_new_messages = filter_thinking_from_history(list(new_messages or []))
+    clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
+    messages = [*ctx.history, *clean_new_messages]
+    logger.info(
+        "Updating message history for session %s with %s messages",
+        ctx.session_id,
+        len(messages),
+    )
+    await update_message_history(ctx.session_id, messages)
+    await refresh_session_agrinet_route_ttl(ctx.session_id)
+
+    get_client().flush()
+
+
+async def _finalize_after_client_disconnect(
+    ctx: _ChatTurnContext,
+    pending_run: asyncio.Task,
+) -> None:
+    try:
+        completed_run, final_route_decision, fallback_used = await asyncio.wait_for(
+            pending_run, _DISCONNECT_FINALIZE_TIMEOUT_SECONDS
+        )
+        await _finalize_chat_turn(
+            ctx,
+            completed_run,
+            final_route_decision,
+            fallback_used,
+            completed_run.output_text,
+            detached=True,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Agent run for session %s did not finish within %ss of the client "
+            "disconnecting; dropping the turn",
+            ctx.session_id,
+            _DISCONNECT_FINALIZE_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to save session %s turn after client disconnect", ctx.session_id
+        )
+
+
 async def _record_chat_turn(
     trace_id: Optional[str],
     telemetry_qid: str,
@@ -291,89 +392,17 @@ async def stream_chat_messages(
             trimmed_history = filter_thinking_from_history(trimmed_history)
 
             chunk_queue: asyncio.Queue[str | None] = asyncio.Queue()
-
-            async def _finalize_turn(
-                completed_run: _AgrinetCompletedRun,
-                final_route_decision: AgrinetRouteDecision,
-                fallback_used: bool,
-                output_text: str,
-                *,
-                detached: bool = False,
-            ) -> None:
-                """Record the finished turn. Also runs detached after a client disconnect."""
-                final_route_metadata = _agrinet_route_metadata(
-                    final_route_decision,
-                    fallback_used=fallback_used,
-                    fallback_from=route_decision.route if fallback_used else None,
-                )
-
-                if trace_id and fallback_used:
-                    await _record_chat_turn(
-                        trace_id, telemetry_qid, session_id, final_route_decision, channel
-                    )
-
-                logger.info(
-                    "Agent run complete for session %s via route %s (%s)",
-                    session_id,
-                    final_route_decision.route,
-                    final_route_decision.model_name,
-                )
-
-                if detached:
-                    logger.info("Finalizing session %s turn after client disconnect", session_id)
-                else:
-                    lf_update_current_span(output=output_text, metadata=final_route_metadata)
-
-                answer_event = create_chat_answer_event(
-                    current_user=telemetry_user,
-                    qid=telemetry_qid,
-                    question_text=query,
-                    answer_text=output_text,
-                    session_id=session_id,
-                )
-                if detached:
-                    await _send_telemetry_event(answer_event)
-                else:
-                    _queue_telemetry_event(background_tasks, answer_event)
-
-                new_messages = completed_run.result.new_messages()
-                clean_new_messages = filter_thinking_from_history(list(new_messages or []))
-                clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
-                messages = [*history, *clean_new_messages]
-                logger.info(
-                    "Updating message history for session %s with %s messages",
-                    session_id,
-                    len(messages),
-                )
-                await update_message_history(session_id, messages)
-                await refresh_session_agrinet_route_ttl(session_id)
-
-                get_client().flush()
-
-            async def _finalize_after_disconnect(pending_run: asyncio.Task) -> None:
-                """Let the in-flight run finish after a disconnect so the turn is still saved."""
-                try:
-                    completed_run, final_route_decision, fallback_used = await asyncio.wait_for(
-                        pending_run, _DISCONNECT_FINALIZE_TIMEOUT_SECONDS
-                    )
-                    await _finalize_turn(
-                        completed_run,
-                        final_route_decision,
-                        fallback_used,
-                        completed_run.output_text,
-                        detached=True,
-                    )
-                except asyncio.TimeoutError:
-                    logger.warning(
-                        "Agent run for session %s did not finish within %ss of the client "
-                        "disconnecting; dropping the turn",
-                        session_id,
-                        _DISCONNECT_FINALIZE_TIMEOUT_SECONDS,
-                    )
-                except Exception:
-                    logger.exception(
-                        "Failed to save session %s turn after client disconnect", session_id
-                    )
+            turn_ctx = _ChatTurnContext(
+                route_decision=route_decision,
+                trace_id=trace_id,
+                telemetry_qid=telemetry_qid,
+                session_id=session_id,
+                channel=channel,
+                telemetry_user=telemetry_user,
+                query=query,
+                background_tasks=background_tasks,
+                history=history,
+            )
 
             with propagate_attributes(tags=[moderation_data.category]):
                 agrinet_task = asyncio.create_task(
@@ -403,13 +432,13 @@ async def stream_chat_messages(
                 except (asyncio.CancelledError, GeneratorExit):
                     # Client hung up mid-stream. Hand the still-running agent task to a
                     # detached finalizer, then let the cancellation continue.
-                    _spawn_detached(_finalize_after_disconnect(agrinet_task))
+                    _spawn_detached(_finalize_after_client_disconnect(turn_ctx, agrinet_task))
                     raise
 
             output_text = completed_run.output_text
 
-            await _finalize_turn(
-                completed_run, final_route_decision, fallback_used, output_text
+            await _finalize_chat_turn(
+                turn_ctx, completed_run, final_route_decision, fallback_used, output_text
             )
         except Exception as exc:
             error_event = create_chat_error_event(
