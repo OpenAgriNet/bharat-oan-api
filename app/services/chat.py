@@ -72,6 +72,23 @@ class _AgrinetStreamState:
     raw_chunks: list[str] = field(default_factory=list)
 
 
+class _StreamChunkSink:
+    """Queue wrapper that remembers whether anything reached the client.
+
+    A failover retry writes into the same queue the caller is already draining,
+    so it is only safe before the first chunk goes out. Past that point the
+    farmer has seen part of an answer and a retry would append a second one.
+    """
+
+    def __init__(self, queue: asyncio.Queue[str | None]) -> None:
+        self._queue = queue
+        self.emitted = False
+
+    async def put(self, chunk: str) -> None:
+        self.emitted = True
+        await self._queue.put(chunk)
+
+
 def _agrinet_route_metadata(
     decision: AgrinetRouteDecision,
     *,
@@ -116,6 +133,137 @@ def _sanitize_streamed_output(raw_output: str) -> str:
     cleaned_output = re.sub(r"<think>[\s\S]*?</think>", "", raw_output)
     cleaned_output = re.sub(r"<think>[\s\S]*$", "", cleaned_output)
     return cleaned_output.strip()
+
+
+def _queue_telemetry_event(background_tasks: BackgroundTasks, event: Any) -> None:
+    background_tasks.add_task(
+        send_telemetry,
+        TelemetryRequest(events=create_frontend_compatible_item_batch(event)).model_dump(),
+    )
+
+
+async def _send_telemetry_event(event: Any) -> None:
+    """Send an event inline: response background tasks never run once the client is gone."""
+    try:
+        await send_telemetry(
+            TelemetryRequest(events=create_frontend_compatible_item_batch(event)).model_dump()
+        )
+    except Exception:
+        logger.exception("Failed to send telemetry event after client disconnect")
+
+
+_DISCONNECT_FINALIZE_TIMEOUT_SECONDS = 180
+
+_detached_finalizers: set[asyncio.Task] = set()
+
+
+def _spawn_detached(coro) -> None:
+    """Run a coroutine outside the request's cancel scope so a disconnect can't kill it."""
+    task = asyncio.create_task(coro)
+    _detached_finalizers.add(task)
+    task.add_done_callback(_detached_finalizers.discard)
+
+
+
+@dataclass
+class _ChatTurnContext:
+    route_decision: AgrinetRouteDecision
+    trace_id: Optional[str]
+    telemetry_qid: str
+    session_id: str
+    channel: str
+    telemetry_user: dict
+    query: str
+    background_tasks: BackgroundTasks
+    history: list
+
+
+async def _finalize_chat_turn(
+    ctx: _ChatTurnContext,
+    completed_run: _AgrinetCompletedRun,
+    final_route_decision: AgrinetRouteDecision,
+    fallback_used: bool,
+    output_text: str,
+    *,
+    detached: bool = False,
+) -> None:
+    final_route_metadata = _agrinet_route_metadata(
+        final_route_decision,
+        fallback_used=fallback_used,
+        fallback_from=ctx.route_decision.route if fallback_used else None,
+    )
+
+    if ctx.trace_id and fallback_used:
+        await _record_chat_turn(
+            ctx.trace_id, ctx.telemetry_qid, ctx.session_id, final_route_decision, ctx.channel
+        )
+
+    logger.info(
+        "Agent run complete for session %s via route %s (%s)",
+        ctx.session_id,
+        final_route_decision.route,
+        final_route_decision.model_name,
+    )
+
+    if detached:
+        logger.info("Finalizing session %s turn after client disconnect", ctx.session_id)
+    else:
+        lf_update_current_span(output=output_text, metadata=final_route_metadata)
+
+    answer_event = create_chat_answer_event(
+        current_user=ctx.telemetry_user,
+        qid=ctx.telemetry_qid,
+        question_text=ctx.query,
+        answer_text=output_text,
+        session_id=ctx.session_id,
+    )
+    if detached:
+        await _send_telemetry_event(answer_event)
+    else:
+        _queue_telemetry_event(ctx.background_tasks, answer_event)
+
+    new_messages = completed_run.result.new_messages()
+    clean_new_messages = filter_thinking_from_history(list(new_messages or []))
+    clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
+    messages = [*ctx.history, *clean_new_messages]
+    logger.info(
+        "Updating message history for session %s with %s messages",
+        ctx.session_id,
+        len(messages),
+    )
+    await update_message_history(ctx.session_id, messages)
+    await refresh_session_agrinet_route_ttl(ctx.session_id)
+
+    get_client().flush()
+
+
+async def _finalize_after_client_disconnect(
+    ctx: _ChatTurnContext,
+    pending_run: asyncio.Task,
+) -> None:
+    try:
+        completed_run, final_route_decision, fallback_used = await asyncio.wait_for(
+            pending_run, _DISCONNECT_FINALIZE_TIMEOUT_SECONDS
+        )
+        await _finalize_chat_turn(
+            ctx,
+            completed_run,
+            final_route_decision,
+            fallback_used,
+            completed_run.output_text,
+            detached=True,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Agent run for session %s did not finish within %ss of the client "
+            "disconnecting; dropping the turn",
+            ctx.session_id,
+            _DISCONNECT_FINALIZE_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to save session %s turn after client disconnect", ctx.session_id
+        )
 
 
 async def _record_chat_turn(
@@ -244,6 +392,18 @@ async def stream_chat_messages(
             trimmed_history = filter_thinking_from_history(trimmed_history)
 
             chunk_queue: asyncio.Queue[str | None] = asyncio.Queue()
+            turn_ctx = _ChatTurnContext(
+                route_decision=route_decision,
+                trace_id=trace_id,
+                telemetry_qid=telemetry_qid,
+                session_id=session_id,
+                channel=channel,
+                telemetry_user=telemetry_user,
+                query=query,
+                background_tasks=background_tasks,
+                history=history,
+            )
+
             with propagate_attributes(tags=[moderation_data.category]):
                 agrinet_task = asyncio.create_task(
                     _run_agrinet_with_failover_streaming(
@@ -257,61 +417,29 @@ async def stream_chat_messages(
                         chunk_queue=chunk_queue,
                     )
                 )
-                while True:
-                    chunk = await chunk_queue.get()
-                    if chunk is None:
-                        break
-                    yield chunk
+                try:
+                    while True:
+                        chunk = await chunk_queue.get()
+                        if chunk is None:
+                            break
+                        yield chunk
 
-                completed_run, final_route_decision, fallback_used = await agrinet_task
+                    # Shielded so that cancelling this request does not cancel the run
+                    # itself: the disconnect finalizer still needs its result.
+                    completed_run, final_route_decision, fallback_used = await asyncio.shield(
+                        agrinet_task
+                    )
+                except (asyncio.CancelledError, GeneratorExit):
+                    # Client hung up mid-stream. Hand the still-running agent task to a
+                    # detached finalizer, then let the cancellation continue.
+                    _spawn_detached(_finalize_after_client_disconnect(turn_ctx, agrinet_task))
+                    raise
 
-            final_route_metadata = _agrinet_route_metadata(
-                final_route_decision,
-                fallback_used=fallback_used,
-                fallback_from=route_decision.route if fallback_used else None,
-            )
-
-            if fallback_used:
-                await _record_chat_turn(
-                    trace_id, telemetry_qid, session_id, final_route_decision, channel
-                )
-
-            result = completed_run.result
             output_text = completed_run.output_text
-            new_messages = result.new_messages()
-            logger.info(
-                "Agent run complete for session %s via route %s (%s)",
-                session_id,
-                final_route_decision.route,
-                final_route_decision.model_name,
-            )
 
-            lf_update_current_span(output=output_text, metadata=final_route_metadata)
-
-            answer_event = create_chat_answer_event(
-                current_user=telemetry_user,
-                qid=telemetry_qid,
-                question_text=query,
-                answer_text=output_text,
-                session_id=session_id,
+            await _finalize_chat_turn(
+                turn_ctx, completed_run, final_route_decision, fallback_used, output_text
             )
-            background_tasks.add_task(
-                send_telemetry,
-                TelemetryRequest(events=create_frontend_compatible_item_batch(answer_event)).model_dump(),
-            )
-
-            clean_new_messages = filter_thinking_from_history(list(new_messages or []))
-            clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
-            messages = [*history, *clean_new_messages]
-            logger.info(
-                "Updating message history for session %s with %s messages",
-                session_id,
-                len(messages),
-            )
-            await update_message_history(session_id, messages)
-            await refresh_session_agrinet_route_ttl(session_id)
-
-            get_client().flush()
         except Exception as exc:
             error_event = create_chat_error_event(
                 current_user=telemetry_user,
@@ -429,6 +557,7 @@ async def _run_agrinet_with_failover_streaming(
     initial_decision: AgrinetRouteDecision,
     chunk_queue: asyncio.Queue[str | None],
 ):
+    sink = _StreamChunkSink(chunk_queue)
     try:
         try:
             completed_run = await _run_agrinet_once_streaming(
@@ -440,11 +569,22 @@ async def _run_agrinet_with_failover_streaming(
                 moderation_category=moderation_category,
                 decision=initial_decision,
                 fallback_used=False,
-                chunk_queue=chunk_queue,
+                chunk_queue=sink,
             )
             return completed_run, initial_decision, False
         except Exception as primary_exc:
             if not settings.agrinet_routing_enabled:
+                raise
+            if sink.emitted:
+                # Part of the answer is already on its way to the farmer; a retry
+                # would stream a second answer on top of it.
+                logger.warning(
+                    "Agrinet route %s failed for session %s after streaming began; "
+                    "not retrying on the alternate route: %s",
+                    initial_decision.route,
+                    session_id,
+                    primary_exc,
+                )
                 raise
 
             fallback_route = get_alternate_agrinet_route(initial_decision.route)
@@ -471,7 +611,7 @@ async def _run_agrinet_with_failover_streaming(
                 decision=fallback_decision,
                 fallback_used=True,
                 fallback_from=initial_decision.route,
-                chunk_queue=chunk_queue,
+                chunk_queue=sink,
             )
             await set_session_agrinet_route(session_id, fallback_decision.route)
             return completed_run, fallback_decision, True
@@ -489,7 +629,7 @@ async def _run_agrinet_once_streaming(
     moderation_category: str,
     decision: AgrinetRouteDecision,
     fallback_used: bool,
-    chunk_queue: asyncio.Queue[str | None] | None = None,
+    chunk_queue: _StreamChunkSink | None = None,
     fallback_from: AgrinetRoute | None = None,
 ) -> _AgrinetCompletedRun:
     route_metadata = _agrinet_route_metadata(

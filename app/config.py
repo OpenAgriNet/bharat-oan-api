@@ -119,6 +119,10 @@ class Settings(BaseSettings):
     agrinet_gemma_model_name: Optional[str] = os.getenv("AGRINET_GEMMA_MODEL_NAME")
     agrinet_gemma_base_url: Optional[str] = os.getenv("AGRINET_GEMMA_BASE_URL")
     agrinet_gemma_api_key: str = os.getenv("AGRINET_GEMMA_API_KEY", "not-needed")
+    # Capacity gate: route to Gemma only while its vLLM engine has spare capacity.
+    agrinet_gemma_max_concurrency: int = int(os.getenv("AGRINET_GEMMA_MAX_CONCURRENCY", "10"))
+    agrinet_gemma_metrics_url: Optional[str] = os.getenv("AGRINET_GEMMA_METRICS_URL")
+    agrinet_gemma_metrics_cache_ttl: int = int(os.getenv("AGRINET_GEMMA_METRICS_CACHE_TTL", "2"))
     marqo_index_name: Optional[str] = None
     marqo_pests_diseases_index_name: Optional[str] = None
 

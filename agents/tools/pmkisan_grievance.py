@@ -134,6 +134,9 @@ class GrievanceStatusDetail(BaseModel):
         lines: List[str] = []
         if self.Reg_No:
             lines.append(f"Registration Number: {self.Reg_No}")
+        if not self.GrievanceDate and not self.GrievanceDescription:
+            lines.append("Grievance Not Registered")
+            return "\n".join(lines)
         lines.append("Grievance Details:")
         if self.GrievanceDate:
             lines.append(f"  Date: {self.GrievanceDate}")
