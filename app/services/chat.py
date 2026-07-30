@@ -300,14 +300,11 @@ def _wrap_image_analysis_message(
 ) -> str:
     if pending_npss_image_url:
         location_instruction = (
-            "A previous NPSS call saved this image and requested one location. "
+            "A previous NPSS call saved this image while waiting for location data. "
             f"The pending image URL is {pending_npss_image_url}. "
-            "If the user's current message provides a village, locality, town, or PIN code, "
-            "collect that single location string, including any district/state context they "
-            "volunteered, then call `analyze_crop_image` again with the pending image URL and "
-            "that location. Translate or transliterate the same place into English tool arguments "
-            "when needed; do not ask the user to repeat it in English. Never invent a place or IDs. "
-            "Do not ask separately for state, district, sub-district, and village."
+            "Call `analyze_crop_image` again with that image URL now. Do not ask for or pass a "
+            "typed location; the backend uses browser coordinates when available and otherwise "
+            "falls back to Krishi Vigyan Kendra, Delhi."
         )
     elif latitude is not None and longitude is not None:
         location_instruction = (
@@ -319,8 +316,8 @@ def _wrap_image_analysis_message(
     else:
         location_instruction = (
             "No browser coordinates were sent with this image upload. "
-            "Do NOT call any geocoding tool or try to provide NPSS state, district, subdistrict, or village IDs. "
-            "Call `analyze_crop_image`; the backend will omit unresolved location fields rather than inventing IDs."
+            "Call `analyze_crop_image` immediately. Do not ask the farmer for a location and do not "
+            "call any geocoding tool; the backend will use Krishi Vigyan Kendra, Delhi as the fallback."
         )
     return (
         f"[USER UPLOADED A CROP IMAGE]\n\n"
@@ -338,9 +335,8 @@ def _wrap_image_analysis_message(
         f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
         f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
         f"If the tool returns multiple findings, show only the most relevant one. "
-        f"If the tool returns `[NPSS_LOCATION_REQUIRED]`, do not present an analysis result; "
-        f"ask the farmer for one village/locality or PIN code in the Selected Language and explain that the image is saved. "
-        f"Otherwise, do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
+        f"Do not ask the farmer for location details during image analysis. "
+        f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
     )
 
 
