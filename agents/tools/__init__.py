@@ -7,6 +7,7 @@ Tools for the BharatVistaar AI Agent.
 from pydantic_ai import Tool
 
 from agents.tools.scheme_info import get_scheme_info
+from agents.tools.maha_vistaar import get_maha_vistaar_scheme_info
 from agents.tools.pmkisan_scheme_status import (
     initiate_pm_kisan_status_check,
     check_pm_kisan_status_with_otp,
@@ -53,6 +54,12 @@ from agents.tools.npss import analyze_crop_image
 TOOLS = [
     Tool(
         get_scheme_info,
+        takes_ctx=True,
+        strict=False,
+    ),
+    # MahaVistaar cross-network (mh-dev pattern) — NDKSP drip + inland fishery only
+    Tool(
+        get_maha_vistaar_scheme_info,
         takes_ctx=True,
         strict=False,
     ),
