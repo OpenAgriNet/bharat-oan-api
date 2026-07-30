@@ -275,29 +275,47 @@ def _closest_date_selection(items: List["MandiItem"], target: date, requested_la
     return _items_on_date(items, closest), header
 
 
+def _latest_available(items: List["MandiItem"]) -> Optional[date]:
+    """Return the most recent arrival date present in the response."""
+    return _closest_available_date(items, datetime.now(_IST).date())
+
+
 def _select_for_range(items: List["MandiItem"], start: date, end: date, requested_label: str) -> Selection:
-    """Every arrival date inside the requested window, or the closest date to its end."""
+    """Every arrival date inside the requested window, or the latest available if none match."""
     in_range = [item for item in items if _item_in_date_range(item, start, end)]
     if in_range:
         return in_range, f"**Mandi Price Discovery** [Price Date Range: {requested_label}]"
-    return _closest_date_selection(items, end, requested_label, "Requested date range")
+    latest = _latest_available(items)
+    if latest is None:
+        return None
+    header = (
+        f"**Mandi Price Discovery** [Requested date range: {requested_label} "
+        f"not available — showing latest prices as of {_display_date(latest)}]"
+    )
+    return _items_on_date(items, latest), header
 
 
 def _select_for_latest(items: List["MandiItem"]) -> Selection:
-    """Latest available: narrow the searched window down to the single most recent arrival
-    date found, rather than mixing every date in the window together."""
-    latest = _closest_available_date(items, datetime.now(_IST).date())
+    """Latest available: narrow to the single most recent arrival date found."""
+    latest = _latest_available(items)
     if latest is None:
         return items, "**Mandi Price Discovery** [Price Date: Latest available]"
     return _items_on_date(items, latest), f"**Mandi Price Discovery** [Price Date: {_display_date(latest)}]"
 
 
 def _select_for_date(items: List["MandiItem"], requested: date, requested_label: str) -> Selection:
-    """The items arriving on the requested date, or the closest date to it."""
+    """Items for the requested date, or the latest available if that date is not in the response."""
     exact_matches = _items_on_date(items, requested)
     if exact_matches:
         return exact_matches, f"**Mandi Price Discovery** [Price Date: {requested_label}]"
-    return _closest_date_selection(items, requested, requested_label, "Requested date")
+    latest = _latest_available(items)
+    if latest is None:
+        return None
+    header = (
+        f"**Mandi Price Discovery** [Requested date: {requested_label} "
+        f"not available — showing latest prices as of {_display_date(latest)}]"
+    )
+    return _items_on_date(items, latest), header
 
 
 # -----------------------
