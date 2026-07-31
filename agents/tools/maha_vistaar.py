@@ -1,19 +1,4 @@
-"""
-Cross-network integration with MahaVistaar (mh-dev pattern).
-
-Additive only — does not replace existing Bharat tools (weather, mandi,
-legacy get_scheme_info, status, grievances, advisory).
-
-Current scope: scheme *information* for the two NDKSP schemes enabled from
-MahaVistaar:
-  - drip-irrigation  → ndksp-drip-irrigation
-  - inland-fishery   → ndksp-inland-fishery
-
-Beckn contract (aligned with mh-oan-api scheme_info + cross_network):
-  - Common context: domain / action / version / bap_* / ids / location / ttl
-  - Message is use-case specific (schemes-agri item descriptor)
-  - bpp_id / bpp_uri are NOT sent on search (only needed for init elsewhere)
-"""
+"""BH → MahaVistaar cross-network scheme search (counterpart of MH bharat_vistaar)."""
 
 from __future__ import annotations
 
@@ -21,7 +6,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List
 
 import httpx
 from langfuse import observe
@@ -36,119 +21,58 @@ from helpers.utils import get_logger
 
 logger = get_logger(__name__)
 
-MAHA_VISTAAR_DOMAIN = "advisory:mh-vistaar"
-DEFAULT_TIMEOUT = DEFAULT_HTTP_TIMEOUT
-
-# Tool-facing code → full scheme name + MH network scheme_code
-MAHA_VISTAAR_SCHEMES: Dict[str, Dict[str, str]] = {
-    "drip-irrigation": {
-        "scheme_name": "Nanaji Deshmukh Krishi Sanjivani Prakalp Drip Irrigation",
-        "network_code": "ndksp-drip-irrigation",
-    },
-    "inland-fishery": {
-        "scheme_name": "Nanaji Deshmukh Krishi Sanjivani Prakalp Inland Fishery",
-        "network_code": "ndksp-inland-fishery",
-    },
-}
-
-MahaSchemeCode = Literal["drip-irrigation", "inland-fishery"]
+DEFAULT_SCHEME_DOMAIN = "schemes:vistaar"
 
 
-def _require_env(name: str) -> str:
-    value = (os.getenv(name) or "").strip()
-    if not value:
-        raise ValueError(f"{name} is not configured")
-    return value
+def _scheme_domain() -> str:
+    return (os.getenv("SCHEME_DOMAIN") or DEFAULT_SCHEME_DOMAIN).strip() or DEFAULT_SCHEME_DOMAIN
 
 
-def _bap_action_url(action: str) -> str:
-    """Resolve BAP URL for search/init/status — same idea as mh-dev cross_network."""
-    base = (os.getenv("MAHA_VISTAAR_BAP_ENDPOINT") or os.getenv("BAP_BASE_URL") or "").strip().rstrip("/")
-    if not base:
-        endpoint = (os.getenv("BAP_ENDPOINT") or "").strip().rstrip("/")
-        if endpoint.endswith("/search"):
-            base = endpoint[: -len("/search")]
-        else:
-            base = endpoint
-    if not base:
-        raise ValueError(
-            "MAHA_VISTAAR_BAP_ENDPOINT or BAP_ENDPOINT is not configured for MahaVistaar cross-network"
-        )
-    return f"{base}/{action.lstrip('/')}"
+def _bap_search_url() -> str:
+    endpoint = (os.getenv("BAP_ENDPOINT") or "").strip().rstrip("/")
+    if not endpoint:
+        raise ValueError("BAP_ENDPOINT is not configured")
+    if endpoint.endswith("/search"):
+        return endpoint
+    return f"{endpoint}/search"
 
 
-def _beckn_context(
-    *,
-    action: str,
-    transaction_id: Optional[str] = None,
-    session_id: str = "",
-    question_id: str = "",
-    include_bpp: bool = False,
-) -> Dict[str, Any]:
-    """
-    Common Beckn context for MahaVistaar N-N calls.
-
-    bpp_id / bpp_uri only when include_bpp=True (init). Search leaves them out
-    (matches mh-dev SMAM search + scheme_info payloads).
-    """
+def build_scheme_search_payload(scheme_code: str) -> Dict[str, Any]:
     now = datetime.now(timezone.utc)
-    context: Dict[str, Any] = {
-        "domain": MAHA_VISTAAR_DOMAIN,
-        "action": action,
-        "version": "1.1.0",
-        "bap_id": os.getenv("MAHA_VISTAAR_BAP_ID") or os.getenv("BAP_ID"),
-        "bap_uri": os.getenv("MAHA_VISTAAR_BAP_URI") or os.getenv("BAP_URI"),
-        "transaction_id": transaction_id or str(uuid.uuid4()),
-        "message_id": str(uuid.uuid4()),
-        "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
-        "ttl": "PT10M",
-        "location": {"country": {"name": "IND"}},
-        "tags": {
-            "session_id": session_id or "",
-            "question_id": question_id or "",
+    return {
+        "context": {
+            "domain": _scheme_domain(),
+            "action": "search",
+            "version": "1.1.0",
+            "bap_id": os.getenv("BAP_ID"),
+            "bap_uri": os.getenv("BAP_URI"),
+            "transaction_id": str(uuid.uuid4()),
+            "message_id": str(uuid.uuid4()),
+            "timestamp": str(int(now.timestamp())),
+            "ttl": "PT10M",
+            "location": {
+                "country": {"code": "IND"},
+                "city": {"code": "*"},
+            },
         },
-    }
-    if include_bpp or action == "init":
-        # Optional targeting of MH BPP when configured (init only by default).
-        bpp_id = (os.getenv("MAHA_VISTAAR_BPP_ID") or "").strip()
-        bpp_uri = (os.getenv("MAHA_VISTAAR_BPP_URI") or "").strip()
-        if bpp_id:
-            context["bpp_id"] = bpp_id
-        if bpp_uri:
-            context["bpp_uri"] = bpp_uri
-    return context
-
-
-def _scheme_info_message(network_code: str) -> Dict[str, Any]:
-    """Message section for MH scheme-info search (use-case specific)."""
-    return {
-        "intent": {
-            "category": {"descriptor": {"code": "schemes-agri"}},
-            "item": {"descriptor": {"code": network_code}},
-        }
-    }
-
-
-def _scheme_info_payload(
-    network_code: str,
-    *,
-    session_id: str = "",
-    question_id: str = "",
-) -> Dict[str, Any]:
-    return {
-        "context": _beckn_context(
-            action="search",
-            session_id=session_id,
-            question_id=question_id,
-            include_bpp=False,
-        ),
-        "message": _scheme_info_message(network_code),
+        "message": {
+            "intent": {
+                "category": {
+                    "descriptor": {
+                        "code": "schemes-agri",
+                    }
+                },
+                "item": {
+                    "descriptor": {
+                        "name": scheme_code,
+                    }
+                },
+            }
+        },
     }
 
 
 class CrossNetworkSchemeResponse(BaseModel):
-    """Minimal formatter for Beckn aggregator / scheme catalog responses."""
-
     responses: list = Field(default_factory=list)
 
     def _has_data(self) -> bool:
@@ -164,11 +88,9 @@ class CrossNetworkSchemeResponse(BaseModel):
 
     def __str__(self) -> str:
         if not self.responses or not self._has_data():
-            return "No scheme data found from MahaVistaar for this scheme."
+            return "No scheme data found for this scheme."
 
-        parts: List[str] = []
-        parts.append("**Source:** Government Scheme Information")
-        parts.append("")
+        parts: List[str] = ["**Source:** Government Scheme Information", ""]
 
         for block in self.responses:
             if not isinstance(block, dict):
@@ -179,9 +101,8 @@ class CrossNetworkSchemeResponse(BaseModel):
                 for item in provider.get("items") or []:
                     for tag in item.get("tags") or []:
                         for entry in tag.get("list") or []:
-                            name = (entry.get("descriptor") or {}).get("name") or (
-                                entry.get("descriptor") or {}
-                            ).get("code")
+                            desc = entry.get("descriptor") or {}
+                            name = desc.get("name") or desc.get("code")
                             value = entry.get("value")
                             if name and value and str(value).strip().lower() not in ("", "null"):
                                 parts.append(f"## {name}")
@@ -193,83 +114,79 @@ class CrossNetworkSchemeResponse(BaseModel):
         return "\n".join(parts).strip()
 
 
-@observe(name="tool:get_maha_vistaar_scheme_info", as_type="tool")
-async def get_maha_vistaar_scheme_info(
+@observe(name="tool:call_maha_vistaar_network", as_type="tool")
+async def call_maha_vistaar_network(
     ctx: RunContext[FarmerContext],
-    scheme_code: MahaSchemeCode,
+    scheme_code: str,
 ) -> str:
-    """Fetch scheme information for MahaVistaar (Maharashtra) schemes via cross-network N-N.
+    """Fetch MahaVistaar scheme info via network search.
 
-    Use this for the two enabled NDKSP schemes only. All other Bharat schemes
-    continue to use `get_scheme_info` or `search_schemes`.
+    Use for schemes listed under MahaVistaar / cross-network in the system prompt
+    (e.g. ndksp-drip-irrigation, ndksp-farm-pond-lining). Pass scheme_code exactly
+    as in the prompt. Do not use for get_scheme_info or search_schemes schemes.
 
     Args:
-        scheme_code: One of:
-            - "drip-irrigation": Nanaji Deshmukh Krishi Sanjivani Prakalp Drip Irrigation
-            - "inland-fishery": Nanaji Deshmukh Krishi Sanjivani Prakalp Inland Fishery
-
-    Returns:
-        Formatted scheme information (eligibility, benefits, application, etc.).
+        scheme_code: Scheme code from the prompt (e.g. "ndksp-drip-irrigation").
     """
     scheme_code = (scheme_code or "").strip()
-    if scheme_code not in MAHA_VISTAAR_SCHEMES:
+    if not scheme_code:
         raise ModelRetry(
-            'scheme_code must be "drip-irrigation" or "inland-fishery". '
-            "For other schemes use get_scheme_info or search_schemes."
+            "scheme_code is required. Use a MahaVistaar scheme code from the system prompt "
+            "(e.g. ndksp-drip-irrigation, ndksp-farm-pond-lining)."
         )
 
-    meta = MAHA_VISTAAR_SCHEMES[scheme_code]
-    network_code = meta["network_code"]
-    scheme_name = meta["scheme_name"]
-
-    payload = _scheme_info_payload(
-        network_code,
-        session_id=ctx.deps.session_id,
-        question_id=ctx.deps.question_id,
-    )
-    transaction_id = payload["context"]["transaction_id"]
+    payload = build_scheme_search_payload(scheme_code)
+    payload["context"]["tags"] = {
+        "session_id": ctx.deps.session_id or "",
+        "question_id": ctx.deps.question_id or "",
+    }
 
     lf_update_current_observation(
-        input={
-            "scheme_code": scheme_code,
-            "network_code": network_code,
-            "Scheme_name": f"scheme_name:{scheme_name}",
-        },
+        input={"scheme_code": scheme_code},
         metadata={
-            "tool": "maha_vistaar.scheme_info",
+            "tool": "call_maha_vistaar_network",
             "cross_network": "maha_vistaar",
             "scheme_code": scheme_code,
-            "network_code": network_code,
-            "transaction_id": transaction_id,
+            "domain": payload["context"]["domain"],
+            "transaction_id": payload["context"]["transaction_id"],
         },
     )
 
     try:
-        endpoint = _bap_action_url("search")
-        logger.info("Beckn [maha-vistaar/scheme-info] URL: %s", endpoint)
+        url = _bap_search_url()
         logger.info(
-            "Beckn [maha-vistaar/scheme-info] payload: %s",
+            "Beckn [call_maha_vistaar_network/search] URL: %s domain=%s",
+            url,
+            payload["context"]["domain"],
+        )
+        logger.info(
+            "Beckn [call_maha_vistaar_network/search] payload: %s",
             json.dumps(payload, ensure_ascii=False),
         )
 
         async with httpx.AsyncClient() as client:
-            response = await client.post(endpoint, json=payload, timeout=DEFAULT_TIMEOUT)
+            response = await client.post(url, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
+
+        logger.info("Beckn [call_maha_vistaar_network/search] status: %s", response.status_code)
 
         if response.status_code != 200:
             logger.error(
-                "MahaVistaar scheme info returned %s: %s",
+                "MahaVistaar network search returned %s: %s",
                 response.status_code,
                 (response.text or "")[:500],
             )
             lf_update_current_observation(
-                metadata={"tool": "maha_vistaar.scheme_info", "http_status": int(response.status_code)}
+                metadata={
+                    "tool": "call_maha_vistaar_network",
+                    "http_status": int(response.status_code),
+                }
             )
-            return "MahaVistaar scheme information is temporarily unavailable. Please try again later."
+            return "Scheme information is temporarily unavailable. Please try again later."
 
         try:
             data = response.json()
         except json.JSONDecodeError:
-            return (response.text or "").strip() or "MahaVistaar returned a non-JSON response."
+            return (response.text or "").strip() or "MahaVistaar network returned a non-JSON response."
 
         responses = data.get("responses", data if isinstance(data, list) else [])
         if not isinstance(responses, list):
@@ -278,7 +195,7 @@ async def get_maha_vistaar_scheme_info(
         result = str(CrossNetworkSchemeResponse.model_validate({"responses": responses}))
         lf_update_current_observation(
             metadata={
-                "tool": "maha_vistaar.scheme_info",
+                "tool": "call_maha_vistaar_network",
                 "has_scheme_data": "No scheme data found" not in result,
             }
         )
@@ -286,16 +203,13 @@ async def get_maha_vistaar_scheme_info(
 
     except ValueError as e:
         logger.error("MahaVistaar cross-network config error: %s", e)
-        return (
-            "MahaVistaar cross-network is not configured. "
-            "Set MAHA_VISTAAR_BAP_ENDPOINT (or BAP_ENDPOINT)."
-        )
+        return "MahaVistaar cross-network is not configured. Set BAP_ENDPOINT, BAP_ID, and BAP_URI."
     except httpx.TimeoutException:
-        logger.error("MahaVistaar scheme info request timed out")
-        return "MahaVistaar scheme request timed out. Please try again later."
+        logger.error("MahaVistaar network request timed out")
+        return "MahaVistaar request timed out. Please try again later."
     except httpx.RequestError as e:
-        logger.error("MahaVistaar scheme info request failed: %s", e)
-        return f"MahaVistaar scheme request failed: {e!s}"
+        logger.error("MahaVistaar network request failed: %s", e)
+        return f"MahaVistaar request failed: {e!s}"
     except Exception as e:
-        logger.error("Unexpected MahaVistaar scheme info error: %s", e)
-        raise ModelRetry(f"Unexpected error calling MahaVistaar scheme info. {e!s}") from e
+        logger.error("Unexpected MahaVistaar network error: %s", e)
+        raise ModelRetry(f"Unexpected error calling MahaVistaar network. {e!s}") from e
