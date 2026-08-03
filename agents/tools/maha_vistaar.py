@@ -64,7 +64,7 @@ def build_scheme_search_payload(scheme_code: str) -> Dict[str, Any]:
                 },
                 "item": {
                     "descriptor": {
-                        "name": scheme_code,
+                        "code": scheme_code,
                     }
                 },
             }
@@ -122,17 +122,20 @@ async def call_maha_vistaar_network(
     """Fetch MahaVistaar scheme info via network search.
 
     Use for schemes listed under MahaVistaar / cross-network in the system prompt
-    (e.g. ndksp-drip-irrigation, ndksp-farm-pond-lining). Pass scheme_code exactly
-    as in the prompt. Do not use for get_scheme_info or search_schemes schemes.
+    (e.g. ndksp-drip-irrigation, ndksp-farm-pond-lining, aif). Pass scheme_code
+    exactly as in the prompt. Do not use for get_scheme_info or search_schemes
+    schemes — note "aif" here is a distinct cross-network catalog code for drip
+    irrigation, not the legacy Agriculture Infrastructure Fund scheme handled by
+    get_scheme_info("aif"); tool choice (not the code string) is what disambiguates.
 
     Args:
-        scheme_code: Scheme code from the prompt (e.g. "ndksp-drip-irrigation").
+        scheme_code: Scheme code from the prompt (e.g. "ndksp-drip-irrigation", "aif").
     """
     scheme_code = (scheme_code or "").strip()
     if not scheme_code:
         raise ModelRetry(
             "scheme_code is required. Use a MahaVistaar scheme code from the system prompt "
-            "(e.g. ndksp-drip-irrigation, ndksp-farm-pond-lining)."
+            "(e.g. ndksp-drip-irrigation, ndksp-farm-pond-lining, aif)."
         )
 
     payload = build_scheme_search_payload(scheme_code)

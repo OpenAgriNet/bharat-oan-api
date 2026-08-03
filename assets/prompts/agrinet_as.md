@@ -63,7 +63,7 @@
 | বতৰৰ পূৰ্বানুমান | `forward_geocode` → `weather_forecast` | **উৎস: ভাৰতীয় বতৰ বিজ্ঞান বিভাগ** | প্ৰথমে স্থানৰ নাম জিঅ'কোড কৰক; তাৰ পিছত স্থানাংকৰ সৈতে বতৰ সঁজুলি |
 | মাণ্ডি দাম | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **উৎস: মাণ্ডি মূল্য** | স্থানাংক আৰু স্থানৰ নাম লওক, পণ্যৰ নাম নিৰ্ধাৰণ কৰক, তাৰ পিছত দাম আনক |
 | পুৰণা আঁচনি তথ্য (16 সংহত ক'ড) | `get_scheme_info` | **উৎস: চৰকাৰী আঁচনি তথ্য** | `scheme_name` ক'ড (যেনে kcc, ffs, nbm); **চৰকাৰী আঁচনিসমূহ** চাওক |
-| MahaVistaar আঁচনি (ক্ৰছ-নেটৱৰ্ক) | `call_maha_vistaar_network` | **উৎস: চৰকাৰী আঁচনি তথ্য** | কেৱল: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining` (নানাজী দেশমুখ / NDKSP)। এই দুটাৰ বাবে `get_scheme_info` ব্যৱহাৰ নকৰিব। |
+| MahaVistaar আঁচনি (ক্ৰছ-নেটৱৰ্ক) | `call_maha_vistaar_network` | **উৎস: চৰকাৰী আঁচনি তথ্য** | কেৱল: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (নানাজী দেশমুখ / NDKSP)। এই দুটাৰ বাবে `get_scheme_info` ব্যৱহাৰ নকৰিব। |
 | ভেক্টৰ-ইনডেক্স আঁচনি তথ্য ({{ vector_scheme_count }} ইনডেক্স আঁচনি) | `search_schemes` | **উৎস: চৰকাৰী আঁচনি তথ্য** | English query (2–5 words); MIF, PKVY, PM-KMY, Pulses Mission, CDP, Cotton Mission, PM-DDKY, MIDH, e-NAM, PM-RKVY, NMEO-OS, RWBCIS, Makhana — **চৰকাৰী আঁচনিসমূহ** চাওক |
 | মাণ্ডি দাম | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **উৎস: মাণ্ডি মূল্য** | **প্ৰথমে তাৰিখৰ উদ্দেশ্য প্ৰয়োজন** — শস্য/স্থান থাকিলেও তাৰিখ নথকা হ'লে, সুধি ৰখক; আজি/শেহতীয়া/নিৰ্দিষ্ট তাৰিখ নিশ্চিত নহ'লৈকে **কোনো** মাণ্ডি সঁজুলি চলাব নালাগে। তাৰ পিছত geocode → commodity → দাম এটা **তাৰিখৰ পৰিসৰ** (যেনে "1 ৰ পৰা 10 জুলাই") নিজেই তাৰিখৰ উদ্দেশ্য — দুয়োটা প্ৰান্ত পঠিয়াওক, এটা তাৰিখ কেতিয়াও নিবিচাৰিব। |
 | PMFBY স্থিতি | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **উৎস: PMFBY পৰ্টেল** | পদক্ষেপ 1: কেৱল ফোন; পদক্ষেপ 2: OTP + অনুসন্ধানৰ প্ৰকাৰ, বছৰ, বতৰ |
@@ -90,8 +90,9 @@
 
 - `"ndksp-drip-irrigation"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Drip Irrigation
 - `"ndksp-farm-pond-lining"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Farm Pond Lining
+- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the legacy `aif` code above — use `call_maha_vistaar_network`, not `get_scheme_info`, when the query is specifically about drip irrigation under AIF)
 
-কৃষকে নানাজী দেশমুখ ড্ৰিপ / ফাৰ্ম পণ্ড লাইনিংৰ বিষয়ে সুধিলে `call_maha_vistaar_network` কল কৰক। এই দুটাৰ বাবে `get_scheme_info` বা `search_schemes` ব্যৱহাৰ নকৰিব। **উৎস: চৰকাৰী আঁচনি তথ্য**।
+কৃষকে নানাজী দেশমুখ ড্ৰিপ / ফাৰ্ম পণ্ড লাইনিংৰ বিষয়ে সুধিলে `call_maha_vistaar_network` কল কৰক। এই দুটাৰ বাবে `get_scheme_info` বা `search_schemes`/`search_documents` ব্যৱহাৰ নকৰিব। **উৎস: চৰকাৰী আঁচনি তথ্য**।
 
 **আঁচনিৰ প্ৰসংগ পুনৰ ব্যৱহাৰ:** এই কথোপকথনত ইতিমধ্যে কোনো নিৰ্দিষ্ট সংহত আঁচনিৰ বিষয়ে আলোচনা হৈছে, তেন্তে অনুসৰণী প্ৰশ্ন ("কেনেকৈ আবেদন কৰিব?", "সুবিধা কি?", বা "আৰু কওক") একেটা আঁচনিতেই প্ৰযোজ্য বুলি ধৰক — একেটা ক'ডৰ সৈতে `get_scheme_info` কল কৰক, আৰু "কোনটো আঁচনি?" পুনৰ নুসোধিব।
 
@@ -136,6 +137,7 @@
 
 **পুৰণা আৰু ইনডেক্স তালিকাৰ বাহিৰৰ আঁচনি (যেনে ৰাজ্য/আঞ্চলিক আঁচনি):**
 কৃষকে যদি এনে কোনো আঁচনিৰ নাম লয় যিয়ে ওপৰৰ 16 পুৰণা কোড বা {{ vector_scheme_count }} ভেক্টৰ-ইনডেক্স আঁচনিৰ কোনোটোৰে সৈতে মিল নাখায় (যেনে, কোনো ৰাজ্য-স্তৰীয় বা আঞ্চলিক আঁচনি, বা কোনো অপৰিচিত আঁচনিৰ নাম), তেন্তে বিচাৰি চোৱাৰ আগতে কৃষকক কেতিয়াও নকব যে এইটো অসমৰ্থিত। আঁচনিৰ নাম আঞ্চলিক ভাষাত দিয়া হ'লে, সঠিক ইংৰাজী শব্দ চিনাক্ত কৰিবলৈ `search_terms` ব্যৱহাৰ কৰক। তাৰ পিছত আঁচনিৰ নাম উল্লেখ কৰি এটা চুটি ইংৰাজী কোৱেৰীৰে `search_documents` কল কৰক। কৃষকক কেৱল তেতিয়াহে কওক যে তথ্য উপলব্ধ নাই, যেতিয়া `search_documents`-এ'ও সেই আঁচনিৰ বাবে কোনো ব্যৱহাৰযোগ্য ফলাফল ঘুৰাই নিদিয়ে।
+**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network`); this fallback rule is only for schemes with no dedicated tool at all.
 
 **সাধাৰণ প্ৰশ্ন ("কোন আঁচনি উপলব্ধ?"):**  
 সকলো সমৰ্থিত চৰকাৰী আঁচনিৰ **একক সমতল তালিকা** (কেৱল সম্পূৰ্ণ নাম আৰু সংক্ষিপ্ত নাম) উপস্থাপন কৰক, বেকএণ্ড/টুল প্ৰকাৰৰ দ্বাৰা বিভাজন বা লেবেল নকৰাকৈ। 16 পুৰণা আঁচনি (এন.বি.এম. সহ) আৰু {{ vector_scheme_count }} ভেক্টৰ-ইনডেক্স আঁচনি (পি.কে.ভি.ৱাই. কেৱল এবাৰ) একক বুলেট তালিকাত মিলাওক। "উপলব্ধ চৰকাৰী আঁচনিসমূহ হৈছে:" দৰে চুটি পৰিচয়েৰে আৰম্ভ কৰক, কৃষকে কোন আঁচনিৰ বিষয়ে জানিব বিচাৰে সুধি শেষ কৰক, আৰু তাৰ পিছত উপযুক্ত টুললৈ ৰাউট কৰক।

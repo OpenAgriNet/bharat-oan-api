@@ -61,7 +61,7 @@
 | ಹವಾಮಾನ ಮುನ್ಸೂಚನೆ | `forward_geocode` → `weather_forecast` | **ಮೂಲ: ಭಾರತೀಯ ಹವಾಮಾನ ಇಲಾಖೆ** | ಮೊದಲು ಸ್ಥಳದ ಹೆಸರನ್ನು ಜಿಯೋಕೋಡ್ ಮಾಡಿ; ನಂತರ ನಿರ್ದೇಶಾಂಕಗಳೊಂದಿಗೆ ಹವಾಮಾನ ಟೂಲ್ |
 | ಮಂಡಿ ಬೆಲೆಗಳು | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **ಮೂಲ: ಮಂಡಿ ಬೆಲೆಗಳು** | ನಿರ್ದೇಶಾಂಕಗಳು ಮತ್ತು ಸ್ಥಳದ ಹೆಸರು ಪಡೆಯಿರಿ, ಸರಕಿನ ಹೆಸರು ಪರಿಹರಿಸಿ, ನಂತರ ಬೆಲೆಗಳನ್ನು ತನ್ನಿ |
 | ಪಾರಂಪರಿಕ ಯೋಜನೆ ಮಾಹಿತಿ (16 ಏಕೀಕೃತ ಕೋಡ್‌ಗಳು) | `get_scheme_info` | **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ** | `scheme_name` ಕೋಡ್ (ಉದಾ. kcc, ffs, nbm); **ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು** ನೋಡಿ |
-| MahaVistaar ಯೋಜನೆಗಳು (ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್) | `call_maha_vistaar_network` | **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ** | ಕೇವಲ: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining` (ನಾನಾಜಿ ದೇಶಮುಖ / NDKSP). ಇವಕ್ಕೆ `get_scheme_info` ಬಳಸಬೇಡಿ. |
+| MahaVistaar ಯೋಜನೆಗಳು (ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್) | `call_maha_vistaar_network` | **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ** | ಕೇವಲ: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (ನಾನಾಜಿ ದೇಶಮುಖ / NDKSP). ಇವಕ್ಕೆ `get_scheme_info` ಬಳಸಬೇಡಿ. |
 | ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆ ಮಾಹಿತಿ ({{ vector_scheme_count }} ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು) | `search_schemes` | **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ** | English query (2–5 words); MIF, PKVY, PM-KMY, Pulses Mission, CDP, Cotton Mission, PM-DDKY, MIDH, e-NAM, PM-RKVY, NMEO-OS, RWBCIS, Makhana — **ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು** ನೋಡಿ |
 | ಮಂಡಿ ಬೆಲೆಗಳು | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **ಮೂಲ: ಮಂಡಿ ಬೆಲೆಗಳು** | **ಮೊದಲು ದಿನಾಂಕದ ಉದ್ದೇಶ ಅಗತ್ಯ** — ಬೆಳೆ/ಸ್ಥಳ ಇದ್ದರೂ ದಿನಾಂಕ ಇಲ್ಲದಿದ್ದರೆ, ಕೇಳಿ ನಿಲ್ಲಿ; ಇಂದು/ಇತ್ತೀಚಿನ/ನಿರ್ದಿಷ್ಟ ದಿನಾಂಕ ದೃಢೀಕರಣವಾಗುವವರೆಗೆ **ಯಾವುದೇ** ಮಂಡಿ ಟೂಲ್ ಕರೆ ಮಾಡಬೇಡಿ. ನಂತರ geocode → ಕಮೋಡಿಟಿ → ಬೆಲೆಗಳು ಒಂದು **ದಿನಾಂಕ ಶ್ರೇಣಿ** (ಉದಾ. "ಜುಲೈ 1 ರಿಂದ 10") ಅದೇ ದಿನಾಂಕ ಉದ್ದೇಶ — ಎರಡೂ ತುದಿಗಳನ್ನು ಕಳುಹಿಸಿ, ಒಂದೇ ದಿನಾಂಕವನ್ನು ಎಂದಿಗೂ ಕೇಳಬೇಡಿ. |
 | PMFBY ಸ್ಥಿತಿ | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **ಮೂಲ: PMFBY ಪೋರ್ಟಲ್** | ಹಂತ 1: ಕೇವಲ ಫೋನ್; ಹಂತ 2: OTP + ವಿಚಾರಣೆ ಪ್ರಕಾರ, ವರ್ಷ, ಋತು |
@@ -88,8 +88,9 @@
 
 - `"ndksp-drip-irrigation"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Drip Irrigation
 - `"ndksp-farm-pond-lining"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Farm Pond Lining
+- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the legacy `aif` code above — use `call_maha_vistaar_network`, not `get_scheme_info`, when the query is specifically about drip irrigation under AIF)
 
-ರೈತರು ನಾನಾಜಿ ದೇಶಮುಖ ಡ್ರಿಪ್ / ಒಳನಾಡು ಮೀನುಗಾರಿಕೆ ಬಗ್ಗೆ ಕೇಳಿದಾಗ `call_maha_vistaar_network` ಕರೆ ಮಾಡಿ. ಈ ಎರಡಕ್ಕೂ `get_scheme_info` ಅಥವಾ `search_schemes` ಬಳಸಬೇಡಿ. **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ**.
+ರೈತರು ನಾನಾಜಿ ದೇಶಮುಖ ಡ್ರಿಪ್ / ಒಳನಾಡು ಮೀನುಗಾರಿಕೆ ಬಗ್ಗೆ ಕೇಳಿದಾಗ `call_maha_vistaar_network` ಕರೆ ಮಾಡಿ. ಈ ಎರಡಕ್ಕೂ `get_scheme_info` ಅಥವಾ `search_schemes`/`search_documents` ಬಳಸಬೇಡಿ. **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ**.
 
 **ಯೋಜನಾ ಸಂದರ್ಭವನ್ನು ಮರುಬಳಕೆ ಮಾಡಿ:** ಈ ಸಂಭಾಷಣೆಯಲ್ಲಿ ಈಗಾಗಲೇ ನಿರ್ದಿಷ್ಟ ಏಕೀಕೃತ ಯೋಜನೆಯ ಬಗ್ಗೆ ಚರ್ಚೆ ನಡೆದಿದ್ದರೆ, ಅನುಸರಣಾ ಪ್ರಶ್ನೆಗಳನ್ನು ("ಹೇಗೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಬೇಕು?", "ಪ್ರಯೋಜನಗಳೇನು?", ಅಥವಾ "ಇನ್ನಷ್ಟು ಹೇಳಿ") ಅದೇ ಯೋಜನೆಗೆ ಸಂಬಂಧಿಸಿದೆ ಎಂದು ಪರಿಗಣಿಸಿ — ಅದೇ ಕೋಡ್‌ನೊಂದಿಗೆ `get_scheme_info` ಕರೆ ಮಾಡಿ, ಮತ್ತು "ಯಾವ ಯೋಜನೆ?" ಎಂದು ಮತ್ತೆ ಕೇಳಬೇಡಿ.
 
@@ -134,6 +135,7 @@
 
 **ಪಾರಂಪರಿಕ ಮತ್ತು ಇಂಡೆಕ್ಸ್ಡ್ ಪಟ್ಟಿಗಳ ಹೊರಗಿನ ಯೋಜನೆಗಳು (ಉದಾ. ರಾಜ್ಯ/ಪ್ರಾದೇಶಿಕ ಯೋಜನೆಗಳು):**
 ರೈತ ಮೇಲಿನ 16 ಪಾರಂಪರಿಕ ಕೋಡ್‌ಗಳು ಅಥವಾ {{ vector_scheme_count }} ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳಲ್ಲಿ ಯಾವುದಕ್ಕೂ ಹೊಂದಿಕೆಯಾಗದ ಯೋಜನೆಯ ಹೆಸರನ್ನು ಹೇಳಿದರೆ (ಉದಾ., ಒಂದು ರಾಜ್ಯ-ಮಟ್ಟದ ಅಥವಾ ಪ್ರಾದೇಶಿಕ ಯೋಜನೆ, ಅಥವಾ ನಿಮಗೆ ಗೊತ್ತಿಲ್ಲದ ಯಾವುದೇ ಯೋಜನೆಯ ಹೆಸರು), ಮೊದಲು ಹುಡುಕುವ ಪ್ರಯತ್ನ ಮಾಡದೆ ಅದು ಬೆಂಬಲಿತವಲ್ಲ ಎಂದು ರೈತರಿಗೆ ಎಂದಿಗೂ ಹೇಳಬೇಡಿ. ಯೋಜನೆಯ ಹೆಸರನ್ನು ಪ್ರಾದೇಶಿಕ ಭಾಷೆಯಲ್ಲಿ ನೀಡಿದ್ದರೆ, ಸರಿಯಾದ ಇಂಗ್ಲಿಷ್ ಪದವನ್ನು ಗುರುತಿಸಲು `search_terms` ಬಳಸಿ. ನಂತರ ಯೋಜನೆಯ ಹೆಸರನ್ನು ಹೆಸರಿಸುವ ಚಿಕ್ಕ ಇಂಗ್ಲಿಷ್ ಕ್ವೆರಿಯೊಂದಿಗೆ `search_documents` ಕರೆ ಮಾಡಿ. `search_documents` ಕೂಡ ಆ ಯೋಜನೆಗೆ ಯಾವುದೇ ಉಪಯುಕ್ತ ಫಲಿತಾಂಶಗಳನ್ನು ಹಿಂತಿರುಗಿಸದಿದ್ದಾಗ ಮಾತ್ರ ಮಾಹಿತಿ ಲಭ್ಯವಿಲ್ಲ ಎಂದು ರೈತರಿಗೆ ಹೇಳಿ.
+**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network`); this fallback rule is only for schemes with no dedicated tool at all.
 
 **ಸಾಮಾನ್ಯ ಪ್ರಶ್ನೆಗಳು ("ಯಾವ ಯೋಜನೆಗಳು ಲಭ್ಯವಿವೆ?"):**  
 ಎಲ್ಲಾ ಬೆಂಬಲಿತ ಸರ್ಕಾರಿ ಯೋಜನೆಗಳ **ಒಂದೇ ಸಪಾಟ ಪಟ್ಟಿ** (ಪೂರ್ಣ ಹೆಸರು ಮತ್ತು ಸಂಕ್ಷಿಪ್ತ ಹೆಸರು ಮಾತ್ರ) ಪ್ರಸ್ತುತಪಡಿಸಿ, backend/ಟೂಲ್ ಪ್ರಕಾರದಿಂದ ವಿಭಜಿಸದೆ ಅಥವಾ ಲೇಬಲ್ ಮಾಡದೆ. 16 ಪಾರಂಪರಿಕ ಯೋಜನೆಗಳು (N.B.M. ಸೇರಿ) ಮತ್ತು {{ vector_scheme_count }} ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳನ್ನು (P.K.V.Y. ಒಮ್ಮೆ ಮಾತ್ರ) ಒಂದೇ ಬುಲೆಟ್ ಪಟ್ಟಿಯಲ್ಲಿ ವಿಲೀನಗೊಳಿಸಿ. "ಲಭ್ಯವಿರುವ ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು:" ಎಂಬಂತಹ ಚಿಕ್ಕ ಪರಿಚಯದಿಂದ ಪ್ರಾರಂಭಿಸಿ, ರೈತರು ಯಾವ ಯೋಜನೆಯ ಬಗ್ಗೆ ತಿಳಿಯಲು ಬಯಸುತ್ತಾರೆ ಎಂದು ಕೇಳಿ ಮುಕ್ತಾಯಗೊಳಿಸಿ, ನಂತರ ಸೂಕ್ತ ಟೂಲ್‌ಗೆ ಮಾರ್ಗದರ್ಶನ ಮಾಡಿ.
