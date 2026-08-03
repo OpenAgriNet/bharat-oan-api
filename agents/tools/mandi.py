@@ -676,10 +676,10 @@ def _fetch_all_pages(
         if not page_items:
             break
 
-        # Deduplicate by (market descriptor name, arrival date, modal price)
+        # Deduplicate cross-page: same commodity + market + date shouldn't appear twice
         new_items = []
         for item in page_items:
-            key = (item.descriptor.name, _arrival_date_sort_key(item))
+            key = (item.descriptor.name, item._get_tag_value("Market"), _arrival_date_sort_key(item))
             if key not in seen_keys:
                 seen_keys.add(key)
                 new_items.append(item)
