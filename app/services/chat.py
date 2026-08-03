@@ -8,7 +8,6 @@ from typing import Any, AsyncGenerator, Optional
 from fastapi import BackgroundTasks
 from langfuse import get_client, observe, propagate_attributes
 from pydantic_ai import AgentRunResultEvent, FinalResultEvent, PartDeltaEvent, TextPartDelta
-from pydantic_ai.models.openai import OpenAIChatModelSettings
 
 from agents.agrinet import agrinet_agent
 from agents.deps import FarmerContext
@@ -53,35 +52,6 @@ from helpers.telemetry import (
 from helpers.utils import get_logger
 
 logger = get_logger(__name__)
-
-# EXPERIMENT: vLLM guided decoding (structured_outputs.regex) to stop the base
-# model from drifting into other Indic/CJK/Korean scripts mid-answer. Allowed
-# set = target script + full ASCII (covers tool-call JSON, English code-
-# switching, markdown) + shared Indic punctuation/currency.
-# Bengali and Assamese intentionally share one Unicode block (Assamese uses
-# the Bengali script with two extra letters covered by the same range).
-_GUIDED_DECODING_SCRIPT_RANGES = {
-    "kn": "ಀ-೿",  # Kannada
-    "ta": "஀-௿",  # Tamil
-    "ml": "ഀ-ൿ",  # Malayalam
-    "te": "ఀ-౿",  # Telugu
-    "bn": "ঀ-৿",  # Bengali
-    "as": "ঀ-৿",  # Assamese (Bengali script block)
-    "gu": "઀-૿",  # Gujarati
-}
-_GUIDED_DECODING_SHARED_CHARS = (
-    "\\t\\n\\r -~"  # ESCAPED tab/newline/CR (raw control bytes crash xgrammar's EBNF parser) + printable ASCII
-    "।॥"            # shared Devanagari danda punctuation
-    "–—‘’“”•₹"  # dashes/quotes/bullet/rupee
-)
-
-
-def _guided_decoding_settings(lang_code: str | None) -> OpenAIChatModelSettings | None:
-    script_range = _GUIDED_DECODING_SCRIPT_RANGES.get((lang_code or "").lower())
-    if not script_range:
-        return None
-    pattern = f"^[{script_range}{_GUIDED_DECODING_SHARED_CHARS}]*$"
-    return OpenAIChatModelSettings(extra_body={"structured_outputs": {"regex": pattern}})
 
 CHAT_TRACE_NAME = (
     os.getenv("LANGFUSE_TRACE_NAME")
@@ -784,7 +754,6 @@ async def _run_agrinet_once_streaming(
                 message_history=trimmed_history,
                 deps=deps,
                 model=get_agrinet_route_model(decision.route),
-                model_settings=_guided_decoding_settings(deps.lang_code),
             ):
                 if isinstance(event, FinalResultEvent):
                     stream_state.final_result_found = True
@@ -882,7 +851,6 @@ async def _run_agrinet_once(
                 message_history=trimmed_history,
                 deps=deps,
                 model=get_agrinet_route_model(decision.route),
-                model_settings=_guided_decoding_settings(deps.lang_code),
             ),
             timeout=settings.agrinet_model_timeout_seconds,
         )
