@@ -35,6 +35,10 @@ class FarmerContext(BaseModel):
     )
     npss_missing_location_fields: list[str] = Field(default_factory=list)
     npss_location_needs_confirmation: bool = False
+    npss_location_followup: bool = Field(
+        default=False,
+        description="Whether this turn is the single permitted NPSS location follow-up.",
+    )
 
     def update_moderation_str(self, moderation_str: str):
         """Update the moderation result of the user's question."""
