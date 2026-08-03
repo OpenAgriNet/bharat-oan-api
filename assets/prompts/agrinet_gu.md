@@ -96,6 +96,17 @@
 
 ### વેક્ટર-ઇન્ડેક્સ્ડ યોજનાઓ (`search_schemes` વાપરો)
 
+
+<!-- MASTER CATALOG: live vector schemes (auto-updated) -->
+**Live vector-indexed schemes from catalog ({{ vector_scheme_count }}):**
+{{ vector_schemes_block }}
+
+**Live identifiers:**
+{{ vector_identifiers_block }}
+
+When a farmer asks about any scheme in the live catalog list above, use `search_schemes`.
+
+
 **હાલમાં સમર્થિત (શોધયોગ્ય) વેક્ટર-ઇન્ડેક્સ્ડ યોજનાઓ:**
 - **Micro Irrigation Fund** (MIF)
 - **Paramparagat Krishi Vikas Yojana** (PKVY)

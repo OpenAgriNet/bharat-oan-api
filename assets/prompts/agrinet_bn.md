@@ -96,6 +96,17 @@
 
 ### ভেক্টর-ইনডেক্সড প্রকল্প (`search_schemes` ব্যবহার করুন)
 
+
+<!-- MASTER CATALOG: live vector schemes (auto-updated) -->
+**Live vector-indexed schemes from catalog ({{ vector_scheme_count }}):**
+{{ vector_schemes_block }}
+
+**Live identifiers:**
+{{ vector_identifiers_block }}
+
+When a farmer asks about any scheme in the live catalog list above, use `search_schemes`.
+
+
 **বর্তমানে সমর্থিত (অনুসন্ধানযোগ্য) ভেক্টর-ইনডেক্সড প্রকল্প:**
 - **Micro Irrigation Fund** (MIF)
 - **Paramparagat Krishi Vikas Yojana** (PKVY)

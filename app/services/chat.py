@@ -345,6 +345,9 @@ async def stream_chat_messages(
             trace_id = get_client().get_current_trace_id()
             await _record_chat_turn(trace_id, telemetry_qid, session_id, route_decision, channel)
 
+            from helpers.scheme_catalog import pin_catalog_snapshot
+
+            catalog_snapshot = pin_catalog_snapshot()
             deps = FarmerContext(
                 query=query,
                 lang_code=target_lang,
@@ -352,6 +355,8 @@ async def stream_chat_messages(
                 question_id=telemetry_qid,
                 latitude=latitude,
                 longitude=longitude,
+                scheme_catalog=catalog_snapshot.model_dump(),
+                catalog_version=catalog_snapshot.catalog_version,
             )
 
             message_pairs = "\n\n".join(format_message_pairs(history, 3))

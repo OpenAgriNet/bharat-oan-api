@@ -45,6 +45,15 @@ class FarmerContext(BaseModel):
         default=False,
         description="Whether this turn is the single permitted NPSS location follow-up.",
     )
+    # Pinned master-catalog snapshot for this chat turn (prompt + tools share one version).
+    scheme_catalog: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Pinned CatalogSnapshot as dict (codes/names for prompt + search allow-list).",
+    )
+    catalog_version: Optional[int] = Field(
+        default=None,
+        description="catalog_version from the pinned scheme catalog snapshot.",
+    )
 
     def update_moderation_str(self, moderation_str: str):
         """Update the moderation result of the user's question."""

@@ -796,10 +796,12 @@ def _merge_supplemental_results(
 def _filter_results_by_scheme(
     results: list[dict[str, Any]],
     scheme_code: Optional[str],
+    allowed_codes: Optional[frozenset[str]] = None,
 ) -> list[dict[str, Any]]:
     if scheme_code:
         return [r for r in results if r.get("scheme_code") == scheme_code]
-    return [r for r in results if r.get("scheme_code") in QDRANT_SCHEME_CODES]
+    codes = allowed_codes if allowed_codes is not None else QDRANT_SCHEME_CODES
+    return [r for r in results if r.get("scheme_code") in codes]
 
 
 def search_schemes(
@@ -818,6 +820,9 @@ def search_schemes(
     client = client or get_qdrant_client()
     model = model or get_embedder()
     scheme_list = scheme_list if scheme_list is not None else _BUILTIN_SCHEME_LIST
+    allowed_codes = frozenset(
+        str(item.get("scheme_code") or "") for item in scheme_list if item.get("scheme_code")
+    ) or QDRANT_SCHEME_CODES
 
     if scheme_code is None:
         scheme_code = resolve_scheme_code(query, scheme_list)
@@ -841,7 +846,7 @@ def search_schemes(
             client, collection_name, fetch_k, model,
         )
 
-    results = _filter_results_by_scheme(results, scheme_code)
+    results = _filter_results_by_scheme(results, scheme_code, allowed_codes)
     results = rerank_results(query, results)
     return _finalize_results(results, section_focus, intent, top_k)
 

@@ -148,6 +148,19 @@ class Settings(BaseSettings):
     qdrant_collection_name: str = os.getenv("QDRANT_COLLECTION_NAME", "schemes-index")
     qdrant_video_collection_name: str = os.getenv("QDRANT_VIDEO_COLLECTION_NAME", "video_data_collection")
 
+    # Master scheme catalog (Postgres-backed API → Redis cache → dynamic prompts/tools)
+    scheme_catalog_enabled: bool = os.getenv("SCHEME_CATALOG_ENABLED", "false").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    scheme_catalog_url: Optional[str] = os.getenv("SCHEME_CATALOG_URL")
+    scheme_catalog_service_key: Optional[str] = os.getenv("SCHEME_CATALOG_SERVICE_KEY")
+    scheme_catalog_refresh_seconds: int = int(os.getenv("SCHEME_CATALOG_REFRESH_SECONDS", "300"))
+    scheme_catalog_cache_ttl: int = int(os.getenv("SCHEME_CATALOG_CACHE_TTL", str(60 * 60 * 6)))
+    scheme_catalog_http_timeout: float = float(os.getenv("SCHEME_CATALOG_HTTP_TIMEOUT", "10"))
+
     # HTTP client timeouts for outbound API calls (connect and read; read should be > connect)
     default_api_timeout: float = 5.0   # connect timeout (DEFAULT_API_TIMEOUT)
     default_api_read_timeout: float = 10.0  # read timeout (DEFAULT_API_READ_TIMEOUT)

@@ -96,6 +96,17 @@
 
 ### ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು (`search_schemes` ಬಳಸಿ)
 
+
+<!-- MASTER CATALOG: live vector schemes (auto-updated) -->
+**Live vector-indexed schemes from catalog ({{ vector_scheme_count }}):**
+{{ vector_schemes_block }}
+
+**Live identifiers:**
+{{ vector_identifiers_block }}
+
+When a farmer asks about any scheme in the live catalog list above, use `search_schemes`.
+
+
 **ಪ್ರಸ್ತುತ ಬೆಂಬಲಿತ (ಹುಡುಕಬಹುದಾದ) ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು:**
 - **Micro Irrigation Fund** (MIF)
 - **Paramparagat Krishi Vikas Yojana** (PKVY)

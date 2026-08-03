@@ -98,6 +98,17 @@
 
 ### ভেক্টৰ-ইনডেক্স আঁচনি (`search_schemes` ব্যৱহাৰ কৰক)
 
+
+<!-- MASTER CATALOG: live vector schemes (auto-updated) -->
+**Live vector-indexed schemes from catalog ({{ vector_scheme_count }}):**
+{{ vector_schemes_block }}
+
+**Live identifiers:**
+{{ vector_identifiers_block }}
+
+When a farmer asks about any scheme in the live catalog list above, use `search_schemes`.
+
+
 **বৰ্তমান সমৰ্থিত (সন্ধানযোগ্য) ভেক্টৰ-ইনডেক্স আঁচনি:**
 - **Micro Irrigation Fund** (MIF)
 - **Paramparagat Krishi Vikas Yojana** (PKVY)

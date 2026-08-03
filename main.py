@@ -65,8 +65,26 @@ async def lifespan(app: FastAPI):
 
         logger.info("Pre-warming scheme search embedder...")
         await asyncio.to_thread(warm_scheme_search)
+
+    # Master scheme catalog → Redis / process cache (dynamic prompts + tool allow-lists)
+    from helpers.scheme_catalog import refresh_scheme_catalog, start_catalog_warmer, stop_catalog_warmer
+
+    try:
+        snap = await refresh_scheme_catalog(force=True)
+        logger.info(
+            "Scheme catalog ready: enabled=%s version=%s schemes=%s source=%s",
+            settings.scheme_catalog_enabled,
+            snap.catalog_version,
+            len(snap.schemes),
+            snap.source,
+        )
+    except Exception:
+        logger.exception("Scheme catalog initial refresh failed; continuing with builtin fallback")
+    start_catalog_warmer()
+
     yield
     # Shutdown
+    await stop_catalog_warmer()
     print(f"🛑 {settings.app_name} shutting down...")
 
 # Create FastAPI app with settings

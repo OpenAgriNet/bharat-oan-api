@@ -18,8 +18,9 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
+from helpers.scheme_catalog.models import CatalogSnapshot
+from helpers.scheme_catalog.store import get_active_scheme_list
 from helpers.scheme_qdrant_search import (
-    format_qdrant_scheme_codes_for_doc,
     format_scheme_unavailable,
     format_search_results,
     get_builtin_scheme_list,
@@ -273,7 +274,7 @@ async def search_schemes(
     Semantic search for Bharat Vistaar scheme guideline PDFs via the Vistaar network layer
     (BAP /search, category scheme-agri-qdrant).
 
-    PLACEHOLDER_SCHEME_CODES
+    Live searchable schemes are listed in the system prompt (from the master catalog).
 
     Do NOT use for legacy integrated schemes handled by get_scheme_info
     (pmkisan, pmfby, kcc, pmksy, shc, sathi, pmasha, aif, smam, pdmc, nfsm, rad, ffs, nbhm).
@@ -285,7 +286,17 @@ async def search_schemes(
     Returns:
         Formatted scheme document chunks with scheme names and relevance scores
     """
-    scheme_list = get_builtin_scheme_list()
+    if ctx.deps.scheme_catalog:
+        try:
+            scheme_list = get_active_scheme_list(
+                CatalogSnapshot.model_validate(ctx.deps.scheme_catalog)
+            )
+        except Exception:
+            scheme_list = get_active_scheme_list()
+    else:
+        scheme_list = get_active_scheme_list()
+    if not scheme_list:
+        scheme_list = get_builtin_scheme_list()
     if query_names_unindexed_scheme(query, scheme_list):
         logger.info("Scheme not in indexed list for query %r", query)
         return format_scheme_unavailable(query)
@@ -434,11 +445,7 @@ async def search_schemes(
         raise ModelRetry("Error searching schemes, please try again") from e
 
 
-if search_schemes.__doc__:
-    search_schemes.__doc__ = search_schemes.__doc__.replace(
-        "PLACEHOLDER_SCHEME_CODES",
-        f"Available Qdrant scheme codes: {format_qdrant_scheme_codes_for_doc()}.",
-    )
+# Module-level docstring stays generic; live schemes come from system prompt + catalog.
 
 
 @observe(name="tool:search_documents", as_type="tool")

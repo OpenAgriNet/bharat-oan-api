@@ -1,6 +1,8 @@
-import os
 from pydantic_ai import Agent, RunContext
 from helpers.utils import get_prompt, get_today_date_str, get_crop_season
+from helpers.scheme_catalog.models import CatalogSnapshot
+from helpers.scheme_catalog.render import build_prompt_context
+from helpers.scheme_catalog.store import pin_catalog_snapshot
 from agents.models import AGRINET_MODEL
 from agents.tools import TOOLS
 from pydantic_ai.models.openai import OpenAIChatModelSettings
@@ -30,4 +32,16 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
     """Get the system prompt for the agrinet agent."""
     deps = ctx.deps
     lang_code = deps.lang_code if deps.lang_code else 'en'
-    return get_prompt(f'agrinet_{lang_code}', context={'today_date': get_today_date_str(), 'crop_season': get_crop_season()})
+    if deps.scheme_catalog:
+        try:
+            snapshot = CatalogSnapshot.model_validate(deps.scheme_catalog)
+        except Exception:
+            snapshot = pin_catalog_snapshot()
+    else:
+        snapshot = pin_catalog_snapshot()
+    context = {
+        "today_date": get_today_date_str(),
+        "crop_season": get_crop_season(),
+        **build_prompt_context(snapshot),
+    }
+    return get_prompt(f"agrinet_{lang_code}", context=context)
