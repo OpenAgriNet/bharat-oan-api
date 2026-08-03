@@ -648,6 +648,11 @@ def _fetch_all_pages(
                 },
             }
 
+        sent_tags = payload.get("message", {}).get("intent", {}).get("tags", [])
+        sent_from = next((t["value"] for t in sent_tags if t.get("code") == "from_date"), None)
+        sent_to = next((t["value"] for t in sent_tags if t.get("code") == "to_date"), None)
+        logger.info("Mandi page %d request: from_date=%s to_date=%s", page, sent_from, sent_to)
+
         try:
             response = httpx.post(search_url, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
         except (httpx.TimeoutException, httpx.RequestError) as e:
@@ -686,6 +691,9 @@ def _fetch_all_pages(
 
         all_items.extend(new_items)
         logger.info("Mandi page %d: %d items fetched, %d new", page, len(page_items), len(new_items))
+
+        if not new_items:
+            break
 
         # Find oldest arrival date in this page
         dated = [_parse_mandi_date(next(
