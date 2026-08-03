@@ -286,11 +286,16 @@ async def search_schemes(
         Formatted scheme document chunks with scheme names and relevance scores
     """
     scheme_list = get_builtin_scheme_list()
+    logger.info(
+        "TOOL CALL: search_schemes(query=%r, top_k=%d) — %d schemes known this turn (static + live-synced)",
+        query, top_k, len(scheme_list),
+    )
     if query_names_unindexed_scheme(query, scheme_list):
-        logger.info("Scheme not in indexed list for query %r", query)
+        logger.info("TOOL RESULT: search_schemes — query names a scheme outside the known list, returning unavailable")
         return format_scheme_unavailable(query)
 
     scheme_code = resolve_scheme_code(query, scheme_list)
+    logger.info("search_schemes: resolved scheme_code=%s for query=%r", scheme_code, query)
     payload = _build_scheme_qdrant_search_payload(
         query=query,
         scheme_code=scheme_code,
@@ -355,7 +360,7 @@ async def search_schemes(
 
         if status and status != "success" and not results:
             logger.info(
-                "Scheme network search non-success status=%s message=%r hits=%s",
+                "TOOL RESULT: search_schemes — network non-success status=%s message=%r hits=%s",
                 status,
                 message,
                 len(results),
@@ -409,6 +414,10 @@ async def search_schemes(
                 "search_backend": search_ctx.get("search_backend"),
             }
         )
+        logger.info(
+            "TOOL RESULT: search_schemes — resolved_scheme_code=%s hit_count=%d doc_ids=%s",
+            resolved or scheme_code, len(results), doc_ids,
+        )
 
         return format_search_results(results, query, scheme_list)
 
@@ -435,9 +444,20 @@ async def search_schemes(
 
 
 if search_schemes.__doc__:
+    _startup_scheme_codes = format_qdrant_scheme_codes_for_doc()
     search_schemes.__doc__ = search_schemes.__doc__.replace(
         "PLACEHOLDER_SCHEME_CODES",
-        f"Available Qdrant scheme codes: {format_qdrant_scheme_codes_for_doc()}.",
+        f"Available Qdrant scheme codes: {_startup_scheme_codes}.",
+    )
+    # This docstring becomes part of the tool-calling schema sent to the model
+    # and is frozen at process start — unlike the system prompt (rendered
+    # fresh every turn via format_vector_schemes_prompt_block), a scheme
+    # synced to Redis *after* this process started won't appear here until
+    # the next restart. Logged once at startup so "why isn't my new scheme
+    # showing up in the tool schema" is answerable from the boot log alone.
+    logger.info(
+        "STARTUP: search_schemes tool docstring frozen with scheme codes: %s",
+        _startup_scheme_codes,
     )
 
 
