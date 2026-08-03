@@ -86,6 +86,7 @@ app.add_middleware(
     allow_credentials=settings.allowed_credentials,
     allow_methods=settings.allowed_methods,
     allow_headers=settings.allowed_headers,
+    expose_headers=["X-QID"],
 )
 
 # Add Timing-Allow-Origin middleware for cross-origin timing access
