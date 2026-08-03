@@ -20,6 +20,8 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 
+REPORT_DIRECTORY_NAME = ".local-dev-logs"
+
 
 def _rows(payload: Any) -> list[dict[str, Any]]:
     """Unwrap the list shape used by NPSS, tolerating common envelopes."""
@@ -260,7 +262,29 @@ async def audit(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def _write_reports(report: dict[str, Any], output_dir: Path) -> tuple[Path, Path]:
+def _validated_output_dir(report_root: Path, requested_dir: Path) -> Path:
+    """Resolve a report path and reject writes outside the local report root."""
+    safe_root = report_root.resolve()
+    candidate = requested_dir.expanduser()
+    if not candidate.is_absolute():
+        candidate = safe_root / candidate
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(safe_root)
+    except ValueError as exc:
+        raise ValueError(
+            f"Report output must stay within {safe_root}; received {requested_dir}"
+        ) from exc
+    return resolved
+
+
+def _write_reports(
+    report: dict[str, Any],
+    requested_dir: Path,
+    *,
+    report_root: Path,
+) -> tuple[Path, Path]:
+    output_dir = _validated_output_dir(report_root, requested_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "npss-empty-villages.json"
     csv_path = output_dir / "npss-empty-villages.csv"
@@ -291,7 +315,15 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--username", default=os.getenv("NPSS_USERNAME"))
     parser.add_argument("--password", default=os.getenv("NPSS_PASSWORD"))
     parser.add_argument("--concurrency", type=int, default=8)
-    parser.add_argument("--output-dir", type=Path, default=repo_root / ".local-dev-logs")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("."),
+        help=(
+            "Report subdirectory within .local-dev-logs. Absolute paths are accepted only "
+            "when they remain inside that directory."
+        ),
+    )
     args = parser.parse_args()
     if not args.username or not args.password:
         parser.error("NPSS_USERNAME and NPSS_PASSWORD are required (set them in .env or pass flags)")
@@ -301,7 +333,16 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
     report = asyncio.run(audit(args))
-    json_path, csv_path = _write_reports(report, args.output_dir)
+    repo_root = Path(__file__).resolve().parents[1]
+    report_root = repo_root / REPORT_DIRECTORY_NAME
+    try:
+        json_path, csv_path = _write_reports(
+            report,
+            args.output_dir,
+            report_root=report_root,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     print(json.dumps(report["summary"], indent=2))
     print(f"JSON report: {json_path}")
     print(f"CSV report:  {csv_path}")
