@@ -6,16 +6,16 @@ NPSS_LOCATION_REQUIRED_MARKER = "[NPSS_LOCATION_REQUIRED]"
 INTERNAL_IMAGE_URL_PATTERN = re.compile(r"\[IMAGE_URL:\s*([^\]\s]+)\s*\]")
 
 LOCATION_FIELD_LABELS = {
-    "en": {"location": "village/locality or PIN code"},
-    "hi": {"location": "गांव/इलाका या पिन कोड"},
-    "as": {"location": "গাঁও/স্থান বা পিন ক'ড"},
-    "bn": {"location": "গ্রাম/এলাকা বা পিন কোড"},
-    "gu": {"location": "ગામ/વિસ્તાર અથવા પિન કોડ"},
-    "kn": {"location": "ಗ್ರಾಮ/ಸ್ಥಳ ಅಥವಾ ಪಿನ್ ಕೋಡ್"},
-    "ml": {"location": "ഗ്രാമം/പ്രദേശം അല്ലെങ്കിൽ പിൻ കോഡ്"},
-    "mr": {"location": "गाव/परिसर किंवा पिन कोड"},
-    "ta": {"location": "கிராமம்/பகுதி அல்லது அஞ்சல் குறியீடு"},
-    "te": {"location": "గ్రామం/ప్రాంతం లేదా పిన్ కోడ్"},
+    "en": {"location": "village, locality, or town"},
+    "hi": {"location": "गांव, इलाका या शहर"},
+    "as": {"location": "গাঁও, স্থান বা চহৰ"},
+    "bn": {"location": "গ্রাম, এলাকা বা শহর"},
+    "gu": {"location": "ગામ, વિસ્તાર અથવા શહેર"},
+    "kn": {"location": "ಗ್ರಾಮ, ಸ್ಥಳ ಅಥವಾ ಪಟ್ಟಣ"},
+    "ml": {"location": "ഗ്രാമം, പ്രദേശം അല്ലെങ്കിൽ പട്ടണം"},
+    "mr": {"location": "गाव, परिसर किंवा शहर"},
+    "ta": {"location": "கிராமம், பகுதி அல்லது நகரம்"},
+    "te": {"location": "గ్రామం, ప్రాంతం లేదా పట్టణం"},
 }
 
 LOCATION_REQUEST_TEMPLATES = {
@@ -32,8 +32,8 @@ LOCATION_REQUEST_TEMPLATES = {
 }
 
 LOCATION_CONFIRMATION_TEMPLATES = {
-    "en": "I couldn’t identify that place precisely. Please share one more specific location, such as your village/locality with district or state, or a PIN code. The image is still saved.",
-    "hi": "उस स्थान की सटीक पहचान नहीं हो पाई। कृपया एक अधिक स्पष्ट स्थान बताएं—जैसे जिले या राज्य के साथ गांव/इलाका, या पिन कोड। छवि अभी भी सुरक्षित है।",
+    "en": "I couldn’t identify that place precisely. Please share one more specific village, locality, or town, with district or state if helpful. The image is still saved.",
+    "hi": "उस स्थान की सटीक पहचान नहीं हो पाई। कृपया कोई अधिक स्पष्ट गांव, इलाका या शहर बताएं—जरूरत हो तो जिले या राज्य के साथ। छवि अभी भी सुरक्षित है।",
 }
 
 

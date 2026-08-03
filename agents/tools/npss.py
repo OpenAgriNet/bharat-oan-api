@@ -67,6 +67,18 @@ NPSS_SOURCE_NAME = "National Pest Surveillance System (NPSS)"
 NPSS_SOURCE_OWNER = "Department of Agriculture & Farmers Welfare, Ministry of Agriculture & Farmers Welfare, Government of India"
 NPSS_SOURCE_URL = "https://npss.dac.gov.in/"
 
+# Deterministic fallback used when browser coordinates are unavailable or cannot
+# be mapped to a complete NPSS hierarchy. These IDs are the NPSS master entries
+# for Krishi Vigyan Kendra, Ujwa, Delhi.
+NPSS_FALLBACK_LOCATION = {
+    "state_id": "9",  # Delhi
+    "district_id": "172",  # South West
+    "sub_district_id": "1869",  # Najafgarh
+    "village_id": "65600",  # Ujwa (CT)
+    "latitude": 28.569352,
+    "longitude": 76.895681,
+}
+
 GCS_MOVE_AFTER_PROCESS = os.getenv("GCS_MOVE_AFTER_PROCESS", "").strip().lower() in ("1", "true", "yes", "on")
 
 # ---------------------------------------------------------------------------
@@ -279,18 +291,15 @@ async def analyze_crop_image(
 
     Args:
         image_url: The URL of the uploaded crop image. This is REQUIRED.
-        location: One farmer-provided village, locality, town, or PIN code. Use only
-            when a previous call requested a location because browser coordinates
-            were unavailable or could not resolve the NPSS hierarchy. Include any
-            district/state context the farmer gave in this same string.
+        location: The farmer's one-time village, locality, or town reply.
+            Pass this only when the previous call requested a location.
     Returns:
         str: Diagnosis result from NPSS including pest name, crop, pathogen class, and description.
         Do NOT call `search_pests_diseases` automatically after this tool.
 
-    If a previous call asked for a location, call this tool again with the same
-    image_url and one location string collected from the conversation. If the
-    farmer writes it in a non-English language or script, translate or transliterate
-    that same place into English for geocoding. Never invent a place or NPSS ID.
+    Browser coordinates are authoritative when present. Without coordinates, the
+    tool asks for one location once. If that reply cannot be resolved, the backend
+    uses the KVK Delhi fallback and continues analysis without another question.
     """
     if not image_url or not image_url.strip():
         return (
@@ -303,14 +312,39 @@ async def analyze_crop_image(
     # Browser coordinates are trusted backend context and are never agent arguments.
     latitude = ctx.deps.latitude
     longitude = ctx.deps.longitude
+    has_browser_coordinates = latitude is not None and longitude is not None
+    farmer_location = str(location or "").strip()
+    if not has_browser_coordinates and not farmer_location and ctx.deps.npss_location_followup:
+        # Enforce the one-follow-up rule even if the model forgets to copy the
+        # farmer's reply into the optional tool argument.
+        farmer_location = str(ctx.deps.query or "").strip()
+
+    if not has_browser_coordinates and not farmer_location:
+        logger.info("NPSS browser coordinates are unavailable; requesting one farmer location")
+        ctx.deps.mark_npss_location_required(["location"])
+        return (
+            f"{NPSS_LOCATION_REQUIRED_MARKER}\n"
+            f"[IMAGE_URL: {image_url}]\n"
+            "The image is saved and ready for NPSS analysis. Ask for one village, locality, "
+            "or town. Once provided, call `analyze_crop_image` again with this same image "
+            "URL and that one location string. Do not ask for any additional location fields."
+        )
 
     token = await _get_cached_npss_token()
-    geo = await resolve_npss_location_ids(
-        latitude,
-        longitude,
-        bearer_token=token,
-        location=location,
-    ) or {}
+    if has_browser_coordinates:
+        geo = await resolve_npss_location_ids(
+            latitude,
+            longitude,
+            bearer_token=token,
+        ) or {}
+    else:
+        geo = await resolve_npss_location_ids(
+            None,
+            None,
+            bearer_token=token,
+            location=farmer_location,
+        ) or {}
+
     state_id = geo.get("state_id")
     district_id = geo.get("district_id")
     sub_district_id = geo.get("sub_district_id")
@@ -327,53 +361,33 @@ async def analyze_crop_image(
             district_id,
             sub_district_id,
         )
-    effective_latitude = geo.get("latitude", latitude)
-    effective_longitude = geo.get("longitude", longitude)
-    has_farmer_location = bool(str(location or "").strip())
+
     complete_master_hierarchy = all((state_id, district_id, sub_district_id, village_id))
-    if not complete_master_hierarchy and not has_farmer_location:
-        logger.info(
-            "NPSS master lookup was incomplete; waiting for one farmer location: "
-            "state_id=%s district_id=%s subdistrict_id=%s village_id=%s lat=%s lon=%s location=%s",
+    if not complete_master_hierarchy:
+        logger.warning(
+            "NPSS location unavailable or incomplete after the permitted lookup; "
+            "using KVK Delhi fallback: state_id=%s district_id=%s subdistrict_id=%s "
+            "village_id=%s lat=%s lon=%s farmer_location=%r",
             state_id,
             district_id,
             sub_district_id,
             village_id,
             latitude,
             longitude,
-            location,
+            farmer_location,
         )
-        ctx.deps.mark_npss_location_required(
-            ["location"],
-            needs_confirmation=bool(location),
-        )
-        detail_request = (
-            "Please ask for one village/locality or PIN code, with district or state "
-            "in the same reply if needed to distinguish it."
-        )
-        return (
-            f"{NPSS_LOCATION_REQUIRED_MARKER}\n"
-            f"[IMAGE_URL: {image_url}]\n"
-            "The image is saved and ready for NPSS analysis. "
-            f"{detail_request} Once provided, call `analyze_crop_image` again with this same "
-            "image URL and one location string. Do not describe this as an analysis failure."
-        )
-    if not complete_master_hierarchy:
-        logger.error(
-            "NPSS master hierarchy remained incomplete after the one location follow-up: "
-            "state_id=%s district_id=%s subdistrict_id=%s village_id=%s lat=%s lon=%s location=%r",
-            state_id,
-            district_id,
-            sub_district_id,
-            village_id,
-            effective_latitude,
-            effective_longitude,
-            location,
-        )
-        return (
-            "The provided location could not be matched to the NPSS administrative master. "
-            "The image analysis cannot continue right now."
-        )
+        state_id = NPSS_FALLBACK_LOCATION["state_id"]
+        district_id = NPSS_FALLBACK_LOCATION["district_id"]
+        sub_district_id = NPSS_FALLBACK_LOCATION["sub_district_id"]
+        village_id = NPSS_FALLBACK_LOCATION["village_id"]
+        effective_latitude = NPSS_FALLBACK_LOCATION["latitude"]
+        effective_longitude = NPSS_FALLBACK_LOCATION["longitude"]
+    else:
+        # Browser coordinates remain authoritative. Forward-geocoded coordinates
+        # are used only for the single farmer-location attempt when browser
+        # coordinates were absent.
+        effective_latitude = latitude if has_browser_coordinates else geo.get("latitude")
+        effective_longitude = longitude if has_browser_coordinates else geo.get("longitude")
 
     # Download image from URL
     try:
