@@ -1,7 +1,7 @@
 import json
 import re
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from rapidfuzz import fuzz, process
 from langfuse import observe
 
@@ -9,6 +9,46 @@ from langfuse import observe
 term_pairs = json.load(open('assets/glossary_terms.json', 'r', encoding='utf-8'))
 
 SUPPORTED_LANGS = ("en", "hi", "transliteration", "as", "bn", "gu", "kn", "ml", "mr", "ta", "te")
+
+# Language fields that may be a single string (legacy) or a list of variants (new format).
+# English (`en`) stays a plain string — it is the concept key / lookup key.
+_MULTI_VALUE_LANG_FIELDS = (
+    "hi",
+    "transliteration",
+    "bn",
+    "te",
+    "ta",
+    "mr",
+    "gu",
+    "kn",
+    "ml",
+    "as_",
+)
+
+
+def _normalize_lang_values(value) -> list[str]:
+    """Coerce a glossary language field to a list of non-empty strings.
+
+    Supports both formats:
+      - legacy:  "hi": "बीज"
+      - multi:   "hi": ["बीज", "बीया", "बिया"]
+    """
+    if value is None or value == "":
+        return []
+    if isinstance(value, str):
+        stripped = value.strip()
+        return [stripped] if stripped else []
+    if isinstance(value, list):
+        terms: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                stripped = item.strip()
+                if stripped:
+                    terms.append(stripped)
+        return terms
+    raise TypeError(
+        f"Glossary language value must be str or list[str], got {type(value).__name__}"
+    )
 
 
 class Language(str, Enum):
@@ -26,29 +66,54 @@ class Language(str, Enum):
 
 
 class TermPair(BaseModel):
-    en: str = Field(description="English term")
-    hi: str = Field(description="Hindi term")
-    transliteration: str = Field(description="Transliteration of Hindi term to English")
-    # Indic languages — empty string means not yet translated
-    bn: str = Field(default="", description="Bengali term")
-    te: str = Field(default="", description="Telugu term")
-    ta: str = Field(default="", description="Tamil term")
-    mr: str = Field(default="", description="Marathi term")
-    gu: str = Field(default="", description="Gujarati term")
-    kn: str = Field(default="", description="Kannada term")
-    ml: str = Field(default="", description="Malayalam term")
-    as_: str = Field(default="", alias="as", description="Assamese term")
+    en: str = Field(description="English term (concept key)")
+    hi: list[str] = Field(default=[], description="Hindi term(s)")
+    transliteration: list[str] = Field(
+        default=[],
+        description="Transliteration(s) of Hindi term(s) to English script",
+    )
+    # Indic languages — empty list means not yet translated
+    bn: list[str] = Field(default=[], description="Bengali term(s)")
+    te: list[str] = Field(default=[], description="Telugu term(s)")
+    ta: list[str] = Field(default=[], description="Tamil term(s)")
+    mr: list[str] = Field(default=[], description="Marathi term(s)")
+    gu: list[str] = Field(default=[], description="Gujarati term(s)")
+    kn: list[str] = Field(default=[], description="Kannada term(s)")
+    ml: list[str] = Field(default=[], description="Malayalam term(s)")
+    as_: list[str] = Field(default=[], alias="as", description="Assamese term(s)")
 
     model_config = {"populate_by_name": True}
 
-    def get_term(self, lang: str) -> str:
-        """Get the term for a specific language code."""
+    @field_validator(*_MULTI_VALUE_LANG_FIELDS, mode="before")
+    @classmethod
+    def coerce_lang_values(cls, value) -> list[str]:
+        return _normalize_lang_values(value)
+
+    def get_terms(self, lang: str) -> list[str]:
+        """All variants for a language code (empty list if missing)."""
         if lang == "as":
-            return self.as_
-        return getattr(self, lang, "")
+            return list(self.as_)
+        if lang == "en":
+            return [self.en] if self.en else []
+        value = getattr(self, lang, None)
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return list(value)
+        return [value] if value else []
+
+    def get_term(self, lang: str) -> str:
+        """Primary (first) term for a language — used for display / normalize.
+
+        Callers that need every synonym should use get_terms() instead.
+        """
+        terms = self.get_terms(lang)
+        return terms[0] if terms else ""
 
     def __str__(self):
-        return f"{self.en} -> {self.hi} ({self.transliteration})"
+        hi = self.get_term("hi")
+        translit = self.get_term("transliteration")
+        return f"{self.en} -> {hi} ({translit})"
 
 
 # Convert raw dictionaries to TermPair objects
@@ -69,7 +134,19 @@ async def search_terms(
         term: The term to search for
         max_results: Maximum number of results to return
         threshold: Minimum similarity score (0-1) to consider a match (default is 0.7)
-        language: Optional language to restrict search to (en/hi/transliteration/as/bn/gu/kn/ml/mr/ta/te)
+        language: Optional language to restrict search to (en/hi/transliteration/as/bn/gu/kn/ml/mr/ta/te).
+            IMPORTANT: pick this based on the actual script/language the query
+            `term` is written in — not on what field you expect the answer to
+            come from. Latin/Roman script is not the same as English: a
+            romanized Indic-language word (e.g. "murjhaane ka rog", "beej")
+            belongs to "transliteration", not "en" — "en" is only for terms
+            that are actually English words (e.g. "Wilt", "Seed"). Likewise,
+            a Devanagari term is "hi", a Bengali-script term is "bn", and so
+            on for every other supported language — always match the code to
+            the query's script, never guess. Mismatching them causes fuzzy
+            matching to fail even when the right entry exists. If you are not
+            sure which language/script the query is in, omit `language`
+            entirely so every field is searched.
 
     Returns:
         str: Formatted string with matching results and their scores
@@ -81,20 +158,22 @@ async def search_terms(
     term_lower = term.lower()
 
     # Determine which languages to search
+    # Accept either a Language enum member or a plain string (e.g. "transliteration")
+    # so callers that don't go through pydantic validation still work.
     if language:
-        search_langs = [language.value]
+        search_langs = [language.value if isinstance(language, Language) else language]
     else:
         search_langs = list(SUPPORTED_LANGS)
 
     for term_pair in TERM_PAIRS:
         max_score = 0.0
 
+        # Score every surface form for each language and keep the best.
+        # That way dialect/synonym variants (not only the primary string) match.
         for lang in search_langs:
-            lang_term = term_pair.get_term(lang)
-            if not lang_term:
-                continue
-            score = fuzz.ratio(term_lower, lang_term.lower()) / 100.0
-            max_score = max(max_score, score)
+            for lang_term in term_pair.get_terms(lang):
+                score = fuzz.ratio(term_lower, lang_term.lower()) / 100.0
+                max_score = max(max_score, score)
 
         if max_score >= threshold:
             matches.append((term_pair, max_score))
