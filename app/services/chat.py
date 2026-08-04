@@ -524,18 +524,11 @@ async def stream_chat_messages(
                     _spawn_detached(_finalize_after_client_disconnect(turn_ctx, agrinet_task))
                     raise
 
-            if deps.npss_location_required:
-                output_text = build_npss_location_request(
-                    target_lang,
-                    deps.npss_missing_location_fields,
-                    needs_confirmation=deps.npss_location_needs_confirmation,
-                )
-            else:
-                output_text = post_process_npss_response(
-                    text=completed_run.output_text,
-                    target_lang=target_lang,
-                    npss_used=deps.npss_used,
-                )
+            output_text = post_process_npss_response(
+                text=completed_run.output_text,
+                target_lang=target_lang,
+                npss_used=deps.npss_used,
+            )
             if defer_npss_output:
                 yield output_text
 
