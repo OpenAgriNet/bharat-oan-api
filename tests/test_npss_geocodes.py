@@ -2,7 +2,7 @@ import asyncio
 from types import SimpleNamespace
 
 from app.core import npss_geocodes
-from app.core.npss_followup import build_npss_location_request, find_pending_npss_image_url
+from app.core.npss_followup import find_pending_npss_image_url
 from app.services.chat import _wrap_image_analysis_message
 from agents.deps import FarmerContext
 from agents.tools import npss
@@ -370,11 +370,26 @@ def test_failed_npss_attempt_does_not_leave_location_conversation_looping():
     assert find_pending_npss_image_url(history) is None
 
 
-def test_image_analysis_requests_one_location_when_coordinates_are_missing(monkeypatch):
+def test_image_analysis_uses_kvk_when_coordinates_are_missing(monkeypatch):
+    captured = {}
+
+    async def fake_token():
+        return "token"
+
     async def unexpected_geocode(*args, **kwargs):
         raise AssertionError("geocoding must not run without browser coordinates")
 
+    async def fake_download(image_url):
+        return b"\xff\xd8\xffimage", "image/jpeg"
+
+    async def fake_analyze(**kwargs):
+        captured.update(kwargs)
+        return {"pest": "Test pest", "crop": "Cotton"}
+
+    monkeypatch.setattr(npss, "_get_cached_npss_token", fake_token)
     monkeypatch.setattr(npss, "resolve_npss_location_ids", unexpected_geocode)
+    monkeypatch.setattr(npss, "_download_image", fake_download)
+    monkeypatch.setattr(npss, "_call_npss_analyze", fake_analyze)
     deps = FarmerContext(
         query="Analyze this image",
         lang_code="hi",
@@ -387,31 +402,24 @@ def test_image_analysis_requests_one_location_when_coordinates_are_missing(monke
 
     result = asyncio.run(npss.analyze_crop_image(ctx, image_url))
 
-    assert "[NPSS_LOCATION_REQUIRED]" in result
-    assert f"[IMAGE_URL: {image_url}]" in result
-    assert "one village, locality, or town" in result
-    assert "additional location fields" in result
-    assert deps.npss_location_required is True
-    assert deps.npss_missing_location_fields == ["location"]
+    assert captured["state_id"] == "9"
+    assert captured["district_id"] == "172"
+    assert captured["sub_district_id"] == "1869"
+    assert captured["village_id"] == "65600"
+    assert captured["latitude"] == 28.569352
+    assert captured["longitude"] == 76.895681
+    assert "[NPSS_LOCATION_REQUIRED]" not in result
+    assert "**NPSS Analysis Result**" in result
 
 
-def test_image_analysis_uses_the_single_typed_location_when_it_resolves(monkeypatch):
+def test_image_analysis_ignores_typed_location_without_coordinates(monkeypatch):
     captured = {}
 
     async def fake_token():
         return "token"
 
-    async def resolved_location(*args, **kwargs):
-        assert args == (None, None)
-        assert kwargs == {"bearer_token": "token", "location": "Rewla Khanpur, Delhi"}
-        return {
-            "state_id": "9",
-            "district_id": "172",
-            "sub_district_id": "1868",
-            "village_id": "65534",
-            "latitude": 28.5648,
-            "longitude": 76.9822,
-        }
+    async def unexpected_geocode(*args, **kwargs):
+        raise AssertionError("typed locations must not trigger geocoding")
 
     async def fake_download(image_url):
         assert image_url == "https://example.test/cotton.jpg"
@@ -422,7 +430,7 @@ def test_image_analysis_uses_the_single_typed_location_when_it_resolves(monkeypa
         return {"pest": "Test pest", "crop": "Cotton"}
 
     monkeypatch.setattr(npss, "_get_cached_npss_token", fake_token)
-    monkeypatch.setattr(npss, "resolve_npss_location_ids", resolved_location)
+    monkeypatch.setattr(npss, "resolve_npss_location_ids", unexpected_geocode)
     monkeypatch.setattr(npss, "_download_image", fake_download)
     monkeypatch.setattr(npss, "_call_npss_analyze", fake_analyze)
     deps = FarmerContext(query="Analyze", lang_code="hi", session_id="session")
@@ -436,55 +444,12 @@ def test_image_analysis_uses_the_single_typed_location_when_it_resolves(monkeypa
         )
     )
 
-    assert captured["latitude"] == 28.5648
-    assert captured["longitude"] == 76.9822
-    assert captured["village_id"] == "65534"
-    assert "**NPSS Analysis Result**" in result
-
-
-def test_image_analysis_falls_back_after_invalid_single_typed_location(monkeypatch):
-    captured = {}
-
-    async def fake_token():
-        return "token"
-
-    async def unresolved_location(*args, **kwargs):
-        assert args == (None, None)
-        assert kwargs == {"bearer_token": "token", "location": "not-a-real-place"}
-        return None
-
-    async def fake_download(image_url):
-        return b"\xff\xd8\xffimage", "image/jpeg"
-
-    async def fake_analyze(**kwargs):
-        captured.update(kwargs)
-        return {"pest": "Test pest", "crop": "Cotton"}
-
-    monkeypatch.setattr(npss, "_get_cached_npss_token", fake_token)
-    monkeypatch.setattr(npss, "resolve_npss_location_ids", unresolved_location)
-    monkeypatch.setattr(npss, "_download_image", fake_download)
-    monkeypatch.setattr(npss, "_call_npss_analyze", fake_analyze)
-    deps = FarmerContext(
-        query="not-a-real-place",
-        lang_code="hi",
-        session_id="session",
-        npss_location_followup=True,
-    )
-
-    result = asyncio.run(
-        npss.analyze_crop_image(
-            SimpleNamespace(deps=deps),
-            "https://example.test/cotton.jpg",
-        )
-    )
-
     assert captured["state_id"] == "9"
     assert captured["district_id"] == "172"
     assert captured["sub_district_id"] == "1869"
     assert captured["village_id"] == "65600"
     assert captured["latitude"] == 28.569352
     assert captured["longitude"] == 76.895681
-    assert "[NPSS_LOCATION_REQUIRED]" not in result
     assert "**NPSS Analysis Result**" in result
 
 
@@ -586,31 +551,7 @@ def test_image_analysis_uses_zero_village_for_verified_urban_hierarchy(monkeypat
     assert "**NPSS Analysis Result**" in result
 
 
-def test_hindi_location_request_starts_a_conversation_without_failure_language():
-    result = build_npss_location_request(
-        "hi",
-        ["location"],
-    )
-
-    assert "गांव, इलाका या शहर" in result
-    assert "राज्य, जिला" not in result
-    assert "छवि सुरक्षित है" in result
-    assert "नहीं किया जा सका" not in result
-
-
-def test_hindi_retry_asks_for_one_more_specific_location_not_four_fields():
-    result = build_npss_location_request(
-        "hi",
-        ["location"],
-        needs_confirmation=True,
-    )
-
-    assert "अधिक स्पष्ट गांव, इलाका या शहर" in result
-    assert "गांव, इलाका या शहर" in result
-    assert "राज्य, जिला, उप-जिला" not in result
-
-
-def test_pending_image_instruction_uses_one_location_then_falls_back():
+def test_pending_image_instruction_retries_without_location():
     wrapped = _wrap_image_analysis_message(
         "Rewla Khanpur, Delhi",
         None,
@@ -619,14 +560,14 @@ def test_pending_image_instruction_uses_one_location_then_falls_back():
     )
 
     assert "Call `analyze_crop_image` again" in wrapped
-    assert "single village, locality, or town" in wrapped
-    assert "Do not ask for another location" in wrapped
+    assert "with that image URL and no location" in wrapped
+    assert "Do not ask the farmer for location details" in wrapped
     assert "Krishi Vigyan Kendra, Delhi" in wrapped
 
 
-def test_image_instruction_requests_location_once_without_coordinates():
+def test_image_instruction_uses_kvk_without_coordinates():
     wrapped = _wrap_image_analysis_message("Analyze", None, None)
 
     assert "Call `analyze_crop_image` immediately without a location" in wrapped
-    assert "exactly once" in wrapped
+    assert "Do not ask the farmer for location details" in wrapped
     assert "Krishi Vigyan Kendra, Delhi" in wrapped

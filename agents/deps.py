@@ -35,16 +35,6 @@ class FarmerContext(BaseModel):
     npss_source_owner: Optional[str] = Field(default=None, description="Official NPSS source owner.")
     npss_source_url: Optional[str] = Field(default=None, description="Official NPSS source URL.")
     npss_raw_result: Optional[dict[str, Any]] = Field(default=None, description="Raw NPSS API result for this turn.")
-    npss_location_required: bool = Field(
-        default=False,
-        description="Whether NPSS needs one farmer-provided place before image analysis can continue.",
-    )
-    npss_missing_location_fields: list[str] = Field(default_factory=list)
-    npss_location_needs_confirmation: bool = False
-    npss_location_followup: bool = Field(
-        default=False,
-        description="Whether this turn is the single permitted NPSS location follow-up.",
-    )
 
     def update_moderation_str(self, moderation_str: str):
         """Update the moderation result of the user's question."""
@@ -63,17 +53,6 @@ class FarmerContext(BaseModel):
         self.npss_source_name = source_name
         self.npss_source_owner = source_owner
         self.npss_source_url = source_url
-
-    def mark_npss_location_required(
-        self,
-        missing_fields: list[str],
-        *,
-        needs_confirmation: bool = False,
-    ) -> None:
-        """Record that the current image analysis is waiting for location details."""
-        self.npss_location_required = True
-        self.npss_missing_location_fields = missing_fields
-        self.npss_location_needs_confirmation = needs_confirmation
 
     def _language_string(self):
         """Get the language string for the agrinet agent."""
