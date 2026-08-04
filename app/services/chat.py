@@ -19,7 +19,7 @@ from agents.models import (
 )
 from agents.moderation import moderation_agent
 from app.config import settings
-from app.core.npss_followup import build_npss_location_request, find_pending_npss_image_url
+from app.core.npss_followup import find_pending_npss_image_url
 from app.services.agrinet_routing import (
     AgrinetRouteDecision,
     get_alternate_agrinet_route,
@@ -300,13 +300,11 @@ def _wrap_image_analysis_message(
 ) -> str:
     if pending_npss_image_url:
         location_instruction = (
-            "A previous NPSS call saved this image and asked for one location. "
+            "A previous NPSS call saved this image while waiting for location data. "
             f"The pending image URL is {pending_npss_image_url}. "
-            "Treat the user's current reply as their single village, locality, or town "
-            "attempt. Call `analyze_crop_image` again with that image URL and one location "
-            "string. Translate or transliterate the same place into English when needed. Do not "
-            "ask for another location: if this attempt cannot be resolved, the backend falls back "
-            "to Krishi Vigyan Kendra, Delhi and continues the analysis."
+            "Call `analyze_crop_image` again with that image URL and no location. Do not ask the "
+            "farmer for location details; the backend will use browser coordinates when present "
+            "or immediately fall back to Krishi Vigyan Kendra, Delhi."
         )
     elif latitude is not None and longitude is not None:
         location_instruction = (
@@ -318,9 +316,8 @@ def _wrap_image_analysis_message(
     else:
         location_instruction = (
             "No browser coordinates were sent with this image upload. "
-            "Call `analyze_crop_image` immediately without a location. The backend will ask the "
-            "farmer for one village, locality, or town exactly once before using the Krishi "
-            "Vigyan Kendra, Delhi fallback."
+            "Call `analyze_crop_image` immediately without a location. Do not ask the farmer for "
+            "location details; the backend will immediately use the Krishi Vigyan Kendra, Delhi fallback."
         )
     return (
         f"[USER UPLOADED A CROP IMAGE]\n\n"
@@ -338,10 +335,8 @@ def _wrap_image_analysis_message(
         f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
         f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
         f"If the tool returns multiple findings, show only the most relevant one. "
-        f"If the tool returns `[NPSS_LOCATION_REQUIRED]`, ask where the farmer is from: one village, locality, or town "
-        f"in the Selected Language and explain that the image is saved. Never ask for location "
-        f"more than once and never ask separately for state, district, sub-district, and village. "
-        f"Otherwise, do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
+        f"Never ask the farmer for location details. "
+        f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
     )
 
 
@@ -455,7 +450,6 @@ async def stream_chat_messages(
             message_pairs = "\n\n".join(format_message_pairs(history, 3))
             logger.info("Message pairs: %s", message_pairs)
             pending_npss_image_url = find_pending_npss_image_url(history)
-            deps.npss_location_followup = bool(pending_npss_image_url)
             last_response = (
                 f"**Conversation**\n\n{message_pairs}\n\n---\n\n" if message_pairs else ""
             )
