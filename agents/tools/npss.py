@@ -16,7 +16,6 @@ from langfuse import observe
 from helpers.utils import get_logger
 from agents.deps import FarmerContext
 from app.core.npss_geocodes import resolve_npss_location_ids
-from app.core.npss_followup import NPSS_LOCATION_REQUIRED_MARKER
 from app.core.cache import cache
 from app.core.image_storage import mark_processed, cleanup_image
 
@@ -291,15 +290,13 @@ async def analyze_crop_image(
 
     Args:
         image_url: The URL of the uploaded crop image. This is REQUIRED.
-        location: The farmer's one-time village, locality, or town reply.
-            Pass this only when the previous call requested a location.
+        location: Deprecated compatibility argument. Typed locations are ignored.
     Returns:
         str: Diagnosis result from NPSS including pest name, crop, pathogen class, and description.
         Do NOT call `search_pests_diseases` automatically after this tool.
 
     Browser coordinates are authoritative when present. Without coordinates, the
-    tool asks for one location once. If that reply cannot be resolved, the backend
-    uses the KVK Delhi fallback and continues analysis without another question.
+    backend immediately uses the KVK Delhi fallback and continues analysis.
     """
     if not image_url or not image_url.strip():
         return (
@@ -313,36 +310,14 @@ async def analyze_crop_image(
     latitude = ctx.deps.latitude
     longitude = ctx.deps.longitude
     has_browser_coordinates = latitude is not None and longitude is not None
-    farmer_location = str(location or "").strip()
-    if not has_browser_coordinates and not farmer_location and ctx.deps.npss_location_followup:
-        # Enforce the one-follow-up rule even if the model forgets to copy the
-        # farmer's reply into the optional tool argument.
-        farmer_location = str(ctx.deps.query or "").strip()
-
-    if not has_browser_coordinates and not farmer_location:
-        logger.info("NPSS browser coordinates are unavailable; requesting one farmer location")
-        ctx.deps.mark_npss_location_required(["location"])
-        return (
-            f"{NPSS_LOCATION_REQUIRED_MARKER}\n"
-            f"[IMAGE_URL: {image_url}]\n"
-            "The image is saved and ready for NPSS analysis. Ask for one village, locality, "
-            "or town. Once provided, call `analyze_crop_image` again with this same image "
-            "URL and that one location string. Do not ask for any additional location fields."
-        )
 
     token = await _get_cached_npss_token()
+    geo = {}
     if has_browser_coordinates:
         geo = await resolve_npss_location_ids(
             latitude,
             longitude,
             bearer_token=token,
-        ) or {}
-    else:
-        geo = await resolve_npss_location_ids(
-            None,
-            None,
-            bearer_token=token,
-            location=farmer_location,
         ) or {}
 
     state_id = geo.get("state_id")
@@ -365,16 +340,15 @@ async def analyze_crop_image(
     complete_master_hierarchy = all((state_id, district_id, sub_district_id, village_id))
     if not complete_master_hierarchy:
         logger.warning(
-            "NPSS location unavailable or incomplete after the permitted lookup; "
+            "NPSS browser location unavailable or incomplete; "
             "using KVK Delhi fallback: state_id=%s district_id=%s subdistrict_id=%s "
-            "village_id=%s lat=%s lon=%s farmer_location=%r",
+            "village_id=%s lat=%s lon=%s",
             state_id,
             district_id,
             sub_district_id,
             village_id,
             latitude,
             longitude,
-            farmer_location,
         )
         state_id = NPSS_FALLBACK_LOCATION["state_id"]
         district_id = NPSS_FALLBACK_LOCATION["district_id"]
@@ -383,11 +357,8 @@ async def analyze_crop_image(
         effective_latitude = NPSS_FALLBACK_LOCATION["latitude"]
         effective_longitude = NPSS_FALLBACK_LOCATION["longitude"]
     else:
-        # Browser coordinates remain authoritative. Forward-geocoded coordinates
-        # are used only for the single farmer-location attempt when browser
-        # coordinates were absent.
-        effective_latitude = latitude if has_browser_coordinates else geo.get("latitude")
-        effective_longitude = longitude if has_browser_coordinates else geo.get("longitude")
+        effective_latitude = latitude
+        effective_longitude = longitude
 
     # Download image from URL
     try:
