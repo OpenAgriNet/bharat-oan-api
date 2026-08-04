@@ -1,9 +1,11 @@
 import asyncio
+import inspect
 from types import SimpleNamespace
 
 from app.core import npss_geocodes
 from app.core.npss_followup import find_pending_npss_image_url
 from app.services.chat import _wrap_image_analysis_message
+from app.services import chat as chat_service
 from agents.deps import FarmerContext
 from agents.tools import npss
 
@@ -571,3 +573,11 @@ def test_image_instruction_uses_kvk_without_coordinates():
     assert "Call `analyze_crop_image` immediately without a location" in wrapped
     assert "Do not ask the farmer for location details" in wrapped
     assert "Krishi Vigyan Kendra, Delhi" in wrapped
+
+
+def test_chat_response_does_not_reference_removed_location_prompt_state():
+    source = inspect.getsource(chat_service.stream_chat_messages)
+
+    assert "npss_location_required" not in source
+    assert "npss_missing_location_fields" not in source
+    assert "npss_location_needs_confirmation" not in source

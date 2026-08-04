@@ -385,12 +385,6 @@ async def stream_chat_messages(
             defer_npss_output = bool(is_image_analysis or pending_npss_image_url)
 
             def _resolve_output_text(completed_run: _AgrinetCompletedRun) -> str:
-                if deps.npss_location_required:
-                    return build_npss_location_request(
-                        target_lang,
-                        deps.npss_missing_location_fields,
-                        needs_confirmation=deps.npss_location_needs_confirmation,
-                    )
                 return post_process_npss_response(
                     text=completed_run.output_text,
                     target_lang=target_lang,
