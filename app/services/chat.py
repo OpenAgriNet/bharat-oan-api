@@ -7,7 +7,8 @@ from typing import Any, AsyncGenerator, Optional
 
 from fastapi import BackgroundTasks
 from langfuse import get_client, observe, propagate_attributes
-from pydantic_ai import AgentRunResultEvent, FinalResultEvent, PartDeltaEvent, TextPartDelta
+from pydantic_ai import AgentRunResultEvent, FinalResultEvent, PartDeltaEvent, PartStartEvent, TextPartDelta
+from pydantic_ai.messages import TextPart
 
 from agents.agrinet import agrinet_agent
 from agents.deps import FarmerContext
