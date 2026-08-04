@@ -8,7 +8,6 @@ from typing import Any, AsyncGenerator, Optional
 from fastapi import BackgroundTasks
 from langfuse import get_client, observe, propagate_attributes
 from pydantic_ai import AgentRunResultEvent, FinalResultEvent, PartDeltaEvent, TextPartDelta
-from pydantic_ai.models.openai import OpenAIChatModelSettings
 
 from agents.agrinet import agrinet_agent
 from agents.deps import FarmerContext
@@ -20,7 +19,7 @@ from agents.models import (
 )
 from agents.moderation import moderation_agent
 from app.config import settings
-from app.core.npss_followup import build_npss_location_request, find_pending_npss_image_url
+from app.core.npss_followup import find_pending_npss_image_url
 from app.services.agrinet_routing import (
     AgrinetRouteDecision,
     get_alternate_agrinet_route,
@@ -53,35 +52,6 @@ from helpers.telemetry import (
 from helpers.utils import get_logger
 
 logger = get_logger(__name__)
-
-# EXPERIMENT: vLLM guided decoding (structured_outputs.regex) to stop the base
-# model from drifting into other Indic/CJK/Korean scripts mid-answer. Allowed
-# set = target script + full ASCII (covers tool-call JSON, English code-
-# switching, markdown) + shared Indic punctuation/currency.
-# Bengali and Assamese intentionally share one Unicode block (Assamese uses
-# the Bengali script with two extra letters covered by the same range).
-_GUIDED_DECODING_SCRIPT_RANGES = {
-    "kn": "ಀ-೿",  # Kannada
-    "ta": "஀-௿",  # Tamil
-    "ml": "ഀ-ൿ",  # Malayalam
-    "te": "ఀ-౿",  # Telugu
-    "bn": "ঀ-৿",  # Bengali
-    "as": "ঀ-৿",  # Assamese (Bengali script block)
-    "gu": "઀-૿",  # Gujarati
-}
-_GUIDED_DECODING_SHARED_CHARS = (
-    "\\t\\n\\r -~"  # ESCAPED tab/newline/CR (raw control bytes crash xgrammar's EBNF parser) + printable ASCII
-    "।॥"            # shared Devanagari danda punctuation
-    "–—‘’“”•₹"  # dashes/quotes/bullet/rupee
-)
-
-
-def _guided_decoding_settings(lang_code: str | None) -> OpenAIChatModelSettings | None:
-    script_range = _GUIDED_DECODING_SCRIPT_RANGES.get((lang_code or "").lower())
-    if not script_range:
-        return None
-    pattern = f"^[{script_range}{_GUIDED_DECODING_SHARED_CHARS}]*$"
-    return OpenAIChatModelSettings(extra_body={"structured_outputs": {"regex": pattern}})
 
 CHAT_TRACE_NAME = (
     os.getenv("LANGFUSE_TRACE_NAME")
@@ -232,14 +202,11 @@ def _wrap_image_analysis_message(
 ) -> str:
     if pending_npss_image_url:
         location_instruction = (
-            "A previous NPSS call saved this image and requested one location. "
+            "A previous NPSS call saved this image while waiting for location data. "
             f"The pending image URL is {pending_npss_image_url}. "
-            "If the user's current message provides a village, locality, town, or PIN code, "
-            "collect that single location string, including any district/state context they "
-            "volunteered, then call `analyze_crop_image` again with the pending image URL and "
-            "that location. Translate or transliterate the same place into English tool arguments "
-            "when needed; do not ask the user to repeat it in English. Never invent a place or IDs. "
-            "Do not ask separately for state, district, sub-district, and village."
+            "Call `analyze_crop_image` again with that image URL and no location. Do not ask the "
+            "farmer for location details; the backend will use browser coordinates when present "
+            "or immediately fall back to Krishi Vigyan Kendra, Delhi."
         )
     elif latitude is not None and longitude is not None:
         location_instruction = (
@@ -251,8 +218,8 @@ def _wrap_image_analysis_message(
     else:
         location_instruction = (
             "No browser coordinates were sent with this image upload. "
-            "Do NOT call any geocoding tool or try to provide NPSS state, district, subdistrict, or village IDs. "
-            "Call `analyze_crop_image`; the backend will omit unresolved location fields rather than inventing IDs."
+            "Call `analyze_crop_image` immediately without a location. Do not ask the farmer for "
+            "location details; the backend will immediately use the Krishi Vigyan Kendra, Delhi fallback."
         )
     return (
         f"[USER UPLOADED A CROP IMAGE]\n\n"
@@ -270,9 +237,8 @@ def _wrap_image_analysis_message(
         f"Do not copy the NPSS description verbatim. Summarize only what the tool returned in 2-4 simple sentences, and translate the explanation for the farmer. "
         f"Do not add a bold label for the description - just output the summary text as a paragraph after the labeled fields. "
         f"If the tool returns multiple findings, show only the most relevant one. "
-        f"If the tool returns `[NPSS_LOCATION_REQUIRED]`, do not present an analysis result; "
-        f"ask the farmer for one village/locality or PIN code in the Selected Language and explain that the image is saved. "
-        f"Otherwise, do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
+        f"Never ask the farmer for location details. "
+        f"Do NOT add treatment advice, prevention advice, spray recommendations, or any follow-up question."
     )
 
 
@@ -419,12 +385,6 @@ async def stream_chat_messages(
             defer_npss_output = bool(is_image_analysis or pending_npss_image_url)
 
             def _resolve_output_text(completed_run: _AgrinetCompletedRun) -> str:
-                if deps.npss_location_required:
-                    return build_npss_location_request(
-                        target_lang,
-                        deps.npss_missing_location_fields,
-                        needs_confirmation=deps.npss_location_needs_confirmation,
-                    )
                 return post_process_npss_response(
                     text=completed_run.output_text,
                     target_lang=target_lang,
@@ -784,17 +744,18 @@ async def _run_agrinet_once_streaming(
                 message_history=trimmed_history,
                 deps=deps,
                 model=get_agrinet_route_model(decision.route),
-                model_settings=_guided_decoding_settings(deps.lang_code),
             ):
                 if isinstance(event, FinalResultEvent):
                     stream_state.final_result_found = True
                     continue
 
                 if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
-                    if not stream_state.final_result_found:
-                        continue
                     raw_chunk = event.delta.content_delta or ""
                     stream_state.raw_chunks.append(raw_chunk)
+
+                    if not stream_state.final_result_found:
+                        continue
+
                     visible_chunk = _strip_streaming_thinking_chunk(raw_chunk, stream_state)
                     if visible_chunk and chunk_queue is not None:
                         await chunk_queue.put(visible_chunk)
@@ -882,7 +843,6 @@ async def _run_agrinet_once(
                 message_history=trimmed_history,
                 deps=deps,
                 model=get_agrinet_route_model(decision.route),
-                model_settings=_guided_decoding_settings(deps.lang_code),
             ),
             timeout=settings.agrinet_model_timeout_seconds,
         )
