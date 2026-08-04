@@ -630,7 +630,16 @@ def _fetch_all_pages(
     current_to = to_date
 
     for page in range(_MAX_PAGES):
-        payload = base_payload
+        # Always patch context with a fresh message_id so the provider doesn't
+        # deduplicate repeat calls as cached responses.
+        payload = {
+            **base_payload,
+            "context": {
+                **base_payload["context"],
+                "transaction_id": str(uuid.uuid4()),
+                "message_id": str(uuid.uuid4()),
+            },
+        }
         if current_to and current_to != to_date:
             # Patch the to_date tag in the payload for subsequent pages
             tags = payload.get("message", {}).get("intent", {}).get("tags", [])
