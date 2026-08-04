@@ -266,7 +266,7 @@ def test_unresolved_typed_location_does_not_replace_browser_coordinates(monkeypa
     assert calls == [28.6307647223, 28.6398522]
 
 
-def test_ambiguous_location_does_not_choose_between_two_hierarchies(monkeypatch):
+def test_ambiguous_location_uses_top_ranked_complete_hierarchy(monkeypatch):
     async def fake_forward_geocode(location):
         assert location == "Rampur"
         return [(10.0, 70.0), (20.0, 80.0)]
@@ -293,7 +293,14 @@ def test_ambiguous_location_does_not_choose_between_two_hierarchies(monkeypatch)
         )
     )
 
-    assert result is None
+    assert result == {
+        "latitude": 10.0,
+        "longitude": 70.0,
+        "state_id": "1",
+        "district_id": "1",
+        "sub_district_id": "1",
+        "village_id": "1",
+    }
 
 
 def test_finds_pending_npss_image_url_from_tool_history():
