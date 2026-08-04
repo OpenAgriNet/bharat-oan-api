@@ -104,6 +104,27 @@ _QDRANT_SCHEME_DEFINITIONS: dict[str, dict[str, Any]] = {
             "development of makhana",
         ],
     },
+    "e-nam": {
+        "scheme_name": "Electronic National Agriculture Market",
+        "scheme_aliases": [
+            "e-NAM",
+            "eNAM",
+            "enam",
+            "national agriculture market",
+            "electronic nam",
+            "electronic national agriculture market",
+        ],
+    },
+    "rwbcis": {
+        "scheme_name": "Restructured Weather Based Crop Insurance Scheme",
+        "scheme_aliases": [
+            "RWBCIS",
+            "weather based crop insurance",
+            "weather insurance",
+            "weather based crop insurance scheme",
+            "restructured weather based crop insurance",
+        ],
+    },
 }
 
 QDRANT_SCHEME_CODES = frozenset(_QDRANT_SCHEME_DEFINITIONS.keys())
