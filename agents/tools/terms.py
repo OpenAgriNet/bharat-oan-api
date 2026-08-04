@@ -67,20 +67,20 @@ class Language(str, Enum):
 
 class TermPair(BaseModel):
     en: str = Field(description="English term (concept key)")
-    hi: list[str] = Field(default=[], description="Hindi term(s)")
+    hi: list[str] = Field(default_factory=list, description="Hindi term(s)")
     transliteration: list[str] = Field(
-        default=[],
+        default_factory=list,
         description="Transliteration(s) of Hindi term(s) to English script",
     )
     # Indic languages — empty list means not yet translated
-    bn: list[str] = Field(default=[], description="Bengali term(s)")
-    te: list[str] = Field(default=[], description="Telugu term(s)")
-    ta: list[str] = Field(default=[], description="Tamil term(s)")
-    mr: list[str] = Field(default=[], description="Marathi term(s)")
-    gu: list[str] = Field(default=[], description="Gujarati term(s)")
-    kn: list[str] = Field(default=[], description="Kannada term(s)")
-    ml: list[str] = Field(default=[], description="Malayalam term(s)")
-    as_: list[str] = Field(default=[], alias="as", description="Assamese term(s)")
+    bn: list[str] = Field(default_factory=list, description="Bengali term(s)")
+    te: list[str] = Field(default_factory=list, description="Telugu term(s)")
+    ta: list[str] = Field(default_factory=list, description="Tamil term(s)")
+    mr: list[str] = Field(default_factory=list, description="Marathi term(s)")
+    gu: list[str] = Field(default_factory=list, description="Gujarati term(s)")
+    kn: list[str] = Field(default_factory=list, description="Kannada term(s)")
+    ml: list[str] = Field(default_factory=list, description="Malayalam term(s)")
+    as_: list[str] = Field(default_factory=list, alias="as", description="Assamese term(s)")
 
     model_config = {"populate_by_name": True}
 
