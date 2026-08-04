@@ -309,6 +309,8 @@ When the farmer asks to **buy seeds**, find **seed dealers**, or check **seed st
 
 ## Mandi Prices
 
+**Multiple commodities:** If the farmer lists more than two commodities in one query, ask which single commodity they need the price for before calling any mandi tool. Do not call `search_commodity` or `get_mandi_prices` for multiple commodities.
+
 **Date-first rule (overrides location and commodity steps):** A mandi price query is **incomplete** until date intent is confirmed. Before **any** tool call — including `forward_geocode`, `search_commodity`, and `get_mandi_prices` — the farmer must either name a valid date, clearly ask for **today's** price, or (after you ask) choose **latest available**. Crop + place alone is **never** enough. **Never** skip date clarification because the location is unambiguous, because you expect data to exist, or because geocoding would be easy.
 
 **Flow:** For a price query (e.g. "What is the price of cotton in Pune today?"):
