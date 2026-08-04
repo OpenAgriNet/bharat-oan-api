@@ -71,6 +71,7 @@ class _AgrinetCompletedRun:
 class _AgrinetStreamState:
     final_result_found: bool = False
     inside_think_block: bool = False
+    pending_text_start: str = ""
     raw_chunks: list[str] = field(default_factory=list)
 
 
@@ -129,6 +130,20 @@ def _strip_streaming_thinking_chunk(chunk: str, state: _AgrinetStreamState) -> s
             visible = visible[: visible.find("<think>")]
 
     return visible
+
+
+async def _emit_final_text_chunk(
+    raw_chunk: str,
+    stream_state: _AgrinetStreamState,
+    chunk_queue: _StreamChunkSink | None,
+) -> None:
+    """Record and stream one final-answer text piece (PartStart prefix or delta)."""
+    if not raw_chunk:
+        return
+    stream_state.raw_chunks.append(raw_chunk)
+    visible_chunk = _strip_streaming_thinking_chunk(raw_chunk, stream_state)
+    if visible_chunk and chunk_queue is not None:
+        await chunk_queue.put(visible_chunk)
 
 
 def _sanitize_streamed_output(raw_output: str) -> str:
@@ -745,22 +760,42 @@ async def _run_agrinet_once_streaming(
                 deps=deps,
                 model=get_agrinet_route_model(decision.route),
             ):
+                # Event order from pydantic-ai for the final answer:
+                #   PartStartEvent(TextPart content="Hello")  # first tokens live here
+                #   FinalResultEvent
+                #   PartDeltaEvent(...content_delta=", I'm here...")
+                # Deltas-only handling drops the PartStart prefix → ", I'm here..." in UI/Langfuse.
+                if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+                    prefix = event.part.content or ""
+                    if not prefix:
+                        continue
+                    if stream_state.final_result_found:
+                        await _emit_final_text_chunk(prefix, stream_state, chunk_queue)
+                    else:
+                        stream_state.pending_text_start = prefix
+                    continue
+
                 if isinstance(event, FinalResultEvent):
                     stream_state.final_result_found = True
+                    if stream_state.pending_text_start:
+                        pending = stream_state.pending_text_start
+                        stream_state.pending_text_start = ""
+                        await _emit_final_text_chunk(pending, stream_state, chunk_queue)
                     continue
 
                 if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
                     if not stream_state.final_result_found:
                         continue
-                    raw_chunk = event.delta.content_delta or ""
-                    stream_state.raw_chunks.append(raw_chunk)
-                    visible_chunk = _strip_streaming_thinking_chunk(raw_chunk, stream_state)
-                    if visible_chunk and chunk_queue is not None:
-                        await chunk_queue.put(visible_chunk)
+                    await _emit_final_text_chunk(
+                        event.delta.content_delta or "",
+                        stream_state,
+                        chunk_queue,
+                    )
                     continue
 
                 if getattr(event, "event_kind", "") == "function_tool_result":
                     stream_state.final_result_found = False
+                    stream_state.pending_text_start = ""
                     continue
 
                 if isinstance(event, AgentRunResultEvent):
@@ -788,9 +823,11 @@ async def _run_agrinet_once_streaming(
     if result is None:
         raise RuntimeError("Agrinet stream finished without a final result")
 
-    fallback_output = str(getattr(result, "output", "") or "")
+    # result.output is the fully assembled ModelResponse text (includes PartStart).
+    # Prefer it so history/Langfuse stay complete even if a stream edge case is missed.
+    full_output = _sanitize_streamed_output(str(getattr(result, "output", "") or ""))
     streamed_output = _sanitize_streamed_output("".join(stream_state.raw_chunks))
-    output_text = streamed_output or _sanitize_streamed_output(fallback_output)
+    output_text = full_output or streamed_output
 
     usage_data = result.usage()
     lf_update_current_observation(

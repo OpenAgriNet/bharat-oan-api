@@ -234,26 +234,20 @@ class SchemeRequest(BaseModel):
     question_id: str = ""
     
     def get_payload(self) -> Dict[str, Any]:
-        """
-        Convert the SchemeRequest object to a dictionary.
-        
-        Returns:
-            Dict[str, Any]: The dictionary representation of the SchemeRequest object
-        """
-        now = datetime.today()
-        
+        """Beckn /search payload (domain from SCHEME_DOMAIN; no bpp_id/bpp_uri)."""
+        now = datetime.now(timezone.utc)
+        domain = (os.getenv("SCHEME_DOMAIN") or "schemes:vistaar").strip() or "schemes:vistaar"
+
         return {
             "context": {
-                "domain": "schemes:vistaar",
+                "domain": domain,
                 "action": "search",
                 "version": "1.1.0",
                 "bap_id": os.getenv("BAP_ID"),
                 "bap_uri": os.getenv("BAP_URI"),
-                "bpp_id": os.getenv("BPP_ID"),
-                "bpp_uri": os.getenv("BPP_URI"),
-                "message_id": str(uuid.uuid4()),
                 "transaction_id": str(uuid.uuid4()),
-                "timestamp": now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "message_id": str(uuid.uuid4()),
+                "timestamp": str(int(now.timestamp())),
                 "ttl": "PT10M",
                 "location": {
                     "country": {

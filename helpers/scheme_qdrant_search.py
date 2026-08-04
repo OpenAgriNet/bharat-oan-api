@@ -11,9 +11,13 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+from langfuse import observe
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 from sentence_transformers import SentenceTransformer
+
+from helpers.langfuse_tracing import lf_update_current_observation
+from helpers.master_catalog import _tier_for_environment, get_master_catalog_snapshot, get_vector_scheme_entries
 
 DEFAULT_EMBEDDING_MODEL = "intfloat/multilingual-e5-large"
 SCHEME_SEARCH_SOURCE = "Government Scheme Information"
@@ -23,6 +27,15 @@ _qdrant_client_cache: dict[tuple[str, Optional[str]], QdrantClient] = {}
 # scheme_code -> scheme_name + aliases.
 # Schemes with guideline PDFs ingested in Qdrant schemes-index.
 # Keep scheme_code values identical to Qdrant payload scheme_code.
+#
+# prompt_visible=False (nbm only): stays a valid resolver candidate — a
+# query naming it still resolves instead of falling through to "scheme not
+# available" — but is left out of the dynamic "vector-indexed schemes"
+# prompt section. nbm has both a legacy entry and Qdrant-indexed content;
+# policy sends it to get_scheme_info ("N.B.M. routing (mandatory)" in
+# agrinet_*.md), so advertising it as search_schemes-searchable there would
+# contradict that rule. Mirrors docs-pipeline's ROUTING_EXCEPTIONS
+# (pipeline/scheme_catalog.py) — set on the entry itself, not a separate list.
 _QDRANT_SCHEME_DEFINITIONS: dict[str, dict[str, Any]] = {
     "cdp": {
         "scheme_name": "Crop Diversification Programme",
@@ -86,6 +99,7 @@ _QDRANT_SCHEME_DEFINITIONS: dict[str, dict[str, Any]] = {
     "nbm": {
         "scheme_name": "National Bamboo Mission",
         "scheme_aliases": ["NBM", "national bamboo mission", "bamboo mission", "national bamboo"],
+        "prompt_visible": False,
     },
     "nmeo": {
         "scheme_name": "National Mission on Edible Oils – Oilseeds",
@@ -174,21 +188,104 @@ _BUILTIN_SCHEME_LIST: list[dict[str, Any]] = [
         "scheme_code": code,
         "scheme_name": definition["scheme_name"],
         "scheme_aliases": list(definition.get("scheme_aliases", [])),
+        "prompt_visible": definition.get("prompt_visible", True),
     }
     for code, definition in _QDRANT_SCHEME_DEFINITIONS.items()
 ]
 
 
 def get_builtin_scheme_list() -> list[dict[str, Any]]:
-    """Built-in scheme registry used for query → scheme_code resolution."""
-    return _BUILTIN_SCHEME_LIST
+    """Scheme registry used for query → scheme_code resolution (search_schemes routing).
+
+    Merges docs-pipeline's live master_catalog Redis snapshot on top of the
+    static seed list above: a scheme promoted in docs-pipeline appears here
+    on the next call — no redeploy needed. The static list is a floor, not a
+    default-to-be-replaced — it keeps existing schemes resolvable even if
+    Redis is unreachable or docs-pipeline hasn't (yet) re-synced an older
+    scheme retroactively. On code collision the live entry wins (docs-pipeline
+    is the source of truth once it has synced a code).
+
+    Legacy get_scheme_info schemes never appear here — see agrinet_*.md's
+    hardcoded "Integrated schemes — legacy" list, untouched by this.
+    """
+    merged: dict[str, dict[str, Any]] = {item["scheme_code"]: item for item in _BUILTIN_SCHEME_LIST}
+    for entry in get_vector_scheme_entries():
+        code = str(entry.get("code") or "").strip().lower()
+        name = str(entry.get("name") or "").strip()
+        if not code or not name:
+            continue
+        merged[code] = {
+            "scheme_code": code,
+            "scheme_name": name,
+            "scheme_aliases": [str(a).strip() for a in (entry.get("aliases") or []) if str(a).strip()],
+            "prompt_visible": True,
+        }
+    return list(merged.values())
+
+
+@observe(name="tool:master_catalog_redis_check", as_type="tool")
+def format_vector_schemes_prompt_block() -> dict[str, Any]:
+    """Render the system prompt's dynamic "vector-indexed schemes" section
+    (bullets + match-identifiers) from get_builtin_scheme_list() — the SAME
+    merged list search_schemes() uses to resolve a query to a scheme_code.
+
+    Deliberately not read from docs-pipeline's Redis `prompt` field directly:
+    that snapshot alone has no static fallback, so on a Redis outage the
+    section would go blank even though the static 13 schemes are still fully
+    resolvable. Rendering from the merged list keeps what the farmer is told
+    is available always consistent with what the resolver actually accepts.
+
+    @observe-wrapped (as_type="tool") purely for Langfuse visibility: this
+    runs once every turn as part of system-prompt construction, not as an
+    LLM-invoked tool, but it's the single call site that triggers the actual
+    Redis read (get_master_catalog_snapshot, via get_builtin_scheme_list) —
+    logging it as a span is what makes "what did we just pull from Redis"
+    inspectable per-turn in the trace, instead of only in server logs.
+    """
+    tier = _tier_for_environment()
+    snapshot = get_master_catalog_snapshot(tier)
+    scheme_list = sorted(
+        (item for item in get_builtin_scheme_list() if item.get("prompt_visible", True)),
+        key=lambda item: item["scheme_code"],
+    )
+    bullets = [f'- **{item["scheme_name"]}** ({item["scheme_code"]})' for item in scheme_list]
+    identifiers = []
+    for item in scheme_list:
+        alias_suffix = "".join(f" / {a}" for a in item.get("scheme_aliases", []))
+        identifiers.append(f'- `{item["scheme_code"]}`{alias_suffix}')
+    result = {
+        "vector_schemes_bullets": "\n".join(bullets),
+        "vector_schemes_identifiers": "\n".join(identifiers),
+        "vector_scheme_count": len(scheme_list),
+    }
+    lf_update_current_observation(
+        input={"tier": tier},
+        output={
+            "redis_snapshot_found": snapshot is not None,
+            "redis_snapshot_version": (snapshot or {}).get("version"),
+            "redis_snapshot_updated_at": (snapshot or {}).get("updated_at"),
+            "redis_entry_count": len((snapshot or {}).get("entries", [])) if snapshot else 0,
+            "merged_scheme_count": len(scheme_list),
+            "merged_scheme_codes": [item["scheme_code"] for item in scheme_list],
+        },
+    )
+    return result
 
 
 def format_qdrant_scheme_codes_for_doc() -> str:
-    """One-line scheme code list for tool docstrings (like get_scheme_info)."""
+    """One-line scheme code list for tool docstrings (like get_scheme_info).
+
+    Patched into search_schemes.__doc__ once at import time (see bottom of
+    agents/tools/search.py) — reflects the merged list as of process start,
+    not live per-turn like the system prompt's vector_schemes_bullets. A
+    newly promoted scheme is still fully routable before the next deploy
+    (get_builtin_scheme_list() is re-evaluated live), just not yet named in
+    this particular docstring line.
+    """
+    scheme_list = get_builtin_scheme_list()
     return ", ".join(
-        f'"{code}" ({_QDRANT_SCHEME_DEFINITIONS[code]["scheme_name"]})'
-        for code in sorted(_QDRANT_SCHEME_DEFINITIONS)
+        f'"{item["scheme_code"]}" ({item["scheme_name"]})'
+        for item in sorted(scheme_list, key=lambda i: i["scheme_code"])
     )
 
 ALIAS_STOPWORDS = {
