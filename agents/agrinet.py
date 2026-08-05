@@ -1,6 +1,6 @@
 import os
 from pydantic_ai import Agent, RunContext
-from helpers.utils import get_prompt, get_today_date_str, get_crop_season, get_logger
+from helpers.utils import get_prompt, get_today_date_str, get_crop_season, get_last_weekday_table, get_logger
 from helpers.scheme_qdrant_search import format_vector_schemes_prompt_block
 from agents.models import AGRINET_MODEL
 from agents.tools import TOOLS
@@ -37,6 +37,7 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
     context = {
         'today_date': get_today_date_str(),
         'crop_season': get_crop_season(),
+        'last_weekday_table': get_last_weekday_table(),
         **scheme_block,
     }
     # Rendered fresh every turn (unlike the tool docstring, frozen at startup —

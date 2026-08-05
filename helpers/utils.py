@@ -9,7 +9,7 @@ import boto3
 from dotenv import load_dotenv
 import base64
 import unicodedata as ud
-from datetime import datetime
+from datetime import datetime, timedelta
 import simplejson as json
 from jinja2 import Environment, FileSystemLoader
 import pytz
@@ -22,6 +22,21 @@ def get_today_date_str() -> str:
     ist = pytz.timezone('Asia/Kolkata')
     today = datetime.now(ist)
     return today.strftime('%A, %d %B %Y')
+
+
+def get_last_weekday_table() -> str:
+    """Return pre-computed 'last [weekday]' dates so the model never has to calculate."""
+    ist = pytz.timezone('Asia/Kolkata')
+    today = datetime.now(ist)
+    days = [('Mon', 0), ('Tue', 1), ('Wed', 2), ('Thu', 3), ('Fri', 4), ('Sat', 5), ('Sun', 6)]
+    entries = []
+    for name, target_num in days:
+        days_back = (today.weekday() - target_num) % 7
+        if days_back == 0:
+            days_back = 7
+        date = today - timedelta(days=days_back)
+        entries.append(f"Last {name}={date.strftime('%d-%m-%Y')}")
+    return ' | '.join(entries)
 
 
 def get_crop_season(dt: datetime = None) -> str:
