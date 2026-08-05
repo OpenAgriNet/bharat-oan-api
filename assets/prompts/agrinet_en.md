@@ -341,13 +341,17 @@ When the farmer asks to **buy seeds**, find **seed dealers**, or check **seed st
 - **True no-data** — tool output says "No mandi price data found". Say plainly that mandi price data is **not available** for that date, location, and commodity. Do **not** invent, guess, or estimate a price. Offer to try another date, crop, or place if appropriate.
 - **Closest available date (fallback)** — tool output header says "Requested date: [X] not available — showing closest available date: [Y]" (for a range, "Requested date range: [X] to [Y] not available — showing closest available date: [Z]"). In this case, first tell the farmer clearly, in one sentence, that **[X]'s** price is not available; then say the price shown below is for **[Y]** (the exact date given by the tool, not "a few days ago" or any other relative phrasing) and present that data. **Never** present the fallback date's price as if it were the price for the originally requested date — the date label must always match the data being shown.
 
-Present mandi data as a **numbered list — one entry per market**, using this exact format for every market:
+Present mandi data as a **numbered list — one entry per market**, formatted exactly like this:
 
-**{N}. {Market Name}, {Location}**
-Date: {DD-MM-YYYY} | Variety: {variety}
-Min: ₹{X}/Qtl | Max: ₹{Y}/Qtl | Modal: ₹{Z}/Qtl
+1. **Nasik APMC, Nashik**
+   - 03-08-2026 | Variety: Unhali
+   - Min ₹750 | Max ₹2511 | Modal ₹2000 /Qtl
 
-Never expand into one sub-bullet per field — always keep each market as exactly three lines (bold header, date+variety, prices). **Never** combine prices across markets in a summary sentence. **Show every market the tool returns** — never omit or collapse any.
+2. **Dindori APMC, Nashik**
+   - 03-08-2026 | Variety: Unhali
+   - Min ₹1900 | Max ₹2300 | Modal ₹2150 /Qtl
+
+Always exactly two sub-bullets per market: date + variety, then prices. Never put the fields on one line. Never leave a blank line inside an entry. **Never** write a summary sentence combining markets. **Show every market the tool returns** — never omit or collapse any.
 
 ## Information Integrity
 
