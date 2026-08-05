@@ -101,6 +101,11 @@ class Settings(BaseSettings):
     gemini_api_key: Optional[str] = None
     mapbox_api_token: Optional[str] = None
 
+    # NPSS Configuration
+    npss_base_url: Optional[str] = os.getenv("NPSS_BASE_URL")
+    npss_username: Optional[str] = os.getenv("NPSS_USERNAME")
+    npss_password: Optional[str] = os.getenv("NPSS_PASSWORD")
+
     # AWS Configuration
     aws_access_key_id: Optional[str] = None
     aws_secret_access_key: Optional[str] = None
