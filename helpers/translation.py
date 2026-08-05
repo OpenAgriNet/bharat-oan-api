@@ -8,6 +8,7 @@ import os
 import re
 import json
 import httpx
+from pathlib import Path
 from dotenv import load_dotenv
 from google.cloud import translate_v2 as translate
 from google.oauth2 import service_account
@@ -15,7 +16,13 @@ from typing import Any, Dict, List, Tuple, Union, Set
 
 load_dotenv(override=True)
 
-term_pairs = json.load(open('assets/word_mapping_reduced_1000.json', 'r', encoding='utf-8'))
+_TERM_MAPPING_PATH = Path(__file__).resolve().parents[1] / "assets" / "word_mapping_reduced_1000.json"
+try:
+    with _TERM_MAPPING_PATH.open("r", encoding="utf-8") as mapping_file:
+        term_pairs = json.load(mapping_file)
+except (FileNotFoundError, OSError, json.JSONDecodeError):
+    # The mapping is an optional enrichment; translation must not prevent app startup.
+    term_pairs = []
 
 def fix_underscores(text):
     """Replace underscores with spaces -> underscores."""
