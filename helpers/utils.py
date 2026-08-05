@@ -25,18 +25,31 @@ def get_today_date_str() -> str:
 
 
 def get_last_weekday_table() -> str:
-    """Return pre-computed 'last [weekday]' dates so the model never has to calculate."""
+    """Return pre-computed 'last' and 'last to last' weekday dates.
+
+    Both tiers are spelled out so the model never performs date arithmetic —
+    it only looks up a row. Emitted as full weekday names (matching how farmers
+    phrase the query) on separate lines, since a single long pipe-joined line
+    was easy for the model to misread across adjacent entries.
+    """
     ist = pytz.timezone('Asia/Kolkata')
     today = datetime.now(ist)
-    days = [('Mon', 0), ('Tue', 1), ('Wed', 2), ('Thu', 3), ('Fri', 4), ('Sat', 5), ('Sun', 6)]
-    entries = []
+    days = [
+        ('Monday', 0), ('Tuesday', 1), ('Wednesday', 2), ('Thursday', 3),
+        ('Friday', 4), ('Saturday', 5), ('Sunday', 6),
+    ]
+    lines = []
     for name, target_num in days:
         days_back = (today.weekday() - target_num) % 7
         if days_back == 0:
             days_back = 7
-        date = today - timedelta(days=days_back)
-        entries.append(f"Last {name}={date.strftime('%d-%m-%Y')}")
-    return ' | '.join(entries)
+        last = today - timedelta(days=days_back)
+        last_to_last = last - timedelta(days=7)
+        lines.append(
+            f"last {name} = {last.strftime('%d-%m-%Y')} | "
+            f"last to last {name} = {last_to_last.strftime('%d-%m-%Y')}"
+        )
+    return '\n'.join(lines)
 
 
 def get_crop_season(dt: datetime = None) -> str:
