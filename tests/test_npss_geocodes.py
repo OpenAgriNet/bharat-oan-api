@@ -44,6 +44,15 @@ DELHI_PROPS = {
 }
 
 
+def test_photon_base_url_requires_https():
+    assert npss_geocodes._validated_photon_base_url(None) is None
+    assert npss_geocodes._validated_photon_base_url("http://photon.internal:2322") is None
+    assert (
+        npss_geocodes._validated_photon_base_url("https://photon.example.gov.in/")
+        == "https://photon.example.gov.in"
+    )
+
+
 async def _fake_master_rows(endpoint, *, bearer_token, params=None):
     del bearer_token
     rows = {

@@ -109,25 +109,12 @@ def _translate_npss_body(
     output_lines = text.splitlines()
 
     for idx, line in enumerate(output_lines):
-        stripped = line.strip()
-        if not stripped:
+        candidate = _translation_candidate(line, target_lang)
+        if not candidate:
             continue
-
-        parsed_label = _parse_markdown_label(stripped)
-        if parsed_label:
-            label, value = parsed_label
-            if label in ("pest", "crop", "cause") and value:
-                if _is_likely_in_target_language(value, target_lang):
-                    continue
-                line_slots.append((idx, label))
-                translatable.append(value)
-            continue
-
-        if _is_likely_in_target_language(line, target_lang):
-            continue
-
-        line_slots.append((idx, None))
-        translatable.append(line)
+        label, value = candidate
+        line_slots.append((idx, label))
+        translatable.append(value)
 
     if not translatable:
         return text
@@ -150,6 +137,28 @@ def _translate_npss_body(
             output_lines[idx] = translated_text
 
     return "\n".join(output_lines)
+
+
+def _translation_candidate(
+    line: str,
+    target_lang: str,
+) -> Optional[tuple[Optional[str], str]]:
+    stripped = line.strip()
+    if not stripped:
+        return None
+
+    parsed_label = _parse_markdown_label(stripped)
+    if parsed_label:
+        label, value = parsed_label
+        if label not in ("pest", "crop", "cause") or not value:
+            return None
+        if _is_likely_in_target_language(value, target_lang):
+            return None
+        return label, value
+
+    if _is_likely_in_target_language(line, target_lang):
+        return None
+    return None, line
 
 
 def _localize_known_labels(text: str, target_lang: str) -> str:

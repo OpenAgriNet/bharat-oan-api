@@ -1,4 +1,5 @@
 from uuid import UUID
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
@@ -10,16 +11,28 @@ from pydantic import BaseModel
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/image", tags=["image"])
+CropImageUpload = Annotated[
+    UploadFile,
+    File(description="Crop image to upload (JPEG or PNG)"),
+]
+AuthenticatedUser = Annotated[dict, Depends(get_current_user)]
 
 
 class ImageUploadResponse(BaseModel):
     image_id: str
 
 
-@router.post("/upload", response_model=ImageUploadResponse)
+@router.post(
+    "/upload",
+    response_model=ImageUploadResponse,
+    responses={
+        400: {"description": "Unsupported image format"},
+        413: {"description": "Image exceeds the configured upload limit"},
+    },
+)
 async def upload_image(
-    image: UploadFile = File(..., description="Crop image to upload (JPEG or PNG)"),
-    current_user: str = Depends(get_current_user)
+    image: CropImageUpload,
+    current_user: AuthenticatedUser,
 ):
     """
     Upload a crop image for pest/disease analysis.
@@ -45,7 +58,10 @@ async def upload_image(
     )
 
 
-@router.get("/{image_id}")
+@router.get(
+    "/{image_id}",
+    responses={404: {"description": "Image not found or expired"}},
+)
 async def serve_image(image_id: UUID):
     """
     Serve an uploaded image by its ID.
