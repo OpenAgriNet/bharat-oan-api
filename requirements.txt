@@ -86,3 +86,5 @@ humanize==4.16.0
 pycryptodome==3.23.0
 
 langfuse==4.14.1
+
+PyYAML==6.0.3  # model registry config loader
