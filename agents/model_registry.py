@@ -29,54 +29,61 @@ def _resolve_values(obj: Any) -> Any:
     return obj
 
 
+def _require(alias: str, config: dict, key: str) -> str:
+    value = (config.get(key) or "").strip()
+    if not value:
+        raise ValueError(f"Alias '{alias}': {key} is required")
+    return value
+
+
+def _build_openai(alias: str, config: dict) -> OpenAIChatModel:
+    api_key = _require(alias, config, "api_key")
+    return OpenAIChatModel(
+        config["model_name"],
+        provider=OpenAIProvider(api_key=api_key),
+    )
+
+
+def _build_vllm(alias: str, config: dict) -> OpenAIChatModel:
+    base_url = _require(alias, config, "base_url")
+    model_name = _require(alias, config, "model_name")
+    api_key = (config.get("api_key") or "not-needed").strip() or "not-needed"
+    return OpenAIChatModel(
+        model_name,
+        provider=OpenAIProvider(base_url=base_url, api_key=api_key),
+    )
+
+
+def _build_azure(alias: str, config: dict) -> OpenAIChatModel:
+    endpoint = _require(alias, config, "endpoint")
+    api_key = _require(alias, config, "api_key")
+    api_version = _require(alias, config, "api_version")
+    deployment_name = _require(alias, config, "deployment_name")
+    client = AsyncAzureOpenAI(
+        azure_endpoint=endpoint.rstrip("/"),
+        api_version=api_version,
+        api_key=api_key,
+    )
+    return OpenAIChatModel(
+        deployment_name,
+        provider=OpenAIProvider(openai_client=client),
+    )
+
+
+_BUILDERS = {
+    "openai": _build_openai,
+    "vllm": _build_vllm,
+    "bharat_ai_grid": _build_vllm,
+    "azure-openai": _build_azure,
+}
+
+
 def _build_model(alias: str, config: dict) -> OpenAIChatModel:
     kind = config.get("kind", "")
-    if kind == "openai":
-        api_key = config.get("api_key", "")
-        if not api_key:
-            raise ValueError(f"Alias '{alias}': api_key is required for kind=openai")
-        return OpenAIChatModel(
-            config["model_name"],
-            provider=OpenAIProvider(api_key=api_key),
-        )
-
-    if kind in ("vllm", "bharat_ai_grid"):
-        base_url = (config.get("base_url") or "").strip()
-        if not base_url:
-            raise ValueError(f"Alias '{alias}': base_url is required for kind={kind}")
-        model_name = (config.get("model_name") or "").strip()
-        if not model_name:
-            raise ValueError(f"Alias '{alias}': model_name is required for kind={kind}")
-        api_key = (config.get("api_key") or "not-needed").strip() or "not-needed"
-        return OpenAIChatModel(
-            model_name,
-            provider=OpenAIProvider(base_url=base_url, api_key=api_key),
-        )
-
-    if kind == "azure-openai":
-        endpoint = (config.get("endpoint") or "").strip()
-        api_key = (config.get("api_key") or "").strip()
-        api_version = (config.get("api_version") or "").strip()
-        deployment_name = (config.get("deployment_name") or "").strip()
-        if not endpoint:
-            raise ValueError(f"Alias '{alias}': endpoint is required for kind=azure-openai")
-        if not api_key:
-            raise ValueError(f"Alias '{alias}': api_key is required for kind=azure-openai")
-        if not api_version:
-            raise ValueError(f"Alias '{alias}': api_version is required for kind=azure-openai")
-        if not deployment_name:
-            raise ValueError(f"Alias '{alias}': deployment_name is required for kind=azure-openai")
-        client = AsyncAzureOpenAI(
-            azure_endpoint=endpoint.rstrip("/"),
-            api_version=api_version,
-            api_key=api_key,
-        )
-        return OpenAIChatModel(
-            deployment_name,
-            provider=OpenAIProvider(openai_client=client),
-        )
-
-    raise ValueError(f"Alias '{alias}': unknown kind '{kind}'")
+    builder = _BUILDERS.get(kind)
+    if not builder:
+        raise ValueError(f"Alias '{alias}': unknown kind '{kind}'")
+    return builder(alias, config)
 
 
 class ModelRegistry:
