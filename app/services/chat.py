@@ -12,6 +12,7 @@ from pydantic_ai.messages import TextPart
 
 from agents.agrinet import agrinet_agent
 from agents.deps import FarmerContext
+from agents.model_registry import get_registry
 from agents.models import (
     LANGFUSE_MODERATION_MODEL_NAME,
     AgrinetRoute,
@@ -754,7 +755,7 @@ async def _run_agrinet_once_streaming(
     result = None
 
     try:
-        async with asyncio.timeout(settings.agrinet_model_timeout_seconds):
+        async with asyncio.timeout(get_registry().get_timeout("agrinet")):
             async for event in agrinet_agent.run_stream_events(
                 user_prompt=user_message,
                 message_history=trimmed_history,
@@ -806,11 +807,11 @@ async def _run_agrinet_once_streaming(
             metadata={
                 **observation_metadata,
                 "error_type": "TimeoutError",
-                "timeout_seconds": settings.agrinet_model_timeout_seconds,
+                "timeout_seconds": get_registry().get_timeout("agrinet"),
             }
         )
         raise TimeoutError(
-            f"Agrinet route {decision.route} timed out after {settings.agrinet_model_timeout_seconds} seconds"
+            f"Agrinet route {decision.route} timed out after {get_registry().get_timeout('agrinet')} seconds"
         ) from exc
     except Exception as exc:
         lf_update_current_observation(
@@ -880,18 +881,18 @@ async def _run_agrinet_once(
                 deps=deps,
                 model=get_agrinet_route_model(decision.route),
             ),
-            timeout=settings.agrinet_model_timeout_seconds,
+            timeout=get_registry().get_timeout("agrinet"),
         )
     except asyncio.TimeoutError as exc:
         lf_update_current_observation(
             metadata={
                 **observation_metadata,
                 "error_type": "TimeoutError",
-                "timeout_seconds": settings.agrinet_model_timeout_seconds,
+                "timeout_seconds": get_registry().get_timeout("agrinet"),
             }
         )
         raise TimeoutError(
-            f"Agrinet route {decision.route} timed out after {settings.agrinet_model_timeout_seconds} seconds"
+            f"Agrinet route {decision.route} timed out after {get_registry().get_timeout('agrinet')} seconds"
         ) from exc
     except Exception as exc:
         lf_update_current_observation(
