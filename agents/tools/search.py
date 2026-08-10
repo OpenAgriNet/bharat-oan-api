@@ -139,6 +139,7 @@ def _chunk_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     section = (details.get("section") or "").strip().lower() or "other"
     doc_id = (details.get("doc_id") or "").strip()
     chunk_id = (details.get("chunk_id") or item.get("id") or "").strip()
+    source = (details.get("source") or "").strip()
 
     score_raw = details.get("score") or "0"
     try:
@@ -154,6 +155,7 @@ def _chunk_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "doc_id": doc_id,
         "chunk_id": chunk_id,
         "section": section,
+        "source": source,
     }
 
 
@@ -407,6 +409,7 @@ async def search_schemes(
                         "scheme_code": r.get("scheme_code") or "",
                         "section": r.get("section") or "",
                         "score": r.get("score"),
+                        "source": r.get("source") or "",
                     }
                     for r in results
                 ],

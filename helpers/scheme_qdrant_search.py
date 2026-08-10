@@ -977,6 +977,20 @@ def _format_result_block(item: dict[str, Any]) -> str:
     )
 
 
+def _distinct_network_sources(results: list[dict[str, Any]]) -> list[str]:
+    """Unique, order-preserving list of per-chunk `source` values from the
+    network response (e.g. "Millet mission (BharatVistaar)"). Empty for the
+    local direct-Qdrant path, which has no network chunk-details tags."""
+    seen: set[str] = set()
+    sources: list[str] = []
+    for item in results:
+        source = str(item.get("source") or "").strip()
+        if source and source not in seen:
+            seen.add(source)
+            sources.append(source)
+    return sources
+
+
 def format_search_results(
     results: list[dict[str, Any]],
     query: str,
@@ -987,8 +1001,10 @@ def format_search_results(
         return _empty_search_message(query, active_scheme_list)
 
     blocks = [_format_result_block(item) for item in results]
+    network_sources = _distinct_network_sources(results)
+    source_label = "; ".join(network_sources) if network_sources else SCHEME_SEARCH_SOURCE
     return (
         f"> Scheme Search Results for `{query}`\n\n"
-        f"**Source: {SCHEME_SEARCH_SOURCE}**\n\n"
+        f"**Source: {source_label}**\n\n"
         + "\n\n----\n\n".join(blocks)
     )
