@@ -1,6 +1,3 @@
-# Model aliases — each defined once.
-# Secrets and URLs stay in ${ENV_VAR}; routing numbers go in directly.
-# Add a new alias here and reference it in a use case to extend without code changes.
 
 models:
   azure_gpt41:
@@ -43,5 +40,5 @@ use_cases:
     default_alias: azure_gpt41       # used when routing is disabled or for state repair
     routing_ttl_seconds: 7200        # how long a session's sticky pick lives in Redis
     timeout_seconds: 45
-    aliases: [gemma_vllm, azure_gpt41]
-    proportions: [70, 30]
+    aliases: [bharat_ai_grid_gemma, gemma_vllm]
+    proportions: [50, 50]   # azure_gpt41 is out of the split; it stays the fallback for both
