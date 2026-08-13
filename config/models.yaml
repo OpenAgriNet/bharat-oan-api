@@ -40,7 +40,5 @@ use_cases:
     default_alias: azure_gpt41       # used when routing is disabled or for state repair
     routing_ttl_seconds: 7200        # how long a session's sticky pick lives in Redis
     timeout_seconds: 45
-    # azure_gpt41 must stay listed: aliases doubles as the set of valid stored routes,
-    # and a failover persists azure_gpt41 to Redis. Weight 0 keeps it out of the split.
-    aliases: [bharat_ai_grid_gemma, gemma_vllm, azure_gpt41]
-    proportions: [50, 50, 0]
+    aliases: [gemma_vllm, azure_gpt41]
+    proportions: [50, 50]
