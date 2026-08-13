@@ -1,4 +1,7 @@
 # bharat-oan-api
+
+See [Model configuration and execution](docs/model-configuration.md) for the
+shared Agrinet and moderation routing, timeout, and fallback policy.
  
 ## Delete all Docker volumes (cleanup)
 ```
@@ -32,4 +35,3 @@ docker compose down --remove-orphans
 docker logs -f oan_app
 ```
 ---
-

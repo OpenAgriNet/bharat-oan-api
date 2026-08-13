@@ -142,7 +142,7 @@ async def _apply_capacity_gate(
     transient, so rewriting it here would drain the canary cohort one turn at a
     time and quietly skew the split.
     """
-    max_concurrency = get_registry().get_fallback_on_concurrency(route)
+    max_concurrency = get_registry().get_max_concurrency(route)
     if max_concurrency is None:
         return _build_decision(route, source)
 
@@ -205,9 +205,3 @@ async def resolve_agrinet_route(
     selected_route = choose_weighted_agrinet_route(randint_fn=randint_fn)
     await set_session_agrinet_route(session_id, selected_route)
     return await _apply_capacity_gate(selected_route, "session_start_weighted", session_id)
-
-
-def get_alternate_agrinet_route(route: AgrinetRoute) -> AgrinetRoute:
-    """Return the fallback alias for the given route, as defined in config/models.yaml."""
-    fallback = get_registry().get_fallback_alias(route)
-    return fallback if fallback else AGRINET_DEFAULT_ROUTE

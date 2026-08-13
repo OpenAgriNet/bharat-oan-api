@@ -23,7 +23,6 @@ agrinet_agent = Agent(
         temperature=0.7,
         top_p=0.95,
         max_tokens=4096,
-        timeout=120,
         parallel_tool_calls=True,
     )
 )

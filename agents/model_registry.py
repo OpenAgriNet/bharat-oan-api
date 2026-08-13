@@ -111,6 +111,9 @@ class ModelRegistry:
 
     # --- use-case access ---
 
+    def get_use_cases(self) -> list[str]:
+        return list(self._use_cases_cfg)
+
     def get_use_case_aliases(self, use_case: str) -> list[str]:
         return list(self._use_cases_cfg.get(use_case, {}).get("aliases", []))
 
@@ -139,22 +142,55 @@ class ModelRegistry:
     def get_timeout(self, use_case: str) -> float:
         return float(self._use_cases_cfg.get(use_case, {}).get("timeout_seconds", 45))
 
-    # --- fallback / capacity ---
+    # --- execution fallback policy ---
 
-    def get_fallback_alias(self, alias: str) -> str | None:
-        return self._models_cfg.get(alias, {}).get("fallback", {}).get("to")
+    def get_fallback_aliases(self, use_case: str, alias: str) -> list[str]:
+        fallbacks = self._use_cases_cfg.get(use_case, {}).get("fallbacks", {})
+        return list(fallbacks.get(alias, []))
 
-    def get_fallback_on_concurrency(self, alias: str) -> int | None:
-        raw = self._models_cfg.get(alias, {}).get("fallback", {}).get("on_concurrency_above")
+    def get_fallback_chain(self, use_case: str, primary_alias: str) -> list[str]:
+        """Return an ordered, de-duplicated fallback chain for one execution.
+
+        The breadth-first expansion supports multi-level policies while making
+        cycles harmless: a model alias is attempted at most once per request.
+        """
+        chain: list[str] = []
+        queue = [primary_alias]
+        while queue:
+            alias = queue.pop(0)
+            if alias in chain:
+                continue
+            chain.append(alias)
+            queue.extend(self.get_fallback_aliases(use_case, alias))
+        return chain
+
+    def get_use_case_model_aliases(self, use_case: str) -> list[str]:
+        aliases: list[str] = []
+        primaries = [
+            self.get_default_alias(use_case),
+            *self.get_use_case_aliases(use_case),
+        ]
+        for primary in primaries:
+            if not primary:
+                continue
+            for alias in self.get_fallback_chain(use_case, primary):
+                if alias not in aliases:
+                    aliases.append(alias)
+        return aliases
+
+    # --- model capacity policy ---
+
+    def get_max_concurrency(self, alias: str) -> int | None:
+        raw = self._models_cfg.get(alias, {}).get("capacity", {}).get("max_concurrency")
         return int(raw) if raw is not None else None
 
     def get_metrics_cache_ttl(self, alias: str) -> int:
-        raw = self._models_cfg.get(alias, {}).get("fallback", {}).get("metrics_cache_ttl", 2)
+        raw = self._models_cfg.get(alias, {}).get("capacity", {}).get("metrics_cache_ttl", 2)
         return int(raw)
 
     def get_metrics_url(self, alias: str) -> str | None:
         config = self._models_cfg.get(alias, {})
-        override = (config.get("fallback", {}).get("metrics_url") or "").strip()
+        override = (config.get("capacity", {}).get("metrics_url") or "").strip()
         if override:
             return override
         base_url = (config.get("base_url") or "").strip()
@@ -167,6 +203,13 @@ class ModelRegistry:
     def validate_use_case(self, use_case: str) -> None:
         uc = self._use_cases_cfg.get(use_case, {})
         aliases = uc.get("aliases", [])
+        self._validate_aliases(use_case, aliases)
+        self._validate_proportions(use_case, aliases, uc.get("proportions"))
+        self._validate_positive_settings(use_case)
+        self._validate_default_alias(use_case)
+        self._validate_fallbacks(use_case, uc.get("fallbacks", {}))
+
+    def _validate_aliases(self, use_case: str, aliases: list[str]) -> None:
         if not aliases:
             raise ValueError(f"Use case '{use_case}' has no aliases in config/models.yaml")
 
@@ -176,27 +219,67 @@ class ModelRegistry:
                     f"Use case '{use_case}' references unknown alias '{alias}'"
                 )
 
-        proportions = uc.get("proportions")
-        if proportions is not None:
-            proportions = [int(p) for p in proportions]
-            if len(proportions) != len(aliases):
-                raise ValueError(
-                    f"Use case '{use_case}': proportions length ({len(proportions)}) "
-                    f"must match aliases length ({len(aliases)})"
-                )
-            if any(p < 0 for p in proportions):
-                raise ValueError(f"Use case '{use_case}': proportions must be non-negative")
-            if sum(proportions) != 100:
-                raise ValueError(f"Use case '{use_case}': proportions must sum to 100")
+    @staticmethod
+    def _validate_proportions(
+        use_case: str,
+        aliases: list[str],
+        raw_proportions: list[int] | None,
+    ) -> None:
+        if raw_proportions is None:
+            return
 
+        proportions = [int(p) for p in raw_proportions]
+        if len(proportions) != len(aliases):
+            raise ValueError(
+                f"Use case '{use_case}': proportions length ({len(proportions)}) "
+                f"must match aliases length ({len(aliases)})"
+            )
+        if any(p < 0 for p in proportions):
+            raise ValueError(f"Use case '{use_case}': proportions must be non-negative")
+        if sum(proportions) != 100:
+            raise ValueError(f"Use case '{use_case}': proportions must sum to 100")
+
+    def _validate_positive_settings(self, use_case: str) -> None:
         ttl = self.get_routing_ttl(use_case)
         if ttl <= 0:
             raise ValueError(f"Use case '{use_case}': routing_ttl_seconds must be positive")
 
+        timeout = self.get_timeout(use_case)
+        if timeout <= 0:
+            raise ValueError(f"Use case '{use_case}': timeout_seconds must be positive")
+
+    def _validate_default_alias(self, use_case: str) -> None:
         default = self.get_default_alias(use_case)
         if default and default not in self._models_cfg:
             raise ValueError(
                 f"Use case '{use_case}': default_alias '{default}' not found in models"
+            )
+
+    def _validate_fallbacks(self, use_case: str, fallbacks: Any) -> None:
+        if not isinstance(fallbacks, dict):
+            raise ValueError(f"Use case '{use_case}': fallbacks must be a mapping")
+        for source, targets in fallbacks.items():
+            self._validate_fallback_entry(use_case, source, targets)
+
+    def _validate_fallback_entry(
+        self,
+        use_case: str,
+        source: str,
+        targets: Any,
+    ) -> None:
+        if source not in self._models_cfg:
+            raise ValueError(
+                f"Use case '{use_case}' fallback references unknown source alias '{source}'"
+            )
+        if not isinstance(targets, list):
+            raise ValueError(
+                f"Use case '{use_case}' fallbacks for '{source}' must be a list"
+            )
+        unknown_targets = [target for target in targets if target not in self._models_cfg]
+        if unknown_targets:
+            raise ValueError(
+                f"Use case '{use_case}' fallback references unknown target alias "
+                f"'{unknown_targets[0]}'"
             )
 
 
