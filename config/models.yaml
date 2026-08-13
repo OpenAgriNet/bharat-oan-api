@@ -7,6 +7,15 @@ models:
     api_key: ${AZURE_OPENAI_API_KEY}
     api_version: ${AZURE_OPENAI_API_VERSION}
 
+  # Registered for future routing/fallback use. It shares the Azure resource
+  # and credentials with GPT-4.1; only the deployment name is different.
+  azure_gpt56_luna:
+    kind: azure-openai
+    deployment_name: ${AZURE_OPENAI_GPT56_LUNA_DEPLOYMENT_NAME}
+    endpoint: ${AZURE_OPENAI_ENDPOINT}
+    api_key: ${AZURE_OPENAI_API_KEY}
+    api_version: ${AZURE_OPENAI_API_VERSION}
+
   gemma_vllm:
     kind: vllm
     model_name: ${AGRINET_GEMMA_MODEL_NAME}

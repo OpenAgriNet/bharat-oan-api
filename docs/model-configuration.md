@@ -20,6 +20,15 @@ references, validates aliases and policies, and lazily constructs model clients.
 give it a use-case name and an async function, and it supplies each configured
 model in order until one succeeds.
 
+## Model catalog
+
+`azure_gpt56_luna` is registered as an optional GPT 5.6 Luna deployment. It
+reuses `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and
+`AZURE_OPENAI_API_VERSION`; only
+`AZURE_OPENAI_GPT56_LUNA_DEPLOYMENT_NAME` is Luna-specific. The alias is not in
+an active use case, so registering it does not change production traffic. Add it
+to a use case's `aliases`, `proportions`, or `fallbacks` when rollout is intended.
+
 ## Agrinet text flow
 
 1. `app.services.agrinet_routing` selects or restores the sticky primary alias.

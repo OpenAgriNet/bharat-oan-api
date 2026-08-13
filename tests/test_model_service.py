@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
+import yaml
 
 from agents.model_registry import ModelRegistry
 from agents.model_service import ModelService
@@ -94,6 +95,19 @@ def test_project_config_has_unified_fallbacks_for_chat_and_moderation() -> None:
         "azure_gpt41",
         "gemma_vllm",
     ]
+
+
+def test_luna_reuses_existing_azure_connection_config() -> None:
+    raw = yaml.safe_load(PROJECT_MODELS_PATH.read_text())
+    gpt41 = raw["models"]["azure_gpt41"]
+    luna = raw["models"]["azure_gpt56_luna"]
+
+    assert luna["kind"] == "azure-openai"
+    assert luna["deployment_name"] == "${AZURE_OPENAI_GPT56_LUNA_DEPLOYMENT_NAME}"
+    assert luna["endpoint"] == gpt41["endpoint"] == "${AZURE_OPENAI_ENDPOINT}"
+    assert luna["api_key"] == gpt41["api_key"] == "${AZURE_OPENAI_API_KEY}"
+    assert luna["api_version"] == gpt41["api_version"] == "${AZURE_OPENAI_API_VERSION}"
+    assert "azure_gpt56_luna" not in raw["use_cases"]["agrinet"]["aliases"]
 
 
 def test_service_retries_on_configured_fallback() -> None:
