@@ -111,6 +111,9 @@ class ModelRegistry:
 
     # --- use-case access ---
 
+    def get_use_cases(self) -> list[str]:
+        return list(self._use_cases_cfg)
+
     def get_use_case_aliases(self, use_case: str) -> list[str]:
         return list(self._use_cases_cfg.get(use_case, {}).get("aliases", []))
 
@@ -139,22 +142,55 @@ class ModelRegistry:
     def get_timeout(self, use_case: str) -> float:
         return float(self._use_cases_cfg.get(use_case, {}).get("timeout_seconds", 45))
 
-    # --- fallback / capacity ---
+    # --- execution fallback policy ---
 
-    def get_fallback_alias(self, alias: str) -> str | None:
-        return self._models_cfg.get(alias, {}).get("fallback", {}).get("to")
+    def get_fallback_aliases(self, use_case: str, alias: str) -> list[str]:
+        fallbacks = self._use_cases_cfg.get(use_case, {}).get("fallbacks", {})
+        return list(fallbacks.get(alias, []))
 
-    def get_fallback_on_concurrency(self, alias: str) -> int | None:
-        raw = self._models_cfg.get(alias, {}).get("fallback", {}).get("on_concurrency_above")
+    def get_fallback_chain(self, use_case: str, primary_alias: str) -> list[str]:
+        """Return an ordered, de-duplicated fallback chain for one execution.
+
+        The breadth-first expansion supports multi-level policies while making
+        cycles harmless: a model alias is attempted at most once per request.
+        """
+        chain: list[str] = []
+        queue = [primary_alias]
+        while queue:
+            alias = queue.pop(0)
+            if alias in chain:
+                continue
+            chain.append(alias)
+            queue.extend(self.get_fallback_aliases(use_case, alias))
+        return chain
+
+    def get_use_case_model_aliases(self, use_case: str) -> list[str]:
+        aliases: list[str] = []
+        primaries = [
+            self.get_default_alias(use_case),
+            *self.get_use_case_aliases(use_case),
+        ]
+        for primary in primaries:
+            if not primary:
+                continue
+            for alias in self.get_fallback_chain(use_case, primary):
+                if alias not in aliases:
+                    aliases.append(alias)
+        return aliases
+
+    # --- model capacity policy ---
+
+    def get_max_concurrency(self, alias: str) -> int | None:
+        raw = self._models_cfg.get(alias, {}).get("capacity", {}).get("max_concurrency")
         return int(raw) if raw is not None else None
 
     def get_metrics_cache_ttl(self, alias: str) -> int:
-        raw = self._models_cfg.get(alias, {}).get("fallback", {}).get("metrics_cache_ttl", 2)
+        raw = self._models_cfg.get(alias, {}).get("capacity", {}).get("metrics_cache_ttl", 2)
         return int(raw)
 
     def get_metrics_url(self, alias: str) -> str | None:
         config = self._models_cfg.get(alias, {})
-        override = (config.get("fallback", {}).get("metrics_url") or "").strip()
+        override = (config.get("capacity", {}).get("metrics_url") or "").strip()
         if override:
             return override
         base_url = (config.get("base_url") or "").strip()
@@ -198,6 +234,28 @@ class ModelRegistry:
             raise ValueError(
                 f"Use case '{use_case}': default_alias '{default}' not found in models"
             )
+
+        timeout = self.get_timeout(use_case)
+        if timeout <= 0:
+            raise ValueError(f"Use case '{use_case}': timeout_seconds must be positive")
+
+        fallbacks = uc.get("fallbacks", {})
+        if not isinstance(fallbacks, dict):
+            raise ValueError(f"Use case '{use_case}': fallbacks must be a mapping")
+        for source, targets in fallbacks.items():
+            if source not in self._models_cfg:
+                raise ValueError(
+                    f"Use case '{use_case}' fallback references unknown source alias '{source}'"
+                )
+            if not isinstance(targets, list):
+                raise ValueError(
+                    f"Use case '{use_case}' fallbacks for '{source}' must be a list"
+                )
+            for target in targets:
+                if target not in self._models_cfg:
+                    raise ValueError(
+                        f"Use case '{use_case}' fallback references unknown target alias '{target}'"
+                    )
 
 
 @lru_cache(maxsize=1)

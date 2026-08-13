@@ -3,8 +3,8 @@ from typing import Literal
 from pydantic_ai import Agent, PromptedOutput
 from helpers.utils import get_prompt
 from dotenv import load_dotenv
-import os
 from pydantic_ai.models import ModelSettings
+from agents.model_registry import get_registry
 from agents.models import MODERATION_MODEL
 
 # TODO: Add tools from tools/scheme.py
@@ -36,6 +36,6 @@ moderation_agent = Agent(
     model_settings=ModelSettings(
         temperature=0.0,
         top_p=1.0,
-        timeout=float(os.getenv("LLM_MODERATION_TIMEOUT_SECONDS", "20")),
+        timeout=get_registry().get_timeout("moderation"),
         # openai_reasoning_effort='low',
     ))

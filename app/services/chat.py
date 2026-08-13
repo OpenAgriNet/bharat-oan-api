@@ -13,18 +13,16 @@ from pydantic_ai.messages import TextPart
 from agents.agrinet import agrinet_agent
 from agents.deps import FarmerContext
 from agents.model_registry import get_registry
+from agents.model_service import get_model_service
 from agents.models import (
     LANGFUSE_MODERATION_MODEL_NAME,
     AgrinetRoute,
-    get_agrinet_route_model,
-    get_agrinet_route_model_name,
 )
 from agents.moderation import moderation_agent
 from app.config import settings
 from app.core.npss_followup import find_pending_npss_image_url
 from app.services.agrinet_routing import (
     AgrinetRouteDecision,
-    get_alternate_agrinet_route,
     refresh_session_agrinet_route_ttl,
     resolve_agrinet_route,
     set_session_agrinet_route,
@@ -560,22 +558,33 @@ async def stream_chat_messages(
 
 @observe(name=AGENT_MODERATION, as_type="agent")
 async def _run_moderation(user_message: str, session_id: str):
-    """Run moderation agent and trace it in Langfuse."""
+    """Run moderation through the shared model timeout/fallback service."""
     lf_update_current_observation(
         input=user_message,
         model=LANGFUSE_MODERATION_MODEL_NAME,
         metadata={"session_id": session_id},
     )
 
-    run = await moderation_agent.run(user_message)
+    async def _invoke(_alias: str, model: Any):
+        return await moderation_agent.run(user_message, model=model)
+
+    execution = await get_model_service().run("moderation", _invoke)
+    run = execution.value
+    execution_metadata = {
+        "session_id": session_id,
+        "model_alias": execution.alias,
+        "fallback_used": execution.fallback_used,
+        "fallback_from": execution.fallback_from,
+        "attempted_aliases": list(execution.attempted_aliases),
+    }
 
     usage_data = run.usage()
     lf_update_current_observation(
         output=str(run.output),
-        model=LANGFUSE_MODERATION_MODEL_NAME,
+        model=execution.model_name,
         input_tokens=usage_data.input_tokens or 0,
         output_tokens=usage_data.output_tokens or 0,
-        metadata={"session_id": session_id},
+        metadata=execution_metadata,
     )
     return run.output
 
@@ -603,49 +612,39 @@ async def _run_agrinet_with_failover(
     moderation_category: str,
     initial_decision: AgrinetRouteDecision,
 ):
-    try:
-        result = await _run_agrinet_once(
-            user_message=user_message,
-            trimmed_history=trimmed_history,
-            deps=deps,
-            session_id=session_id,
-            user_id=user_id,
-            moderation_category=moderation_category,
-            decision=initial_decision,
-            fallback_used=False,
-        )
-        return result, initial_decision, False
-    except Exception as primary_exc:
-        if not settings.agrinet_routing_enabled:
-            raise
-
-        fallback_route = get_alternate_agrinet_route(initial_decision.route)
-        fallback_decision = AgrinetRouteDecision(
-            route=fallback_route,
-            model_name=get_agrinet_route_model_name(fallback_route),
+    def _decision(alias: str) -> AgrinetRouteDecision:
+        if alias == initial_decision.route:
+            return initial_decision
+        return AgrinetRouteDecision(
+            route=alias,
+            model_name=get_registry().get_model_name(alias),
             source="failover",
         )
-        logger.warning(
-            "Agrinet route %s failed for session %s; retrying on %s (%s): %s",
-            initial_decision.route,
-            session_id,
-            fallback_decision.route,
-            fallback_decision.model_name,
-            primary_exc,
-        )
-        result = await _run_agrinet_once(
+
+    async def _invoke(alias: str, model: Any):
+        decision = _decision(alias)
+        return await _run_agrinet_once(
             user_message=user_message,
             trimmed_history=trimmed_history,
             deps=deps,
             session_id=session_id,
             user_id=user_id,
             moderation_category=moderation_category,
-            decision=fallback_decision,
-            fallback_used=True,
-            fallback_from=initial_decision.route,
+            decision=decision,
+            fallback_used=alias != initial_decision.route,
+            fallback_from=initial_decision.route if alias != initial_decision.route else None,
+            model=model,
         )
-        await set_session_agrinet_route(session_id, fallback_decision.route)
-        return result, fallback_decision, True
+
+    execution = await get_model_service().run(
+        "agrinet",
+        _invoke,
+        primary_alias=initial_decision.route,
+    )
+    final_decision = _decision(execution.alias)
+    if execution.fallback_used:
+        await set_session_agrinet_route(session_id, execution.alias)
+    return execution.value, final_decision, execution.fallback_used
 
 
 async def _run_agrinet_with_failover_streaming(
@@ -660,62 +659,41 @@ async def _run_agrinet_with_failover_streaming(
 ):
     sink = _StreamChunkSink(chunk_queue)
     try:
-        try:
-            completed_run = await _run_agrinet_once_streaming(
-                user_message=user_message,
-                trimmed_history=trimmed_history,
-                deps=deps,
-                session_id=session_id,
-                user_id=user_id,
-                moderation_category=moderation_category,
-                decision=initial_decision,
-                fallback_used=False,
-                chunk_queue=sink,
-            )
-            return completed_run, initial_decision, False
-        except Exception as primary_exc:
-            if not settings.agrinet_routing_enabled:
-                raise
-            if sink.emitted:
-                # Part of the answer is already on its way to the farmer; a retry
-                # would stream a second answer on top of it.
-                logger.warning(
-                    "Agrinet route %s failed for session %s after streaming began; "
-                    "not retrying on the alternate route: %s",
-                    initial_decision.route,
-                    session_id,
-                    primary_exc,
-                )
-                raise
-
-            fallback_route = get_alternate_agrinet_route(initial_decision.route)
-            fallback_decision = AgrinetRouteDecision(
-                route=fallback_route,
-                model_name=get_agrinet_route_model_name(fallback_route),
+        def _decision(alias: str) -> AgrinetRouteDecision:
+            if alias == initial_decision.route:
+                return initial_decision
+            return AgrinetRouteDecision(
+                route=alias,
+                model_name=get_registry().get_model_name(alias),
                 source="failover",
             )
-            logger.warning(
-                "Agrinet route %s failed for session %s; retrying on %s (%s): %s",
-                initial_decision.route,
-                session_id,
-                fallback_decision.route,
-                fallback_decision.model_name,
-                primary_exc,
-            )
-            completed_run = await _run_agrinet_once_streaming(
+
+        async def _invoke(alias: str, model: Any):
+            decision = _decision(alias)
+            return await _run_agrinet_once_streaming(
                 user_message=user_message,
                 trimmed_history=trimmed_history,
                 deps=deps,
                 session_id=session_id,
                 user_id=user_id,
                 moderation_category=moderation_category,
-                decision=fallback_decision,
-                fallback_used=True,
-                fallback_from=initial_decision.route,
+                decision=decision,
+                fallback_used=alias != initial_decision.route,
+                fallback_from=initial_decision.route if alias != initial_decision.route else None,
                 chunk_queue=sink,
+                model=model,
             )
-            await set_session_agrinet_route(session_id, fallback_decision.route)
-            return completed_run, fallback_decision, True
+
+        execution = await get_model_service().run(
+            "agrinet",
+            _invoke,
+            primary_alias=initial_decision.route,
+            can_fallback=lambda: not sink.emitted,
+        )
+        final_decision = _decision(execution.alias)
+        if execution.fallback_used:
+            await set_session_agrinet_route(session_id, execution.alias)
+        return execution.value, final_decision, execution.fallback_used
     finally:
         await chunk_queue.put(None)
 
@@ -732,6 +710,7 @@ async def _run_agrinet_once_streaming(
     fallback_used: bool,
     chunk_queue: _StreamChunkSink | None = None,
     fallback_from: AgrinetRoute | None = None,
+    model: Any = None,
 ) -> _AgrinetCompletedRun:
     route_metadata = _agrinet_route_metadata(
         decision,
@@ -760,7 +739,7 @@ async def _run_agrinet_once_streaming(
                 user_prompt=user_message,
                 message_history=trimmed_history,
                 deps=deps,
-                model=get_agrinet_route_model(decision.route),
+                model=model,
             ):
                 # Event order from pydantic-ai for the final answer:
                 #   PartStartEvent(TextPart content="Hello")  # first tokens live here
@@ -853,6 +832,7 @@ async def _run_agrinet_once(
     decision: AgrinetRouteDecision,
     fallback_used: bool,
     fallback_from: AgrinetRoute | None = None,
+    model: Any = None,
 ):
     """Run the agrinet agent for a specific model route and trace it in Langfuse."""
     route_metadata = _agrinet_route_metadata(
@@ -879,7 +859,7 @@ async def _run_agrinet_once(
                 user_prompt=user_message,
                 message_history=trimmed_history,
                 deps=deps,
-                model=get_agrinet_route_model(decision.route),
+                model=model,
             ),
             timeout=get_registry().get_timeout("agrinet"),
         )

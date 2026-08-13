@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from agents.model_registry import ModelRegistry, get_registry
-from app.config import settings
 
 # Public type alias — any alias name from config/models.yaml.
 AgrinetRoute = str
@@ -35,11 +34,15 @@ def get_agrinet_route_model_name(route: AgrinetRoute) -> str:
     return _r().get_model_name(route)
 
 
-def validate_agrinet_routing_config() -> None:
-    if not settings.agrinet_routing_enabled:
-        return
+def validate_model_config() -> None:
+    """Validate and build every primary and fallback model at startup."""
     registry = _r()
-    registry.validate_use_case(_AGRINET_USE_CASE)
-    # Force-build every agrinet model so bad config (missing env vars) fails at startup.
-    for alias in registry.get_use_case_aliases(_AGRINET_USE_CASE):
-        registry.get_model(alias)
+    for use_case in registry.get_use_cases():
+        registry.validate_use_case(use_case)
+        for alias in registry.get_use_case_model_aliases(use_case):
+            registry.get_model(alias)
+
+
+def validate_agrinet_routing_config() -> None:
+    """Backward-compatible entrypoint for older startup imports."""
+    validate_model_config()
