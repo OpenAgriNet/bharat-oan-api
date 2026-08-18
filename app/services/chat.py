@@ -58,17 +58,12 @@ logger = get_logger(__name__)
 
 # vLLM guided decoding (structured_outputs.regex) to stop the base model from
 # drifting into another script mid-answer. This is an ALLOWLIST (own script +
-# ASCII + Unicode Common/Inherited) — NOT a denylist of other scripts. A
-# denylist over non-ASCII ranges silently fails to enforce on xgrammar
-# (confirmed bug: https://github.com/mlc-ai/xgrammar/issues/848 — negated
-# classes containing bytes >127 get clamped to 127 and the exclusion never
-# actually applies, which also explains the degenerate-repetition behavior
-# seen when testing the denylist form).
-# Common/Inherited (verified via the `regex` module's Script property, not
-# guessed) covers every shared punctuation/symbol/emoji/combining-mark
+# ASCII + Unicode Common/Inherited) — NOT a denylist of other scripts. 
+# Common/Inherited (verified via the `regex` module's Script property, 
+# ) covers every shared punctuation/symbol/emoji/combining-mark
 # automatically — e.g. danda (U+0964/U+0965) and ZWJ/ZWNJ (U+200C/200D) are
-# both Common/Inherited despite looking script-specific, which is exactly
-# what #142/#167 got wrong by hand-picking a punctuation allowlist instead.
+# both Common/Inherited despite looking script-specific
+
 _SCRIPT_EXCLUSIVE_RANGES = {
     "bn": "\u0980-\u0983\u0985-\u098c\u098f-\u0990\u0993-\u09a8\u09aa-\u09b0\u09b2\u09b6-\u09b9\u09bc-\u09c4\u09c7-\u09c8\u09cb-\u09ce\u09d7\u09dc-\u09dd\u09df-\u09e3\u09e6-\u09fe",  # Bengali (Assamese shares this block)
     "gu": "\u0a81-\u0a83\u0a85-\u0a8d\u0a8f-\u0a91\u0a93-\u0aa8\u0aaa-\u0ab0\u0ab2-\u0ab3\u0ab5-\u0ab9\u0abc-\u0ac5\u0ac7-\u0ac9\u0acb-\u0acd\u0ad0\u0ae0-\u0ae3\u0ae6-\u0af1\u0af9-\u0aff",  # Gujarati
@@ -97,10 +92,8 @@ def _escape_for_char_class(chars: str) -> str:
 # observed to mix scripts (per eval history), so no gate needed for them.
 _GUIDED_DECODING_TARGETS = {"kn", "ta", "ml", "te", "bn", "as", "gu"}
 
-# Precomputed once at import time, not per-request — compiling one of these
-# patterns costs ~10ms cold and ~0.1ms on a cache hit (measured directly
-# against xgrammar), so this is purely about avoiding repeated string-building
-# work, not a real latency concern either way.
+# Precomputed once at import time, not per-request
+
 _GUIDED_DECODING_PATTERNS = {
     lang: f"^[{_escape_for_char_class(exclusive + _ASCII_RANGE + _COMMON_INHERITED_RANGE)}]*$"
     for lang, exclusive in _SCRIPT_EXCLUSIVE_RANGES.items()
