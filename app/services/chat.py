@@ -112,14 +112,15 @@ _GUIDED_DECODING_PATTERNS["as"] = _GUIDED_DECODING_PATTERNS["bn"]  # Assamese sh
 # to Azure/plain-OpenAI would either 400 or silently no-op. agrinet routes
 # 50/50 between gemma_vllm and azure_gpt41 (config/models.yaml), so this must
 # check the actual selected route's kind, not just assume vLLM.
-_GUIDED_DECODING_CAPABLE_KINDS = {"vllm", "bharat_ai_grid"}
+# Deliberately vllm-only, not bharat_ai_grid: both share the same OpenAI-
+# compatible client builder in model_registry.py, but that only means they
+# speak the same wire protocol — it says nothing about whether Bharat AI
+# Grid's backend actually runs vLLM/xgrammar. Untested, and that alias isn't
+# even wired into any use case's routing yet, so don't assume.
+_GUIDED_DECODING_CAPABLE_KINDS = {"vllm"}
 
 
 def _guided_decoding_settings(lang_code: str | None, route: str) -> OpenAIChatModelSettings | None:
-    # LOCAL TEST ONLY: lets a second app instance run as the "without" arm for
-    # side-by-side UI comparison. Revert before commit.
-    if os.getenv("DISABLE_GUIDED_DECODING"):
-        return None
     lang_code = (lang_code or "").lower()
     if lang_code not in _GUIDED_DECODING_TARGETS:
         return None
