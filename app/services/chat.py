@@ -753,9 +753,10 @@ async def _run_agrinet_once_streaming(
 
     stream_state = _AgrinetStreamState()
     result = None
+    timeout_seconds = get_registry().get_timeout("agrinet", decision.route)
 
     try:
-        async with asyncio.timeout(get_registry().get_timeout("agrinet")):
+        async with asyncio.timeout(timeout_seconds):
             async for event in agrinet_agent.run_stream_events(
                 user_prompt=user_message,
                 message_history=trimmed_history,
@@ -807,11 +808,11 @@ async def _run_agrinet_once_streaming(
             metadata={
                 **observation_metadata,
                 "error_type": "TimeoutError",
-                "timeout_seconds": get_registry().get_timeout("agrinet"),
+                "timeout_seconds": timeout_seconds,
             }
         )
         raise TimeoutError(
-            f"Agrinet route {decision.route} timed out after {get_registry().get_timeout('agrinet')} seconds"
+            f"Agrinet route {decision.route} timed out after {timeout_seconds} seconds"
         ) from exc
     except Exception as exc:
         lf_update_current_observation(
@@ -873,6 +874,8 @@ async def _run_agrinet_once(
         metadata=observation_metadata,
     )
 
+    timeout_seconds = get_registry().get_timeout("agrinet", decision.route)
+
     try:
         result = await asyncio.wait_for(
             agrinet_agent.run(
@@ -881,18 +884,18 @@ async def _run_agrinet_once(
                 deps=deps,
                 model=get_agrinet_route_model(decision.route),
             ),
-            timeout=get_registry().get_timeout("agrinet"),
+            timeout=timeout_seconds,
         )
     except asyncio.TimeoutError as exc:
         lf_update_current_observation(
             metadata={
                 **observation_metadata,
                 "error_type": "TimeoutError",
-                "timeout_seconds": get_registry().get_timeout("agrinet"),
+                "timeout_seconds": timeout_seconds,
             }
         )
         raise TimeoutError(
-            f"Agrinet route {decision.route} timed out after {get_registry().get_timeout('agrinet')} seconds"
+            f"Agrinet route {decision.route} timed out after {timeout_seconds} seconds"
         ) from exc
     except Exception as exc:
         lf_update_current_observation(

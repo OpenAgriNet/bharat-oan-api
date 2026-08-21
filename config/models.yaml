@@ -24,6 +24,9 @@ models:
     model_name: ${BHARAT_AI_GRID_MODEL_NAME}
     base_url: ${BHARAT_AI_GRID_BASE_URL}
     api_key: ${BHARAT_AI_GRID_API_KEY}
+    # Shorter than the use case's: a gateway with an extra hop, so cut over to
+    # the fallback while there is still budget left for it to answer.
+    timeout_seconds: ${BHARAT_AI_GRID_TIMEOUT_SECONDS:-30}
     fallback:
       to: azure_gpt41
       on_error: [ModelHTTPError, TimeoutError]
@@ -39,6 +42,7 @@ use_cases:
   agrinet:
     default_alias: azure_gpt41       # used when routing is disabled or for state repair
     routing_ttl_seconds: 7200        # how long a session's sticky pick lives in Redis
-    timeout_seconds: 45
-    aliases: [gemma_vllm, azure_gpt41]
-    proportions: [50, 50]
+    timeout_seconds: ${AGRINET_TIMEOUT_SECONDS:-90}   # per attempt; a model's own overrides this
+    aliases: [gemma_vllm, bharat_ai_grid_gemma, azure_gpt41]
+    proportions: [50, 50, 0]     # azure_gpt41 is never picked at session start; weight 0 keeps it
+                                 # a valid sticky value so failover/deflect writes survive re-reads

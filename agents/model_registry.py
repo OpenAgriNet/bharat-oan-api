@@ -12,11 +12,17 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 _YAML_PATH = Path(__file__).parent.parent / "config" / "models.yaml"
-_ENV_RE = re.compile(r"\$\{([^}]+)\}")
+_ENV_RE = re.compile(r"\$\{([^}:]+)(?::-([^}]*))?\}")
 
 
 def _resolve_env(value: str) -> str:
-    return _ENV_RE.sub(lambda m: os.environ.get(m.group(1), ""), value)
+    """${VAR} resolves to "" when unset; ${VAR:-default} falls back, as in docker-compose."""
+
+    def substitute(match: re.Match) -> str:
+        resolved = os.environ.get(match.group(1), "")
+        return resolved if resolved else (match.group(2) or "")
+
+    return _ENV_RE.sub(substitute, value)
 
 
 def _resolve_values(obj: Any) -> Any:
@@ -136,7 +142,12 @@ class ModelRegistry:
     def get_routing_ttl(self, use_case: str) -> int:
         return int(self._use_cases_cfg.get(use_case, {}).get("routing_ttl_seconds", 7200))
 
-    def get_timeout(self, use_case: str) -> float:
+    def get_timeout(self, use_case: str, alias: str | None = None) -> float:
+        """Wall-clock budget for one attempt; a model's own timeout_seconds wins over the use case's."""
+        if alias:
+            override = self._models_cfg.get(alias, {}).get("timeout_seconds")
+            if override is not None:
+                return float(override)
         return float(self._use_cases_cfg.get(use_case, {}).get("timeout_seconds", 45))
 
     # --- fallback / capacity ---
@@ -192,6 +203,13 @@ class ModelRegistry:
         ttl = self.get_routing_ttl(use_case)
         if ttl <= 0:
             raise ValueError(f"Use case '{use_case}': routing_ttl_seconds must be positive")
+
+        if self.get_timeout(use_case) <= 0:
+            raise ValueError(f"Use case '{use_case}': timeout_seconds must be positive")
+
+        for alias in aliases:
+            if self.get_timeout(use_case, alias) <= 0:
+                raise ValueError(f"Alias '{alias}': timeout_seconds must be positive")
 
         default = self.get_default_alias(use_case)
         if default and default not in self._models_cfg:
