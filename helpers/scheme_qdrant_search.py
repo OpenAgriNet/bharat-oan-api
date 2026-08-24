@@ -24,216 +24,44 @@ SCHEME_SEARCH_SOURCE = "Government Scheme Information"
 _embedder_cache: dict[str, SentenceTransformer] = {}
 _qdrant_client_cache: dict[tuple[str, Optional[str]], QdrantClient] = {}
 
-# scheme_code -> scheme_name + aliases.
-# Schemes with guideline PDFs ingested in Qdrant schemes-index.
-# Keep scheme_code values identical to Qdrant payload scheme_code.
-#
-# prompt_visible=False (nbm only): stays a valid resolver candidate — a
-# query naming it still resolves instead of falling through to "scheme not
-# available" — but is left out of the dynamic "vector-indexed schemes"
-# prompt section. nbm has both a legacy entry and Qdrant-indexed content;
-# policy sends it to get_scheme_info ("N.B.M. routing (mandatory)" in
-# agrinet_*.md), so advertising it as search_schemes-searchable there would
-# contradict that rule. Mirrors docs-pipeline's ROUTING_EXCEPTIONS
-# (pipeline/scheme_catalog.py) — set on the entry itself, not a separate list.
-_QDRANT_SCHEME_DEFINITIONS: dict[str, dict[str, Any]] = {
-    "cdp": {
-        "scheme_name": "Crop Diversification Programme",
-        "scheme_aliases": [
-            "CDP",
-            "crop diversification",
-            "crop diversification programme",
-            "crop diversification program",
-            "Crop Diversification Program",
-        ],
-    },
-    "cotton-mission": {
-        "scheme_name": "Cotton Mission",
-        "scheme_aliases": [
-            "cotton mission",
-            "cotton scheme",
-            "nfsm cotton",
-            "NFSM Cotton",
-        ],
-    },
-    "e-nam": {
-        "scheme_name": "Electronic National Agriculture Market",
-        "scheme_aliases": [
-            "e-NAM",
-            "eNAM",
-            "enam",
-            "national agriculture market",
-            "electronic nam",
-            "electronic national agriculture market",
-        ],
-    },
-    "makhana": {
-        "scheme_name": "Central Sector Scheme for Development of Makhana",
-        "scheme_aliases": [
-            "makhana",
-            "makana",
-            "foxnut",
-            "horticulture makhana",
-            "makhana scheme",
-            "development of makhana",
-        ],
-    },
-    "midh": {
-        "scheme_name": "Mission for Integrated Development of Horticulture",
-        "scheme_aliases": [
-            "MIDH",
-            "horticulture mission",
-            "krishonnati horticulture",
-            "national horticulture mission",
-            "integrated development of horticulture",
-        ],
-    },
-    "mif": {
-        "scheme_name": "Micro Irrigation Fund",
-        "scheme_aliases": [
-            "MIF",
-            "micro irrigation fund",
-            "Micro Irrigation Fund scheme",
-        ],
-    },
-    "nbm": {
-        "scheme_name": "National Bamboo Mission",
-        "scheme_aliases": ["NBM", "national bamboo mission", "bamboo mission", "national bamboo"],
-        "prompt_visible": False,
-    },
-    "nmeo": {
-        "scheme_name": "National Mission on Edible Oils – Oilseeds",
-        "scheme_aliases": [
-            "NMEO",
-            "NMEO-OS",
-            "NMEO OS",
-            "oilseeds mission",
-            "nmoe",
-            "national mission on edible oils",
-            "edible oils oilseeds",
-        ],
-    },
-    "pkvy": {
-        "scheme_name": "Paramparagat Krishi Vikas Yojana",
-        "scheme_aliases": [
-            "PKVY",
-            "paramparagat krishi vikas yojana",
-            "paramparagat krishi",
-            "organic farming scheme",
-        ],
-    },
-    "pm-ddky": {
-        "scheme_name": "Prime Minister Dhan–Dhaanya Krishi Yojana",
-        "scheme_aliases": [
-            "PM-DDKY",
-            "PM DDKY",
-            "pm ddky",
-            "dhan-dhaanya krishi yojana",
-            "dhan dhaanya krishi yojana",
-            "dhan-dhaanya",
-            "dhan dhaanya",
-            "PM Dhan Dhaanya Krishi Yojana",
-        ],
-    },
-    "pm-kmy": {
-        "scheme_name": "Pradhan Mantri Kisan Maandhan Yojana",
-        "scheme_aliases": [
-            "PM-KMY",
-            "PMKMY",
-            "pm kmy",
-            "Kisan Maandhan Yojana",
-            "Kisan Mandhan Yojana",
-            "kisan mandhan",
-            "PMKMY Yojana",
-        ],
-    },
-    "pm-rkvy": {
-        "scheme_name": "Pradhan Mantri Rashtriya Krishi Vikas Yojana",
-        "scheme_aliases": [
-            "PM-RKVY",
-            "PM RKVY",
-            "pm rkvy",
-            "RKVY",
-            "rashtriya krishi vikas",
-            "rashtriya krishi vikas yojana",
-        ],
-    },
-    "pulses-mission": {
-        "scheme_name": "Mission for Aatmanirbharta in Pulses",
-        "scheme_aliases": [
-            "pulses mission",
-            "pulses scheme",
-            "nfsm pulses",
-            "aatmanirbharta in pulses",
-            "mission for aatmanirbharta in pulses",
-            "aatmanirbharta pulses mission",
-            "National Food Security Mission – Pulses",
-        ],
-    },
-    "rwbcis": {
-        "scheme_name": "Restructured Weather Based Crop Insurance Scheme",
-        "scheme_aliases": [
-            "RWBCIS",
-            "weather based crop insurance",
-            "weather insurance",
-            "weather based crop insurance scheme",
-        ],
-    },
-}
-
-QDRANT_SCHEME_CODES = frozenset(_QDRANT_SCHEME_DEFINITIONS.keys())
-
-_BUILTIN_SCHEME_LIST: list[dict[str, Any]] = [
-    {
-        "scheme_code": code,
-        "scheme_name": definition["scheme_name"],
-        "scheme_aliases": list(definition.get("scheme_aliases", [])),
-        "prompt_visible": definition.get("prompt_visible", True),
-    }
-    for code, definition in _QDRANT_SCHEME_DEFINITIONS.items()
-]
-
-
 def get_builtin_scheme_list() -> list[dict[str, Any]]:
     """Scheme registry used for query → scheme_code resolution (search_schemes routing).
 
-    Merges docs-pipeline's live master_catalog Redis snapshot on top of the
-    static seed list above: a scheme promoted in docs-pipeline appears here
-    on the next call — no redeploy needed. The static list is a floor, not a
-    default-to-be-replaced — it keeps existing schemes resolvable even if
-    Redis is unreachable or docs-pipeline hasn't (yet) re-synced an older
-    scheme retroactively. On code collision the live entry wins (docs-pipeline
-    is the source of truth once it has synced a code).
+    Sourced entirely from docs-pipeline's live master_catalog Redis snapshot
+    (Postgres is the source of truth) — a scheme promoted in docs-pipeline
+    appears here on the next call, no redeploy needed. Returns an empty list
+    if Redis is unreachable or the snapshot hasn't been written yet; callers
+    must tolerate that (see get_vector_scheme_entries / get_master_catalog_snapshot
+    docstrings for the fails-open contract).
 
     Legacy get_scheme_info schemes never appear here — see agrinet_*.md's
     hardcoded "Integrated schemes — legacy" list, untouched by this.
     """
-    merged: dict[str, dict[str, Any]] = {item["scheme_code"]: item for item in _BUILTIN_SCHEME_LIST}
+    scheme_list: list[dict[str, Any]] = []
     for entry in get_vector_scheme_entries():
         code = str(entry.get("code") or "").strip().lower()
         name = str(entry.get("name") or "").strip()
         if not code or not name:
             continue
-        merged[code] = {
+        scheme_list.append({
             "scheme_code": code,
             "scheme_name": name,
             "scheme_aliases": [str(a).strip() for a in (entry.get("aliases") or []) if str(a).strip()],
             "prompt_visible": True,
-        }
-    return list(merged.values())
+        })
+    return scheme_list
 
 
 @observe(name="tool:master_catalog_redis_check", as_type="tool")
 def format_vector_schemes_prompt_block() -> dict[str, Any]:
     """Render the system prompt's dynamic "vector-indexed schemes" section
     (bullets + match-identifiers) from get_builtin_scheme_list() — the SAME
-    merged list search_schemes() uses to resolve a query to a scheme_code.
+    list search_schemes() uses to resolve a query to a scheme_code.
 
     Deliberately not read from docs-pipeline's Redis `prompt` field directly:
-    that snapshot alone has no static fallback, so on a Redis outage the
-    section would go blank even though the static 13 schemes are still fully
-    resolvable. Rendering from the merged list keeps what the farmer is told
-    is available always consistent with what the resolver actually accepts.
+    rendering from get_builtin_scheme_list() keeps what the farmer is told is
+    available always consistent with what the resolver actually accepts, even
+    though today both ultimately read the same Redis snapshot.
 
     @observe-wrapped (as_type="tool") purely for Langfuse visibility: this
     runs once every turn as part of system-prompt construction, not as an
@@ -276,7 +104,7 @@ def format_qdrant_scheme_codes_for_doc() -> str:
     """One-line scheme code list for tool docstrings (like get_scheme_info).
 
     Patched into search_schemes.__doc__ once at import time (see bottom of
-    agents/tools/search.py) — reflects the merged list as of process start,
+    agents/tools/search.py) — reflects the Redis snapshot as of process start,
     not live per-turn like the system prompt's vector_schemes_bullets. A
     newly promoted scheme is still fully routable before the next deploy
     (get_builtin_scheme_list() is re-evaluated live), just not yet named in
@@ -893,10 +721,11 @@ def _merge_supplemental_results(
 def _filter_results_by_scheme(
     results: list[dict[str, Any]],
     scheme_code: Optional[str],
+    known_scheme_codes: frozenset[str],
 ) -> list[dict[str, Any]]:
     if scheme_code:
         return [r for r in results if r.get("scheme_code") == scheme_code]
-    return [r for r in results if r.get("scheme_code") in QDRANT_SCHEME_CODES]
+    return [r for r in results if r.get("scheme_code") in known_scheme_codes]
 
 
 def search_schemes(
@@ -914,7 +743,8 @@ def search_schemes(
     """
     client = client or get_qdrant_client()
     model = model or get_embedder()
-    scheme_list = scheme_list if scheme_list is not None else _BUILTIN_SCHEME_LIST
+    scheme_list = scheme_list if scheme_list is not None else get_builtin_scheme_list()
+    known_scheme_codes = frozenset(item["scheme_code"] for item in scheme_list)
 
     if scheme_code is None:
         scheme_code = resolve_scheme_code(query, scheme_list)
@@ -938,7 +768,7 @@ def search_schemes(
             client, collection_name, fetch_k, model,
         )
 
-    results = _filter_results_by_scheme(results, scheme_code)
+    results = _filter_results_by_scheme(results, scheme_code, known_scheme_codes)
     results = rerank_results(query, results)
     return _finalize_results(results, section_focus, intent, top_k)
 
@@ -997,7 +827,7 @@ def format_search_results(
     scheme_list: Optional[list[dict[str, Any]]] = None,
 ) -> str:
     if not results:
-        active_scheme_list = scheme_list if scheme_list is not None else _BUILTIN_SCHEME_LIST
+        active_scheme_list = scheme_list if scheme_list is not None else get_builtin_scheme_list()
         return _empty_search_message(query, active_scheme_list)
 
     blocks = [_format_result_block(item) for item in results]
