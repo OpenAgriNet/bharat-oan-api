@@ -7,10 +7,10 @@ time a document is DEV-ingested or PROD-promoted. This module is the read side:
 it lets the chat agent see newly-live schemes without a redeploy.
 
 Fails open by design: any Redis error, missing key, or malformed payload returns
-None from get_master_catalog_snapshot(), and callers fall back to their own
-static seed data (see scheme_qdrant_search.get_builtin_scheme_list). A Redis
-outage must never take down scheme routing — it should just freeze it at
-whatever was last known (or the static fallback, on a cold start).
+None from get_master_catalog_snapshot(), and callers (see
+scheme_qdrant_search.get_builtin_scheme_list) treat that as "no vector-indexed
+schemes known right now" rather than raising — a Redis outage degrades scheme
+routing instead of crashing it.
 """
 from __future__ import annotations
 

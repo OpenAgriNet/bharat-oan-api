@@ -289,7 +289,7 @@ async def search_schemes(
     """
     scheme_list = get_builtin_scheme_list()
     logger.info(
-        "TOOL CALL: search_schemes(query=%r, top_k=%d) — %d schemes known this turn (static + live-synced)",
+        "TOOL CALL: search_schemes(query=%r, top_k=%d) — %d schemes known this turn (live-synced from Redis)",
         query, top_k, len(scheme_list),
     )
     if query_names_unindexed_scheme(query, scheme_list):
