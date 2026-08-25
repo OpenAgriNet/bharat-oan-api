@@ -133,16 +133,13 @@ def _request(action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
 
     except _AifUnavailable:
         raise
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as e:
         logger.error(f"AIF {action} request timed out")
-        raise _AifUnavailable(UNAVAILABLE)
-    except ValueError as e:
-        # Covers the unconfigured endpoint and a non-JSON body alike.
-        logger.error(f"AIF {action} failed: {e}")
-        raise _AifUnavailable(UNAVAILABLE)
+        raise _AifUnavailable(UNAVAILABLE) from e
     except Exception as e:
+        # Covers the unconfigured endpoint, a non-JSON body, and transport errors alike.
         logger.error(f"AIF {action} failed: {e}")
-        raise _AifUnavailable(UNAVAILABLE)
+        raise _AifUnavailable(UNAVAILABLE) from e
 
 
 def _unwrap(envelope: Dict[str, Any]) -> Dict[str, Any]:
@@ -230,46 +227,57 @@ def _render_loan_status(envelope: Dict[str, Any]) -> str:
     return f"{SOURCE_LINE}\n\n{status}"
 
 
+def _group_tickets(order: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
+    """Tickets keyed by application number, in first-seen order.
+
+    A farmer tracks their applications, and one application can carry several
+    tickets. AIF reports 0 for tickets not tied to an application (the network omits
+    those), so those collect under "".
+    """
+    grouped: Dict[str, List[Dict[str, str]]] = {}
+    for item in order.get("items") or []:
+        ticket = _values((item.get("tags") or [{}])[0])
+        grouped.setdefault(ticket.get("loan_application_number") or "", []).append(ticket)
+    return grouped
+
+
+def _group_lines(key: str, tickets: List[Dict[str, str]]) -> List[str]:
+    """One application's block: a header, then each ticket with its shortened description."""
+    header = f"Application {key}" if key else "Not linked to an application"
+    lines = [f"{header} — {len(tickets)} ticket(s)"]
+    for ticket in tickets:
+        kind = ticket.get("query_type") or "Support ticket"
+        status = ticket.get("status") or "Unknown"
+        lines.append(f"  {kind} ({status})")
+        description = _shorten(ticket.get("description") or "")
+        if description:
+            lines.append(f"    {description}")
+    lines.append("")
+    return lines
+
+
 def _render_grievance_status(envelope: Dict[str, Any]) -> str:
     tag = _outcome_tag(envelope, "status")
     code, short_desc = _descriptor(tag)
-    values = _values(tag)
 
     # No tickets is a successful result, not an error.
     if code == "no_grievances":
         return f"{SOURCE_LINE}\n\nThere are no open grievances or support tickets."
     if code != "grievance_status":
-        return _failure(short_desc, values)
+        return _failure(short_desc, _values(tag))
 
     order = (_unwrap(envelope).get("message") or {}).get("order") or {}
-
-    # Grouped by application, in first-seen order: a farmer tracks their applications,
-    # and one application can carry several tickets. AIF reports 0 for tickets not tied
-    # to an application (the network omits those), so they get their own group last.
-    grouped: Dict[str, List[Dict[str, str]]] = {}
-    for item in order.get("items") or []:
-        ticket = _values(((item.get("tags") or [{}])[0]))
-        grouped.setdefault(ticket.get("loan_application_number") or "", []).append(ticket)
+    grouped = _group_tickets(order)
+    numbered = [key for key in grouped if key]
 
     total = sum(len(tickets) for tickets in grouped.values())
-    numbered = [key for key in grouped if key]
     summary = f"{total} support ticket(s)"
     if numbered:
         summary += f" across {len(numbered)} application(s)"
-    lines = [SOURCE_LINE, "", f"{summary}.", ""]
 
+    lines = [SOURCE_LINE, "", f"{summary}.", ""]
     for key in numbered + ([""] if "" in grouped else []):
-        tickets = grouped[key]
-        header = f"Application {key}" if key else "Not linked to an application"
-        lines.append(f"{header} — {len(tickets)} ticket(s)")
-        for ticket in tickets:
-            kind = ticket.get("query_type") or "Support ticket"
-            status = ticket.get("status") or "Unknown"
-            lines.append(f"  {kind} ({status})")
-            description = _shorten(ticket.get("description") or "")
-            if description:
-                lines.append(f"    {description}")
-        lines.append("")
+        lines.extend(_group_lines(key, grouped[key]))
 
     return "\n".join(lines).strip()
 
