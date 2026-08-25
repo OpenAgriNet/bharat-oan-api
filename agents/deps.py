@@ -21,6 +21,10 @@ class FarmerContext(BaseModel):
     query: str = Field(description="The user's question.")
     lang_code: str = Field(description="The language code of the user's question.", default='hi')
     session_id: str = Field(description="The session ID for the conversation.")
+    question_id: str = Field(
+        default="",
+        description="Question ID (qid) from the chat API for telemetry correlation.",
+    )
     moderation_str: Optional[str] = Field(default=None, description="The moderation result of the user's question.")
     latitude: Optional[float] = Field(default=None, description="User's latitude for geocoding.")
     longitude: Optional[float] = Field(default=None, description="User's longitude for geocoding.")

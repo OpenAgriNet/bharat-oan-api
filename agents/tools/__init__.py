@@ -13,7 +13,11 @@ from agents.tools.pmfby_grievance import (
     pmfby_submit_grievance,
 )
 from agents.tools.shc_scheme_status import check_shc_status
-from agents.tools.pmkisan_grievance import submit_pmkisan_grievance, pmkisan_grievance_status
+from agents.tools.pmkisan_grievance import (
+    pmkisan_grievance_send_otp,
+    pmkisan_submit_grievance,
+    pmkisan_grievance_status,
+)
 from agents.tools.terms import search_terms
 from agents.tools.search import search_documents
 from agents.tools.search import search_videos
@@ -84,13 +88,18 @@ TOOLS = [
         strict=False,
     ),
     Tool(
-        submit_pmkisan_grievance,
-        takes_ctx=False,
+        pmkisan_grievance_send_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        pmkisan_submit_grievance,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
         pmkisan_grievance_status,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
