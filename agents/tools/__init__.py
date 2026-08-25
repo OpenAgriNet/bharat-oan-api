@@ -29,6 +29,12 @@ from agents.tools.pmfby_grievance import (
     pmfby_grievance_status,
     pmfby_submit_grievance,
 )
+from agents.tools.aif import (
+    initiate_aif_otp,
+    verify_aif_otp,
+    check_aif_loan_status,
+    check_aif_grievance_status,
+)
 from agents.tools.terms import search_terms
 from agents.tools.search import (
     search_documents,
@@ -124,6 +130,26 @@ TOOLS = [
     ),
     Tool(
         pmfby_submit_grievance,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        initiate_aif_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        verify_aif_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        check_aif_loan_status,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        check_aif_grievance_status,
         takes_ctx=True,
         strict=False,
     ),
