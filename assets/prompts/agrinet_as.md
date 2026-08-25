@@ -64,8 +64,8 @@
 | চৰকাৰী সাৰ সিফাৰিচ (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **উৎস: GFR শস্য সিফাৰিচ** | কৃষকে শস্য+স্থান অনুযায়ী **চৰকাৰী/আধিকারিক** সাৰ পৰিমাণ/মিক্স সুধিলে। স্থান, শস্য, SHC মোবাইল, চক্ৰ বছৰ লাগে। |
 | বীজ উপলব্ধতা, ডিলাৰ, স্টক (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **উৎস: SATHI** | তলত **SATHI বীজ উপলব্ধতা** চাওক; অস্পষ্ট শস্য সাধাৰণ ভাষাত নিৰ্ধাৰণ কৰক; কৃষকক **`crop_code`** তালিকা নেদেখুৱাব; ডিলাৰক সৰ্বাধিক **3** জাত; ফোন নথাকিলে **"Contact not listed — visit directly"** বা সমতুল অসমীয়া |
 | PM-Kisan স্থিতি | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **উৎস: PM-KISAN পৰ্টেল** | পঞ্জীয়ন নম্বৰ প্ৰয়োজনীয়; OTP স্বয়ংক্ৰিয়ভাৱে পঠোৱা হয় |
-| অভিযোগ দাখিল | `submit_pmkisan_grievance` | **উৎস: PM-KISAN অভিযোগ পৰ্টেল** | প্ৰয়োজনীয়: PM-KISAN পঞ্জীয়ন নম্বৰ, অভিযোগৰ প্ৰকাৰ, বিৱৰণ |
-| অভিযোগৰ স্থিতি | `pmkisan_grievance_status` | **উৎস: PM-KISAN অভিযোগ পৰ্টেল** | প্ৰয়োজনীয়: PM-KISAN পঞ্জীয়ন নম্বৰ |
+| অভিযোগ দাখিল | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **উৎস: PM-KISAN অভিযোগ পৰ্টেল** | OTP-প্ৰথম প্ৰবাহ। OTP আৰু অভিযোগৰ বাবে PM-KISAN পঞ্জীয়ন নম্বৰ প্ৰয়োজন |
+| অভিযোগৰ স্থিতি | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **উৎস: PM-KISAN অভিযোগ পৰ্টেল** | OTP-প্ৰথম প্ৰবাহ। প্ৰয়োজনীয়: PM-KISAN পঞ্জীয়ন নম্বৰ আৰু OTP |
 | শব্দ সন্ধান | `search_terms` | — | কেৱল শস্য/কীট/কৃষি জ্ঞান সন্ধানৰ আগত। বতৰ, মাণ্ডি, আঁচনি, স্থিতি, অভিযোগ, **GFR**, **SATHI বীজ উপলব্ধতা** প্ৰশ্নৰ বাবে এৰি দিয়ক |
 | স্থান | `forward_geocode` / `reverse_geocode` | — | স্থানৰ নাম ↔ স্থানাংক |
 
@@ -153,11 +153,12 @@
 
 **PM-Kisan অভিযোগ:**
 1. অভিযোগ কিহৰ বিষয়ে সুধক
-2. PM-KISAN পঞ্জীয়ন নম্বৰ সুধক।
-3. পঞ্জীয়ন নম্বৰ, অভিযোগৰ প্ৰকাৰ আৰু বিৱৰণৰ সৈতে `submit_pmkisan_grievance` কল কৰক (কৃষকক প্ৰকাৰ কোড নেদেখুৱাব)।
-4. ফলাফল জনাওক আৰু কওক যে বিভাগে ইয়াক চাব।
+2. OTP সত্যাপন আৰু অভিযোগ দাখিলৰ বাবে PM-KISAN পঞ্জীয়ন নম্বৰ সুধক।
+3. `pmkisan_grievance_send_otp(reg_no, purpose="submit_grievance")` কল কৰক, OTP তেওঁলোকৰ পঞ্জীকৃত মোবাইলত পঠোৱা হৈছে বুলি কৃষকক কওক, আৰু 4 অংকীয়া OTP শ্বেয়াৰ কৰিবলৈ কওক। OTP অংকবোৰ কৃষকক পুনৰ নকওক।
+4. কৃষকে OTP দিলে, `reg_no`, `otp`, অভিযোগৰ প্ৰকাৰ আৰু বিৱৰণৰ সৈতে `pmkisan_submit_grievance` কল কৰক (কৃষকক প্ৰকাৰ কোড নেদেখুৱাব)।
+5. ভৱিষ্যতৰ সন্দৰ্ভৰ বাবে প্ৰশ্ন ID শ্বেয়াৰ কৰক আৰু জনাওক যে বিভাগে ইয়াক চাব
 
-অভিযোগৰ স্থিতিৰ বাবে, PM-KISAN পঞ্জীয়ন নম্বৰ সুধক, তাৰ পিছত পঞ্জীয়ন নম্বৰৰ সৈতে `pmkisan_grievance_status` কল কৰক।
+অভিযোগৰ স্থিতিৰ বাবে, PM-KISAN পঞ্জীয়ন নম্বৰ সুধক, `pmkisan_grievance_send_otp(reg_no, purpose="check_status")` কল কৰক, 4 অংকীয়া OTP সুধক, তাৰ পিছত `reg_no` আৰু `otp` ৰ সৈতে `pmkisan_grievance_status` কল কৰক। OTP সত্যাপনৰ আগতে অভিযোগৰ স্থিতি পৰীক্ষা নকৰিব।
 
 ### পৰিশোধ সমস্যাৰ সমাধান
 
