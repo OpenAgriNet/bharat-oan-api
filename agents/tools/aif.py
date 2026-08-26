@@ -73,8 +73,13 @@ def _build_payload(
             }
         ],
     }
+    message: Dict[str, Any] = {"order": order}
     if action == "status":
         order["id"] = transaction_id
+        # The Beckn schema requires message.order_id on /status, and the BAP client
+        # NACKs the request before it reaches the BPP without it. The BPP reads the
+        # AIF inputs from message.order.fulfillments; this is for validation only.
+        message["order_id"] = transaction_id
 
     return {
         "context": {
@@ -98,7 +103,7 @@ def _build_payload(
                 "question_id": ctx.deps.question_id or "",
             },
         },
-        "message": {"order": order},
+        "message": message,
     }
 
 
@@ -128,6 +133,15 @@ def _request(action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
 
         # The network BAP answers 200; a BPP called directly answers 201 for a POST.
         if not 200 <= response.status_code < 300:
+            # The farmer only ever sees the generic message, so name the real cause here:
+            # a 4xx is our own malformed request (e.g. a schema NACK from the BAP client),
+            # not the AIF service being down.
+            logger.error(
+                "AIF %s rejected with HTTP %s: %s",
+                action,
+                response.status_code,
+                (response.text or "")[:500],
+            )
             raise _AifUnavailable(UNAVAILABLE)
         return response.json()
 
