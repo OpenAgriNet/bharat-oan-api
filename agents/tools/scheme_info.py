@@ -8,6 +8,8 @@ from typing import List, Optional, Dict, Any, Literal
 from pydantic_ai import ModelRetry, UnexpectedModelBehavior
 import os
 from langfuse import observe
+from pydantic_ai.tools import RunContext
+from agents.deps import FarmerContext
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.pmkisan_installment_release import get_pm_kisan_23rd_installment_release_section
 
@@ -31,6 +33,8 @@ _SCHEME_LABELS: Dict[str, str] = {
     "ffs": "Framework for Fertilizer Sales",
     "nbhm": "National Beekeeping & Honey Mission",
 }
+
+LEGACY_SCHEME_CODES = frozenset(_SCHEME_LABELS.keys())
 
 
 def _scheme_tool_metadata(scheme_name: str) -> Dict[str, str]:
@@ -225,28 +229,24 @@ class SchemeRequest(BaseModel):
              - "nbhm": National Beekeeping & Honey Mission
     """
     scheme_name: str
+    session_id: str = ""
+    question_id: str = ""
     
     def get_payload(self) -> Dict[str, Any]:
-        """
-        Convert the SchemeRequest object to a dictionary.
-        
-        Returns:
-            Dict[str, Any]: The dictionary representation of the SchemeRequest object
-        """
-        now = datetime.today()
-        
+        """Beckn /search payload (domain from SCHEME_DOMAIN; no bpp_id/bpp_uri)."""
+        now = datetime.now(timezone.utc)
+        domain = (os.getenv("SCHEME_DOMAIN") or "schemes:vistaar").strip() or "schemes:vistaar"
+
         return {
             "context": {
-                "domain": "schemes:vistaar",
+                "domain": domain,
                 "action": "search",
                 "version": "1.1.0",
                 "bap_id": os.getenv("BAP_ID"),
                 "bap_uri": os.getenv("BAP_URI"),
-                "bpp_id": os.getenv("BPP_ID"),
-                "bpp_uri": os.getenv("BPP_URI"),
-                "message_id": str(uuid.uuid4()),
                 "transaction_id": str(uuid.uuid4()),
-                "timestamp": now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+                "message_id": str(uuid.uuid4()),
+                "timestamp": str(int(now.timestamp())),
                 "ttl": "PT10M",
                 "location": {
                     "country": {
@@ -255,7 +255,11 @@ class SchemeRequest(BaseModel):
                     "city": {
                         "code": "*"
                     }
-                }
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "intent": {
@@ -275,7 +279,10 @@ class SchemeRequest(BaseModel):
 
 
 @observe(name="tool:get_scheme_info", as_type="tool")
-def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc", "pkvy", "nfsm", "rad", "ffs", "nbhm"]) -> str:
+def get_scheme_info(
+    ctx: RunContext[FarmerContext],
+    scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc", "pkvy", "nfsm", "rad", "ffs", "nbhm"],
+) -> str:
     """Retrieve detailed information about government agricultural schemes.
     
     This tool fetches comprehensive scheme data including benefits, eligibility criteria, 
@@ -311,7 +318,11 @@ def get_scheme_info(scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmks
             input={"scheme_code": scheme_name, "Scheme_name": meta["Scheme_name"]},
             metadata=meta,
         )
-        payload = SchemeRequest(scheme_name=scheme_name).get_payload()
+        payload = SchemeRequest(
+            scheme_name=scheme_name,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
+        ).get_payload()
         lf_update_current_observation(
             metadata={
                 **meta,

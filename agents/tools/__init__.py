@@ -40,7 +40,7 @@ from agents.tools.npss import analyze_crop_image
 TOOLS = [
     Tool(
         get_scheme_info,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     # MahaVistaar cross-network (BH → MH, N-N pattern) — NDKSP drip irrigation, farm pond lining, and AIF drip irrigation only
