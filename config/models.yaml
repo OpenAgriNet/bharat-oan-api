@@ -40,5 +40,5 @@ use_cases:
     default_alias: azure_gpt41       # used when routing is disabled or for state repair
     routing_ttl_seconds: 7200        # how long a session's sticky pick lives in Redis
     timeout_seconds: 45
-    aliases: [gemma_vllm, azure_gpt41]
-    proportions: [50, 50]
+    aliases: [gemma_vllm, bharat_ai_grid_gemma, azure_gpt41]
+    proportions: ["${AGRINET_PROPORTION_GEMMA_VLLM}", "${AGRINET_PROPORTION_BHARAT_AI_GRID}", "${AGRINET_PROPORTION_AZURE}"]
