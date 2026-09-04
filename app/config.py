@@ -137,8 +137,8 @@ class Settings(BaseSettings):
     qdrant_collection_name: str = os.getenv("QDRANT_COLLECTION_NAME", "schemes-index")
 
     # HTTP client timeouts for outbound API calls (connect and read; read should be > connect)
-    default_api_timeout: float = 5.0   # connect timeout (DEFAULT_API_TIMEOUT)
-    default_api_read_timeout: float = 10.0  # read timeout (DEFAULT_API_READ_TIMEOUT)
+    default_api_timeout: float = float(os.getenv("DEFAULT_API_TIMEOUT", 5.0))   # connect timeout (DEFAULT_API_TIMEOUT)
+    default_api_read_timeout: float = float(os.getenv("DEFAULT_API_READ_TIMEOUT", 10.0)) # read timeout (DEFAULT_API_READ_TIMEOUT)
 
     class Config:
         env_file = ".env"
