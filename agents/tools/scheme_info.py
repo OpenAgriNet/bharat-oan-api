@@ -31,6 +31,7 @@ _SCHEME_LABELS: Dict[str, str] = {
     "nfsm": "National Food Security Mission",
     "rad": "Rainfed Area Development",
     "ffs": "Framework for Fertilizer Sales",
+    "nbm": "National Bamboo Mission",
     "nbhm": "National Beekeeping & Honey Mission",
 }
 
@@ -226,6 +227,7 @@ class SchemeRequest(BaseModel):
              - "nfsm": National Food Security Mission
              - "rad": Rainfed Area Development
              - "ffs": Framework for Fertilizer Sales
+             - "nbm": National Bamboo Mission
              - "nbhm": National Beekeeping & Honey Mission
     """
     scheme_name: str
@@ -281,7 +283,7 @@ class SchemeRequest(BaseModel):
 @observe(name="tool:get_scheme_info", as_type="tool")
 def get_scheme_info(
     ctx: RunContext[FarmerContext],
-    scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc", "pkvy", "nfsm", "rad", "ffs", "nbhm"],
+    scheme_name: Literal["kcc", "pmkisan", "pmfby", "shc", "pmksy", "sathi", "pmasha", "aif", "smam", "pdmc", "pkvy", "nfsm", "rad", "ffs","nbm", "nbhm"],
 ) -> str:
     """Retrieve detailed information about government agricultural schemes.
     
@@ -305,6 +307,7 @@ def get_scheme_info(
             - "nfsm": National Food Security Mission
             - "rad": Rainfed Area Development
             - "ffs": Framework for Fertilizer Sales
+            - "nbm": National Bamboo Mission
             - "nbhm": National Beekeeping & Honey Mission
 
     Returns:
