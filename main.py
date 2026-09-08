@@ -15,8 +15,6 @@ load_dotenv()
 # Set root/app log level from config so INFO logs (e.g. Bhashini, TTS, Transcribe) appear
 _log_level = getattr(logging, (settings.log_level or "INFO").upper(), logging.INFO)
 logging.basicConfig(level=_log_level, format=settings.log_format, force=True)
-for _name in ("helpers.transcription", "helpers.tts", "app.tasks.telemetry", "app.routers.transcribe", "app.routers.tts"):
-    logging.getLogger(_name).setLevel(_log_level)
 
 logger = logging.getLogger(__name__)
 
