@@ -63,6 +63,12 @@ def _tier_for_environment() -> str:
     return "dev" if settings.environment.strip().lower() in _DEV_ENVIRONMENTS else "live"
 
 
+def _redis_key_for_tier(tier: str) -> str:
+    """Full Redis key of the snapshot to read. MASTER_CATALOG_REDIS_KEY overrides
+    the default master-catalog:<tier>:snapshot when set."""
+    return settings.master_catalog_redis_key or f"{_REDIS_KEY_PREFIX}:{tier}:snapshot"
+
+
 def get_master_catalog_snapshot(tier: Optional[str] = None) -> Optional[dict[str, Any]]:
     """Read+parse the live snapshot for this deployment's tier (dev sees dev+live
     entries, prod sees live only — decided by docs-pipeline at write time).
@@ -75,7 +81,7 @@ def get_master_catalog_snapshot(tier: Optional[str] = None) -> Optional[dict[str
     if client is None:
         return None
     try:
-        raw = client.get(f"{_REDIS_KEY_PREFIX}:{tier}:snapshot")
+        raw = client.get(_redis_key_for_tier(tier))
         if not raw:
             return None
         payload = json.loads(raw)
