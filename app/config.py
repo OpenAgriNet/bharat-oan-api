@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     redis_max_connections: int = int(os.getenv("REDIS_MAX_CONNECTIONS", "100"))
     redis_retry_on_timeout: bool = os.getenv("REDIS_RETRY_ON_TIMEOUT", "true").strip().lower() in ("1", "true", "yes", "on")
 
+    # Master Catalog snapshot key (unprefixed, written by docs-pipeline). When set,
+    # this exact Redis key is read; otherwise it defaults to master-catalog:<tier>:snapshot.
+    master_catalog_redis_key: str = os.getenv("MASTER_CATALOG_REDIS_KEY", "")
+
     # Cache Configuration
     default_cache_ttl: int = 60 * 60 * 24  # 24 hours
     suggestions_cache_ttl: int = 60 * 30    # 30 minutes
