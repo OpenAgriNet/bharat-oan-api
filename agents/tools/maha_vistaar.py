@@ -22,6 +22,10 @@ from helpers.utils import get_logger
 logger = get_logger(__name__)
 
 DEFAULT_SCHEME_DOMAIN = "schemes:vistaar"
+MH_TARGETED_SCHEME_CODES = frozenset({
+    "ndksp-drip-irrigation",
+    "ndksp-farm-pond-lining",
+})
 
 
 def _scheme_domain() -> str:
@@ -39,7 +43,7 @@ def _bap_search_url() -> str:
 
 def build_scheme_search_payload(scheme_code: str) -> Dict[str, Any]:
     now = datetime.now(timezone.utc)
-    return {
+    payload = {
         "context": {
             "domain": _scheme_domain(),
             "action": "search",
@@ -70,6 +74,12 @@ def build_scheme_search_payload(scheme_code: str) -> Dict[str, Any]:
             }
         },
     }
+    if scheme_code in MH_TARGETED_SCHEME_CODES:
+        mh_bpp_id = (os.getenv("MH_BPP_ID") or "").strip()
+        if not mh_bpp_id:
+            raise ValueError("MH_BPP_ID is not configured")
+        payload["context"]["bpp_id"] = mh_bpp_id
+    return payload
 
 
 class CrossNetworkSchemeResponse(BaseModel):
@@ -138,7 +148,11 @@ async def call_maha_vistaar_network(
             "(e.g. ndksp-drip-irrigation, ndksp-farm-pond-lining, aif)."
         )
 
-    payload = build_scheme_search_payload(scheme_code)
+    try:
+        payload = build_scheme_search_payload(scheme_code)
+    except ValueError as e:
+        logger.error("MahaVistaar cross-network config error: %s", e)
+        return "MahaVistaar cross-network is not configured. Set MH_BPP_ID."
     payload["context"]["tags"] = {
         "session_id": ctx.deps.session_id or "",
         "question_id": ctx.deps.question_id or "",
