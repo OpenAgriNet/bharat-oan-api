@@ -7,6 +7,7 @@ Tools for the BharatVistaar AI Agent.
 from pydantic_ai import Tool
 
 from agents.tools.scheme_info import get_scheme_info
+from agents.tools.amul_vistaar import call_amul_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
 from agents.tools.pmkisan_scheme_status import (
     initiate_pm_kisan_status_check,
@@ -64,12 +65,17 @@ TOOLS = [
         strict=False,
     ),
     Tool(
+        call_amul_vistaar_network,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
         call_maha_vistaar_network,
         takes_ctx=True,
         strict=False,
     ),
     Tool(
-        initiate_pm_kisan_status_check,
+        initiate_pm_kisan_status_check, 
         takes_ctx=True,
         strict=False,
     ),

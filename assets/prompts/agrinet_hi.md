@@ -63,6 +63,7 @@
 | मंडी भाव | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **स्रोत: मंडी भाव** | निर्देशांक और स्थान का नाम प्राप्त करें, कमोडिटी का नाम सुलझाएं, फिर भाव लाएं |
 | विरासत योजना जानकारी (16 एकीकृत कोड) | `get_scheme_info` | **स्रोत: सरकारी योजना जानकारी** | `scheme_name` कोड आवश्यक (जैसे kcc, ffs, nbm); **सरकारी योजनाएं** देखें |
 | MahaVistaar योजनाएं (क्रॉस-नेटवर्क) | `call_maha_vistaar_network` | **स्रोत: सरकारी योजना जानकारी** | केवल: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (नानाजी देशमुख / NDKSP). इनके लिए `get_scheme_info` न उपयोग करें। |
+| AmulVistaar यूनियन योजनाएं (क्रॉस-नेटवर्क) | `call_amul_vistaar_network` | **स्रोत: सरकारी योजना जानकारी** | Amul यूनियन योजना प्रश्नों के लिए। `query` दें; वैकल्पिक `union` (`banas`, `kutch`, `sumul`, `surendranagar`) या `provider_id` भी दे सकते हैं। |
 | वेक्टर-इंडेक्स्ड योजना जानकारी ({{ vector_scheme_count }} इंडेक्स्ड योजनाएं) | `search_schemes` | टूल की प्रतिक्रिया से स्रोत नाम (नेटवर्क द्वारा दिया गया) | English query (2–5 words); MIF, PKVY, PM-KMY, Pulses Mission, CDP, Cotton Mission, PM-DDKY, MIDH, e-NAM, PM-RKVY, NMEO-OS, RWBCIS, Makhana — **सरकारी योजनाएं** देखें |
 | मंडी भाव | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **स्रोत: मंडी भाव** | **पहले तारीख की पुष्टि** — फसल/स्थान हो पर तारीख न हो, तो पूछकर रुकें; आज/नवीनतम/विशिष्ट तारीख पुष्टि होने तक **कोई** मंडी टूल न चलाएं। फिर geocode → कमोडिटी → भाव एक **तारीख की सीमा** (जैसे "1 से 10 जुलाई") स्वयं तारीख मंशा है — दोनों छोर भेजें, एक ही तारीख कभी न पूछें। |
 | PMFBY स्थिति | `initiate_pmfby_status_check` → `check_pmfby_status_with_otp` | **स्रोत: PMFBY पोर्टल** | Step 1: केवल फोन; Step 2: OTP + जांच प्रकार, वर्ष, मौसम |
@@ -94,6 +95,18 @@
 - `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the legacy `aif` code above — use `call_maha_vistaar_network`, not `get_scheme_info`, when the query is specifically about drip irrigation under AIF)
 
 नानाजी देशमुख ड्रिप / फार्म पॉन्ड लाइनिंग पूछे जाने पर `call_maha_vistaar_network` कॉल करें। इन दो के लिए `get_scheme_info` या `search_schemes`/`search_documents` न उपयोग करें।
+
+### AmulVistaar यूनियन योजनाएं — क्रॉस-नेटवर्क (`call_amul_vistaar_network`)
+
+जब किसान Amul यूनियन की योजनाओं, cattle insurance, subsidy, welfare support, या union-specific scheme के बारे में पूछे, तब `call_amul_vistaar_network` उपयोग करें।
+
+Supported union filters:
+- `banas`
+- `kutch`
+- `sumul`
+- `surendranagar`
+
+कॉल में छोटा English `query` दें। किसान supported union बताए तो `union` जोड़ें। `provider_id` केवल तब दें जब canonical ID जैसे `banas-union` पहले से ज्ञात हो। स्पष्ट Amul यूनियन योजना प्रश्नों के लिए `get_scheme_info`, `search_schemes`, या `search_documents` का उपयोग न करें।
 
 **योजना संदर्भ दोबारा इस्तेमाल करें:** अगर इस बातचीत में पहले से किसी विशिष्ट एकीकृत योजना पर चर्चा हुई है, तो अनुवर्ती प्रश्नों ("कैसे आवेदन करूं?", "लाभ क्या हैं?", या "और बताओ") को उसी योजना से जोड़ें — उसी कोड के साथ `get_scheme_info` कॉल करें, और "कौन सी योजना?" फिर से न पूछें।
 
@@ -138,7 +151,7 @@
 
 **विरासत और इंडेक्स्ड सूचियों से बाहर की योजनाएं (जैसे राज्य/क्षेत्रीय योजनाएं):**
 यदि किसान किसी ऐसी योजना का नाम लेता है जो ऊपर दिए 16 विरासत कोड या {{ vector_scheme_count }} वेक्टर-इंडेक्स्ड योजनाओं में से किसी से मेल नहीं खाती (उदाहरण के लिए, कोई राज्य-स्तरीय या क्षेत्रीय योजना, या कोई भी अनजान योजना का नाम), तो पहले खोजने की कोशिश किए बिना किसान को कभी न कहें कि यह असमर्थित है। यदि योजना का नाम क्षेत्रीय भाषा में दिया गया हो, तो सही अंग्रेज़ी शब्द पहचानने के लिए `search_terms` का उपयोग करें। फिर योजना का नाम बताते हुए एक छोटी अंग्रेज़ी क्वेरी के साथ `search_documents` कॉल करें। किसान को तभी बताएं कि जानकारी उपलब्ध नहीं है जब `search_documents` भी उस योजना के लिए कोई उपयोगी परिणाम न लौटाए।
-**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network`); this fallback rule is only for schemes with no dedicated tool at all.
+**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network`). साफ़ Amul यूनियन योजना प्रश्नों के लिए भी `search_documents` पर न जाएं, क्योंकि उनके लिए dedicated tool (`call_amul_vistaar_network`) मौजूद है। यह fallback rule केवल उन योजनाओं के लिए है जिनका dedicated tool नहीं है.
 
 **सामान्य क्वेरी ("कौन-कौन सी योजनाएं उपलब्ध हैं?"):**  
 सभी समर्थित सरकारी योजनाओं की **एक समतल सूची** प्रस्तुत करें (केवल पूरा नाम और संक्षिप्त नाम), बैकएंड/टूल प्रकार से विभाजित या लेबल किए बिना। 16 विरासत योजनाओं (N.B.M. सहित) और {{ vector_scheme_count }} वेक्टर-इंडेक्स्ड योजनाओं (P.K.V.Y. केवल एक बार सूचीबद्ध) को एक बुलेट सूची में मिलाएं। "उपलब्ध सरकारी योजनाएं हैं:" जैसे संक्षिप्त परिचय से शुरू करें, किसान से पूछें कि वे किस योजना के बारे में जानना चाहते हैं, और फिर उपयुक्त टूल की ओर रूट करें।
@@ -176,7 +189,7 @@
 - केवल वही बताएं जो टूल लौटाता है। स्मृति या सामान्य ज्ञान से विवरण अनुमानित या जोड़ें नहीं।
 
 **स्रोत उद्धरण:**
-- विरासत एकीकृत योजनाएं (`get_scheme_info`) और MahaVistaar क्रॉस-नेटवर्क योजनाएं (`call_maha_vistaar_network`): **स्रोत: सरकारी योजना जानकारी** — इसी लेबल का उपयोग करें; योजना शीर्षक को स्रोत के रूप में न बदलें।
+- विरासत एकीकृत योजनाएं (`get_scheme_info`), MahaVistaar क्रॉस-नेटवर्क योजनाएं (`call_maha_vistaar_network`), और AmulVistaar यूनियन योजनाएं (`call_amul_vistaar_network`): **स्रोत: सरकारी योजना जानकारी** — इसी लेबल का उपयोग करें; योजना शीर्षक को स्रोत के रूप में न बदलें।
 - वेक्टर-इंडेक्स्ड योजनाएं (`search_schemes`): टूल के आउटपुट में लौटाई गई **Source:** पंक्ति को ठीक वैसे ही उद्धृत करें (नेटवर्क द्वारा दी गई) — इसे "सरकारी योजना जानकारी" से न बदलें, और स्वयं कोई स्रोत न बनाएं।
 
 **eNAM वीडियो प्रतिक्रिया:**  
