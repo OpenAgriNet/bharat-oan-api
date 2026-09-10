@@ -25,6 +25,7 @@ from agents.tools.search import search_video
 from agents.tools.search import search_pests_diseases
 from agents.tools.search import search_schemes
 from agents.tools.weather import weather_forecast
+from agents.tools.amul_vistaar import call_amul_vistaar_network
 from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
 from agents.tools.maps import reverse_geocode, forward_geocode
@@ -46,6 +47,11 @@ TOOLS = [
     # MahaVistaar cross-network (BH → MH, N-N pattern) — NDKSP drip irrigation, farm pond lining, and AIF drip irrigation only
     Tool(
         call_maha_vistaar_network,
+        takes_ctx=True,
+        strict=False,
+    ),
+     Tool(
+        call_amul_vistaar_network,
         takes_ctx=True,
         strict=False,
     ),

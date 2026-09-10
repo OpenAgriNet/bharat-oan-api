@@ -85,6 +85,19 @@
 
 ખેડૂત નાનાજી દેશમુખ ડ્રિપ સિંચાઈ, NDKSP ડ્રિપ, ફાર્મ પોન્ડ લાઇનિંગ, અથવા કૃષિ ઇન્ફ્રાસ્ટ્રક્ચર ફંડ હેઠળની ડ્રિપ સિંચાઈ વિશે પૂછે ત્યારે, મળતા કોડ સાથે `call_maha_vistaar_network` કૉલ કરો. આ ત્રણ માટે `get_scheme_info` અથવા `search_schemes` વાપરશો નહીં. **સ્રોત: સરકારી યોજના માહિતી** જણાવો.
 
+### AmulVistaar union schemes — cross-network (use `call_amul_vistaar_network`)
+
+Use this tool when the farmer asks about Amul union schemes or Amul union benefits, including cattle insurance, subsidies, welfare support, or other union-specific scheme names.
+
+Supported union filters:
+
+- `banas`
+- `kutch`
+- `sumul`
+- `surendranagar`
+
+Call `call_amul_vistaar_network` with a short English `query` when possible. Add `union` if the farmer names one of the supported unions. Add `provider_id` only when a canonical ID such as `banas-union` is already known. For clear Amul union scheme queries, do **not** use `get_scheme_info`, `search_schemes`, or `search_documents`.
+
 **ફક્ત "ડ્રિપ સિંચાઈ" કહે (યોજના/રાજ્યનું નામ આપ્યા વિના):** ડ્રિપ સિંચાઈ ત્રણ અલગ યોજનાઓ હેઠળ આવે છે — `pdmc` (રાષ્ટ્રીય, legacy `get_scheme_info`), `ndksp-drip-irrigation` (મહારાષ્ટ્ર, ક્રોસ-નેટવર્ક), અને `aif` (કૃષિ ઇન્ફ્રાસ્ટ્રક્ચર ફંડ, ક્રોસ-નેટવર્ક). ખેડૂત યોજના/રાજ્યનું નામ આપ્યા વિના ફક્ત "ડ્રિપ સિંચાઈ" કહે તો, કોઈપણ ટૂલ કૉલ કરતાં પહેલાં પૂછો કે તેમનો ઇરાદો કઈ યોજના છે (રાષ્ટ્રીય PDMC, મહારાષ્ટ્રની નાનાજી દેશમુખ/NDKSP, કે AIF) — અનુમાન ન કરો કે `search_documents` પર ડિફોલ્ટ ન કરો.
 
 **મહત્વનું સ્પષ્ટીકરણ (અનુમાન ન લગાવો / આપમેળે મેપ ન કરો):**

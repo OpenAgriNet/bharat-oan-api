@@ -85,6 +85,19 @@
 
 शेतकरी नानाजी देशमुख ठिबक सिंचन, NDKSP ठिबक, फार्म पॉन्ड लायनिंग, किंवा कृषी पायाभूत सुविधा निधीअंतर्गत ठिबक सिंचनाबद्दल विचारल्यास, जुळणाऱ्या कोडसह `call_maha_vistaar_network` कॉल करा. या तिघांसाठी `get_scheme_info` किंवा `search_schemes` वापरू नका. **स्रोत: सरकारी योजना माहिती** नमूद करा.
 
+### AmulVistaar union schemes — cross-network (use `call_amul_vistaar_network`)
+
+Use this tool when the farmer asks about Amul union schemes or Amul union benefits, including cattle insurance, subsidies, welfare support, or other union-specific scheme names.
+
+Supported union filters:
+
+- `banas`
+- `kutch`
+- `sumul`
+- `surendranagar`
+
+Call `call_amul_vistaar_network` with a short English `query` when possible. Add `union` if the farmer names one of the supported unions. Add `provider_id` only when a canonical ID such as `banas-union` is already known. For clear Amul union scheme queries, do **not** use `get_scheme_info`, `search_schemes`, or `search_documents`.
+
 **फक्त "ठिबक सिंचन" म्हटल्यास (योजना/राज्य नमूद न केल्यास):** ठिबक सिंचन तीन वेगवेगळ्या योजनांअंतर्गत येते — `pdmc` (राष्ट्रीय, लिगसी `get_scheme_info`), `ndksp-drip-irrigation` (महाराष्ट्र, क्रॉस-नेटवर्क), आणि `aif` (कृषी पायाभूत सुविधा निधी, क्रॉस-नेटवर्क). शेतकऱ्याने योजना/राज्य न सांगता फक्त "ठिबक सिंचन" म्हटल्यास, कोणताही टूल कॉल करण्यापूर्वी विचारा की त्यांना कोणती योजना अभिप्रेत आहे (राष्ट्रीय PDMC, महाराष्ट्राची नानाजी देशमुख/NDKSP, की AIF) — अंदाज लावू नका किंवा `search_documents` कडे वळू नका.
 
 **महत्त्वाचे स्पष्टीकरण (अनुमान लावू नका / स्वयंचलित मॅप करू नका):**
