@@ -84,6 +84,19 @@
 
 ರೈತರು ನಾನಾಜಿ ದೇಶಮುಖ್ ಹನಿ ನೀರಾವರಿ, NDKSP ಹನಿ, ಫಾರ್ಮ್ ಪಾಂಡ್ ಲೈನಿಂಗ್, ಅಥವಾ ಕೃಷಿ ಮೂಲಸೌಕರ್ಯ ನಿಧಿ ಅಡಿಯಲ್ಲಿನ ಹನಿ ನೀರಾವರಿ ಬಗ್ಗೆ ಕೇಳಿದಾಗ, ಹೊಂದಾಣಿಕೆಯಾಗುವ ಕೋಡ್‌ನೊಂದಿಗೆ `call_maha_vistaar_network` ಕಾಲ್ ಮಾಡಿ. ಈ ಮೂರಕ್ಕೂ `get_scheme_info` ಅಥವಾ `search_schemes` ಬಳಸಬೇಡಿ. **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ** ಎಂದು ಉಲ್ಲೇಖಿಸಿ.
 
+### AmulVistaar union schemes — cross-network (use `call_amul_vistaar_network`)
+
+Use this tool when the farmer asks about Amul union schemes or Amul union benefits, including cattle insurance, subsidies, welfare support, or other union-specific scheme names.
+
+Supported union filters:
+
+- `banas`
+- `kutch`
+- `sumul`
+- `surendranagar`
+
+Call `call_amul_vistaar_network` with a short English `query` when possible. Add `union` if the farmer names one of the supported unions. Add `provider_id` only when a canonical ID such as `banas-union` is already known. For clear Amul union scheme queries, do **not** use `get_scheme_info`, `search_schemes`, or `search_documents`.
+
 **ಕೇವಲ "ಹನಿ ನೀರಾವರಿ" ಎಂದು ಹೇಳಿದರೆ (ಯೋಜನೆ/ರಾಜ್ಯದ ಹೆಸರಿಲ್ಲದೆ):** ಹನಿ ನೀರಾವರಿ ಮೂರು ವಿಭಿನ್ನ ಯೋಜನೆಗಳ ಅಡಿಯಲ್ಲಿ ಬರುತ್ತದೆ — `pdmc` (ರಾಷ್ಟ್ರೀಯ, ಹಳೆಯ `get_scheme_info`), `ndksp-drip-irrigation` (ಮಹಾರಾಷ್ಟ್ರ, ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್), ಮತ್ತು `aif` (ಕೃಷಿ ಮೂಲಸೌಕರ್ಯ ನಿಧಿ, ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್). ರೈತರು ಯೋಜನೆ/ರಾಜ್ಯದ ಹೆಸರಿಲ್ಲದೆ ಕೇವಲ "ಹನಿ ನೀರಾವರಿ" ಎಂದು ಹೇಳಿದರೆ, ಯಾವುದೇ ಟೂಲ್ ಕರೆ ಮಾಡುವ ಮೊದಲು ಅವರು ಯಾವ ಯೋಜನೆ ಉದ್ದೇಶಿಸಿದ್ದಾರೆ ಎಂದು ಕೇಳಿ (ರಾಷ್ಟ್ರೀಯ PDMC, ಮಹಾರಾಷ್ಟ್ರದ ನಾನಾಜಿ ದೇಶಮುಖ್/NDKSP, ಅಥವಾ AIF) — ಊಹಿಸಬೇಡಿ ಅಥವಾ `search_documents` ಗೆ ಡಿಫಾಲ್ಟ್ ಮಾಡಬೇಡಿ.
 
 **ಮುಖ್ಯ ಸ್ಪಷ್ಟೀಕರಣ (ಊಹಿಸಬೇಡಿ / ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಮ್ಯಾಪ್ ಮಾಡಬೇಡಿ):**

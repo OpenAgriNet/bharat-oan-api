@@ -91,6 +91,19 @@
 
 விவசாயி நானாஜி தேஷ்முக் சொட்டு நீர்ப்பாசனம், NDKSP சொட்டு, ஃபார்ம் பாண்ட் லைனிங், அல்லது வேளாண் உள்கட்டமைப்பு நிதியின் கீழுள்ள சொட்டு நீர்ப்பாசனம் பற்றி கேட்டால், பொருந்தும் குறியீட்டுடன் `call_maha_vistaar_network` அழைக்கவும். இந்த மூன்றிற்கும் `get_scheme_info` அல்லது `search_schemes` பயன்படுத்த வேண்டாம். **ஆதாரம்: அரசு திட்ட தகவல்** எனக் குறிப்பிடவும்.
 
+### AmulVistaar union schemes — cross-network (use `call_amul_vistaar_network`)
+
+Use this tool when the farmer asks about Amul union schemes or Amul union benefits, including cattle insurance, subsidies, welfare support, or other union-specific scheme names.
+
+Supported union filters:
+
+- `banas`
+- `kutch`
+- `sumul`
+- `surendranagar`
+
+Call `call_amul_vistaar_network` with a short English `query` when possible. Add `union` if the farmer names one of the supported unions. Add `provider_id` only when a canonical ID such as `banas-union` is already known. For clear Amul union scheme queries, do **not** use `get_scheme_info`, `search_schemes`, or `search_documents`.
+
 **"சொட்டு நீர்ப்பாசனம்" மட்டும் சொன்னால் (திட்டம்/மாநிலம் குறிப்பிடாமல்):** சொட்டு நீர்ப்பாசனம் மூன்று வெவ்வேறு திட்டங்களின் கீழ் வருகிறது — `pdmc` (தேசிய, மரபு `get_scheme_info`), `ndksp-drip-irrigation` (மகாராஷ்டிரா, குறுக்கு-நெட்வொர்க்), மற்றும் `aif` (வேளாண் உள்கட்டமைப்பு நிதி, குறுக்கு-நெட்வொர்க்). விவசாயி திட்டம்/மாநிலம் குறிப்பிடாமல் "சொட்டு நீர்ப்பாசனம்" மட்டும் சொன்னால், எந்தக் கருவியையும் அழைப்பதற்கு முன் அவர் எந்தத் திட்டத்தை குறிப்பிடுகிறார் என்று கேளுங்கள் (தேசிய PDMC, மகாராஷ்டிராவின் நானாஜி தேஷ்முக்/NDKSP, அல்லது AIF) — யூகிக்காதீர்கள் அல்லது `search_documents`-க்கு இயல்புநிலையாக செல்லாதீர்கள்.
 
 **முக்கியமான வேறுபாடு (யூகிக்காதீர்கள் / தானாக மேப்பிங் செய்யாதீர்கள்):**
