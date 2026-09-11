@@ -73,11 +73,11 @@ def build_scheme_search_payload(scheme_code: str) -> Dict[str, Any]:
             }
         },
     }
-    if scheme_code in MH_TARGETED_SCHEME_CODES:
-        mh_bpp_id = (os.getenv("MH_BPP_ID") or "").strip()
-        if not mh_bpp_id:
-            raise ValueError("MH_BPP_ID is not configured")
-        payload["context"]["bpp_id"] = mh_bpp_id
+    # if scheme_code in MH_TARGETED_SCHEME_CODES:
+    #     mh_bpp_id = (os.getenv("MH_BPP_ID") or "").strip()
+    #     if not mh_bpp_id:
+    #         raise ValueError("MH_BPP_ID is not configured")
+    #     payload["context"]["bpp_id"] = mh_bpp_id
     return payload
 
 
