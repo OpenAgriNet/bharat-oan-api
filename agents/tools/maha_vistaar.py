@@ -55,8 +55,7 @@ def build_scheme_search_payload(scheme_code: str) -> Dict[str, Any]:
             "timestamp": str(int(now.timestamp())),
             "ttl": "PT10M",
             "location": {
-                "country": {"code": "IND"},
-                "city": {"code": "*"},
+                "country": {"code": "IND"}
             },
         },
         "message": {
