@@ -19,7 +19,7 @@ logging.basicConfig(level=_log_level, format=settings.log_format, force=True)
 logger = logging.getLogger(__name__)
 
 # Import all routers
-from app.routers import chat, transcribe, tts, health, file, token, telemetry, image
+from app.routers import chat, transcribe, tts, health, file, token, telemetry, image, callback
 # from app.routers import suggestions  # Commented out: suggestion agent disabled
 
 class TimingAllowOriginMiddleware:
@@ -110,3 +110,4 @@ app.include_router(file.router, prefix=settings.api_prefix)
 app.include_router(token.router, prefix=settings.api_prefix)
 app.include_router(telemetry.router, prefix=settings.api_prefix)
 app.include_router(image.router, prefix=settings.api_prefix)
+app.include_router(callback.router, prefix=settings.api_prefix)

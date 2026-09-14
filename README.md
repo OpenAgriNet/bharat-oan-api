@@ -33,3 +33,18 @@ docker logs -f oan_app
 ```
 ---
 
+## AgriStack callback URLs
+
+Use these public callback endpoints for AgriStack integration.
+
+- Base callback: `/api/callback?from=agristack`
+- Wildcard callback: `/api/callback/<any-sub-path>?from=agristack`
+
+Supported methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`
+
+The callback response includes:
+- `from` query param value
+- all query params
+- selected request headers
+- parsed body (`json` / `form` / `raw`)
+
