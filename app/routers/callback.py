@@ -1,10 +1,12 @@
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 from fastapi import APIRouter, Query, Request, status
 
 router = APIRouter(tags=["agristack-callback"])
+logger = logging.getLogger(__name__)
 
 _ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
@@ -64,7 +66,7 @@ async def _extract_body(request: Request) -> Tuple[Optional[str], Optional[Any]]
 
 async def _build_callback_response(request: Request, source: Optional[str], wildcard_path: str) -> Dict[str, Any]:
     body_type, body = await _extract_body(request)
-    return {
+    response = {
         "status": "received",
         "from": source,
         "source": source,
@@ -76,6 +78,9 @@ async def _build_callback_response(request: Request, source: Optional[str], wild
         "body_type": body_type,
         "body": body,
     }
+
+    logger.info("callback.received %s", json.dumps(response, default=str))
+    return response
 
 
 @router.api_route("/callback", methods=_ALLOWED_METHODS, status_code=status.HTTP_200_OK)
