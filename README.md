@@ -39,6 +39,7 @@ Use these public callback endpoints for AgriStack integration.
 
 - Base callback: `/api/callback?from=agristack`
 - Wildcard callback: `/api/callback/<any-sub-path>?from=agristack`
+- Status check: `/api/callback/status?from=agristack&callbackSessionId=<id>`
 
 Supported methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`
 
@@ -47,4 +48,8 @@ The callback response includes:
 - all query params
 - selected request headers
 - parsed body (`json` / `form` / `raw`)
+
+`callbackSessionId` behavior:
+- When callback POST includes `callbackSessionId`, backend stores receipt status in cache.
+- Frontend then checks status via `GET /api/callback/status` using the same `callbackSessionId`.
 

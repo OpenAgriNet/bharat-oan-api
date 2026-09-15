@@ -4,11 +4,31 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 from fastapi import APIRouter, Query, Request, status
+from app.config import settings
+from app.core.cache import cache
 
 router = APIRouter(tags=["agristack-callback"])
 logger = logging.getLogger(__name__)
 
 _ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+_CALLBACK_STATUS_NAMESPACE = "callback-status"
+
+
+async def _mark_callback_received(callback_session_id: str, source: Optional[str], method: str, wildcard_path: str) -> None:
+    callback_state = {
+        "status": "received",
+        "callbackSessionId": callback_session_id,
+        "source": source,
+        "method": method,
+        "callback_path": f"/{wildcard_path}" if wildcard_path else "",
+        "received_at_utc": datetime.now(timezone.utc).isoformat(),
+    }
+    await cache.set(
+        callback_session_id,
+        callback_state,
+        ttl=settings.callback_session_ttl_seconds,
+        namespace=_CALLBACK_STATUS_NAMESPACE,
+    )
 
 
 def _collect_query_params(request: Request) -> Dict[str, Any]:
@@ -66,10 +86,12 @@ async def _extract_body(request: Request) -> Tuple[Optional[str], Optional[Any]]
 
 async def _build_callback_response(request: Request, source: Optional[str], wildcard_path: str) -> Dict[str, Any]:
     body_type, body = await _extract_body(request)
+    callback_session_id = request.query_params.get("callbackSessionId")
     response = {
         "status": "received",
         "from": source,
         "source": source,
+        "callbackSessionId": callback_session_id,
         "method": request.method,
         "callback_path": f"/{wildcard_path}" if wildcard_path else "",
         "received_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -79,7 +101,42 @@ async def _build_callback_response(request: Request, source: Optional[str], wild
         "body": body,
     }
 
+    if callback_session_id:
+        try:
+            await _mark_callback_received(callback_session_id, source, request.method, wildcard_path)
+        except Exception as exc:
+            logger.exception("callback.status_store_failed callbackSessionId=%s error=%s", callback_session_id, str(exc))
+
     logger.info("callback.received %s", json.dumps(response, default=str))
+    return response
+
+
+@router.get("/callback/status", status_code=status.HTTP_200_OK)
+async def agristack_callback_status(
+    callback_session_id: str = Query(..., alias="callbackSessionId"),
+    source: Optional[str] = Query(default=None, alias="from"),
+) -> Dict[str, Any]:
+    """Returns callback receipt status for a callbackSessionId."""
+    callback_state = await cache.get(callback_session_id, namespace=_CALLBACK_STATUS_NAMESPACE)
+    if not callback_state:
+        response = {
+            "callbackSessionId": callback_session_id,
+            "from": source,
+            "status": "not_found",
+        }
+        logger.info("callback.status_check %s", json.dumps(response, default=str))
+        return response
+
+    response = {
+        "callbackSessionId": callback_session_id,
+        "from": source,
+        "status": callback_state.get("status", "received"),
+        "received_at_utc": callback_state.get("received_at_utc"),
+        "callback_path": callback_state.get("callback_path", ""),
+        "source": callback_state.get("source"),
+        "method": callback_state.get("method"),
+    }
+    logger.info("callback.status_check %s", json.dumps(response, default=str))
     return response
 
 

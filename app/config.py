@@ -80,6 +80,7 @@ class Settings(BaseSettings):
     # Cache Configuration
     default_cache_ttl: int = 60 * 60 * 24  # 24 hours
     suggestions_cache_ttl: int = 60 * 30    # 30 minutes
+    callback_session_ttl_seconds: int = int(os.getenv("CALLBACK_SESSION_TTL_SECONDS", "900"))
 
     # Logging Configuration
     log_level: str = "INFO"
