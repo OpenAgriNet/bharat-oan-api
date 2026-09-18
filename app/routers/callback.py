@@ -14,6 +14,30 @@ _ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 _CALLBACK_STATUS_NAMESPACE = "callback-status"
 
 
+def _extract_callback_session_id(query_params: Dict[str, Any], body: Optional[Any]) -> Optional[str]:
+    # Prefer explicit callbackSessionId query param when provided.
+    query_session_id = query_params.get("callbackSessionId")
+    if isinstance(query_session_id, str) and query_session_id.strip():
+        return query_session_id.strip()
+
+    if not isinstance(body, dict):
+        return None
+
+    direct_keys = ["callbackSessionId", "sessionId"]
+    for key in direct_keys:
+        value = body.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    data_section = body.get("data")
+    if isinstance(data_section, dict):
+        nested_value = data_section.get("sessionId")
+        if isinstance(nested_value, str) and nested_value.strip():
+            return nested_value.strip()
+
+    return None
+
+
 async def _mark_callback_received(callback_session_id: str, source: Optional[str], method: str, wildcard_path: str) -> None:
     callback_state = {
         "status": "received",
@@ -86,7 +110,8 @@ async def _extract_body(request: Request) -> Tuple[Optional[str], Optional[Any]]
 
 async def _build_callback_response(request: Request, source: Optional[str], wildcard_path: str) -> Dict[str, Any]:
     body_type, body = await _extract_body(request)
-    callback_session_id = request.query_params.get("callbackSessionId")
+    query_params = _collect_query_params(request)
+    callback_session_id = _extract_callback_session_id(query_params, body)
     response = {
         "status": "received",
         "from": source,
@@ -95,7 +120,7 @@ async def _build_callback_response(request: Request, source: Optional[str], wild
         "method": request.method,
         "callback_path": f"/{wildcard_path}" if wildcard_path else "",
         "received_at_utc": datetime.now(timezone.utc).isoformat(),
-        "query_params": _collect_query_params(request),
+        "query_params": query_params,
         "headers": _collect_headers(request),
         "body_type": body_type,
         "body": body,
