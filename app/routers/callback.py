@@ -10,7 +10,6 @@ from app.core.cache import cache
 router = APIRouter(tags=["agristack-callback"])
 logger = logging.getLogger(__name__)
 
-_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 _CALLBACK_STATUS_NAMESPACE = "callback-status"
 
 
@@ -38,14 +37,19 @@ def _extract_callback_session_id(query_params: Dict[str, Any], body: Optional[An
     return None
 
 
-async def _mark_callback_received(callback_session_id: str, source: Optional[str], method: str, wildcard_path: str) -> None:
+async def _mark_callback_received(
+    callback_session_id: str,
+    source: Optional[str],
+    method: str,
+    body: Optional[Any],
+) -> None:
     callback_state = {
         "status": "received",
         "callbackSessionId": callback_session_id,
         "source": source,
         "method": method,
-        "callback_path": f"/{wildcard_path}" if wildcard_path else "",
         "received_at_utc": datetime.now(timezone.utc).isoformat(),
+        "body": body,
     }
     await cache.set(
         callback_session_id,
@@ -108,7 +112,12 @@ async def _extract_body(request: Request) -> Tuple[Optional[str], Optional[Any]]
     return "raw", raw_body.decode("utf-8", errors="replace")
 
 
-async def _build_callback_response(request: Request, source: Optional[str], wildcard_path: str) -> Dict[str, Any]:
+@router.post("/callback", status_code=status.HTTP_200_OK)
+async def agristack_callback(
+    request: Request,
+    source: Optional[str] = Query(default=None, alias="from"),
+) -> Dict[str, Any]:
+    """Receives AgriStack's farmer-data callback and caches it by callbackSessionId."""
     body_type, body = await _extract_body(request)
     query_params = _collect_query_params(request)
     callback_session_id = _extract_callback_session_id(query_params, body)
@@ -118,7 +127,6 @@ async def _build_callback_response(request: Request, source: Optional[str], wild
         "source": source,
         "callbackSessionId": callback_session_id,
         "method": request.method,
-        "callback_path": f"/{wildcard_path}" if wildcard_path else "",
         "received_at_utc": datetime.now(timezone.utc).isoformat(),
         "query_params": query_params,
         "headers": _collect_headers(request),
@@ -128,7 +136,7 @@ async def _build_callback_response(request: Request, source: Optional[str], wild
 
     if callback_session_id:
         try:
-            await _mark_callback_received(callback_session_id, source, request.method, wildcard_path)
+            await _mark_callback_received(callback_session_id, source, request.method, body)
         except Exception as exc:
             logger.exception("callback.status_store_failed callbackSessionId=%s error=%s", callback_session_id, str(exc))
 
@@ -141,7 +149,7 @@ async def agristack_callback_status(
     callback_session_id: str = Query(..., alias="callbackSessionId"),
     source: Optional[str] = Query(default=None, alias="from"),
 ) -> Dict[str, Any]:
-    """Returns callback receipt status for a callbackSessionId."""
+    """Returns callback receipt status (and cached body) for a callbackSessionId."""
     callback_state = await cache.get(callback_session_id, namespace=_CALLBACK_STATUS_NAMESPACE)
     if not callback_state:
         response = {
@@ -157,28 +165,9 @@ async def agristack_callback_status(
         "from": source,
         "status": callback_state.get("status", "received"),
         "received_at_utc": callback_state.get("received_at_utc"),
-        "callback_path": callback_state.get("callback_path", ""),
         "source": callback_state.get("source"),
         "method": callback_state.get("method"),
+        "body": callback_state.get("body"),
     }
     logger.info("callback.status_check %s", json.dumps(response, default=str))
     return response
-
-
-@router.api_route("/callback", methods=_ALLOWED_METHODS, status_code=status.HTTP_200_OK)
-async def agristack_callback(
-    request: Request,
-    source: Optional[str] = Query(default=None, alias="from"),
-) -> Dict[str, Any]:
-    """Universal callback endpoint for AgriStack redirects and server callbacks."""
-    return await _build_callback_response(request, source, "")
-
-
-@router.api_route("/callback/{wildcard_path:path}", methods=_ALLOWED_METHODS, status_code=status.HTTP_200_OK)
-async def agristack_callback_wildcard(
-    request: Request,
-    wildcard_path: str,
-    source: Optional[str] = Query(default=None, alias="from"),
-) -> Dict[str, Any]:
-    """Wildcard variant that accepts callbacks on nested subpaths."""
-    return await _build_callback_response(request, source, wildcard_path)

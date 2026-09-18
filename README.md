@@ -37,11 +37,8 @@ docker logs -f oan_app
 
 Use these public callback endpoints for AgriStack integration.
 
-- Base callback: `/api/callback?from=agristack`
-- Wildcard callback: `/api/callback/<any-sub-path>?from=agristack`
-- Status check: `/api/callback/status?from=agristack&callbackSessionId=<id>`
-
-Supported methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`
+- Callback (POST, from AgriStack): `/api/callback?from=agristack`
+- Status check (GET, from frontend): `/api/callback/status?from=agristack&callbackSessionId=<id>`
 
 The callback response includes:
 - `from` query param value
