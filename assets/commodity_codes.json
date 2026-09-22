@@ -146,30 +146,6 @@
     ]
   },
   {
-    "code": 7,
-    "name": "Red Gram",
-    "terms": [
-      "red gram",
-      "tur",
-      "arhar",
-      "pigeon pea",
-      "अरहर",
-      "তুর",
-      "অড়হর",
-      "તુવેર",
-      "tuver",
-      "ತೊಗರಿ",
-      "togari",
-      "തുവര",
-      "thuvara",
-      "तूर",
-      "துவரை",
-      "thuvarai",
-      "కందులు",
-      "kandulu"
-    ]
-  },
-  {
     "code": 8,
     "name": "Black Gram(Urd Beans)(Whole)",
     "terms": [
@@ -310,9 +286,9 @@
   },
   {
     "code": 14,
-    "name": "Sunflower",
+    "name": "Sunflower/Sunflower Seed",
     "terms": [
-      "sunflower",
+      "sunflower/sunflower seed",
       "सूरजमुखी",
       "surajmukhi",
       "সূর্যমুখী",
@@ -821,9 +797,9 @@
   },
   {
     "code": 36,
-    "name": "Cardamoms",
+    "name": "Cardamom",
     "terms": [
-      "cardamoms",
+      "cardamom",
       "cardamom",
       "elaichi",
       "इलायची",
@@ -870,7 +846,7 @@
   },
   {
     "code": 38,
-    "name": "Cumin Seed(Jeera)",
+    "name": "Cummin Seed(Jeera)",
     "terms": [
       "jeera",
       "cumin seed",
@@ -1036,7 +1012,7 @@
   },
   {
     "code": 45,
-    "name": "Arhar(Tur/Red Gram)(Whole)",
+    "name": "Red gram/Arhar/Tur(whole)",
     "terms": [
       "tur",
       "red gram",
@@ -1168,9 +1144,9 @@
   },
   {
     "code": 51,
-    "name": "Rice Bran",
+    "name": "Riccbcan",
     "terms": [
-      "rice bran",
+      "riccbcan",
       "arisi hottu",
       "arisi thavidu",
       "ariyude thol",
@@ -1726,30 +1702,6 @@
       "ముచ్చకాయ",
       "ಹಸಿ ಬಾಳೆ",
       "പച്ച വാഴ"
-    ]
-  },
-  {
-    "code": 77,
-    "name": "Dal(Avare)",
-    "terms": [
-      "avare",
-      "dal",
-      "abhari",
-      "abuya dal",
-      "avar",
-      "avarai",
-      "avare dal",
-      "avare dali",
-      "avreni dal",
-      "aware",
-      "अवारे",
-      "অভুয়া ডাল",
-      "অভৰী",
-      "અવરેની દાળ",
-      "அவரை",
-      "అవర్",
-      "ಅವರೆ ಡಾಲ್",
-      "അവരെ ദാലി"
     ]
   },
   {
@@ -2550,9 +2502,9 @@
   },
   {
     "code": 117,
-    "name": "Sunhemp",
+    "name": "Sanai/Sunhemp",
     "terms": [
-      "sunhemp",
+      "sanai/sunhemp",
       "Suryahemp",
       "Suryakanti Dose",
       "sanai",
@@ -2681,30 +2633,6 @@
       "karumbu",
       "చెరకు",
       "cheraku"
-    ]
-  },
-  {
-    "code": 123,
-    "name": "Jaggery",
-    "terms": [
-      "jaggery",
-      "gur",
-      "गुड़",
-      "gud",
-      "গুৰ",
-      "গুড়",
-      "ગોળ",
-      "gol",
-      "ಬೆಲ್ಲ",
-      "bella",
-      "ശർക്കര",
-      "sharkkara",
-      "गूळ",
-      "gul",
-      "வெல்லம்",
-      "vellam",
-      "బెల్లం",
-      "bellam"
     ]
   },
   {
@@ -2862,7 +2790,7 @@
   },
   {
     "code": 131,
-    "name": "Cucumber(Kheera)",
+    "name": "Cucumbar(Kheera)",
     "terms": [
       "kheera",
       "cucumber",
@@ -2886,7 +2814,7 @@
   },
   {
     "code": 132,
-    "name": "Ridge Gourd(Tori)",
+    "name": "Ridgeguard(Tori)",
     "terms": [
       "tori",
       "ridge gourd",
@@ -2909,9 +2837,9 @@
   },
   {
     "code": 133,
-    "name": "Radish",
+    "name": "Raddish",
     "terms": [
-      "radish",
+      "raddish",
       "Chukka",
       "Mulagi",
       "mula",
@@ -3339,9 +3267,9 @@
   },
   {
     "code": 153,
-    "name": "Jack Fruit",
+    "name": "Jack Fruit(Ripe)",
     "terms": [
-      "jack fruit",
+      "jack fruit(ripe)",
       "hālasina hannu",
       "jackfruit",
       "jak fruit",
@@ -4060,7 +3988,7 @@
   },
   {
     "code": 186,
-    "name": "Rose(Loose)",
+    "name": "Rose(Loose))",
     "terms": [
       "loose",
       "rose",
@@ -4278,9 +4206,9 @@
   },
   {
     "code": 196,
-    "name": "Cashew Kernel",
+    "name": "Cashew Kernnel",
     "terms": [
-      "cashew kernel",
+      "cashew kernnel",
       "adike sippe",
       "arukulu",
       "kaju",
@@ -4608,7 +4536,7 @@
   },
   {
     "code": 214,
-    "name": "Arhar Dal(Tur Dal)",
+    "name": "Red gram split/Arhar dal/Tur dal",
     "terms": [
       "tur dal",
       "arhar dal",
@@ -5099,28 +5027,6 @@
     ]
   },
   {
-    "code": 238,
-    "name": "Sunflower Seed",
-    "terms": [
-      "sunflower seed",
-      "bullāru",
-      "soji",
-      "suryakanti bij",
-      "suryamukhi bij",
-      "suryaphal birane",
-      "suryomukhi bij",
-      "sūriyakānti vithai",
-      "सूर्यफुल बियाणे",
-      "সূর্যমুখী বীজ",
-      "সূৰ্যমুখী বীজ",
-      "સૂર્યમુખી બીજ",
-      "சூரியகாந்தி விதை",
-      "బుల్లారు",
-      "ಸೂರ್ಯಕಾಂತಿ ಬೀಜ",
-      "സോജി"
-    ]
-  },
-  {
     "code": 239,
     "name": "Soji",
     "terms": [
@@ -5397,7 +5303,7 @@
   },
   {
     "code": 252,
-    "name": "Pigeon Pea(Arhar Fali)",
+    "name": "Pegeon Pea(Arhar Fali)",
     "terms": [
       "arhar fali",
       "pigeon pea",
@@ -5472,7 +5378,7 @@
   },
   {
     "code": 256,
-    "name": "Kartali(Kantola)",
+    "name": "Spiny Gourd / Kartali(Kantola)",
     "terms": [
       "kantola",
       "kartali",
@@ -5531,9 +5437,9 @@
   },
   {
     "code": 259,
-    "name": "Peas cod",
+    "name": "Pea Pod/Pea Cod/हरी मटर",
     "terms": [
-      "peas cod",
+      "pea pod/pea cod/हरी मटर",
       "batani kay",
       "bathaani sancha",
       "mahjaluki",
@@ -6135,9 +6041,9 @@
   },
   {
     "code": 288,
-    "name": "Mushrooms",
+    "name": "Mashrooms",
     "terms": [
-      "mushrooms",
+      "mashrooms",
       "ambu",
       "gombo",
       "gubbacha",
@@ -6554,7 +6460,7 @@
   },
   {
     "code": 308,
-    "name": "Egyptian Clover(Barseem)",
+    "name": "Egypian Clover(Barseem)",
     "terms": [
       "barseem",
       "egyptian clover",
@@ -7358,7 +7264,7 @@
   },
   {
     "code": 346,
-    "name": "Ambady/Mesta",
+    "name": "Ambady/Mesta/Patson",
     "terms": [
       "ambady",
       "mesta",
@@ -8258,7 +8164,7 @@
   },
   {
     "code": 392,
-    "name": "tulip",
+    "name": "Tulip",
     "terms": [
       "tulip",
       "lal phul",
