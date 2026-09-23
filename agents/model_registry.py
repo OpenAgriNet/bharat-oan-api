@@ -109,6 +109,9 @@ class ModelRegistry:
             return config.get("deployment_name", alias)
         return config.get("model_name", alias)
 
+    def get_kind(self, alias: str) -> str:
+        return self._models_cfg.get(alias, {}).get("kind", "")
+
     # --- use-case access ---
 
     def get_use_case_aliases(self, use_case: str) -> list[str]:
