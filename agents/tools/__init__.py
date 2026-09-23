@@ -19,6 +19,12 @@ from agents.tools.pmkisan_grievance import (
     pmkisan_submit_grievance,
     pmkisan_grievance_status,
 )
+from agents.tools.aif import (
+    initiate_aif_otp,
+    verify_aif_otp,
+    check_aif_loan_status,
+    check_aif_grievance_status,
+)
 from agents.tools.terms import search_terms
 from agents.tools.search import search_documents
 from agents.tools.search import search_video
@@ -197,6 +203,26 @@ TOOLS = [
     ),
     Tool(
         analyze_crop_image,
+        takes_ctx=True,
+        strict=False,
+    ),
+      Tool(
+        initiate_aif_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        verify_aif_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        check_aif_loan_status,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        check_aif_grievance_status,
         takes_ctx=True,
         strict=False,
     ),

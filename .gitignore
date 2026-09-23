@@ -22,6 +22,7 @@ build/
 develop-eggs/
 dist/
 downloads/
+assets/prompts_backup_20260922_164719
 eggs/
 .eggs/
 lib/
