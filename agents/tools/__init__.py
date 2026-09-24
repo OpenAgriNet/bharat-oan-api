@@ -57,6 +57,11 @@ from agents.tools.sathi_seed import (
     search_sathi_seed_availability,
 )
 from agents.tools.npss import analyze_crop_image
+from agents.tools.agristack import (
+    get_agristack_farmer_location,
+    get_agristack_farmer_crops,
+    only_with_agristack_consent,
+)
 
 TOOLS = [
     Tool(
@@ -238,5 +243,18 @@ TOOLS = [
         analyze_crop_image,
         takes_ctx=True,
         strict=False,
+    ),
+    # Hidden from the model unless the farmer logged in with AgriStack and gave consent.
+    Tool(
+        get_agristack_farmer_location,
+        takes_ctx=True,
+        strict=False,
+        prepare=only_with_agristack_consent,
+    ),
+    Tool(
+        get_agristack_farmer_crops,
+        takes_ctx=True,
+        strict=False,
+        prepare=only_with_agristack_consent,
     ),
 ]

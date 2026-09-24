@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 from langcodes import Language
 
@@ -30,6 +30,10 @@ class FarmerContext(BaseModel):
     moderation_str: Optional[str] = Field(default=None, description="The moderation result of the user's question.")
     latitude: Optional[float] = Field(default=None, description="User's latitude for geocoding.")
     longitude: Optional[float] = Field(default=None, description="User's longitude for geocoding.")
+    agristack_status: Literal["not_logged_in", "no_consent", "consent"] = Field(
+        default="not_logged_in",
+        description="AgriStack login state for this session (see assets/prompts/agristack_rules.md).",
+    )
     npss_used: bool = Field(default=False, description="Whether NPSS image analysis was used in this turn.")
     npss_source_name: Optional[str] = Field(default=None, description="Official NPSS source name.")
     npss_source_owner: Optional[str] = Field(default=None, description="Official NPSS source owner.")
@@ -81,6 +85,14 @@ class FarmerContext(BaseModel):
             )
         return None
     
+    def _agristack_context_string(self):
+        """AgriStack status line read by the prompt's AgriStack rules; absent when not logged in."""
+        if self.agristack_status == "consent":
+            return "**AgriStack status:** logged in with consent"
+        if self.agristack_status == "no_consent":
+            return "**AgriStack status:** logged in without consent"
+        return None
+
     def get_user_message(self):
         """Get the user message for the agrinet agent."""
         strings = [
@@ -88,5 +100,6 @@ class FarmerContext(BaseModel):
             self._language_string(),
             self._moderation_string(),
             self._location_context_string(),
+            self._agristack_context_string(),
         ]
         return "\n".join([x for x in strings if x])

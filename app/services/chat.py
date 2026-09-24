@@ -12,6 +12,7 @@ from pydantic_ai.messages import TextPart
 
 from agents.agrinet import agrinet_agent
 from agents.deps import FarmerContext
+from agents.tools.agristack import get_agristack_link
 from agents.model_registry import get_registry
 from agents.models import (
     LANGFUSE_MODERATION_MODEL_NAME,
@@ -357,6 +358,7 @@ async def stream_chat_messages(
             trace_id = get_client().get_current_trace_id()
             await _record_chat_turn(trace_id, telemetry_qid, session_id, route_decision, channel)
 
+            agristack_link = await get_agristack_link(session_id)
             deps = FarmerContext(
                 query=query,
                 lang_code=target_lang,
@@ -364,6 +366,11 @@ async def stream_chat_messages(
                 question_id=telemetry_qid,
                 latitude=latitude,
                 longitude=longitude,
+                agristack_status=(
+                    "not_logged_in"
+                    if not agristack_link
+                    else "consent" if agristack_link["has_consent"] else "no_consent"
+                ),
             )
 
             message_pairs = "\n\n".join(format_message_pairs(history, 3))

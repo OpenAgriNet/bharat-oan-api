@@ -211,3 +211,6 @@ jmeter/
 # Deployment/Build scripts
 localbuild_deployment.md
 run.sh
+
+# Local backup of prompts from before the AgriStack prompt changes
+assets/prompts/backup_before_agristack/
