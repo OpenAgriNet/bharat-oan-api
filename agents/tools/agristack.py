@@ -89,22 +89,23 @@ CATEGORY_A = "agristack-category-a"
 CATEGORY_B = "agristack-category-b"
 
 def current_season_and_year(now: Optional[datetime] = None) -> tuple[str, str]:
-    """Season name and its starting year, overridable via AGRISTACK_SEASON / AGRISTACK_YEAR.
+    """Season name and AgriStack agricultural year ("2025-2026"), overridable via
+    AGRISTACK_SEASON / AGRISTACK_YEAR.
 
-    Kharif Jun-Sep, Rabi Oct-Feb (Jan/Feb belong to the Rabi that started the previous
-    year), Zaid Mar-May.
+    Seasons: Kharif Jun-Sep, Rabi Oct-Feb, Zaid Mar-May. The agricultural year runs
+    June-May, so Kharif 2025, Rabi 2025-26 and Zaid 2026 are all "2025-2026".
     """
     now = now or datetime.now(pytz.timezone("Asia/Kolkata"))
     month = now.month
     if 6 <= month <= 9:
-        season, year = "Kharif", now.year
-    elif month >= 10:
-        season, year = "Rabi", now.year
-    elif month <= 2:
-        season, year = "Rabi", now.year - 1
+        season = "Kharif"
+    elif month >= 10 or month <= 2:
+        season = "Rabi"
     else:
-        season, year = "Zaid", now.year
-    return os.getenv("AGRISTACK_SEASON") or season, os.getenv("AGRISTACK_YEAR") or str(year)
+        season = "Zaid"
+    start_year = now.year if month >= 6 else now.year - 1
+    year = f"{start_year}-{start_year + 1}"
+    return os.getenv("AGRISTACK_SEASON") or season, os.getenv("AGRISTACK_YEAR") or year
 
 
 def build_payload(

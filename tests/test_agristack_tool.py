@@ -107,22 +107,23 @@ def test_category_a_payload_sends_farmer_id_only():
 
 def test_category_b_payload_adds_season_and_year(monkeypatch):
     monkeypatch.setenv("AGRISTACK_SEASON", "Kharif")
-    monkeypatch.setenv("AGRISTACK_YEAR", "2026")
+    monkeypatch.setenv("AGRISTACK_YEAR", "2025-2026")
     payload = agristack.build_payload("F1", agristack.CATEGORY_B, session_id="S1")
     assert payload["message"]["intent"]["item"]["id"] == "agristack-category-b"
-    assert _intent_tags(payload) == {"farmerId": "F1", "season": "Kharif", "year": "2026"}
+    assert _intent_tags(payload) == {"farmerId": "F1", "season": "Kharif", "year": "2025-2026"}
 
 
 def test_season_and_year(monkeypatch):
     monkeypatch.delenv("AGRISTACK_SEASON", raising=False)
     monkeypatch.delenv("AGRISTACK_YEAR", raising=False)
-    assert agristack.current_season_and_year(datetime(2026, 7, 1)) == ("Kharif", "2026")
-    assert agristack.current_season_and_year(datetime(2026, 11, 1)) == ("Rabi", "2026")
-    assert agristack.current_season_and_year(datetime(2026, 1, 15)) == ("Rabi", "2025")
-    assert agristack.current_season_and_year(datetime(2026, 4, 1)) == ("Zaid", "2026")
+    assert agristack.current_season_and_year(datetime(2025, 7, 1)) == ("Kharif", "2025-2026")
+    assert agristack.current_season_and_year(datetime(2025, 11, 1)) == ("Rabi", "2025-2026")
+    assert agristack.current_season_and_year(datetime(2026, 1, 15)) == ("Rabi", "2025-2026")
+    assert agristack.current_season_and_year(datetime(2026, 4, 1)) == ("Zaid", "2025-2026")
+    assert agristack.current_season_and_year(datetime(2026, 6, 1)) == ("Kharif", "2026-2027")
     monkeypatch.setenv("AGRISTACK_SEASON", "KHARIF")
-    monkeypatch.setenv("AGRISTACK_YEAR", "2025-26")
-    assert agristack.current_season_and_year(datetime(2026, 1, 15)) == ("KHARIF", "2025-26")
+    monkeypatch.setenv("AGRISTACK_YEAR", "2024-2025")
+    assert agristack.current_season_and_year(datetime(2026, 1, 15)) == ("KHARIF", "2024-2025")
 
 
 # --- response ---
