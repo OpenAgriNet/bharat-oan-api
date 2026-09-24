@@ -83,9 +83,8 @@ markdownify==1.2.3
 # Human-friendly formatting
 humanize==4.16.0
 
-pycryptodome
-langfuse>=3.0.0
-psycopg2-binary
+pycryptodome==3.23.0
+psycopg2-binary==2.9.10  # optional AgriStack callback audit writes (CALLBACK_AUDIT_DB_URL)
 
 langfuse==4.14.1
 

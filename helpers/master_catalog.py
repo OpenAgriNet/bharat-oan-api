@@ -1,4 +1,4 @@
-can you"""
+"""
 Master Catalog (Postgres, owned by docs-pipeline) — Redis snapshot reader.
 
 docs-pipeline writes `master-catalog:dev:snapshot` / `master-catalog:live:snapshot`
