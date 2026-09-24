@@ -234,3 +234,4 @@ def test_every_language_prompt_includes_agristack_rules():
         )
         assert "## AgriStack farmer data" in prompt, lang
         assert "consent is not enabled from your end" in prompt, lang
+        assert "Never assume the farmer's place or crop" in prompt, lang
