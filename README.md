@@ -1,5 +1,27 @@
 # bharat-oan-api
- 
+
+## Callback endpoints
+
+Use these endpoints for AgriStack callback integration:
+
+- POST/GET callback receiver: /api/callback?from=agristack
+- Optional wildcard receiver: /api/callback/<any-sub-path>?from=agristack
+- Callback status check: /api/callback/status?from=agristack&callbackSessionId=<id>
+
+Behavior:
+
+- callbackSessionId is accepted from query param, body.callbackSessionId, body.sessionId, or body.data.sessionId.
+- Callback receipt is stored in Redis namespace callback-status with TTL.
+- Status endpoint returns received or not_found.
+- farmerId and consent fields are extracted as metadata when present.
+
+Optional env vars:
+
+- CALLBACK_SESSION_TTL_SECONDS (default 3600)
+- CALLBACK_AUDIT_DB_URL (Postgres URL, enables audit writes)
+- CALLBACK_AUDIT_TABLE_NAME (default agristack_callback_audit)
+
+
 ## Delete all Docker volumes (cleanup)
 ```
 docker system prune -a --volumes
