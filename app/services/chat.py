@@ -359,6 +359,12 @@ async def stream_chat_messages(
             await _record_chat_turn(trace_id, telemetry_qid, session_id, route_decision, channel)
 
             agristack_link = await get_agristack_link(session_id)
+            logger.info(
+                "chat.context session=%s agristack=%s browser_location=%s",
+                session_id,
+                "not_logged_in" if not agristack_link else ("consent" if agristack_link["has_consent"] else "no_consent"),
+                latitude is not None and longitude is not None,
+            )
             deps = FarmerContext(
                 query=query,
                 lang_code=target_lang,
