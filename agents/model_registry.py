@@ -8,8 +8,7 @@ from typing import Any
 
 import yaml
 from openai import AsyncAzureOpenAI
-from pydantic_ai.models import Model
-from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
+from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 _YAML_PATH = Path(__file__).parent.parent / "config" / "models.yaml"
@@ -37,23 +36,12 @@ def _require(alias: str, config: dict, key: str) -> str:
     return value
 
 
-def _build_openai_compatible(alias: str, config: dict, api_key: str) -> Model:
-    model_name = _require(alias, config, "model_name")
-    provider_args = {"api_key": api_key}
-    if base_url := (config.get("base_url") or "").strip():
-        provider_args["base_url"] = base_url.rstrip("/") + "/"
-    api = config.get("api", "chat")
-    if api == "chat":
-        model_class = OpenAIChatModel
-    elif api == "responses":
-        model_class = OpenAIResponsesModel
-    else:
-        raise ValueError(f"Alias '{alias}': unsupported API '{api}'")
-    return model_class(model_name, provider=OpenAIProvider(**provider_args))
-
-
-def _build_openai(alias: str, config: dict) -> Model:
-    return _build_openai_compatible(alias, config, _require(alias, config, "api_key"))
+def _build_openai(alias: str, config: dict) -> OpenAIChatModel:
+    api_key = _require(alias, config, "api_key")
+    return OpenAIChatModel(
+        config["model_name"],
+        provider=OpenAIProvider(api_key=api_key),
+    )
 
 
 def _build_vllm(alias: str, config: dict) -> OpenAIChatModel:
@@ -66,9 +54,7 @@ def _build_vllm(alias: str, config: dict) -> OpenAIChatModel:
     )
 
 
-def _build_azure(alias: str, config: dict) -> Model:
-    if config.get("base_url"):
-        return _build_openai_compatible(alias, config, _require(alias, config, "api_key"))
+def _build_azure(alias: str, config: dict) -> OpenAIChatModel:
     endpoint = _require(alias, config, "endpoint")
     api_key = _require(alias, config, "api_key")
     api_version = _require(alias, config, "api_version")
@@ -87,11 +73,12 @@ def _build_azure(alias: str, config: dict) -> Model:
 _BUILDERS = {
     "openai": _build_openai,
     "vllm": _build_vllm,
+    "bharat_ai_grid": _build_vllm,
     "azure-openai": _build_azure,
 }
 
 
-def _build_model(alias: str, config: dict) -> Model:
+def _build_model(alias: str, config: dict) -> OpenAIChatModel:
     kind = config.get("kind", "")
     builder = _BUILDERS.get(kind)
     if not builder:
@@ -105,11 +92,11 @@ class ModelRegistry:
         resolved = _resolve_values(raw)
         self._models_cfg: dict[str, dict] = resolved.get("models", {})
         self._use_cases_cfg: dict[str, dict] = resolved.get("use_cases", {})
-        self._model_cache: dict[str, Model] = {}
+        self._model_cache: dict[str, OpenAIChatModel] = {}
 
     # --- model access ---
 
-    def get_model(self, alias: str) -> Model:
+    def get_model(self, alias: str) -> OpenAIChatModel:
         if alias not in self._model_cache:
             if alias not in self._models_cfg:
                 raise ValueError(f"Model alias '{alias}' not found in config/models.yaml")
@@ -119,7 +106,7 @@ class ModelRegistry:
     def get_model_name(self, alias: str) -> str:
         config = self._models_cfg.get(alias, {})
         if config.get("kind") == "azure-openai":
-            return config.get("deployment_name") or config.get("model_name", alias)
+            return config.get("deployment_name", alias)
         return config.get("model_name", alias)
 
     # --- use-case access ---
