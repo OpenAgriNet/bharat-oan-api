@@ -55,7 +55,6 @@ else:
 class AuthRequest(BaseModel):
     mobile: Optional[str] = Field(None, description="Mobile number")
     name: Optional[str] = Field(None, description="User name")
-    role: Optional[str] = Field(None, description="User role")
     fingerprint_id: Optional[str] = Field(None, description="Client fingerprint/device identifier")
     metadata: Optional[Any] = Field(None, description="Additional metadata")
 
@@ -79,7 +78,6 @@ class PlayIntegrityAuthRequest(BaseModel):
 
 class ApiKeyAuthRequest(BaseModel):
     client_code: str = Field(..., description="Client code for selecting per-client API key")
-    claims: Optional[Dict[str, Any]] = Field(None, description="Additional claims to include in the JWT")
 
 
 def _normalize_client_code(client_code: str) -> str:
@@ -429,7 +427,8 @@ def _build_guest_auth_payload(
 ) -> tuple[Dict[str, Any], int]:
     mobile = request.mobile if request and request.mobile else None
     name = request.name if request and request.name else "guest"
-    role = request.role if request and request.role else "public"
+    # Public token issuance must never accept a caller-controlled role.
+    role = "public"
     channel = "BharatVistaar"
     guest_sub = f"guest:{fingerprint_id}" if fingerprint_id else "guest:anon"
 
@@ -529,9 +528,9 @@ async def create_auth_token_with_api_key(
 
     token, expires_in = _issue_jwt_token(
         channel=client_code,
+        role="public",
         expires_minutes=settings.jwt_expiry_minutes,
         include_issued_at=True,
-        extra_claims=request.claims,
     )
     return StaticAuthResponse(token=token, expires_in=expires_in)
 
