@@ -8,7 +8,8 @@ from langfuse import observe
 # Load term pairs from JSON file with UTF-8 encoding
 term_pairs = json.load(open('assets/glossary_terms.json', 'r', encoding='utf-8'))
 
-SUPPORTED_LANGS = ("en", "hi", "transliteration", "as", "bn", "gu", "kn", "ml", "mr", "ta", "te")
+# ISO 639 codes. Note: voice-oan-api uses "od" for Odia; this repo uses the ISO code "or".
+SUPPORTED_LANGS = ("en", "hi", "transliteration", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te")
 
 # Language fields that may be a single string (legacy) or a list of variants (new format).
 # English (`en`) stays a plain string — it is the concept key / lookup key.
@@ -23,6 +24,9 @@ _MULTI_VALUE_LANG_FIELDS = (
     "kn",
     "ml",
     "as_",
+    "or_",
+    "pa",
+    "mai",
 )
 
 
@@ -59,8 +63,11 @@ class Language(str, Enum):
     BENGALI = "bn"
     GUJARATI = "gu"
     KANNADA = "kn"
+    MAITHILI = "mai"
     MALAYALAM = "ml"
     MARATHI = "mr"
+    ODIA = "or"
+    PUNJABI = "pa"
     TAMIL = "ta"
     TELUGU = "te"
 
@@ -81,6 +88,9 @@ class TermPair(BaseModel):
     kn: list[str] = Field(default_factory=list, description="Kannada term(s)")
     ml: list[str] = Field(default_factory=list, description="Malayalam term(s)")
     as_: list[str] = Field(default_factory=list, alias="as", description="Assamese term(s)")
+    or_: list[str] = Field(default_factory=list, alias="or", description="Odia term(s)")
+    pa: list[str] = Field(default_factory=list, description="Punjabi term(s)")
+    mai: list[str] = Field(default_factory=list, description="Maithili term(s)")
 
     model_config = {"populate_by_name": True}
 
@@ -91,8 +101,8 @@ class TermPair(BaseModel):
 
     def get_terms(self, lang: str) -> list[str]:
         """All variants for a language code (empty list if missing)."""
-        if lang == "as":
-            return list(self.as_)
+        if lang in ("as", "or"):  # Python keywords, stored as `as_` / `or_`
+            return list(getattr(self, f"{lang}_"))
         if lang == "en":
             return [self.en] if self.en else []
         value = getattr(self, lang, None)
@@ -134,7 +144,7 @@ async def search_terms(
         term: The term to search for
         max_results: Maximum number of results to return
         threshold: Minimum similarity score (0-1) to consider a match (default is 0.7)
-        language: Optional language to restrict search to (en/hi/transliteration/as/bn/gu/kn/ml/mr/ta/te).
+        language: Optional language to restrict search to (en/hi/transliteration/as/bn/gu/kn/mai/ml/mr/or/pa/ta/te).
             IMPORTANT: pick this based on the actual script/language the query
             `term` is written in — not on what field you expect the answer to
             come from. Latin/Roman script is not the same as English: a

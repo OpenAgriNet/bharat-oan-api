@@ -223,7 +223,7 @@ def test_agristack_tools_hidden_unless_consent():
 def test_every_language_prompt_includes_agristack_rules():
     from helpers.utils import get_prompt
 
-    for lang in ("en", "hi", "as", "bn", "gu", "kn", "ml", "mr", "ta", "te"):
+    for lang in ("en", "hi", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te"):
         prompt = get_prompt(
             f"agrinet_{lang}",
             context={
