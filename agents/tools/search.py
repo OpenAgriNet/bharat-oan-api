@@ -277,8 +277,8 @@ async def search_schemes(
 
     PLACEHOLDER_SCHEME_CODES
 
-    Also use for the national schemes KCC, PM-Kisan, PMFBY, SHC, PMKSY, SATHI,
-    PM-AASHA, AIF, SMAM, PDMC, PKVY, NFSM, RAD, FFS, NBM and NBHM.
+    Do NOT use for legacy integrated schemes handled by get_scheme_info
+    (pmkisan, pmfby, kcc, pmksy, shc, sathi, pmasha, aif, smam, pdmc, nfsm, rad, ffs, nbhm).
 
     Args:
         query: Natural-language question in English (eligibility, benefits, application process)
