@@ -277,6 +277,9 @@ async def search_schemes(
 
     PLACEHOLDER_SCHEME_CODES
 
+    Also use for the national schemes KCC, PM-Kisan, PMFBY, SHC, PMKSY, SATHI,
+    PM-AASHA, AIF, SMAM, PDMC, PKVY, NFSM, RAD, FFS, NBM and NBHM.
+
     Args:
         query: Natural-language question in English (eligibility, benefits, application process)
         top_k: Maximum number of chunks to return (default: 10)
