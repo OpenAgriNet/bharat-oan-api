@@ -8,7 +8,8 @@ from langfuse import observe
 # Load term pairs from JSON file with UTF-8 encoding
 term_pairs = json.load(open('assets/glossary_terms.json', 'r', encoding='utf-8'))
 
-SUPPORTED_LANGS = ("en", "hi", "transliteration", "as", "bn", "gu", "kn", "ml", "mr", "ta", "te")
+# ISO 639 codes. Note: voice-oan-api uses "od" for Odia; this repo uses the ISO code "or".
+SUPPORTED_LANGS = ("en", "hi", "transliteration", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te")
 
 
 class Language(str, Enum):
@@ -19,8 +20,11 @@ class Language(str, Enum):
     BENGALI = "bn"
     GUJARATI = "gu"
     KANNADA = "kn"
+    MAITHILI = "mai"
     MALAYALAM = "ml"
     MARATHI = "mr"
+    ODIA = "or"
+    PUNJABI = "pa"
     TAMIL = "ta"
     TELUGU = "te"
 
@@ -38,13 +42,16 @@ class TermPair(BaseModel):
     kn: str = Field(default="", description="Kannada term")
     ml: str = Field(default="", description="Malayalam term")
     as_: str = Field(default="", alias="as", description="Assamese term")
+    or_: str = Field(default="", alias="or", description="Odia term")
+    pa: str = Field(default="", description="Punjabi term")
+    mai: str = Field(default="", description="Maithili term")
 
     model_config = {"populate_by_name": True}
 
     def get_term(self, lang: str) -> str:
         """Get the term for a specific language code."""
-        if lang == "as":
-            return self.as_
+        if lang in ("as", "or"):  # Python keywords, stored as `as_` / `or_`
+            return getattr(self, f"{lang}_")
         return getattr(self, lang, "")
 
     def __str__(self):
@@ -69,7 +76,7 @@ async def search_terms(
         term: The term to search for
         max_results: Maximum number of results to return
         threshold: Minimum similarity score (0-1) to consider a match (default is 0.7)
-        language: Optional language to restrict search to (en/hi/transliteration/as/bn/gu/kn/ml/mr/ta/te)
+        language: Optional language to restrict search to (en/hi/transliteration/as/bn/gu/kn/mai/ml/mr/or/pa/ta/te)
 
     Returns:
         str: Formatted string with matching results and their scores
