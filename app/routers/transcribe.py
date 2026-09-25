@@ -100,6 +100,9 @@ async def transcribe(
             source_lang = _detect_language(
                 request.audio_content, session_id, uid, request.qid, background_tasks
             )
+            # Bhashini ALD labels Maithili speech as Hindi; trust the UI's Maithili selection.
+            if source_lang == "hi" and (request.lang_code or "").strip().lower() == "mai":
+                source_lang = "mai"
             transcription = transcribe_bhashini(request.audio_content, source_lang)
             response_lang_code = source_lang
         else:
