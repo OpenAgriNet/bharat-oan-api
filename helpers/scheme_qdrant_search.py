@@ -34,8 +34,8 @@ def get_builtin_scheme_list() -> list[dict[str, Any]]:
     must tolerate that (see get_vector_scheme_entries / get_master_catalog_snapshot
     docstrings for the fails-open contract).
 
-    Legacy get_scheme_info schemes never appear here — see agrinet_*.md's
-    hardcoded "Integrated schemes — legacy" list, untouched by this.
+    Includes the former legacy integrated schemes (PM-KISAN, PMFBY, KCC, ...);
+    get_scheme_info is no longer registered.
     """
     scheme_list: list[dict[str, Any]] = []
     for entry in get_vector_scheme_entries():
@@ -101,7 +101,7 @@ def format_vector_schemes_prompt_block() -> dict[str, Any]:
 
 
 def format_qdrant_scheme_codes_for_doc() -> str:
-    """One-line scheme code list for tool docstrings (like get_scheme_info).
+    """One-line scheme code list for the search_schemes tool docstring.
 
     Patched into search_schemes.__doc__ once at import time (see bottom of
     agents/tools/search.py) — reflects the Redis snapshot as of process start,
@@ -294,7 +294,7 @@ def classify_query_intent(query: str) -> Optional[str]:
 
 
 def classify_scheme_section_focus(query: str) -> Optional[str]:
-    """Mirrors legacy get_scheme_info eligibility/exclusion routing."""
+    """Eligibility/exclusion section focus for a scheme query."""
     q = query.lower()
     has_eligibility = any(term in q for term in INTENT_TERMS["eligibility"])
     has_exclusion = any(term in q for term in EXCLUSION_TERMS)
@@ -837,4 +837,46 @@ def format_search_results(
         f"> Scheme Search Results for `{query}`\n\n"
         f"**Source: {source_label}**\n\n"
         + "\n\n----\n\n".join(blocks)
+    )
+
+
+# Schemes that also have a live status/service flow. search_schemes appends an
+# offer for these after the scheme answer; the prompt routes a direct status
+# request straight to the flow without calling search_schemes first.
+SCHEME_STATUS_SERVICES: dict[str, tuple[tuple[str, str], ...]] = {
+    "pmkisan": (
+        ("PM-KISAN beneficiary / installment status", "initiate_pm_kisan_status_check → check_pm_kisan_status_with_otp"),
+        ("PM-KISAN grievance submit", "pmkisan_grievance_send_otp → pmkisan_submit_grievance"),
+        ("PM-KISAN grievance status", "pmkisan_grievance_send_otp → pmkisan_grievance_status"),
+    ),
+    "pmfby": (
+        ("PMFBY policy / claim status", "initiate_pmfby_status_check → check_pmfby_status_with_otp"),
+        ("PMFBY grievance status", "pmfby_grievance_status"),
+    ),
+    "aif": (
+        ("AIF loan status", "initiate_aif_otp → verify_aif_otp → check_aif_loan_status"),
+        ("AIF grievance status", "initiate_aif_otp → verify_aif_otp → check_aif_grievance_status"),
+    ),
+    "shc": (
+        ("Soil Health Card status", "check_shc_status"),
+    ),
+    "smam": (
+        ("SMAM application / beneficiary status", "check_smam_scheme_status"),
+    ),
+}
+
+
+def format_status_check_offer(scheme_code: Optional[str]) -> str:
+    """Offer block appended to search_schemes output; empty when the scheme has no status flow."""
+    services = SCHEME_STATUS_SERVICES.get((scheme_code or "").strip().lower())
+    if not services:
+        return ""
+    lines = "\n".join(f"- {label} (tools: {flow})" for label, flow in services)
+    return (
+        "\n\n----\n\n"
+        "**Status check available for this scheme:**\n"
+        f"{lines}\n"
+        "After answering, ask the farmer in their language whether they want to check "
+        "their status (name the service in plain words; never mention tool names). "
+        "Start the flow only if they say yes."
     )
