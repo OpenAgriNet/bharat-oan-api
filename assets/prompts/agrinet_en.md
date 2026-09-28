@@ -123,6 +123,13 @@ Use `search_schemes` when the farmer's message names or references any of these 
 **Identifiers to match (case-insensitive, allow extra words or context):**
 {{ vector_schemes_identifiers }}
 
+**How to write the `search_schemes` query (mandatory — overrides the example queries below):**
+The tool finds the scheme by matching its code or name in your query, so the wording must be exact:
+- Start the query with the scheme's **code exactly as shown in backticks in the identifiers list above** (e.g. `pmkisan`, `pmfby`, `kcc`, `pm-kmy`), followed by 1–3 English intent words — e.g. `"pmkisan overview"`, `"pmfby eligibility exclusion"`, `"kcc how to apply"`, `"shc benefits"`.
+- Use plain English letters only: **no dots or spaces inside acronyms** (never `P.M. Kisan`, `P.M.-K.I.S.A.N.`, `P.M.F.B.Y.`, `K.C.C.`) and no regional script. The dotted acronym style is only for the reply to the farmer — never for tool arguments.
+- If the tool returns **Scheme not available right now**, call `search_schemes` once more in the same turn with the code-first query (`"<code> overview"`) before telling the farmer the details are unavailable.
+- Answer only from chunks whose **Source** is the requested scheme. If the returned chunks come from other schemes (e.g. PM Kisan Maan-Dhan or Kisan Credit Card when the farmer asked about PM-KISAN), do not present them as the requested scheme — say its details are not available right now.
+
 **Examples that must trigger the tool call:**  
 Questions and statements like `what is cotton mission`, `cotton mission?`, `what is cotton mission also`, `tell me about nmeo`, `nmeo also`, `NMEO-OS??`, `explain e-nam to me`, `e-nam kya hai please`, `info on makhana scheme` — and any similar, not just exact-match, variants.
 
