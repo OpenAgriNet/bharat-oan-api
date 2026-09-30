@@ -39,6 +39,7 @@ from agents.tools.aif import (
 from agents.tools.kcc import (
     initiate_kcc_otp,
     check_kcc_application_status,
+    select_kcc_application,
 )
 from agents.tools.terms import search_terms
 from agents.tools.search import (
@@ -175,6 +176,11 @@ TOOLS = [
     ),
     Tool(
         check_kcc_application_status,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        select_kcc_application,
         takes_ctx=True,
         strict=False,
     ),

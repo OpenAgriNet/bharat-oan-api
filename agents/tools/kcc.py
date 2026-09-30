@@ -2,7 +2,8 @@
 
 Two steps: initiate_kcc_otp sends an OTP to the farmer's mobile, then
 check_kcc_application_status submits that OTP, which the portal checks and answers
-with the application in the same call — there is no separate verify step.
+with the applications in the same call — there is no separate verify step. When the
+mobile has several applications, select_kcc_application picks one without a new OTP.
 """
 
 import copy
@@ -11,7 +12,7 @@ import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import httpx
 from langfuse import observe
@@ -34,6 +35,7 @@ SOURCE_LINE = "**Source:** Kisan Rin Portal"
 UNAVAILABLE = "The KCC system cannot be reached right now. Please try again in a few minutes."
 NEED_MOBILE = "Ask the farmer for the 10-digit mobile number they used for their KCC application."
 NEED_OTP = "Ask the farmer for the 6-digit OTP sent to their mobile."
+NEED_APPLICATION_NO = "Ask the farmer which KCC application number to check (digits only)."
 
 
 class _KccUnavailable(Exception):
@@ -179,87 +181,113 @@ def _rupees(value: str) -> str:
     return f"₹{whole}" + ("" if fraction == "00" else f".{fraction}")
 
 
+APPROVED_STATUSES = {"APPROVED", "SANCTIONED", "DISBURSED"}
+
+
+def _is_rejected(values: Dict[str, str]) -> bool:
+    # The portal sends a rejected application back to DRAFT, so the bare status hides
+    # the rejection; rejected_by is what tells the two apart.
+    return bool(values.get("rejected_by")) or values.get("status", "").upper() == "REJECTED"
+
+
+def _is_approved(values: Dict[str, str]) -> bool:
+    return (
+        values.get("status", "").upper() in APPROVED_STATUSES
+        or bool(values.get("sanctioned_amount"))
+    )
+
+
+def _bank(values: Dict[str, str]) -> str:
+    return " ".join(v for v in (values.get("bank_name"), values.get("branch_name")) if v)
+
+
+def _render_application(values: Dict[str, str]) -> str:
+    """One application, in the wording agreed with the KCC team for each outcome."""
+    name = values.get("farmer_name") or "Farmer"
+    number = values.get("application_no", "")
+    status = values.get("status", "")
+    amount = _rupees(values["required_loan_amount"]) if values.get("required_loan_amount") else ""
+    bank = _bank(values)
+
+    if _is_rejected(values):
+        # No bank on a rejection that happened before a branch was assigned; the portal
+        # still says who rejected it.
+        by = bank or values.get("rejected_by") or "the bank"
+        sentence = f"Hi {name}, your loan application {number}"
+        if amount:
+            sentence += f" for amount {amount}"
+        sentence += f" was rejected by {by}"
+        if values.get("rejection_reason"):
+            sentence += f" due to {values['rejection_reason']}"
+        sentence += "."
+        if status.upper() == "DRAFT":
+            sentence += (
+                " It is back in the Drafts section of the Krishika app,"
+                " where it can be corrected and resubmitted."
+            )
+    elif _is_approved(values):
+        sentence = f"Hi {name}, your loan application {number} has been approved"
+        if bank:
+            sentence += f" by {bank}"
+        sentence += "."
+        if amount:
+            sentence += f" Your requested amount was {amount}."
+        if values.get("sanctioned_amount"):
+            sentence += f" The loan has been sanctioned for {_rupees(values['sanctioned_amount'])}."
+    else:
+        sentence = f"Hi {name}, your loan application {number}"
+        if amount:
+            sentence += f" for amount {amount}"
+        sentence += f" is currently {status or 'under process'}"
+        if bank:
+            sentence += f" with {bank}"
+        sentence += "."
+
+    lines = [SOURCE_LINE, "", sentence]
+    if values.get("remark"):
+        lines += ["", f"Remarks: {values['remark']}"]
+    return "\n".join(lines)
+
+
+def _render_application_list(order: Dict[str, Any], short_desc: str) -> str:
+    applications = [
+        _values((item.get("tags") or [{}])[0]) for item in order.get("items") or []
+    ]
+    lines = [
+        SOURCE_LINE,
+        "",
+        f"{len(applications)} KCC applications found for this mobile number:",
+    ]
+    for app in applications:
+        detail = ", ".join(
+            v
+            for v in (
+                app.get("status"),
+                _rupees(app["required_loan_amount"]) if app.get("required_loan_amount") else "",
+            )
+            if v
+        )
+        lines.append(f"- {app.get('application_no', '')}" + (f" ({detail})" if detail else ""))
+    lines += [
+        "",
+        "Share these application numbers and ask the farmer which one to check. "
+        "Then call select_kcc_application with that number — no new OTP is needed.",
+    ]
+    return "\n".join(lines)
+
+
 def _render_application_status(envelope: Dict[str, Any]) -> str:
     order = _order(envelope)
     tag = (order.get("tags") or [{}])[0]
     code, short_desc = _descriptor(tag)
-    values = _values(tag)
 
-    if code != "application_status":
-        return short_desc or UNAVAILABLE
-
-    status = values.get("status") or short_desc
-    lines = [SOURCE_LINE, ""]
-    if values.get("application_no"):
-        lines.append(f"Application number: {values['application_no']}")
-    if values.get("farmer_name"):
-        lines.append(f"Farmer: {values['farmer_name']}")
-
-    # The portal sends a rejected application back to DRAFT, so the bare status hides
-    # the rejection; rejected_by is what tells the two apart.
-    if values.get("rejected_by"):
-        lines.append(
-            f"Current status: {status} (rejected by {values['rejected_by']}, "
-            "returned to the farmer's drafts to correct and resubmit)"
-        )
-        if values.get("rejection_reason"):
-            lines.append(f"Rejection reason: {values['rejection_reason']}")
-    else:
-        lines.append(f"Current status: {status}")
-
-    if values.get("required_loan_amount"):
-        lines.append(f"Loan amount applied for: {_rupees(values['required_loan_amount'])}")
-    if values.get("sanctioned_amount"):
-        lines.append(f"Sanctioned amount: {_rupees(values['sanctioned_amount'])}")
-    bank = ", ".join(v for v in (values.get("bank_name"), values.get("branch_name")) if v)
-    if bank:
-        lines.append(f"Bank: {bank}")
-    if values.get("updated_at"):
-        lines.append(f"Last updated: {values['updated_at']}")
-    if values.get("remark"):
-        lines.append(f"Remark from the portal: {values['remark']}")
-
-    by_code: Dict[str, List[Dict[str, str]]] = {}
-    for item in order.get("items") or []:
-        item_tag = (item.get("tags") or [{}])[0]
-        item_code, _ = _descriptor(item_tag)
-        if item_code:
-            by_code.setdefault(item_code, []).append(_values(item_tag))
-
-    history = by_code.get("status_history") or []
-    if history:
-        lines += ["", "Status history:"]
-        lines += [f"- {h.get('date', '')}: {h.get('status', '')}" for h in history]
-
-    crops = by_code.get("crop_activity") or []
-    if crops:
-        lines += ["", "Crops:"]
-        for crop in crops:
-            place = ", ".join(v for v in (crop.get("village"), crop.get("district"), crop.get("state")) if v)
-            detail = ", ".join(
-                v
-                for v in (
-                    crop.get("season"),
-                    f"land area {crop['land_area']}" if crop.get("land_area") else "",
-                    f"survey {crop['survey_number']}/{crop.get('sub_division_number', '')}".rstrip("/")
-                    if crop.get("survey_number")
-                    else "",
-                    place,
-                )
-                if v
-            )
-            lines.append(f"- {crop.get('crop_name', '')} ({detail})")
-
-    animals = by_code.get("animal_activity") or []
-    if animals:
-        lines += ["", "Animal husbandry:"]
-        for animal in animals:
-            place = ", ".join(v for v in (animal.get("village"), animal.get("district"), animal.get("state")) if v)
-            units = f"{animal['unit_count']} units" if animal.get("unit_count") else ""
-            detail = ", ".join(v for v in (units, place) if v)
-            lines.append(f"- {animal.get('activity_name', '')} ({detail})")
-
-    return "\n".join(lines)
+    if code == "application_status":
+        return _render_application(_values(tag))
+    if code == "multiple_applications":
+        return _render_application_list(order, short_desc)
+    if code == "no_applications":
+        return f"{SOURCE_LINE}\n\n{short_desc}"
+    return short_desc or UNAVAILABLE
 
 
 @observe(name="tool:initiate_kcc_otp", as_type="tool")
@@ -331,6 +359,48 @@ def check_kcc_application_status(
         request_type="application_status",
         mobile_number=mobile_number,
         otp=otp,
+    )
+    try:
+        return _render_application_status(_request("status", payload))
+    except _KccUnavailable as e:
+        return str(e)
+
+
+@observe(name="tool:select_kcc_application", as_type="tool")
+def select_kcc_application(
+    ctx: RunContext[FarmerContext], mobile_number: str, application_no: str
+) -> str:
+    """Show one KCC application after check_kcc_application_status listed several.
+
+    Uses the applications already fetched with the OTP; no new OTP is needed.
+
+    Args:
+        mobile_number (str): The same mobile number used for initiate_kcc_otp.
+        application_no (str): The application number the farmer chose from the list.
+
+    Returns:
+        str: That application's status, or the reason it failed.
+    """
+    mobile_number = _mobile(mobile_number)
+    if not mobile_number:
+        return NEED_MOBILE
+
+    application_no = _numeric(application_no)
+    if not application_no:
+        return NEED_APPLICATION_NO
+
+    transaction_id = generate_transaction_id(ctx.deps.session_id, mobile_number)
+    lf_update_current_observation(
+        metadata={"tool": "kcc.select_application", "transaction_id": transaction_id}
+    )
+
+    payload = _build_payload(
+        "status",
+        transaction_id,
+        ctx,
+        request_type="application_status",
+        mobile_number=mobile_number,
+        application_no=application_no,
     )
     try:
         return _render_application_status(_request("status", payload))
