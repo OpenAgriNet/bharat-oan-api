@@ -36,6 +36,10 @@ from agents.tools.aif import (
     check_aif_loan_status,
     check_aif_grievance_status,
 )
+from agents.tools.kcc import (
+    initiate_kcc_otp,
+    check_kcc_application_status,
+)
 from agents.tools.terms import search_terms
 from agents.tools.search import (
     search_documents,
@@ -161,6 +165,16 @@ TOOLS = [
     ),
     Tool(
         check_aif_grievance_status,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        initiate_kcc_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        check_kcc_application_status,
         takes_ctx=True,
         strict=False,
     ),

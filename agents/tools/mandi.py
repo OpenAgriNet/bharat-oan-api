@@ -168,27 +168,55 @@ def _normalize_requested_range(
     return start, end, start != end
 
 
+def _capped_range(
+    price_date: Optional[str], price_date_to: Optional[str]
+) -> tuple[Optional[date], Optional[date]]:
+    """The requested (start, end) with the end capped at today (IST); None where not given."""
+    today_ist = datetime.now(_IST).date()
+    start, end, _ = _normalize_requested_range(price_date, price_date_to)
+    if end is not None:
+        end = min(end, today_ist)
+    if start is not None:
+        start = min(start, end or today_ist)
+    return start, end
+
+
+def _range_too_long(price_date: Optional[str], price_date_to: Optional[str]) -> Optional[str]:
+    """Tool output for a requested range wider than the API's 30-day limit, else None."""
+    start, end = _capped_range(price_date, price_date_to)
+    if start is None or end is None or (end - start).days <= MAX_DATE_RANGE_DAYS:
+        return None
+    suggested_start = end - timedelta(days=MAX_DATE_RANGE_DAYS)
+    return (
+        "**Mandi Price Discovery** [Status: RANGE_TOO_LONG]\n"
+        f"Requested date range {_display_date(start)} to {_display_date(end)} is "
+        f"{(end - start).days + 1} days. Mandi prices can be fetched for at most "
+        f"{MAX_DATE_RANGE_DAYS} days at a time.\n"
+        f"Suggested window: {_display_date(suggested_start)} to {_display_date(end)} "
+        f"(price_date={suggested_start.strftime('%d-%m-%Y')}, price_date_to={end.strftime('%d-%m-%Y')})."
+    )
+
+
 def _resolve_date_range(price_date: Optional[str], price_date_to: Optional[str] = None) -> tuple[str, str]:
     """Resolve the from_date/to_date window (DD-MM-YYYY) for the mandi search payload.
 
-    When the farmer asks for an explicit range ("01-07-2026 to 10-07-2026"), both ends are
-    honoured: from_date is the start and to_date the end, capped at today (IST).
+    - Single date: exactly that day, so the provider reports whether *that* day has data.
+    - Range ("01-07-2026 to 10-07-2026"): both ends as given, end capped at today (IST).
+    - No date (latest available), or only an end date: the MAX_DATE_RANGE_DAYS window
+      ending there, to find the most recent arrivals.
 
-    For a single requested date, to_date stays today so the closest-available-date fallback
-    still has newer arrivals to choose from; when no date was requested (latest available),
-    from_date is pushed back the full window to maximize the chance of finding recent arrivals.
-
-    Either way the window is clamped to MAX_DATE_RANGE_DAYS, since the API rejects wider ranges.
+    The window is clamped to MAX_DATE_RANGE_DAYS as a safety net, since the API rejects
+    wider ranges; get_mandi_prices rejects over-long requested ranges before this.
     """
+    start, end = _capped_range(price_date, price_date_to)
     today_ist = datetime.now(_IST).date()
 
-    start, end, _ = _normalize_requested_range(price_date, price_date_to)
-
-    to_date = min(end, today_ist) if end is not None else today_ist
-    if start is not None:
-        from_date = min(start, to_date)
+    if start is not None and end is None:
+        to_date = from_date = start
+    elif start is not None:
+        to_date, from_date = end, start
     else:
-        # No start date: search back the full window so the latest/closest fallback has data.
+        to_date = end or today_ist
         from_date = to_date - timedelta(days=MAX_DATE_RANGE_DAYS)
 
     from_date = max(from_date, to_date - timedelta(days=MAX_DATE_RANGE_DAYS))
@@ -259,20 +287,8 @@ def _closest_available_date(items: List["MandiItem"], target: date) -> Optional[
 
 
 # A selection is the items to display plus the header describing them, or None when the
-# response holds no dated item to fall back on.
+# response holds nothing for the requested date(s).
 Selection = Optional[tuple[List["MandiItem"], str]]
-
-
-def _closest_date_selection(items: List["MandiItem"], target: date, requested_label: str, noun: str) -> Selection:
-    """Fall back to the dated items nearest `target`, labelled as a substitute for what was asked."""
-    closest = _closest_available_date(items, target)
-    if closest is None:
-        return None
-    header = (
-        f"**Mandi Price Discovery** [{noun}: {requested_label} "
-        f"not available — showing closest available date: {_display_date(closest)}]"
-    )
-    return _items_on_date(items, closest), header
 
 
 def _latest_available(items: List["MandiItem"]) -> Optional[date]:
@@ -281,18 +297,11 @@ def _latest_available(items: List["MandiItem"]) -> Optional[date]:
 
 
 def _select_for_range(items: List["MandiItem"], start: date, end: date, requested_label: str) -> Selection:
-    """Every arrival date inside the requested window, or the latest available if none match."""
+    """Every arrival date inside the requested window; None when nothing falls inside it."""
     in_range = [item for item in items if _item_in_date_range(item, start, end)]
-    if in_range:
-        return in_range, f"**Mandi Price Discovery** [Price Date Range: {requested_label}]"
-    latest = _latest_available(items)
-    if latest is None:
+    if not in_range:
         return None
-    header = (
-        f"**Mandi Price Discovery** [Requested date range: {requested_label} "
-        f"not available — showing latest prices as of {_display_date(latest)}]"
-    )
-    return _items_on_date(items, latest), header
+    return in_range, f"**Mandi Price Discovery** [Price Date Range: {requested_label}]"
 
 
 def _select_for_latest(items: List["MandiItem"]) -> Selection:
@@ -304,18 +313,20 @@ def _select_for_latest(items: List["MandiItem"]) -> Selection:
 
 
 def _select_for_date(items: List["MandiItem"], requested: date, requested_label: str) -> Selection:
-    """Items for the requested date, or the latest available if that date is not in the response."""
+    """Items for the requested date; None when that date is not in the response."""
     exact_matches = _items_on_date(items, requested)
-    if exact_matches:
-        return exact_matches, f"**Mandi Price Discovery** [Price Date: {requested_label}]"
-    latest = _latest_available(items)
-    if latest is None:
+    if not exact_matches:
         return None
-    header = (
-        f"**Mandi Price Discovery** [Requested date: {requested_label} "
-        f"not available — showing latest prices as of {_display_date(latest)}]"
-    )
-    return _items_on_date(items, latest), header
+    return exact_matches, f"**Mandi Price Discovery** [Price Date: {requested_label}]"
+
+
+def _nearby_mandi_label(search_context: Dict[str, str]) -> str:
+    """"Junnar(Narayangaon), Pune (about 23.5 km away)" for the substitute mandi."""
+    place = ", ".join(p for p in [search_context.get("market"), search_context.get("district")] if p)
+    distance = search_context.get("distance_km")
+    if distance:
+        place += f" (about {distance} km away)"
+    return place or "another nearby mandi"
 
 
 # -----------------------
@@ -407,6 +418,15 @@ class Provider(BaseModel):
 class Catalog(BaseModel):
     descriptor: Descriptor
     providers: List[Provider]
+    tags: Optional[List[Tag]] = None
+
+    def search_context(self) -> Dict[str, str]:
+        """The provider's search-context tag as {code: value}: status (data_found /
+        nearby_only / no_data), market, district, distance_km, ..."""
+        for tag in self.tags or []:
+            if tag.descriptor.code == "search-context":
+                return {i.descriptor.code: i.value for i in tag.list if i.descriptor.code}
+        return {}
 
     def __str__(self) -> str:
         lines = []
@@ -461,20 +481,46 @@ class MandiResponse(BaseModel):
         self,
         requested_price_date: Optional[str] = None,
         requested_price_date_to: Optional[str] = None,
+        search_context: Optional[Dict[str, str]] = None,
+        include_nearby_mandis: bool = False,
     ) -> str:
+        """Render prices for the requested date(s).
+
+        search_context comes from the provider (status, market, district, distance_km)
+        plus the requested commodity/requested_location. Its status picks the case:
+          - data_found:  prices for the requested place.
+          - nearby_only: no data at the requested place, but the nearest mandi with data
+                         (within 50 km) has it. Prices are withheld until the farmer
+                         chooses that mandi (include_nearby_mandis=True).
+          - no_data:     nothing at any mandi within 50 km for the period.
+        """
+        ctx = search_context or {}
         start, end, is_range = _normalize_requested_range(requested_price_date, requested_price_date_to)
         requested_label = (
             f"{_display_date(start)} to {_display_date(end)}"
             if is_range
             else _format_price_date_display(requested_price_date)
         )
+        commodity = ctx.get("commodity") or "the requested commodity"
+        place = ctx.get("requested_location") or "the requested location"
         no_data = (
-            f"**Mandi Price Discovery** [Price Date: {requested_label}]\n"
-            "No mandi price data found for the requested location and commodity."
+            f"**Mandi Price Discovery** [Status: NO_DATA] [Price Date: {requested_label}]\n"
+            f"No mandi price data found for {commodity} at {place}, or at any other mandi "
+            f"within 50 km, for {requested_label}."
         )
 
         if not self.responses or not self._has_mandi_data():
             return no_data
+
+        nearby = ctx.get("status") == "nearby_only"
+        if nearby and not include_nearby_mandis:
+            return (
+                f"**Mandi Price Discovery** [Status: NO_DATA_AT_REQUESTED_MANDI] [Price Date: {requested_label}]\n"
+                f"No mandi price data found for {commodity} at {place} for {requested_label}.\n"
+                f"Nearest mandi with data for the same period: {_nearby_mandi_label(ctx)}.\n"
+                "Its prices are not shown yet. To show them, call get_mandi_prices again with "
+                "the same arguments and include_nearby_mandis=true."
+            )
 
         all_items = self._collect_items()
         if is_range:
@@ -488,6 +534,8 @@ class MandiResponse(BaseModel):
             return no_data
 
         display_items, header = selection
+        if nearby:
+            header += f" [Nearest mandi with data — none at {place}: {_nearby_mandi_label(ctx)}]"
         lines = [header]
         for item in sorted(display_items, key=_arrival_date_sort_key, reverse=True):
             lines.append(str(item))
@@ -617,15 +665,21 @@ def _fetch_all_pages(
     base_payload: dict,
     from_date: Optional[str],
     to_date: Optional[str],
-) -> Optional[List[MandiItem]]:
+    include_nearby_mandis: bool = False,
+) -> Optional[tuple[List[MandiItem], Dict[str, str]]]:
     """Paginate backward through the provider's 10-item cap.
 
     The provider returns the N most-recent arrivals within the requested window.
     We walk backward: after each call we find the oldest arrival date returned,
     set to_date = oldest - 1 day, and repeat until we reach from_date or get
-    no new items.  Returns None on HTTP/network error.
+    no new items.
+
+    Returns (items, search_context) where search_context is the first page's
+    provider status (see Catalog.search_context), or None on HTTP/network error
+    before any item was fetched.
     """
     all_items: List[MandiItem] = []
+    search_context: Dict[str, str] = {}
     seen_keys: set = set()
     current_to = to_date
 
@@ -666,11 +720,11 @@ def _fetch_all_pages(
             response = httpx.post(search_url, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
         except (httpx.TimeoutException, httpx.RequestError) as e:
             logger.error("Mandi API page %d request failed: %s", page, e)
-            return None if not all_items else all_items
+            return None if not all_items else (all_items, search_context)
 
         if response.status_code not in (200, 201):
             logger.error("Mandi API page %d returned status %s", page, response.status_code)
-            return None if not all_items else all_items
+            return None if not all_items else (all_items, search_context)
 
         data = response.json()
         if "message" in data and "responses" not in data:
@@ -684,8 +738,10 @@ def _fetch_all_pages(
 
         page_items: List[MandiItem] = []
         for resp in parsed.responses:
+            if page == 0 and not search_context:
+                search_context = resp.message.catalog.search_context()
             for provider in resp.message.catalog.providers:
-                page_items.extend(provider.items)
+                page_items.extend(provider.items or [])
 
         if not page_items:
             break
@@ -700,6 +756,11 @@ def _fetch_all_pages(
 
         all_items.extend(new_items)
         logger.info("Mandi page %d: %d items fetched, %d new", page, len(page_items), len(new_items))
+
+        # A substitute mandi's prices are withheld until the farmer asks for them,
+        # so there is no point paging further back through them.
+        if search_context.get("status") == "nearby_only" and not include_nearby_mandis:
+            break
 
         if not new_items:
             break
@@ -722,7 +783,7 @@ def _fetch_all_pages(
         current_to = (oldest - timedelta(days=1)).strftime("%d-%m-%Y")
 
     logger.info("Mandi pagination complete: %d total items across pages", len(all_items))
-    return all_items
+    return all_items, search_context
 
 
 def _build_merged_response(base_payload: dict, items: List[MandiItem]) -> MandiResponse:
@@ -756,6 +817,7 @@ async def get_mandi_prices(
     commodity_name: str,
     price_date: Optional[str] = None,
     price_date_to: Optional[str] = None,
+    include_nearby_mandis: bool = False,
 ) -> str:
     """Get mandi prices for a specific commodity near a location.
 
@@ -766,16 +828,25 @@ async def get_mandi_prices(
     Args:
         latitude (float): Latitude of the location
         longitude (float): Longitude of the location
-        location_name (str): City or market area name (e.g. Jaipur, Pune)
+        location_name (str): City or district name (e.g. Jaipur, Pune); when the farmer names a
+            specific mandi, pass the mandi name (e.g. Azadpur) so the result says whether that
+            mandi itself has data
         commodity_name (str): English commodity name from search_commodity (e.g. Onion)
         price_date (str): Optional price date in DD-MM-YYYY; pass for today/yesterday/specific dates.
             For a date range ("from 01-07-2026 to 10-07-2026") pass the start date here.
         price_date_to (str): Optional end date in DD-MM-YYYY; pass only for a date range, together
             with price_date as the start date (e.g. price_date=01-07-2026, price_date_to=10-07-2026).
+            A range may span at most 30 days.
+        include_nearby_mandis (bool): Pass true only after the farmer has chosen to see prices
+            from the nearest mandi with data, following a NO_DATA_AT_REQUESTED_MANDI result.
 
     Returns:
         str: Formatted mandi price data for the requested commodity and location
     """
+    too_long = _range_too_long(price_date, price_date_to)
+    if too_long:
+        return too_long
+
     try:
         payload = MandiRequest(
             latitude=latitude,
@@ -798,6 +869,7 @@ async def get_mandi_prices(
                 "commodity_name": commodity_name,
                 "price_date": price_date,
                 "price_date_to": price_date_to,
+                "include_nearby_mandis": include_nearby_mandis,
                 "from_date": from_date,
                 "to_date": to_date,
             },
@@ -814,14 +886,21 @@ async def get_mandi_prices(
         search_url = bap_endpoint.rstrip("/") + "/search"
         logger.info(f"Mandi API search URL: {search_url}")
 
-        all_items = _fetch_all_pages(search_url, payload, from_date, to_date)
-        if all_items is None:
+        fetched = _fetch_all_pages(search_url, payload, from_date, to_date, include_nearby_mandis)
+        if fetched is None:
             return "Mandi service unavailable. Please try again later."
+        all_items, provider_context = fetched
 
         mandi_response = _build_merged_response(payload, all_items)
         return mandi_response.format_output(
             requested_price_date=price_date,
             requested_price_date_to=price_date_to,
+            search_context={
+                "commodity": commodity_name,
+                "requested_location": location_name,
+                **provider_context,
+            },
+            include_nearby_mandis=include_nearby_mandis,
         )
 
     except httpx.TimeoutException:

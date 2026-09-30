@@ -18,6 +18,7 @@ from agents.tools.mandi import (
     _closest_available_date,
     _item_matches_requested_date,
     _parse_mandi_date,
+    _range_too_long,
     _resolve_date_range,
 )
 
@@ -70,9 +71,8 @@ class TestParseMandiDate:
 
 
 class TestResolveDateRange:
-    def test_to_date_is_always_today(self):
-        _, to_date = _resolve_date_range("25-07-2026")
-        assert to_date == _today_ist_str()
+    def test_single_date_asks_for_exactly_that_day(self):
+        assert _resolve_date_range("25-07-2026") == ("25-07-2026", "25-07-2026")
 
     def test_no_price_date_defaults_from_date_to_max_range_ago(self):
         from_date, to_date = _resolve_date_range(None)
@@ -82,14 +82,14 @@ class TestResolveDateRange:
     def test_recent_price_date_is_used_as_is(self):
         recent = _days_ago_str(5)
         from_date, to_date = _resolve_date_range(recent)
-        assert from_date == recent
-        assert to_date == _today_ist_str()
+        assert (from_date, to_date) == (recent, recent)
 
-    def test_price_date_beyond_max_range_is_clamped(self):
+    def test_old_single_date_is_not_moved(self):
         too_old = _days_ago_str(MAX_DATE_RANGE_DAYS + 100)
-        from_date, to_date = _resolve_date_range(too_old)
-        assert from_date == _days_ago_str(MAX_DATE_RANGE_DAYS)
-        assert to_date == _today_ist_str()
+        assert _resolve_date_range(too_old) == (too_old, too_old)
+
+    def test_future_single_date_is_capped_at_today(self):
+        assert _resolve_date_range(_days_ago_str(-3)) == (_today_ist_str(), _today_ist_str())
 
     def test_price_date_exactly_at_boundary_is_not_clamped(self):
         boundary = _days_ago_str(MAX_DATE_RANGE_DAYS)
@@ -121,6 +121,11 @@ class TestResolveDateRange:
         from_date, to_date = _resolve_date_range(start, end)
         assert from_date == _days_ago_str(MAX_DATE_RANGE_DAYS + 5)
         assert to_date == end
+
+    def test_range_of_exactly_max_days_is_allowed(self):
+        start, end = _days_ago_str(MAX_DATE_RANGE_DAYS + 5), _days_ago_str(5)
+        assert _range_too_long(start, end) is None
+        assert _resolve_date_range(start, end) == (start, end)
 
     def test_range_end_without_start_searches_back_from_the_end(self):
         end = _days_ago_str(10)
@@ -157,7 +162,7 @@ class TestMandiRequestPayload:
         tags = payload["message"]["intent"]["tags"]
         assert tags == [
             {"code": "from_date", "value": "25-07-2026"},
-            {"code": "to_date", "value": _today_ist_str()},
+            {"code": "to_date", "value": "25-07-2026"},
         ]
 
     def test_payload_uses_the_requested_range_ends(self, monkeypatch):
@@ -181,7 +186,7 @@ class TestMandiRequestPayload:
         tags = payload["message"]["intent"]["tags"]
         assert tags == [
             {"code": "from_date", "value": start},
-            {"code": "to_date", "value": _today_ist_str()},
+            {"code": "to_date", "value": start},
         ]
 
     def test_payload_context_fields(self, monkeypatch):
@@ -311,30 +316,15 @@ class TestMandiResponseFormatOutput:
         assert output.count("Commodity: Onion") == 1
         assert "Lasalgaon" in output
 
-    def test_no_exact_match_falls_back_to_closest_available_date(self):
+    def test_no_exact_match_reports_no_data_instead_of_another_date(self):
         item = _make_item("1", arrival_date="19-07-2026")
         provider = Provider(id="p1", descriptor=Descriptor(name="Provider"), items=[item])
         response = self._make_response(providers=[provider])
 
         output = response.format_output(requested_price_date="25-12-2026")
 
-        assert "not available" in output
-        assert "closest available date" in output
-        assert "Lasalgaon" in output
-        assert "No mandi price data found" not in output
-
-    def test_fallback_prefers_the_more_recent_of_two_equidistant_dates(self):
-        earlier = _make_item("1", arrival_date="18-07-2026")
-        later = _make_item("2", arrival_date="22-07-2026")
-        provider = Provider(id="p1", descriptor=Descriptor(name="Provider"), items=[earlier, later])
-        response = self._make_response(providers=[provider])
-
-        # Requested date (20-07-2026) is exactly 2 days from both candidates.
-        output = response.format_output(requested_price_date="20-07-2026")
-
-        assert output.count("Commodity: Onion") == 1
-        assert "22-07-2026" not in output  # display uses the formatted date, not raw
-        assert "Wednesday, 22 July 2026" in output
+        assert "[Status: NO_DATA]" in output
+        assert "Lasalgaon" not in output
 
     def test_items_without_any_parseable_date_report_no_data_when_no_exact_match(self):
         item = _make_item("1", arrival_date=None)
@@ -369,7 +359,7 @@ class TestMandiResponseFormatOutput:
         body = output.split("\n---\n", 1)[1]
         assert body.index("Friday, 10 July 2026") < body.index("Sunday, 05 July 2026") < body.index("Wednesday, 01 July 2026")
 
-    def test_date_range_with_no_data_inside_falls_back_to_closest_date(self):
+    def test_date_range_with_no_data_inside_reports_no_data(self):
         item = _make_item("1", arrival_date="20-07-2026")
         provider = Provider(id="p1", descriptor=Descriptor(name="Provider"), items=[item])
         response = self._make_response(providers=[provider])
@@ -379,9 +369,9 @@ class TestMandiResponseFormatOutput:
             requested_price_date_to="10-07-2026",
         )
 
-        assert "Requested date range: Wednesday, 01 July 2026 to Friday, 10 July 2026 not available" in output
-        assert "closest available date: Monday, 20 July 2026" in output
-        assert "Lasalgaon" in output
+        assert "[Status: NO_DATA]" in output
+        assert "Wednesday, 01 July 2026 to Friday, 10 July 2026" in output
+        assert "Lasalgaon" not in output
 
     def test_date_range_with_no_providers_reports_the_range(self):
         response = self._make_response(providers=[])
@@ -418,3 +408,89 @@ class TestMandiResponseFormatOutput:
 
         assert output.count("Commodity: Onion") == 1
         assert "Monday, 20 July 2026" in output
+
+
+class TestSearchContextStatus:
+    NEARBY = {
+        "status": "nearby_only",
+        "commodity": "Onion",
+        "requested_location": "Manchar",
+        "market": "Junnar(Narayangaon)",
+        "district": "Pune",
+        "distance_km": "23.5",
+    }
+
+    def _response(self, tags=None):
+        item = _make_item("1", arrival_date="28-09-2026")
+        provider = Provider(id="p1", descriptor=Descriptor(name="Provider"), items=[item])
+        catalog = Catalog(descriptor=Descriptor(), providers=[provider], tags=tags)
+        return MandiResponse(
+            context=_make_context(),
+            responses=[ResponseItem(context=_make_context(), message=Message(catalog=catalog))],
+        )
+
+    def test_catalog_reads_the_provider_search_context_tag(self):
+        tag = Tag(
+            descriptor=Descriptor(code="search-context"),
+            list=[
+                TagItem(descriptor=Descriptor(code="status"), value="nearby_only"),
+                TagItem(descriptor=Descriptor(code="market"), value="Junnar(Narayangaon)"),
+            ],
+        )
+        catalog = self._response(tags=[tag]).responses[0].message.catalog
+        assert catalog.search_context() == {"status": "nearby_only", "market": "Junnar(Narayangaon)"}
+
+    def test_catalog_without_tags_has_empty_context(self):
+        assert self._response().responses[0].message.catalog.search_context() == {}
+
+    def test_data_found_shows_prices(self):
+        output = self._response().format_output(
+            requested_price_date="28-09-2026",
+            search_context={"status": "data_found", "commodity": "Onion", "requested_location": "Nashik"},
+        )
+        assert "Status:" not in output
+        assert "Lasalgaon" in output
+
+    def test_nearby_only_withholds_prices_and_names_the_nearest_mandi(self):
+        output = self._response().format_output(
+            requested_price_date="28-09-2026", search_context=self.NEARBY
+        )
+        assert "[Status: NO_DATA_AT_REQUESTED_MANDI]" in output
+        assert "No mandi price data found for Onion at Manchar" in output
+        assert "Junnar(Narayangaon), Pune (about 23.5 km away)" in output
+        assert "include_nearby_mandis=true" in output
+        assert "Commodity: Onion" not in output
+
+    def test_nearby_only_shows_prices_once_the_farmer_chooses_them(self):
+        output = self._response().format_output(
+            requested_price_date="28-09-2026", search_context=self.NEARBY, include_nearby_mandis=True
+        )
+        assert "Nearest mandi with data — none at Manchar: Junnar(Narayangaon), Pune" in output
+        assert "Commodity: Onion" in output
+
+    def test_no_data_names_commodity_and_place(self):
+        response = MandiResponse(context=_make_context(), responses=[])
+        output = response.format_output(
+            requested_price_date="28-09-2026",
+            search_context={"status": "no_data", "commodity": "Onion", "requested_location": "Manchar"},
+        )
+        assert "[Status: NO_DATA]" in output
+        assert "No mandi price data found for Onion at Manchar, or at any other mandi within 50 km" in output
+
+
+class TestRangeTooLong:
+    def test_range_over_max_days_is_rejected_with_a_suggested_window(self):
+        start, end = _days_ago_str(MAX_DATE_RANGE_DAYS + 40), _days_ago_str(5)
+        output = _range_too_long(start, end)
+        assert output is not None
+        assert "[Status: RANGE_TOO_LONG]" in output
+        assert f"at most {MAX_DATE_RANGE_DAYS} days" in output
+        assert f"price_date={_days_ago_str(MAX_DATE_RANGE_DAYS + 5)}, price_date_to={end}" in output
+
+    def test_future_end_is_capped_before_measuring(self):
+        # 20 days ago to 20 days ahead is only 20 days once capped at today.
+        assert _range_too_long(_days_ago_str(20), _days_ago_str(-20)) is None
+
+    def test_single_date_and_latest_are_never_too_long(self):
+        assert _range_too_long(_days_ago_str(200), None) is None
+        assert _range_too_long(None, None) is None
