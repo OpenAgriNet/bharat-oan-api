@@ -36,11 +36,6 @@ from agents.tools.aif import (
     check_aif_loan_status,
     check_aif_grievance_status,
 )
-from agents.tools.kcc import (
-    initiate_kcc_otp,
-    check_kcc_application_status,
-    select_kcc_application,
-)
 from agents.tools.terms import search_terms
 from agents.tools.search import (
     search_documents,
@@ -62,11 +57,6 @@ from agents.tools.sathi_seed import (
     search_sathi_seed_availability,
 )
 from agents.tools.npss import analyze_crop_image
-from agents.tools.agristack import (
-    get_agristack_farmer_location,
-    get_agristack_farmer_crops,
-    only_with_agristack_consent,
-)
 
 TOOLS = [
     Tool(
@@ -170,21 +160,6 @@ TOOLS = [
         strict=False,
     ),
     Tool(
-        initiate_kcc_otp,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        check_kcc_application_status,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        select_kcc_application,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
         search_terms,
         takes_ctx=False,
         strict=False,
@@ -264,17 +239,5 @@ TOOLS = [
         takes_ctx=True,
         strict=False,
     ),
-    # Hidden from the model unless the farmer logged in with AgriStack and gave consent.
-    Tool(
-        get_agristack_farmer_location,
-        takes_ctx=True,
-        strict=False,
-        prepare=only_with_agristack_consent,
-    ),
-    Tool(
-        get_agristack_farmer_crops,
-        takes_ctx=True,
-        strict=False,
-        prepare=only_with_agristack_consent,
-    ),
+
 ]

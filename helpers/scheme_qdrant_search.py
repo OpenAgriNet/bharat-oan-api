@@ -857,9 +857,6 @@ SCHEME_STATUS_SERVICES: dict[str, tuple[tuple[str, str], ...]] = {
         ("AIF loan status", "initiate_aif_otp → verify_aif_otp → check_aif_loan_status"),
         ("AIF grievance status", "initiate_aif_otp → verify_aif_otp → check_aif_grievance_status"),
     ),
-    "kcc": (
-        ("KCC application status", "initiate_kcc_otp → check_kcc_application_status"),
-    ),
     "shc": (
         ("Soil Health Card status", "check_shc_status"),
     ),

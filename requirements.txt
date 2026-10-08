@@ -55,6 +55,7 @@ httpx==0.28.1
 # Search and Data
 marqo==3.18.2 # Vector search
 qdrant-client==1.18.0 # Qdrant vector search (scheme documents)
+torch==2.14.0 # Docker installs the CPU wheel from the PyTorch index
 sentence-transformers==5.6.1 # Embeddings for Qdrant scheme search
 rapidfuzz==3.14.5 # Fuzzy string matching
 
@@ -84,7 +85,6 @@ markdownify==1.2.3
 humanize==4.16.0
 
 pycryptodome==3.23.0
-psycopg2-binary==2.9.10  # optional AgriStack callback audit writes (CALLBACK_AUDIT_DB_URL)
 
 langfuse==4.14.1
 

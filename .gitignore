@@ -212,8 +212,5 @@ jmeter/
 localbuild_deployment.md
 run.sh
 
-# Local backup of prompts from before the AgriStack prompt changes
-assets/prompts/backup_before_agristack/
-
 # Local backup of files (committed versions) from before the legacy scheme removal
 backups/

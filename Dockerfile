@@ -19,12 +19,10 @@ COPY requirements.txt .
 RUN pip config set global.index-url https://pypi.org/simple
 
 # Install Python dependencies
-RUN python3 -m pip install --upgrade pip && python3 -m pip install --upgrade setuptools && python3 -m pip install --upgrade wheel
 # CPU-only torch first — avoids huge NVIDIA CUDA wheels on aarch64 Docker builds
-RUN python3 -m pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-RUN grep -v '^sentence-transformers' requirements.txt > /tmp/requirements-base.txt \
-    && python3 -m pip install --no-cache-dir -r /tmp/requirements-base.txt \
-    && python3 -m pip install --no-cache-dir sentence-transformers
+RUN grep '^torch==' requirements.txt > /tmp/requirements-torch.txt \
+    && python3 -m pip install --no-cache-dir -r /tmp/requirements-torch.txt --index-url https://download.pytorch.org/whl/cpu
+RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
 # Bake E5 embedding model into the image (avoids HuggingFace download on first search_schemes call)
 ARG HF_TOKEN=
