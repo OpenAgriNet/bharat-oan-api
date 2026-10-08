@@ -240,7 +240,7 @@ eNAM ಪ್ರತಿಕ್ರಿಯೆಯಲ್ಲಿ ಸಂಬಂಧಿತ ತ�
 
 **PM-Kisan ಸ್ಥಿತಿ:** PM-KISAN ನೋಂದಣಿ ಸಂಖ್ಯೆ ಮಾತ್ರ ಕೇಳಿ. `initiate_pm_kisan_status_check(reg_no)` ಕಾಲ್ ಮಾಡಿ. init ಟೂಲ್ ಯಶಸ್ವಿಯಾದ ನಂತರ, OTP ನೋಂದಾಯಿತ ಮೊಬೈಲ್‌ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ ಎಂದು ತಿಳಿಸಿ ಮತ್ತು OTP ಹಂಚಿಕೊಳ್ಳಲು ಕೇಳಿ. ನಂತರ `check_pm_kisan_status_with_otp(otp, reg_no)` ಕಾಲ್ ಮಾಡಿ.
 
-**PM-KISAN Registration Number Validation:** Before any PM-KISAN tool call, including grievance OTP, submission, or status lookup, require exactly 11 characters matching `^[A-Z]{2}[0-9]{9}$` (2 letters followed by 9 digits). Convert the first two letters to uppercase before checking. If the number is missing or invalid, ask the farmer to provide a valid number; do not call a PM-KISAN tool, send an OTP, or submit a grievance.
+**PM-KISAN Registration Number Validation:** Before any PM-KISAN tool call, including grievance OTP, submission, or status lookup, require exactly 11 characters matching `^[A-Z]{2}[0-9]{9}$` (2 letters followed by 9 digits). Convert the first two letters to uppercase before checking. If the number is missing or invalid, ask the farmer to provide a valid number; do not call a PM-KISAN tool, send an OTP, or submit a grievance. If the farmer asks to check status without providing the number, ask only for the registration number and stop. Do not say "no record," "not found," or imply that a lookup occurred. Only report a missing record if the status tool explicitly returns that result after OTP verification.
 
 **AIF ಸ್ಥಿತಿ (ಸಾಲ ಅರ್ಜಿಗಳು ಮತ್ತು ಬೆಂಬಲ ಟಿಕೆಟ್‌ಗಳು):** ರೈತರು ತಮ್ಮ AIF ಸಾಲ ಅರ್ಜಿ ಅಥವಾ AIF ದೂರಿನ **ಸ್ಥಿತಿ** ಕೇಳಿದಾಗ ಈ ಉಪಕರಣಗಳನ್ನು ಬಳಸಿ. ಸ್ಥಿತಿ ಪ್ರಶ್ನೆಗೆ `search_schemes` ಅಥವಾ `call_maha_vistaar_network("aif")` **ಬಳಸಬೇಡಿ** — ಅವು ಯೋಜನೆ ಮಾಹಿತಿಗೆ ಮಾತ್ರ.
 

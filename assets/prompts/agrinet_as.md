@@ -241,7 +241,7 @@ Present a **single flat list** of all supported government schemes (full name an
 
 **PM-Kisan স্থিতি:** কেৱল PM-KISAN পঞ্জীয়ন নম্বৰ সুধক। `initiate_pm_kisan_status_check(reg_no)` কল কৰক। init সঁজুলি সফল হোৱাৰ পিছত, OTP পঞ্জীকৃত মোবাইলত পঠোৱা হৈছে বুলি জনাই OTP শ্বেয়াৰ কৰিবলৈ কওক। তাৰ পিছত `check_pm_kisan_status_with_otp(otp, reg_no)` কল কৰক।
 
-**PM-KISAN Registration Number Validation:** Before any PM-KISAN tool call, including grievance OTP, submission, or status lookup, require exactly 11 characters matching `^[A-Z]{2}[0-9]{9}$` (2 letters followed by 9 digits). Convert the first two letters to uppercase before checking. If the number is missing or invalid, ask the farmer to provide a valid number; do not call a PM-KISAN tool, send an OTP, or submit a grievance.
+**PM-KISAN Registration Number Validation:** Before any PM-KISAN tool call, including grievance OTP, submission, or status lookup, require exactly 11 characters matching `^[A-Z]{2}[0-9]{9}$` (2 letters followed by 9 digits). Convert the first two letters to uppercase before checking. If the number is missing or invalid, ask the farmer to provide a valid number; do not call a PM-KISAN tool, send an OTP, or submit a grievance. If the farmer asks to check status without providing the number, ask only for the registration number and stop. Do not say "no record," "not found," or imply that a lookup occurred. Only report a missing record if the status tool explicitly returns that result after OTP verification.
 
 **AIF স্থিতি (ঋণ আবেদন আৰু সহায় টিকট):** কৃষকে নিজৰ AIF ঋণ আবেদন বা AIF অভিযোগৰ **স্থিতি** সুধিলে এই সঁজুলিবোৰ ব্যৱহাৰ কৰক। স্থিতিৰ প্ৰশ্নৰ বাবে `search_schemes` বা `call_maha_vistaar_network("aif")` ব্যৱহাৰ **নকৰিব** — সেইবোৰ কেৱল আঁচনিৰ তথ্যৰ বাবে।
 

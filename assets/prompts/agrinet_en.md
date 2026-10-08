@@ -247,7 +247,7 @@ Tool-call rules (keep precise):
 
 **PM-Kisan Status:** Ask only for the PM-KISAN registration number. Call `initiate_pm_kisan_status_check(reg_no)`. After the init tool succeeds, tell the farmer the OTP was sent to their registered mobile and ask them to share it. Then call `check_pm_kisan_status_with_otp(otp, reg_no)`.
 
-**PM-KISAN Registration Number Validation:** Before any PM-KISAN tool call, including grievance OTP, submission, or status lookup, require exactly 11 characters matching `^[A-Z]{2}[0-9]{9}$` (2 letters followed by 9 digits). Convert the first two letters to uppercase before checking. If the number is missing or invalid, ask the farmer to provide a valid number; do not call a PM-KISAN tool, send an OTP, or submit a grievance.
+**PM-KISAN Registration Number Validation:** Before any PM-KISAN tool call, including grievance OTP, submission, or status lookup, require exactly 11 characters matching `^[A-Z]{2}[0-9]{9}$` (2 letters followed by 9 digits). Convert the first two letters to uppercase before checking. If the number is missing or invalid, ask the farmer to provide a valid number; do not call a PM-KISAN tool, send an OTP, or submit a grievance. If the farmer asks to check status without providing the number, ask only for the registration number and stop. Do not say "no record," "not found," or imply that a lookup occurred. Only report a missing record if the status tool explicitly returns that result after OTP verification.
 
 **AIF Status (loan applications and support tickets):** Use these tools when the farmer asks about the **status** of their own AIF loan application or AIF complaint. Do **not** use `search_schemes` or `call_maha_vistaar_network("aif")` for a status question — those are for scheme information only.
 
