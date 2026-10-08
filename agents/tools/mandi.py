@@ -2,6 +2,7 @@
 Mandi price discovery tool for fetching commodity prices from nearby mandis
 using the Vistaar Beckn API.
 """
+import asyncio
 import os
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -886,7 +887,10 @@ async def get_mandi_prices(
         search_url = bap_endpoint.rstrip("/") + "/search"
         logger.info(f"Mandi API search URL: {search_url}")
 
-        fetched = _fetch_all_pages(search_url, payload, from_date, to_date, include_nearby_mandis)
+        # Up to _MAX_PAGES blocking HTTP calls; run them off the event loop.
+        fetched = await asyncio.to_thread(
+            _fetch_all_pages, search_url, payload, from_date, to_date, include_nearby_mandis
+        )
         if fetched is None:
             return "Mandi service unavailable. Please try again later."
         all_items, provider_context = fetched
