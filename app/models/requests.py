@@ -8,8 +8,13 @@ class ChatRequest(BaseModel):
     source_lang: str = Field('hi', description="Source language code")
     target_lang: str = Field('hi', description="Target language code")
     user_id: str = Field('anonymous', description="User identifier")
-    latitude: Optional[float] = Field(None, description="User latitude for geocode lookup")
-    longitude: Optional[float] = Field(None, description="User longitude for geocode lookup")
+    latitude: Optional[float | Literal[""]] = Field(None, description="User latitude for geocode lookup")
+    longitude: Optional[float | Literal[""]] = Field(None, description="User longitude for geocode lookup")
+
+    @field_validator("latitude", "longitude", mode="before")
+    @classmethod
+    def normalize_empty_coordinates(cls, value):
+        return None if value == "" else value
 
 class TelemetryFeedbackRequest(BaseModel):
     qid: str = Field(..., description="Question or message ID for telemetry correlation")

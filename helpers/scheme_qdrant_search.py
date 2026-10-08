@@ -34,8 +34,8 @@ def get_builtin_scheme_list() -> list[dict[str, Any]]:
     must tolerate that (see get_vector_scheme_entries / get_master_catalog_snapshot
     docstrings for the fails-open contract).
 
-    Includes the former legacy integrated schemes (PM-KISAN, PMFBY, KCC, ...);
-    get_scheme_info is no longer registered.
+    Legacy scheme information continues to use get_scheme_info in production;
+    this list describes the schemes available through the vector index.
     """
     scheme_list: list[dict[str, Any]] = []
     for entry in get_vector_scheme_entries():
