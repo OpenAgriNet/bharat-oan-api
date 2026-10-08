@@ -140,7 +140,8 @@ def test_image_cleanup_accepts_naive_and_aware_metadata(load_module, monkeypatch
 
 
 @pytest.mark.parametrize("supplied_qid", [None, "frontend-question-id"])
-def test_chat_returns_actual_stream_qid_in_exposed_header(load_module, monkeypatch, supplied_qid):
+@pytest.mark.parametrize("coordinates", [None, ("", ""), ("28.6", "77.2")])
+def test_chat_returns_actual_stream_qid_in_exposed_header(load_module, monkeypatch, supplied_qid, coordinates):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
@@ -168,13 +169,96 @@ def test_chat_returns_actual_stream_qid_in_exposed_header(load_module, monkeypat
     params = {"query": "hello", "session_id": "session-1"}
     if supplied_qid:
         params["qid"] = supplied_qid
+    if coordinates is not None:
+        params.update(latitude=coordinates[0], longitude=coordinates[1])
     response = TestClient(app).get("/chat/", params=params)
     assert response.status_code == 200
     assert response.text == "answer"
     returned_qid = response.headers["x-qid"]
     assert response.headers["access-control-expose-headers"] == "X-QID"
     assert returned_qid == captured[0]["qid"]
+    assert captured[0]["latitude"] == (28.6 if coordinates and coordinates[0] else None)
+    assert captured[0]["longitude"] == (77.2 if coordinates and coordinates[1] else None)
     if supplied_qid:
         assert returned_qid == supplied_qid
     else:
         uuid.UUID(returned_qid)
+
+
+@pytest.fixture
+def token_module(load_module, monkeypatch, tmp_path):
+    settings = SimpleNamespace(jwt_private_key_path=None, base_dir=tmp_path,
+        jwt_algorithm="RS256", jwt_expiry_minutes=15,
+        play_integrity_package_name_prefix="PLAY_INTEGRITY_PACKAGE_NAME_",
+        play_integrity_private_key_prefix="PLAY_INTEGRITY_PRIVATE_KEY_",
+        api_key_auth_token_prefix="API_KEY_AUTH_TOKEN_")
+    config = ModuleType("app.config")
+    config.settings = settings
+    config.get_default_httpx_timeout = lambda: 10
+    config.DEFAULT_HTTP_TIMEOUT = 10
+    monkeypatch.setitem(sys.modules, "app.config", config)
+    cache_module = ModuleType("app.core.cache")
+    cache_module.cache = SimpleNamespace()
+    monkeypatch.setitem(sys.modules, "app.core.cache", cache_module)
+    return load_module("app/routers/token.py")
+
+
+@pytest.mark.parametrize("kind", ["package", "api_key"])
+@pytest.mark.parametrize("value", ["  configured-value  ", "  "])
+def test_auth_configuration_trims_values_and_rejects_whitespace(token_module, monkeypatch, kind, value):
+    from fastapi import HTTPException
+    key = "PLAY_INTEGRITY_PACKAGE_NAME_TEST_CLIENT" if kind == "package" else "API_KEY_AUTH_TOKEN_TEST_CLIENT"
+    resolve = token_module._resolve_play_integrity_package_name if kind == "package" else token_module._resolve_api_key
+    monkeypatch.setenv(key, value)
+    if value.strip():
+        assert resolve("test-client") == "configured-value"
+    else:
+        with pytest.raises(HTTPException) as error:
+            resolve("test-client")
+        assert error.value.status_code == 500
+
+
+def test_play_integrity_normalizes_escaped_private_key(token_module, monkeypatch, tmp_path):
+    import asyncio
+    import json
+    service_account_path = tmp_path / "service-account.json"
+    service_account_path.write_text(json.dumps({"private_key": "placeholder"}))
+    monkeypatch.setattr(token_module, "_resolve_service_account_path", lambda client: service_account_path)
+    monkeypatch.setenv("PLAY_INTEGRITY_PRIVATE_KEY_TEST_CLIENT", "BEGIN\\nEND")
+    captured = []
+    def credentials(info, scopes):
+        captured.append(info)
+        return SimpleNamespace(valid=True, token="test-access-token")
+    monkeypatch.setattr(token_module.service_account.Credentials, "from_service_account_info", credentials)
+    assert asyncio.run(token_module._get_play_integrity_access_token("test-client")) == "test-access-token"
+    assert captured[0]["private_key"] == "BEGIN\nEND"
+
+
+def test_guest_cannot_choose_admin_role(token_module, monkeypatch):
+    import asyncio
+    captured = []
+    monkeypatch.setattr(token_module, "private_key", object())
+    monkeypatch.setattr(token_module.jwt, "encode", lambda payload, key, algorithm: captured.append(payload) or "test-token")
+    request = token_module.AuthRequest.model_validate({"role": "admin", "fingerprint_id": "device-1"})
+    asyncio.run(token_module.create_auth_token(request))
+    assert captured[0]["role"] == "public"
+    assert captured[0]["sub"] == "guest:device-1"
+
+
+def test_api_key_cannot_override_jwt_claims(token_module, monkeypatch):
+    import asyncio
+    captured = []
+    monkeypatch.setenv("API_KEY_AUTH_TOKEN_TEST_CLIENT", "test-api-key")
+    monkeypatch.setattr(token_module, "private_key", object())
+    monkeypatch.setattr(token_module.jwt, "encode", lambda payload, key, algorithm: captured.append(payload) or "test-token")
+    request = token_module.ApiKeyAuthRequest.model_validate({"client_code": "test-client", "claims": {"role": "admin", "channel": "other-client"}})
+    asyncio.run(token_module.create_auth_token_with_api_key(request, "test-api-key"))
+    assert captured[0]["role"] == "public"
+    assert captured[0]["channel"] == "test-client"
+
+
+@pytest.mark.parametrize("language", ["en", "hi", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te"])
+def test_prompt_template_compiles(language):
+    from jinja2 import Environment
+    text = (ROOT / "assets/prompts" / f"agrinet_{language}.md").read_text()
+    Environment().parse(text)
