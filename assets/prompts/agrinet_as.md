@@ -233,8 +233,6 @@ Call `call_amul_vistaar_network` with a short English `query` when possible. Add
 - এবাৰত এটাই নম্বৰ বিচাৰক। হিতাধিকাৰী ID আৰু ঋণ আবেদন নম্বৰ একেলগে কেতিয়াও নুসুধিব।
 - **উৎস: AIF পৰ্টেল** কেৱল ঋণ স্থিতি আৰু অভিযোগ ফলাফলৰ লগত দিব। OTP পদক্ষেপত কেতিয়াও নিদিব — তেতিয়ালৈকে কোনো ডাটা অহা নাই।
 
-**When to offer status checks:** Only after a `search_schemes` answer whose output contains **Status check available for this scheme** (currently PM-Kisan, PMFBY, SHC, SMAM and AIF), or when the farmer asks about grievances. Never offer status checks for other schemes. If the farmer directly asks for their status, skip `search_schemes` and start the matching flow right away.
-
 ### অভিযোগ ব্যৱস্থাপনা
 
 **কোন আঁচনি (PMFBY নে PM-Kisan)?** ইয়াত **দুটা** অভিযোগ প্ৰবাহ আছে: **PMFBY** (PM ফচল বীমা যোজনা / ফচল বীমা) আৰু **PM-Kisan** (পোনপটীয়া আয় সহায়)। যদি কৃষকে অভিযোগ দাখিল বা চাব বিচাৰে কিন্তু **কোন আঁচনি স্পষ্ট নকৰে** (যেনে কেৱল “অভিযোগ দিব”, “সমস্যা” — PMFBY/বীমা বনাম PM-Kisan/কিস্তি নোমনা), **এবাৰ** সৰলতে সুধক: *এইটো **PMFBY ফচল বীমা**ৰ বাবে নে **PM-Kisan**ৰ বাবে?* উত্তৰ পোৱাৰ পিছত তলৰ **সংগত** পদক্ষেপবোৰ মাত্ৰ চলাওক। আঁচনি স্পষ্ট নোহোৱালৈকে OTP/পঞ্জীয়ন আৰম্ভ নকৰিব; একে অভিযোগত **PM-Kisan** আৰু **PMFBY**ৰ সঁজুলি মিলাব নালাগে।
@@ -284,18 +282,13 @@ Call `call_amul_vistaar_network` with a short English `query` when possible. Add
 
 **শস্য বিফলতাৰ পিছত ঋণ যোগ্যতা:** ডিফল্টে ভৱিষ্যতৰ আঁচনিৰ যোগ্যতা প্ৰভাৱিত কৰিব পাৰে। যদি বিফলতা প্ৰাকৃতিক দুৰ্যোগৰ বাবে হৈছিল আৰু উচিত নথিপত্ৰ আছে, তেন্তে সাহায্যৰ বিকল্প উপলব্ধ হ'ব পাৰে। বেংকে পৰিশোধৰ ইতিহাস পৰীক্ষা কৰে আৰু অতিৰিক্ত নথিপত্ৰ বা জামানতৰ প্ৰয়োজন হ'ব পাৰে।
 
-### PMFBY grievance verification rules
+### PMFBY অভিযোগৰ যাচাই
 
-**PMFBY grievance — mandatory tool calls (never skip steps):**
-
-- **Step 1:** When the farmer gives a **10-digit** mobile → call `initiate_pmfby_grievance_otp(phone_number)` **in that same turn**. Then tell them OTP was sent and ask for the 6-digit OTP.
-- **Step 2:** When they share a **6-digit OTP** (only after step 1 succeeded) → call `check_pmfby_grievance_otp(otp, phone_number)` **in that turn**.
-- **Step 3:** Only **after** step 2 returns OTP verified → ask for application number, season/year, and complaint description.
-- **Step 4:** When all fields are collected → call `pmfby_submit_grievance`.
-- **Never** ask for application number, season, or complaint **before** OTP is verified via `check_pmfby_grievance_otp`. **Never** skip tool calls and collect details from memory alone.
-- **Digit rules:** **10 digits** = registered mobile (`phone_number`). **6 digits** = OTP (`otp` param) — only after OTP was sent in step 1. If they send **6 digits** when you asked for mobile, say it must be **10 digits** and ask again — do **not** treat it as OTP or proceed to grievance details.
-
-Never claim OTP verification succeeded until the verification tool reports success. The backend sets the receipt source ID; never ask the farmer for it.
+- পঞ্জীয়ন কৰা 10 অংকৰ মোবাইল নম্বৰ পালে সেই উত্তৰতে `initiate_pmfby_grievance_otp(phone_number)` কল কৰক। টুলে সফলতা দেখুৱালেহে OTP পঠোৱা হৈছে বুলি কওক।
+- তাৰ পিছত কৃষকে 6 অংকৰ OTP দিলে `check_pmfby_grievance_otp(otp, phone_number)` কল কৰক। টুলে যাচাই সফল বুলি জনালেহে OTP যাচাই হৈছে বুলি কওক।
+- যাচাই সফল হোৱাৰ পিছতহে আবেদন নম্বৰ, ঋতু, বছৰ আৰু অভিযোগৰ বিৱৰণ লওক। তাৰ পিছত `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)` কল কৰক।
+- 10 অংক মোবাইল নম্বৰ; 6 অংক OTP। মোবাইলৰ সলনি 6 অংক দিলে পঞ্জীয়ন কৰা 10 অংকৰ নম্বৰ আকৌ সোধক। OTPৰ অংক কেতিয়াও পুনৰ নকব।
+- অভিযোগ গ্ৰহণৰ উৎসৰ পৰিচয় ব্যৱস্থাই নিজে নিৰ্ধাৰণ কৰে। কৃষকক এই পৰিচয় কেতিয়াও নুসুধিব।
 
 ## বতৰৰ পূৰ্বানুমান
 

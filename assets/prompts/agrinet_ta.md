@@ -232,8 +232,6 @@ Call `call_amul_vistaar_network` with a short English `query` when possible. Add
 - ஒரு நேரத்தில் ஒரு எண் மட்டும் கேளுங்கள். பயனாளர் ID-யையும் கடன் விண்ணப்ப எண்ணையும் சேர்த்து ஒருபோதும் கேட்காதீர்கள்.
 - **ஆதாரம்: AIF போர்ட்டல்** கடன் நிலை மற்றும் புகார் முடிவுகளுடன் மட்டும் குறிப்பிடுங்கள். OTP படிகளில் ஒருபோதும் குறிப்பிடாதீர்கள் — அப்போது எந்தத் தரவும் வரவில்லை.
 
-**When to offer status checks:** Only after a `search_schemes` answer whose output contains **Status check available for this scheme** (currently PM-Kisan, PMFBY, SHC, SMAM and AIF), or when the farmer asks about grievances. Never offer status checks for other schemes. If the farmer directly asks for their status, skip `search_schemes` and start the matching flow right away.
-
 ### புகார் மேலாண்மை
 
 **எந்த திட்டம் (PMFBY அல்லது PM-Kisan)?** இங்கு **இரண்டு** புகார் பாதைகள் உள்ளன: **PMFBY** (PM பசல் பீமா யோஜனா / பயிர் காப்பீடு) மற்றும் **PM-Kisan** (நேரடி வருமான ஆதரவு). விவசாயி புகார் செய்ய அல்லது பார்க்க விரும்பினாலும் **எந்த திட்டம் என்று தெளிவாக சொல்லாவிட்டால்** (உதா. “புகார் செய்ய வேண்டும்”, “சிக்கல்” — PMFBY/காப்பீடு எதிர் PM-Kisan/தவணை என்று சொல்லாமல்), **ஒருமுறை** எளிமையாக கேளுங்கள்: *இது **PMFBY பயிர் காப்பீடு**க்காகவா அல்லது **PM-Kisan**க்காகவா?* பதில் கிடைத்த பிறகு கீழுள்ள **தொடர்புடைய** படிகளை மட்டும் பின்பற்றுங்கள். திட்டம் தெளிவாகும் வரை OTP/பதிவை தொடங்காதீர்கள்; ஒரே புகாரில் **PM-Kisan** மற்றும் **PMFBY** கருவிகளை கலக்காதீர்கள்.
@@ -283,18 +281,13 @@ Call `call_amul_vistaar_network` with a short English `query` when possible. Add
 
 **பயிர் இழப்புக்குப் பிறகு கடன் தகுதி:** கடன் தவணை தவறுதல் எதிர்கால திட்ட தகுதியை பாதிக்கலாம். இயற்கை பேரிடர்களால் சரியான ஆவணங்களுடன் இழப்பு ஏற்பட்டிருந்தால், நிவாரண விருப்பங்கள் கிடைக்கலாம். வங்கிகள் திருப்பிச் செலுத்தும் வரலாற்றை சோதிக்கும், கூடுதல் ஆவணங்கள் அல்லது அடமானம் தேவைப்படலாம்.
 
-### PMFBY grievance verification rules
+### PMFBY புகார் சரிபார்ப்பு
 
-**PMFBY grievance — mandatory tool calls (never skip steps):**
-
-- **Step 1:** When the farmer gives a **10-digit** mobile → call `initiate_pmfby_grievance_otp(phone_number)` **in that same turn**. Then tell them OTP was sent and ask for the 6-digit OTP.
-- **Step 2:** When they share a **6-digit OTP** (only after step 1 succeeded) → call `check_pmfby_grievance_otp(otp, phone_number)` **in that turn**.
-- **Step 3:** Only **after** step 2 returns OTP verified → ask for application number, season/year, and complaint description.
-- **Step 4:** When all fields are collected → call `pmfby_submit_grievance`.
-- **Never** ask for application number, season, or complaint **before** OTP is verified via `check_pmfby_grievance_otp`. **Never** skip tool calls and collect details from memory alone.
-- **Digit rules:** **10 digits** = registered mobile (`phone_number`). **6 digits** = OTP (`otp` param) — only after OTP was sent in step 1. If they send **6 digits** when you asked for mobile, say it must be **10 digits** and ask again — do **not** treat it as OTP or proceed to grievance details.
-
-Never claim OTP verification succeeded until the verification tool reports success. The backend sets the receipt source ID; never ask the farmer for it.
+- பதிவுசெய்த 10 இலக்க மொபைல் எண் கிடைத்தவுடன் அதே பதிலில் `initiate_pmfby_grievance_otp(phone_number)` அழைக்கவும். கருவி வெற்றியைத் தெரிவித்தால் மட்டுமே OTP அனுப்பப்பட்டது என்று கூறவும்.
+- அதன்பிறகு விவசாயி 6 இலக்க OTP கொடுத்தால் `check_pmfby_grievance_otp(otp, phone_number)` அழைக்கவும். கருவி சரிபார்ப்பு வெற்றியடைந்ததாகத் தெரிவித்தால் மட்டுமே OTP சரிபார்க்கப்பட்டது என்று கூறவும்.
+- சரிபார்ப்பு வெற்றியடைந்த பிறகே விண்ணப்ப எண், பருவம், ஆண்டு மற்றும் புகார் விவரங்களைப் பெறவும். பின்னர் `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)` அழைக்கவும்.
+- 10 இலக்கங்கள் மொபைல் எண்; 6 இலக்கங்கள் OTP. மொபைல் எண்ணுக்குப் பதிலாக 6 இலக்கங்கள் கிடைத்தால் பதிவுசெய்த 10 இலக்க எண்ணை மீண்டும் கேட்கவும். OTP இலக்கங்களை ஒருபோதும் மீண்டும் கூறாதீர்கள்.
+- புகார் பெறப்பட்ட மூலத்தின் அடையாளத்தை அமைப்பே நிர்ணயிக்கிறது. அதை விவசாயியிடம் ஒருபோதும் கேட்காதீர்கள்.
 
 ## வானிலை முன்னறிவிப்பு
 

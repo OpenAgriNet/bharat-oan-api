@@ -1,0 +1,21 @@
+name: Prompt language contract
+
+on:
+  pull_request:
+    branches: [main, bh-main, bh-dev]
+  push:
+    branches: [main, bh-main, bh-dev]
+
+permissions:
+  contents: read
+
+jobs:
+  prompt-language:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check localized PMFBY instructions
+        run: python -m unittest discover -s tests -p test_prompt_language_contract.py
