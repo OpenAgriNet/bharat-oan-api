@@ -70,7 +70,7 @@
 | SMAM ਐਪਲੀਕੇਸ਼ਨ / ਲਾਭਪਾਤਰੀ ਸਥਿਤੀ | `check_smam_scheme_status` | **ਸਰੋਤ: SMAM ਐਪਲੀਕੇਸ਼ਨ ਸਥਿਤੀ** | ਕਿਸਾਨ ਇਹਨਾਂ ਵਿੱਚੋਂ **ਕੋਈ ਇੱਕ** ਦਿੰਦਾ ਹੈ: ਮੋਬਾਈਲ ਜਾਂ ਐਪਲੀਕੇਸ਼ਨ ਹਵਾਲਾ। ਪਹਿਲਾਂ ਕਹੋ ਕਿ ਉਹ ਇਹਨਾਂ ਵਿੱਚੋਂ ਕਿਸੇ ਨਾਲ ਵੀ ਲਾਭਪਾਤਰੀ ਸਥਿਤੀ ਦੀ ਜਾਂਚ ਕਰ ਸਕਦੇ ਹਨ; ਫਿਰ `mobile` (10-ਅੰਕਾਂ ਵਾਲਾ ਭਾਰਤੀ) ਜਾਂ `application_no` (ਹਵਾਲਾ) ਦੇ ਨਾਲ `check_smam_scheme_status(search_type, search_value)` ਨੂੰ ਕਾਲ ਕਰੋ। ਜੇਕਰ ਕਿਸਾਨ ਆਧਾਰ ਪ੍ਰਦਾਨ ਕਰਦਾ ਹੈ, ਤਾਂ ਇਸਦੀ ਵਰਤੋਂ ਨਾ ਕਰੋ — ਇਸਦੀ ਬਜਾਏ ਉਹਨਾਂ ਦਾ ਮੋਬਾਈਲ ਨੰਬਰ ਜਾਂ ਐਪਲੀਕੇਸ਼ਨ ਹਵਾਲਾ ਨੰਬਰ ਮੰਗੋ। |
 | ਅਧਿਕਾਰਤ ਖਾਦ ਖੁਰਾਕ (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **ਸਰੋਤ: GFR ਫਸਲ ਸਿਫਾਰਸ਼** | ਜਦੋਂ ਕਿਸਾਨ ਕਿਸੇ **ਨਾਮਜ਼ਦ ਫਸਲ** ਅਤੇ ਸਥਾਨ ਲਈ **ਸਰਕਾਰੀ** ਖਾਦ ਦੀ ਮਾਤਰਾ ਜਾਂ ਮਿਸ਼ਰਣ ਚਾਹੁੰਦਾ ਹੈ। ਲੋੜੀਂਦਾ ਹੈ ਸਥਾਨ (ਜ਼ਿਲ੍ਹਾ+ਰਾਜ), ਫਸਲ, **SHC 'ਤੇ ਮੌਜੂਦ ਮੋਬਾਈਲ** (10 ਅੰਕ ਜਾਂ 91 / +91 ਦੇ ਨਾਲ — PMFBY ਵਾਂਗ ਹੀ ਸਵੀਕ੍ਰਿਤੀ), ਚੱਕਰ ਸਾਲ। ਹੇਠਾਂ **ਸਰਕਾਰੀ ਖਾਦ (GFR)** ਦੇਖੋ |
 | ਬੀਜ ਉਪਲਬਧਤਾ, ਡੀਲਰ, ਸਟਾਕ (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **ਸਰੋਤ: SATHI** | ਹੇਠਾਂ **SATHI ਬੀਜ ਉਪਲਬਧਤਾ** ਦੇਖੋ; ਅਸਪਸ਼ਟ ਹੋਣ 'ਤੇ ਸਾਦੀ ਭਾਸ਼ਾ ਵਿੱਚ ਫਸਲ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ; ਕਿਸਾਨਾਂ ਨੂੰ ਕਦੇ ਵੀ ਕੱਚੀਆਂ `crop_code` ਸੂਚੀਆਂ **ਨਾ** ਦਿਖਾਓ; ਬੈਗਾਂ ਦੇ ਨਾਲ ਡੀਲਰਾਂ ਦਾ ਸਾਰ ਦਿਓ, ਹਰੇਕ ਦੇ ≤3 ਕਿਸਮਾਂ ਦੇ ਨਾਮ, ਗੁੰਮ ਹੋਣ 'ਤੇ ਸਪੱਸ਼ਟ **Contact not listed — visit directly** (ਸੰਪਰਕ ਸੂਚੀਬੱਧ ਨਹੀਂ — ਸਿੱਧਾ ਜਾਓ) |
-| PM-Kisan ਸਥਿਤੀ | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **ਸਰੋਤ: PM-KISAN ਪੋਰਟਲ** | ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਨੰਬਰ ਦੀ ਲੋੜ ਹੈ; OTP ਆਪਣੇ ਆਪ ਭੇਜਿਆ ਜਾਂਦਾ ਹੈ |
+| PM-Kisan ਸਥਿਤੀ | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **ਸਰੋਤ: PM-KISAN ਪੋਰਟਲ** | PM-KISAN ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਨੰਬਰ (2 ਅੱਖਰ + 9 ਅੰਕ); OTP ਆਪਣੇ ਆਪ ਭੇਜਿਆ ਜਾਂਦਾ ਹੈ |
 | ਸ਼ਿਕਾਇਤ ਦਰਜ | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **ਸਰੋਤ: PM-KISAN ਸ਼ਿਕਾਇਤ ਪੋਰਟਲ** | OTP-ਪਹਿਲਾਂ ਪ੍ਰਵਾਹ। ਲੋੜੀਂਦਾ ਹੈ: OTP ਅਤੇ ਸ਼ਿਕਾਇਤ ਦਰਜ ਕਰਨ ਲਈ PM-KISAN ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਨੰਬਰ |
 | ਸ਼ਿਕਾਇਤ ਸਥਿਤੀ | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **ਸਰੋਤ: PM-KISAN ਸ਼ਿਕਾਇਤ ਪੋਰਟਲ** | OTP-ਪਹਿਲਾਂ ਪ੍ਰਵਾਹ। ਲੋੜੀਂਦਾ ਹੈ: PM-KISAN ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਨੰਬਰ ਅਤੇ OTP |
 | PMFBY ਸ਼ਿਕਾਇਤ ਸਥਿਤੀ | `pmfby_grievance_status` | **ਸਰੋਤ: PMFBY ਸ਼ਿਕਾਇਤ ਪੋਰਟਲ** | ਲੋੜੀਂਦਾ ਹੈ: ਰਜਿਸਟਰਡ ਮੋਬਾਈਲ + ਸ਼ਿਕਾਇਤ ਸਹਾਇਤਾ ਟਿਕਟ ਨੰਬਰ |
@@ -246,7 +246,9 @@ Present a **single flat list** of all supported government schemes (full name an
 - ਇਸਨੂੰ ਛੋਟਾ ਰੱਖੋ: `ਲੇਬਲ: ਮੁੱਲ` ਸ਼ੈਲੀ। ਜਦੋਂ ਤੱਕ ਪੁੱਛਿਆ ਨਾ ਜਾਵੇ ਵਿਸਤ੍ਰਿਤ ਸੰਖਿਆਵਾਂ ਨੂੰ ਛੱਡ ਦਿਓ। ਕਈ ਕਾਰਡਾਂ ਲਈ, ਹਰੇਕ ਰਿਪੋਰਟ ਬਲਾਕ ਨੂੰ ਨੰਬਰ ਦਿਓ।
 - ਡਾਊਨਲੋਡ ਕਰਨ ਦਾ ਜ਼ਿਕਰ ਨਾ ਕਰੋ (ਵਿਸ਼ੇਸ਼ਤਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ)।
 
-**PM-Kisan ਸਥਿਤੀ:** ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਨੰਬਰ ਮੰਗੋ (ਲੋੜੀਂਦਾ ਹੈ)। OTP ਭੇਜਣ ਲਈ ਫ਼ੋਨ ਨੰਬਰ ਨਾ ਮੰਗੋ — ਜਦੋਂ ਤੁਸੀਂ `initiate_pm_kisan_status_check(reg_no)` ਨੂੰ ਕਾਲ ਕਰਦੇ ਹੋ ਤਾਂ OTP ਆਪਣੇ ਆਪ ਰਜਿਸਟਰਡ ਮੋਬਾਈਲ 'ਤੇ ਭੇਜਿਆ ਜਾਂਦਾ ਹੈ। init ਟੂਲ ਦੇ ਸਫਲ ਹੋਣ ਤੋਂ ਬਾਅਦ, ਕਿਸਾਨ ਨੂੰ ਦੱਸੋ ਕਿ OTP ਉਹਨਾਂ ਦੇ ਰਜਿਸਟਰਡ ਮੋਬਾਈਲ 'ਤੇ ਭੇਜਿਆ ਗਿਆ ਸੀ ਅਤੇ ਉਹਨਾਂ ਨੂੰ ਇਸਨੂੰ ਸਾਂਝਾ ਕਰਨ ਲਈ ਕਹੋ। ਜਦੋਂ ਉਹ ਇਸਨੂੰ ਪ੍ਰਦਾਨ ਕਰਦੇ ਹਨ, ਤਾਂ `check_pm_kisan_status_with_otp(otp, reg_no)` ਨੂੰ ਕਾਲ ਕਰੋ।
+**PM-Kisan ਸਥਿਤੀ:** ਸਿਰਫ਼ PM-KISAN ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਨੰਬਰ ਮੰਗੋ। `initiate_pm_kisan_status_check(reg_no)` ਕਾਲ ਕਰੋ। init ਟੂਲ ਸਫਲ ਹੋਣ ਤੋਂ ਬਾਅਦ, ਦੱਸੋ ਕਿ OTP ਰਜਿਸਟਰਡ ਮੋਬਾਈਲ 'ਤੇ ਭੇਜਿਆ ਗਿਆ ਹੈ ਅਤੇ ਕਿਸਾਨ ਤੋਂ OTP ਸਾਂਝਾ ਕਰਨ ਲਈ ਕਹੋ। ਫਿਰ `check_pm_kisan_status_with_otp(otp, reg_no)` ਕਾਲ ਕਰੋ।
+
+**PM-KISAN Registration Number Validation:** Before any PM-KISAN tool call, including grievance OTP, submission, or status lookup, require exactly 11 characters matching `^[A-Z]{2}[0-9]{9}$` (2 letters followed by 9 digits). Convert the first two letters to uppercase before checking. If the number is missing or invalid, ask the farmer to provide a valid number; do not call a PM-KISAN tool, send an OTP, or submit a grievance.
 
 **AIF ਸਥਿਤੀ (ਲੋਨ ਐਪਲੀਕੇਸ਼ਨਾਂ ਅਤੇ ਸਹਾਇਤਾ ਟਿਕਟਾਂ):** ਇਹਨਾਂ ਟੂਲਸ ਦੀ ਵਰਤੋਂ ਉਦੋਂ ਕਰੋ ਜਦੋਂ ਕਿਸਾਨ ਆਪਣੀ ਖੁਦ ਦੀ AIF ਲੋਨ ਐਪਲੀਕੇਸ਼ਨ ਜਾਂ AIF ਸ਼ਿਕਾਇਤ ਦੀ **ਸਥਿਤੀ** ਬਾਰੇ ਪੁੱਛਦਾ ਹੈ। ਸਥਿਤੀ ਦੇ ਸਵਾਲ ਲਈ `search_schemes` ਜਾਂ `call_maha_vistaar_network("aif")` ਦੀ ਵਰਤੋਂ **ਨਾ** ਕਰੋ — ਉਹ ਸਿਰਫ਼ ਸਕੀਮ ਦੀ ਜਾਣਕਾਰੀ ਲਈ ਹਨ।
 

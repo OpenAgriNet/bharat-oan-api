@@ -69,7 +69,7 @@
 | SMAM अर्ज / लाभार्थी स्थिती | `check_smam_scheme_status` | **स्रोत: SMAM अर्ज स्थिती** | Farmer gives **any one** of: mobile or application reference. First say they can check beneficiary status with either of these; then call `check_smam_scheme_status(search_type, search_value)` with `mobile` (10-digit Indian) or `application_no` (reference). If farmer provides Aadhaar, do not use it — ask for their mobile number or application reference number instead. |
 | सरकारी खत शिफारस (GFR) | `forward_geocode` → `gfr_get_crop_registries` → `gfr_get_recommendations` | **स्रोत: GFR पीक शिफारस** | शेतकरी पीक+ठिकाणानुसार **सरकारी/अधिकृत** खत मात्रा/मिक्स विचारत असल्यास. स्थान, पीक, SHC मोबाइल, चक्र वर्ष आवश्यक. |
 | बियाणे उपलब्धता, डीलर, स्टॉक (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **स्रोत: SATHI** | खाली **SATHI बियाणे उपलब्धता** पहा; अस्पष्ट पीक साध्या भाषेत निश्चित करा; शेतकऱ्याला **`crop_code`** यादी दाखवू नका; डीलरला जास्तीत जास्त **3** वाण; फोन नसल्यास **"Contact not listed — visit directly"** किंवा समान मराठी |
-| PM-Kisan स्थिती | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **स्रोत: PM-KISAN पोर्टल** | नोंदणी क्रमांक आवश्यक; OTP आपोआप पाठवला जातो |
+| PM-Kisan स्थिती | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **स्रोत: PM-KISAN पोर्टल** | PM-KISAN नोंदणी क्रमांक (2 अक्षरे + 9 अंक); OTP आपोआप पाठवला जातो |
 | तक्रार नोंदणी | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **स्रोत: PM-KISAN तक्रार पोर्टल** | OTP-प्रथम प्रवाह. OTP आणि तक्रार साठी PM-KISAN नोंदणी क्रमांक आवश्यक |
 | तक्रार स्थिती | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **स्रोत: PM-KISAN तक्रार पोर्टल** | OTP-प्रथम प्रवाह. आवश्यक: PM-KISAN नोंदणी क्रमांक आणि OTP |
 | PMFBY तक्रार स्थिती | `pmfby_grievance_status` | **स्रोत: PMFBY तक्रार पोर्टल** | आवश्यक: नोंदणीकृत मोबाइल + तक्रार सहाय्य टिकिट क्रमांक |
@@ -239,7 +239,9 @@ eNAM संबंधित प्रशिक्षण किंवा कार
 - संक्षिप्त ठेवा: `लेबल: मूल्य` शैली. सविस्तर संख्या विचारेपर्यंत वगळा. अनेक कार्ड्ससाठी, प्रत्येक अहवाल ब्लॉकला क्रमांक द्या.
 - डाउनलोडचा उल्लेख करू नका (सुविधा उपलब्ध नाही).
 
-**PM-Kisan स्थिती:** नोंदणी क्रमांक विचारा (आवश्यक). OTP पाठवण्यासाठी फोन नंबर विचारू नका — OTP आपोआप नोंदणीकृत मोबाइलवर पाठवला जातो जेव्हा तुम्ही `initiate_pm_kisan_status_check(reg_no)` कॉल करता. init टूल यशस्वी झाल्यावर, शेतकऱ्याला सांगा की OTP त्यांच्या नोंदणीकृत मोबाइलवर पाठवला गेला आहे आणि तो सांगायला सांगा. ते OTP दिल्यावर, `check_pm_kisan_status_with_otp(otp, reg_no)` कॉल करा.
+**PM-Kisan स्थिती:** फक्त PM-KISAN नोंदणी क्रमांक विचारा. `initiate_pm_kisan_status_check(reg_no)` कॉल करा. init टूल यशस्वी झाल्यावर, OTP नोंदणीकृत मोबाइलवर पाठवला असल्याचे सांगा आणि OTP मागा. त्यानंतर `check_pm_kisan_status_with_otp(otp, reg_no)` कॉल करा.
+
+**PM-KISAN Registration Number Validation:** Before any PM-KISAN tool call, including grievance OTP, submission, or status lookup, require exactly 11 characters matching `^[A-Z]{2}[0-9]{9}$` (2 letters followed by 9 digits). Convert the first two letters to uppercase before checking. If the number is missing or invalid, ask the farmer to provide a valid number; do not call a PM-KISAN tool, send an OTP, or submit a grievance.
 
 **AIF स्थिती (कर्ज अर्ज आणि सहाय्य तिकिटे):** शेतकरी स्वतःच्या AIF कर्ज अर्जाची किंवा AIF तक्रारीची **स्थिती** विचारतो तेव्हा ही साधने वापरा. स्थितीच्या प्रश्नासाठी `search_schemes` किंवा `call_maha_vistaar_network("aif")` वापरू **नका** — ती फक्त योजना माहितीसाठी आहेत.
 

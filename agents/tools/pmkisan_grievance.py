@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Literal
@@ -697,9 +698,7 @@ def _validate_submit_grievance_inputs(
     otp: Optional[str],
 ) -> tuple[str, str]:
     """Return (identifier_value, reg_no_clean) or raise ModelRetry."""
-    if not reg_no or not reg_no.strip():
-        raise ModelRetry("Please provide the PM-KISAN Registration Number.")
-    identifier_value = to_ascii_digits(reg_no).strip()
+    identifier_value = _validate_pmkisan_registration_number(reg_no)
     if not grievance_type or grievance_type not in GRIEVANCE_MAPPING:
         choices = '", "'.join(GRIEVANCE_TYPES)
         raise ModelRetry(f'Invalid grievance type: "{grievance_type}". Please select from: "{choices}".')
@@ -712,6 +711,20 @@ def _validate_submit_grievance_inputs(
             "First call pmkisan_grievance_send_otp, then call this tool with the received OTP."
         )
     return identifier_value, reg_no_clean
+
+
+def _validate_pmkisan_registration_number(reg_no: str) -> str:
+    """Normalize and validate the PM-KISAN format: two letters followed by nine digits."""
+    if not reg_no or not reg_no.strip():
+        raise ModelRetry("Please provide the PM-KISAN Registration Number.")
+
+    normalized = to_ascii_digits(reg_no).strip().upper()
+    if not re.fullmatch(r"[A-Z]{2}[0-9]{9}", normalized):
+        raise ModelRetry(
+            "Invalid PM-KISAN Registration Number. It must be exactly 11 characters: "
+            "2 letters followed by 9 digits (for example, AB123456789)."
+        )
+    return normalized
 
 
 async def _submit_grievance_init_request(
@@ -786,11 +799,9 @@ async def pmkisan_grievance_send_otp(
         OTP send confirmation or service error.
     """
     try:
-        if not reg_no or not reg_no.strip():
-            raise ModelRetry("Please provide the PM-KISAN Registration Number to send OTP.")
-
+        reg_no_clean = _validate_pmkisan_registration_number(reg_no)
         purpose_text = "submit the grievance" if purpose == "submit_grievance" else "check grievance status"
-        return await _request_pm_kisan_otp(ctx, to_ascii_digits(reg_no).strip(), phone_number, purpose_text)
+        return await _request_pm_kisan_otp(ctx, reg_no_clean, phone_number, purpose_text)
 
     except httpx.TimeoutException:
         logger.error("PM-KISAN grievance OTP request timed out.")
@@ -885,12 +896,7 @@ async def pmkisan_grievance_status(
         Grievance status summary or OTP verification error.
     """
     try:
-        if not reg_no or not reg_no.strip():
-            raise ModelRetry(
-                "Please provide the PM-KISAN Registration Number to check grievance status."
-            )
-
-        identifier_value = to_ascii_digits(reg_no).strip()
+        identifier_value = _validate_pmkisan_registration_number(reg_no)
         identifier_type: Literal["reg-number"] = "reg-number"
 
         reg_no_clean = identifier_value
