@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 import time
 from typing import Any
@@ -20,7 +21,7 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/transcribe", tags=["transcribe"])
 
 
-def _detect_language(
+async def _detect_language(
     audio_content: str,
     session_id: str,
     uid: str,
@@ -32,7 +33,8 @@ def _detect_language(
     success, status_code, error_code, error_message = False, 500, None, None
     detected_lang = None
     try:
-        detected_lang = detect_audio_language_bhashini(audio_content)
+        # Blocking HTTP with retries; keep it off the event loop.
+        detected_lang = await asyncio.to_thread(detect_audio_language_bhashini, audio_content)
         success, status_code = True, 200
         return detected_lang
     except Exception as e:
@@ -97,16 +99,21 @@ async def transcribe(
     try:
         if request.service_type == 'bhashini':
             # Always detect spoken language first, then transcribe with the detected code.
-            source_lang = _detect_language(
+            source_lang = await _detect_language(
                 request.audio_content, session_id, uid, request.qid, background_tasks
             )
             # Bhashini ALD labels Maithili speech as Hindi; trust the UI's Maithili selection.
             if source_lang == "hi" and (request.lang_code or "").strip().lower() == "mai":
                 source_lang = "mai"
-            transcription = transcribe_bhashini(request.audio_content, source_lang)
+            # Bhashini and Whisper calls are blocking HTTP with retries; keep them off the event loop.
+            transcription = await asyncio.to_thread(
+                transcribe_bhashini, request.audio_content, source_lang
+            )
             response_lang_code = source_lang
         else:
-            response_lang_code, transcription = transcribe_whisper(request.audio_content)
+            response_lang_code, transcription = await asyncio.to_thread(
+                transcribe_whisper, request.audio_content
+            )
         success, status_code = True, 200
     except Exception as e:
         error_code, error_message = type(e).__name__, str(e)
