@@ -3,14 +3,6 @@ name: Build and Push to GCP Artifact Registry
 on:
   workflow_dispatch:
     inputs:
-      target_environment:
-        description: Branch/environment name to use for image tags and GitHub environment
-        required: true
-        default: bh-dev
-        type: choice
-        options:
-          - bh-dev
-          - main
       push_image:
         description: Push the built Docker image to Artifact Registry
         required: true
@@ -18,11 +10,9 @@ on:
         type: boolean
   push:
     branches:
-      - main
       - bh-dev
   pull_request:
     branches:
-      - main
       - bh-dev
 
 env:
@@ -31,8 +21,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Use the target branch name as the environment (GitHub Environments must match branch names: main, bh-dev)
-    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target_environment || github.base_ref || github.ref_name }}
+    # Manual runs use the selected source branch for credentials and image tags.
+    if: github.event_name != 'workflow_dispatch' || github.ref_name == 'main' || github.ref_name == 'bh-dev'
+    environment: ${{ github.base_ref || github.ref_name }}
 
     steps:
       - name: Checkout repository
@@ -47,8 +38,6 @@ jobs:
           # Determine the branch name depending on event type
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BRANCH="${{ github.base_ref }}"
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            BRANCH="${{ inputs.target_environment }}"
           else
             BRANCH="${{ github.ref_name }}"
           fi
