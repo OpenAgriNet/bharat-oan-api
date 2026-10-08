@@ -6,6 +6,7 @@ from fastapi import BackgroundTasks
 from helpers.utils import get_logger
 from app.utils import _get_message_history, trim_history, format_message_pairs, set_cache
 from agents.suggestions import suggestions_agent
+from app.services.model_routing import get_model_router
 from langcodes import Language
 
 logger = get_logger(__name__)
@@ -32,7 +33,9 @@ async def create_suggestions(session_id: str, target_lang: str = 'mr'):
         message = f"**Conversation**\n\n{message_pairs}\n\n**Based on the conversation, suggest 3-5 questions the farmer can ask in {target_lang_name}.**"
         
         # Run the agent
-        agent_run   = await suggestions_agent.run(message)
+        agent_run, _, _ = await get_model_router().run_agent(
+            "suggestions", session_id, suggestions_agent, message
+        )
         suggestions = [x for x in agent_run.output]
         logger.info(f"Suggestions: {suggestions}")
         

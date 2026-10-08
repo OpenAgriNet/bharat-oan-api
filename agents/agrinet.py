@@ -1,8 +1,7 @@
-import os
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import RunContext
 from helpers.utils import get_prompt, get_today_date_str, get_crop_season, get_last_weekday_table, get_logger
 from helpers.scheme_qdrant_search import format_vector_schemes_prompt_block
-from agents.models import AGRINET_MODEL
+from agents.models import configured_agent
 from agents.tools import TOOLS
 from pydantic_ai.models.openai import OpenAIChatModelSettings
 from agents.deps import FarmerContext
@@ -10,8 +9,8 @@ from agents.deps import FarmerContext
 logger = get_logger(__name__)
 
 
-agrinet_agent = Agent(
-    model=AGRINET_MODEL,
+agrinet_agent = configured_agent(
+    "agrinet",
     name="Vistaar Agent",
     instrument=False,
     output_type=str,
@@ -23,7 +22,6 @@ agrinet_agent = Agent(
         temperature=0.7,
         top_p=0.95,
         max_tokens=4096,
-        timeout=120,
         parallel_tool_calls=True,
     )
 )

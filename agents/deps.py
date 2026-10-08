@@ -88,9 +88,18 @@ class FarmerContext(BaseModel):
     def _agristack_context_string(self):
         """AgriStack status line read by the prompt's AgriStack rules; absent when not logged in."""
         if self.agristack_status == "consent":
-            return "**AgriStack status:** logged in with consent"
+            return (
+                "**AgriStack status:** logged in with consent. If this question needs the farmer's place or crop "
+                "and the farmer did not name it, call the AgriStack tool first instead of asking or following the "
+                "normal ask-first flow: `get_agristack_farmer_location` for weather forecast/advisory/alerts; "
+                "`get_agristack_farmer_crops` for crop advisory, pests/diseases and mandi prices."
+            )
         if self.agristack_status == "no_consent":
-            return "**AgriStack status:** logged in without consent"
+            return (
+                "**AgriStack status:** logged in without consent. Do not call AgriStack tools. If this question needs "
+                "a place or crop the farmer did not name, first say that AgriStack data could not be accessed because "
+                "consent is not enabled from their end, then ask for it."
+            )
         return None
 
     def get_user_message(self):

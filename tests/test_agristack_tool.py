@@ -208,6 +208,9 @@ def test_user_message_status_line():
     assert "AgriStack" not in message("not_logged_in")
     assert "**AgriStack status:** logged in with consent" in message("consent")
     assert "**AgriStack status:** logged in without consent" in message("no_consent")
+    assert "get_agristack_farmer_location" in message("consent")
+    assert "get_agristack_farmer_crops" in message("consent")
+    assert "get_agristack" not in message("no_consent")
 
 
 def test_agristack_tools_hidden_unless_consent():
@@ -220,7 +223,7 @@ def test_agristack_tools_hidden_unless_consent():
 def test_every_language_prompt_includes_agristack_rules():
     from helpers.utils import get_prompt
 
-    for lang in ("en", "hi", "as", "bn", "gu", "kn", "ml", "mr", "ta", "te"):
+    for lang in ("en", "hi", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te"):
         prompt = get_prompt(
             f"agrinet_{lang}",
             context={

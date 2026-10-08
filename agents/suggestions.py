@@ -1,14 +1,14 @@
-from pydantic_ai import Agent, PromptedOutput
+from pydantic_ai import PromptedOutput
 from pydantic_ai.settings import ModelSettings
 from typing import List
 from helpers.utils import get_prompt
 from dotenv import load_dotenv
-from agents.models import LLM_AGRINET_MODEL
+from agents.models import configured_agent
 load_dotenv()
 
-suggestions_agent = Agent(
+suggestions_agent = configured_agent(
+    "suggestions",
     name="Suggestions Agent",
-    model=LLM_AGRINET_MODEL,
     instructions=get_prompt('suggestions_system'),
     instrument=False,
     output_type=PromptedOutput(List[str]),

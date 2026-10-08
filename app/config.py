@@ -133,8 +133,6 @@ class Settings(BaseSettings):
     # LLM Configuration
     llm_provider: Optional[str] = None
     llm_model_name: Optional[str] = None
-    # Deployment toggle — all other routing/model config lives in config/models.yaml.
-    agrinet_routing_enabled: bool = os.getenv("AGRINET_ROUTING_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
     marqo_index_name: Optional[str] = None
     marqo_pests_diseases_index_name: Optional[str] = None
 
