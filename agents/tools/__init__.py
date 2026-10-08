@@ -65,6 +65,7 @@ from agents.tools.npss import analyze_crop_image
 from agents.tools.agristack import (
     get_agristack_farmer_location,
     get_agristack_farmer_crops,
+    get_agristack_farmer_profile,
     only_with_agristack_consent,
 )
 
@@ -273,6 +274,12 @@ TOOLS = [
     ),
     Tool(
         get_agristack_farmer_crops,
+        takes_ctx=True,
+        strict=False,
+        prepare=only_with_agristack_consent,
+    ),
+    Tool(
+        get_agristack_farmer_profile,
         takes_ctx=True,
         strict=False,
         prepare=only_with_agristack_consent,

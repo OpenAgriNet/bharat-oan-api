@@ -83,10 +83,12 @@ async def get_agristack_link(session_id: str) -> Optional[dict[str, Any]]:
 
 
 # -----------------------
-# Category A / B request
+# Category A / B / C request
 # -----------------------
 CATEGORY_A = "agristack-category-a"
 CATEGORY_B = "agristack-category-b"
+CATEGORY_C = "agristack-category-c"
+_SEASONAL_CATEGORIES = (CATEGORY_B, CATEGORY_C)
 
 def current_season_and_year(now: Optional[datetime] = None) -> tuple[str, str]:
     """Season name and AgriStack agricultural year ("2025-2026"), overridable via
@@ -109,12 +111,17 @@ def current_season_and_year(now: Optional[datetime] = None) -> tuple[str, str]:
 
 
 def build_payload(
-    farmer_id: str, category: str, session_id: str = "", question_id: str = ""
+    farmer_id: str,
+    category: str,
+    session_id: str = "",
+    question_id: str = "",
+    season: Optional[str] = None,
+    year: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Beckn search for the provider's AgristackService. Category B also needs season/year."""
+    """Beckn search for the provider's AgristackService. Categories B and C also need season/year."""
     tags = [{"descriptor": {"code": "farmerId"}, "value": farmer_id}]
-    if category == CATEGORY_B:
-        season, year = current_season_and_year()
+    if category in _SEASONAL_CATEGORIES:
+        season, year = (season, year) if season and year else current_season_and_year()
         tags += [
             {"descriptor": {"code": "season"}, "value": season},
             {"descriptor": {"code": "year"}, "value": year},
@@ -187,11 +194,15 @@ def parse_agristack_response(data: Any) -> tuple[dict[str, Any], Optional[str]]:
     return sections, (None if sections else error)
 
 
-async def fetch_agristack(
-    farmer_id: str, category: str, session_id: str = "", question_id: str = ""
+async def _fetch_agristack_for_season(
+    farmer_id: str,
+    category: str,
+    session_id: str,
+    question_id: str,
+    season: str,
+    year: str,
 ) -> tuple[dict[str, Any], Optional[str]]:
-    """Category A or B sections for a farmer, cached per session for PROFILE_CACHE_TTL_SECONDS."""
-    cache_key = f"{session_id}:{farmer_id}:{category}"
+    cache_key = f"{session_id}:{farmer_id}:{category}:{season}:{year}"
     try:
         cached = await cache.get(cache_key, namespace=PROFILE_CACHE_NAMESPACE)
         if isinstance(cached, dict) and cached:
@@ -205,7 +216,7 @@ async def fetch_agristack(
     bep = bap_endpoint.rstrip("/")
     search_url = bep if bep.endswith("/search") else bep + "/search"
 
-    payload = build_payload(farmer_id, category, session_id, question_id)
+    payload = build_payload(farmer_id, category, session_id, question_id, season, year)
     lf_update_current_observation(
         metadata={
             "tool": f"agristack.{category}",
@@ -224,6 +235,26 @@ async def fetch_agristack(
             await cache.set(cache_key, sections, ttl=PROFILE_CACHE_TTL_SECONDS, namespace=PROFILE_CACHE_NAMESPACE)
         except Exception:
             logger.warning("agristack.profile_cache_write_failed session=%s", session_id)
+    return sections, error
+
+
+async def fetch_agristack(
+    farmer_id: str, category: str, session_id: str = "", question_id: str = ""
+) -> tuple[dict[str, Any], Optional[str]]:
+    """Category A/B/C sections for a farmer, cached per session for PROFILE_CACHE_TTL_SECONDS.
+
+    Categories B and C fall back to Kharif of the same year when Rabi's crop survey isn't
+    uploaded yet.
+    """
+    season, year = current_season_and_year()
+    sections, error = await _fetch_agristack_for_season(farmer_id, category, session_id, question_id, season, year)
+    if category in _SEASONAL_CATEGORIES and season == "Rabi" and not sections.get("crop_survey"):
+        fallback_sections, _ = await _fetch_agristack_for_season(
+            farmer_id, category, session_id, question_id, "Kharif", year
+        )
+        if fallback_sections.get("crop_survey"):
+            sections = {**sections, "crop_survey": fallback_sections["crop_survey"]}
+            error = None
     return sections, error
 
 
@@ -247,9 +278,10 @@ _GEOCODE_HINT = (
     "Use the village/district/state from the land parcels (or farmer details) with forward_geocode "
     "to get coordinates. Do not show IDs, survey numbers or raw data to the farmer. Source: AgriStack"
 )
+_PROFILE_HINT = "Do not show IDs, survey numbers or raw data to the farmer. Source: AgriStack"
 
 
-async def _run(ctx: RunContext[FarmerContext], category: str, heading: str) -> str:
+async def _run(ctx: RunContext[FarmerContext], category: str, heading: str, hint: str = _GEOCODE_HINT) -> str:
     link = await get_agristack_link(ctx.deps.session_id)
     if not link:
         return f"Farmer is not logged in with AgriStack. {_ASK_FARMER}"
@@ -282,7 +314,7 @@ async def _run(ctx: RunContext[FarmerContext], category: str, heading: str) -> s
     ):
         if key in sections:
             lines.append(f"{label}: {_section_text(sections[key])}")
-    lines.append(_GEOCODE_HINT)
+    lines.append(hint)
     return "\n".join(lines)
 
 
@@ -308,4 +340,19 @@ async def get_agristack_farmer_crops(ctx: RunContext[FarmerContext]) -> str:
     """
     return await _run(
         ctx, CATEGORY_B, "AgriStack farmer land and crops (use as the farmer's own location and crops):"
+    )
+
+
+@observe(name="tool:get_agristack_farmer_profile", as_type="tool")
+async def get_agristack_farmer_profile(ctx: RunContext[FarmerContext]) -> str:
+    """Full profile (identity, land ownership, crop survey) for the logged-in farmer, from
+    AgriStack (Category C: farmer details + land ownership + crop survey).
+
+    Use for scheme eligibility, scheme application/renewal, grievance submission and
+    fertilizer recommendation/quota questions that need the farmer's gender, address, caste
+    category or land ownership — instead of asking. Only works when the farmer logged in with
+    AgriStack and gave consent.
+    """
+    return await _run(
+        ctx, CATEGORY_C, "AgriStack farmer profile (use as the farmer's own details):", _PROFILE_HINT
     )

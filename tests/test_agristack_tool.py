@@ -113,6 +113,14 @@ def test_category_b_payload_adds_season_and_year(monkeypatch):
     assert _intent_tags(payload) == {"farmerId": "F1", "season": "Kharif", "year": "2025-2026"}
 
 
+def test_category_c_payload_adds_season_and_year(monkeypatch):
+    monkeypatch.setenv("AGRISTACK_SEASON", "Kharif")
+    monkeypatch.setenv("AGRISTACK_YEAR", "2025-2026")
+    payload = agristack.build_payload("F1", agristack.CATEGORY_C, session_id="S1")
+    assert payload["message"]["intent"]["item"]["id"] == "agristack-category-c"
+    assert _intent_tags(payload) == {"farmerId": "F1", "season": "Kharif", "year": "2025-2026"}
+
+
 def test_season_and_year(monkeypatch):
     monkeypatch.delenv("AGRISTACK_SEASON", raising=False)
     monkeypatch.delenv("AGRISTACK_YEAR", raising=False)
@@ -159,6 +167,7 @@ def test_tools_not_logged_in(monkeypatch):
     _fake_cache(monkeypatch, {})
     assert "not logged in" in asyncio.run(agristack.get_agristack_farmer_location(_ctx("NONE")))
     assert "not logged in" in asyncio.run(agristack.get_agristack_farmer_crops(_ctx("NONE")))
+    assert "not logged in" in asyncio.run(agristack.get_agristack_farmer_profile(_ctx("NONE")))
 
 
 def test_tools_without_consent_do_not_call_agristack(monkeypatch):
@@ -196,6 +205,15 @@ def test_crops_tool_uses_category_b(monkeypatch):
     out = asyncio.run(agristack.get_agristack_farmer_crops(_ctx("S1")))
     assert calls == [("30187009346", "agristack-category-b")]
     assert "Paddy" in out and "Bemetara" in out
+
+
+def test_profile_tool_uses_category_c(monkeypatch):
+    _fake_cache(monkeypatch, {("callback-status", "S1"): WITH_CONSENT_CALLBACK})
+    calls = []
+    _record_fetch(monkeypatch, calls)
+    out = asyncio.run(agristack.get_agristack_farmer_profile(_ctx("S1")))
+    assert calls == [("30187009346", "agristack-category-c")]
+    assert "forward_geocode" not in out
 
 
 # --- agent context ---

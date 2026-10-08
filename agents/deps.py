@@ -89,10 +89,12 @@ class FarmerContext(BaseModel):
         """AgriStack status line read by the prompt's AgriStack rules; absent when not logged in."""
         if self.agristack_status == "consent":
             return (
-                "**AgriStack status:** logged in with consent. If this question needs the farmer's place or crop "
-                "and the farmer did not name it, call the AgriStack tool first instead of asking or following the "
-                "normal ask-first flow: `get_agristack_farmer_location` for weather forecast/advisory/alerts; "
-                "`get_agristack_farmer_crops` for crop advisory, pests/diseases and mandi prices."
+                "**AgriStack status:** logged in with consent. If this question needs the farmer's place, crop, or "
+                "profile details and the farmer did not name/give them, call the AgriStack tool first instead of "
+                "asking or following the normal ask-first flow: `get_agristack_farmer_location` for weather "
+                "forecast/advisory/alerts; `get_agristack_farmer_crops` for crop advisory, pests/diseases and mandi "
+                "prices; `get_agristack_farmer_profile` for scheme eligibility/application/renewal, grievance "
+                "submission, and fertilizer recommendation/quota."
             )
         if self.agristack_status == "no_consent":
             return (
