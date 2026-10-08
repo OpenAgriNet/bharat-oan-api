@@ -29,21 +29,12 @@ class Settings(BaseSettings):
     allowed_credentials: bool = True
     allowed_methods: List[str] = ["*"]
     allowed_headers: List[str] = ["*"]
-    disable_auth: bool = (
-        os.getenv("DISABLE_AUTH", "").strip().lower() in ("1", "true", "yes", "y", "on")
-        or os.getenv("ENVIRONMENT", "production").strip().lower() in ("local", "dev", "development")
-    )
-    disable_auth_mobile: str = os.getenv("DISABLE_AUTH_MOBILE", "9999999999")
 
     # JWT Configuration
     jwt_algorithm: str = "RS256"
     jwt_public_key_path: str = os.getenv("JWT_PUBLIC_KEY_PATH", "jwt_public_key.pem")
     jwt_private_key_path: Optional[str] = os.getenv("JWT_PRIVATE_KEY_PATH")
     jwt_expiry_minutes: int = int(os.getenv("JWT_EXPIRY_MINUTES", "15"))
-    disable_jwt: bool = (
-        os.getenv("DISABLE_JWT", "").strip().lower() in ("1", "true", "yes", "on")
-        or os.getenv("DISABLE_JWT_FOR_LOCAL", "").strip().lower() in ("1", "true", "yes", "on")
-    )
 
     # API Key Auth Configuration
     api_key_auth_token: Optional[str] = os.getenv("API_KEY_AUTH_TOKEN")
