@@ -16,6 +16,7 @@ levels are omitted so the NPSS request never records an arbitrary location.
 import asyncio
 from difflib import SequenceMatcher
 import json
+import math
 import os
 import re
 import unicodedata
@@ -30,23 +31,50 @@ logger = get_logger(__name__)
 
 _master_cache: dict[str, list[dict[str, Any]]] = {}
 
+
+def _validated_photon_base_url(value: Optional[str]) -> Optional[str]:
+    parsed = urlparse(value or "")
+    if parsed.scheme != "https" or not parsed.hostname:
+        return None
+    return (value or "").rstrip("/")
+
+
 NPSS_BASE_URL = os.getenv("NPSS_BASE_URL", "https://npss.dac.gov.in/api3.0").rstrip("/")
 PHOTON_URL = os.getenv("PHOTON_HOST")
-_parsed_photon = urlparse(PHOTON_URL or "")
-PHOTON_HOST = _parsed_photon.hostname or "10.128.188.19"
-PHOTON_PORT = _parsed_photon.port or 2322
-PHOTON_BASE_URL = f"http://{PHOTON_HOST}:{PHOTON_PORT}"
+PHOTON_BASE_URL = _validated_photon_base_url(PHOTON_URL)
 INDIA_BBOX = (68.0, 6.0, 98.0, 36.0)
+ADMINISTRATIVE_SUFFIXES = (
+    "sub district",
+    "subdistrict",
+    "district",
+    "tehsil",
+    "taluka",
+    "taluk",
+)
 
 
 def _normalize_text(value: Any) -> str:
     text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii")
     text = re.sub(r"[^a-z0-9]+", " ", text.lower())
-    text = re.sub(r"\s+", " ", text).strip()
+    text = " ".join(text.split())
     # Photon and government masters may use the current and former Bengaluru
     # spellings interchangeably at district and sub-district levels.
     text = re.sub(r"\bbangalore\b", "bengaluru", text)
-    return re.sub(r"\s+(subdistrict|sub district|tehsil|taluka|taluk|district)$", "", text).strip()
+    for suffix in ADMINISTRATIVE_SUFFIXES:
+        marker = f" {suffix}"
+        if text.endswith(marker):
+            return text.removesuffix(marker).strip()
+    return text
+
+
+def _without_parent_affix(value: str, parent: str) -> Optional[str]:
+    prefix = f"{parent} "
+    suffix = f" {parent}"
+    if value.startswith(prefix):
+        return value.removeprefix(prefix).strip()
+    if value.endswith(suffix):
+        return value.removesuffix(suffix).strip()
+    return None
 
 
 def _extract_id(row: dict[str, Any], candidates: tuple[str, ...]) -> str:
@@ -104,15 +132,9 @@ def _candidate_variants(candidates: list[str], parent_names: Optional[list[str]]
         if normalized not in variants:
             variants.append(normalized)
         for parent in normalized_parents:
-            for prefix, suffix in ((f"{parent} ", ""), ("", f" {parent}")):
-                if prefix and normalized.startswith(prefix):
-                    stripped = normalized[len(prefix):].strip()
-                elif suffix and normalized.endswith(suffix):
-                    stripped = normalized[:-len(suffix)].strip()
-                else:
-                    continue
-                if stripped and stripped not in variants:
-                    variants.append(stripped)
+            stripped = _without_parent_affix(normalized, parent)
+            if stripped and stripped not in variants:
+                variants.append(stripped)
     return variants
 
 
@@ -246,6 +268,9 @@ def _pick_similar_subdistrict_scope(
 
 
 async def _reverse_geocode_properties(latitude: float, longitude: float) -> dict[str, Any]:
+    if not PHOTON_BASE_URL:
+        logger.warning("NPSS reverse geocoding is disabled because PHOTON_HOST is not a valid HTTPS URL")
+        return {}
     try:
         async with httpx.AsyncClient(base_url=PHOTON_BASE_URL, timeout=10.0) as client:
             base_params = {"lat": latitude, "lon": longitude, "lang": "en"}
@@ -276,6 +301,9 @@ async def _forward_geocode_coordinates(location: str) -> list[tuple[float, float
     """Return unique in-India Photon candidates for one human-friendly place name."""
     query = str(location or "").strip()
     if not query:
+        return []
+    if not PHOTON_BASE_URL:
+        logger.warning("NPSS forward geocoding is disabled because PHOTON_HOST is not a valid HTTPS URL")
         return []
 
     try:
@@ -330,7 +358,9 @@ async def _fetch_master_rows(
     return rows
 
 
-async def _resolve_from_master_apis(
+# Keep the parent-child NPSS master traversal in one orchestration scope so
+# state from different hierarchy branches cannot be combined accidentally.
+async def _resolve_from_master_apis(  # NOSONAR
     latitude: Optional[float],
     longitude: Optional[float],
     *,
@@ -588,7 +618,7 @@ async def _resolve_from_master_apis(
     return result
 
 
-async def resolve_npss_location_ids(
+async def resolve_npss_location_ids(  # NOSONAR
     latitude: Optional[float],
     longitude: Optional[float],
     *,
@@ -605,7 +635,8 @@ async def resolve_npss_location_ids(
     # was unavailable. It must not prevent a legitimate typed-location fallback
     # from supplying coordinates.
     browser_coordinates_are_authoritative = coordinates_provided and not (
-        float(latitude) == 0.0 and float(longitude) == 0.0
+        math.isclose(float(latitude), 0.0, abs_tol=1e-9)
+        and math.isclose(float(longitude), 0.0, abs_tol=1e-9)
     )
     coordinate_result: Optional[dict] = None
     if coordinates_provided:
