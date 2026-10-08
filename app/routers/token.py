@@ -191,8 +191,8 @@ def _resolve_play_integrity_package_name(client_code: Optional[str] = None) -> s
         normalized = _normalize_client_code(client_code)
         env_key = f"{settings.play_integrity_package_name_prefix}{normalized}"
         package_name = os.getenv(env_key)
-        if package_name:
-            return package_name
+        if package_name and package_name.strip():
+            return package_name.strip()
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -212,8 +212,8 @@ def _resolve_api_key(client_code: Optional[str] = None) -> str:
         normalized = _normalize_client_code(client_code)
         env_key = f"{settings.api_key_auth_token_prefix}{normalized}"
         client_key = os.getenv(env_key)
-        if client_key:
-            return client_key
+        if client_key and client_key.strip():
+            return client_key.strip()
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -254,7 +254,7 @@ async def _get_play_integrity_access_token(client_code: Optional[str] = None) ->
                 
                 if private_key_from_env:
                     # Replace the private_key in JSON with env value
-                    service_account_info['private_key'] = private_key_from_env
+                    service_account_info["private_key"] = private_key_from_env.replace("\\n", "\n")
                     logger.info(f"Loaded private key for {client_key} from env var {env_key}")
             
             _play_integrity_credentials[client_key] = service_account.Credentials.from_service_account_info(
