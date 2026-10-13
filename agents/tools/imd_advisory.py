@@ -92,6 +92,28 @@ def _lookup_sync(keys: List[str]) -> dict:
         _pool.putconn(conn)
 
 
+def _filter_by_crop(rows: List[dict], crop: Optional[str]) -> tuple:
+    """Rows for the given crop; all rows with a note when the bulletin has none for it."""
+    if not crop:
+        return rows, ""
+    matched = [r for r in rows if (r.get("crop") or "").lower() == crop.strip().lower()]
+    if matched:
+        return matched, ""
+    return rows, f"(No advisory specifically for {crop} in this bulletin; showing the full district advisory.)"
+
+
+def _format_advisory(districts: str, date: Optional[str], rows: List[dict], note: str, show_regional: bool) -> str:
+    lines = [f"IMD District Agromet Advisory — {districts} — bulletin dated {date}", note]
+    for r in rows:
+        label = r.get("crop") or "General"
+        lines.append(f"[{label}] {(r.get('advisory_eng') or '').strip()}")
+        regional = (r.get("advisory_reg") or "").strip()
+        if show_regional and regional:
+            lines.append(f"[{label} — regional language text] {regional}")
+    lines.append("Source: India Meteorological Department (District Agromet Advisory)")
+    return "\n".join(line for line in lines if line)
+
+
 async def imd_agromet_advisory(
     ctx: RunContext[FarmerContext],
     latitude: Optional[float] = None,
@@ -143,22 +165,6 @@ async def imd_agromet_advisory(
     if not rows:
         return f"No IMD agromet advisory is available yet for {districts or 'this location'}."
 
-    note = ""
-    if crop:
-        matched = [r for r in rows if (r.get("crop") or "").lower() == crop.strip().lower()]
-        if matched:
-            rows = matched
-        else:
-            note = f"(No advisory specifically for {crop} in this bulletin; showing the full district advisory.)"
-
+    rows, note = _filter_by_crop(rows, crop)
     show_regional = (ctx.deps.lang_code or "en") != "en"
-    lines = [f"IMD District Agromet Advisory — {districts} — bulletin dated {data.get('date')}", note]
-    for r in rows:
-        label = r.get("crop") or "General"
-        text = (r.get("advisory_eng") or "").strip()
-        lines.append(f"[{label}] {text}")
-        regional = (r.get("advisory_reg") or "").strip()
-        if show_regional and regional:
-            lines.append(f"[{label} — regional language text] {regional}")
-    lines.append("Source: India Meteorological Department (District Agromet Advisory)")
-    return "\n".join(l for l in lines if l)
+    return _format_advisory(districts, data.get("date"), rows, note, show_regional)
