@@ -14,7 +14,14 @@ router = APIRouter(tags=["resolver-callback"])
 logger = get_logger(__name__)
 
 
-@router.post("/resolver/on_resolve")
+@router.post(
+    "/resolver/on_resolve",
+    responses={
+        400: {"description": "Body is not JSON or has no ref."},
+        401: {"description": "Invalid resolver signature."},
+        404: {"description": "Unknown ref."},
+    },
+)
 async def resolver_on_resolve(request: Request):
     raw = await request.body()
     if not valid_signature(raw, request.headers.get("x-resolver-timestamp"), request.headers.get("x-resolver-signature")):
@@ -23,7 +30,7 @@ async def resolver_on_resolve(request: Request):
     try:
         body = json.loads(raw)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Body must be JSON.")
+        raise HTTPException(status_code=400, detail="Body must be JSON.") from None
     ref = body.get("ref") if isinstance(body, dict) else None
     if not isinstance(ref, str) or not ref:
         raise HTTPException(status_code=400, detail="Missing ref.")

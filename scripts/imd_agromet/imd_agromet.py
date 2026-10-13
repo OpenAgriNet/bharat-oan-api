@@ -95,11 +95,8 @@ def _download(date: str) -> tuple[list, str]:
     return (data if isinstance(data, list) else []), url
 
 
-def fetch(conn, date: str | None, file: str | None) -> dict:
-    if file:
-        rows, src = json.loads(Path(file).read_text(encoding="utf-8")), file
-    else:
-        rows, src = _download(date)
+def fetch(conn, date: str) -> dict:
+    rows, src = _download(date)
     rows = [r for r in rows if isinstance(r, dict) and r.get("id") is not None]
     with conn, conn.cursor() as cur:
         cur.execute("SELECT imd_district_id, lgd_district_code FROM imd_district_map")
@@ -153,6 +150,13 @@ def status(conn) -> dict:
         }
 
 
+def _bulletin_date(value: str) -> str:
+    try:
+        return dt.date.fromisoformat(value).isoformat()
+    except ValueError:
+        raise argparse.ArgumentTypeError("date must be YYYY-MM-DD") from None
+
+
 def main() -> None:
     ist = dt.datetime.now(dt.timezone(dt.timedelta(hours=5, minutes=30))).date().isoformat()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -160,8 +164,7 @@ def main() -> None:
     sub.add_parser("setup")
     sub.add_parser("seed-keys")
     f = sub.add_parser("fetch")
-    f.add_argument("--date", default=ist)
-    f.add_argument("--file", help="IMD JSON saved earlier (instead of downloading)")
+    f.add_argument("--date", default=ist, type=_bulletin_date)
     sub.add_parser("status")
     a = ap.parse_args()
     conn = connect()
@@ -171,7 +174,7 @@ def main() -> None:
         elif a.cmd == "seed-keys":
             out = seed_keys(conn)
         elif a.cmd == "fetch":
-            out = fetch(conn, a.date, a.file)
+            out = fetch(conn, a.date)
         else:
             out = status(conn)
     except httpx.HTTPError as exc:
