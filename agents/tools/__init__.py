@@ -49,6 +49,7 @@ from agents.tools.search import (
     search_schemes,
 )
 from agents.tools.weather import weather_forecast
+from agents.tools.imd_advisory import imd_agromet_advisory
 from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
 from agents.tools.maps import reverse_geocode, forward_geocode
@@ -283,5 +284,10 @@ TOOLS = [
         takes_ctx=True,
         strict=False,
         prepare=only_with_agristack_consent,
+    ),
+    Tool(
+        imd_agromet_advisory,
+        takes_ctx=True,
+        strict=False,
     ),
 ]
