@@ -19,13 +19,11 @@ from agents.deps import FarmerContext
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.scheme_qdrant_search import (
-    format_qdrant_scheme_codes_for_doc,
-    format_scheme_unavailable,
+    NO_RESULTS_MESSAGE,
+    _format_page,
+    classify_chunk_section,
     format_search_results,
     format_status_check_offer,
-    get_builtin_scheme_list,
-    query_names_unindexed_scheme,
-    resolve_scheme_code,
 )
 from helpers.utils import get_logger
 from agents.tools.terms import normalize_text_with_glossary
@@ -141,6 +139,13 @@ def _chunk_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     doc_id = (details.get("doc_id") or "").strip()
     chunk_id = (details.get("chunk_id") or item.get("id") or "").strip()
     source = (details.get("source") or "").strip()
+    doc_title = (
+        details.get("title") or details.get("title_en") or details.get("doc_title")
+        or details.get("filename") or ""
+    ).strip()
+    page = _format_page(details.get("page_start"), details.get("page_end")) or (
+        details.get("page") or ""
+    ).strip()
 
     score_raw = details.get("score") or "0"
     try:
@@ -157,6 +162,8 @@ def _chunk_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "chunk_id": chunk_id,
         "section": section,
         "source": source,
+        "doc_title": doc_title,
+        "page": page,
     }
 
 
@@ -218,15 +225,12 @@ def _parse_scheme_network_response(data: Dict[str, Any]) -> tuple[List[Dict[str,
 
 def _build_scheme_qdrant_search_payload(
     query: str,
-    scheme_code: Optional[str] = None,
     session_id: str = "",
     question_id: str = "",
 ) -> Dict[str, Any]:
     """Beckn /search body for scheme guideline document search (scheme-agri-qdrant)."""
     now = datetime.now(timezone.utc)
     item_descriptor: Dict[str, str] = {"name": query}
-    if scheme_code:
-        item_descriptor["code"] = scheme_code
 
     return {
         "context": {
@@ -276,44 +280,31 @@ async def search_schemes(
     Semantic search for Bharat Vistaar scheme guideline PDFs via the Vistaar network layer
     (BAP /search, category scheme-agri-qdrant).
 
-    PLACEHOLDER_SCHEME_CODES
-
     Covers every catalog scheme, including PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM and N.B.M.
-    For a direct status/grievance request (e.g. "check my PM-KISAN status"), call the
-    status tools instead — do not call this first.
+    Searches across all indexed schemes; each result is labelled with its scheme, document
+    and page. For a direct status/grievance request (e.g. "check my PM-KISAN status"), call
+    the status tools instead — do not call this first.
 
     Args:
         query: Natural-language question in English (eligibility, benefits, application process)
         top_k: Maximum number of chunks to return (default: 10)
 
     Returns:
-        Formatted scheme document chunks with scheme names and relevance scores
+        Formatted scheme document chunks labelled [scheme | document | page] with relevance scores
     """
-    scheme_list = get_builtin_scheme_list()
-    logger.info(
-        "TOOL CALL: search_schemes(query=%r, top_k=%d) — %d schemes known this turn (live-synced from Redis)",
-        query, top_k, len(scheme_list),
-    )
-    if query_names_unindexed_scheme(query, scheme_list):
-        logger.info("TOOL RESULT: search_schemes — query names a scheme outside the known list, returning unavailable")
-        return format_scheme_unavailable(query)
-
-    scheme_code = resolve_scheme_code(query, scheme_list)
-    logger.info("search_schemes: resolved scheme_code=%s for query=%r", scheme_code, query)
+    logger.info("TOOL CALL: search_schemes(query=%r, top_k=%d)", query, top_k)
     payload = _build_scheme_qdrant_search_payload(
         query=query,
-        scheme_code=scheme_code,
         session_id=ctx.deps.session_id,
         question_id=ctx.deps.question_id,
     )
     transaction_id = payload.get("context", {}).get("transaction_id")
     lf_update_current_observation(
-        input={"query": query, "top_k": top_k, "scheme_code": scheme_code},
+        input={"query": query, "top_k": top_k},
         metadata={
             "tool": "scheme.search",
             "category": SCHEME_AGRI_QDRANT_CATEGORY,
             "transaction_id": transaction_id,
-            "resolved_scheme_code": scheme_code,
         },
     )
 
@@ -323,12 +314,7 @@ async def search_schemes(
         return "Scheme search service is not configured. Please try again later."
 
     search_url = bap_endpoint.rstrip("/") + "/search"
-    logger.info(
-        "Scheme network search: query=%r scheme_code=%s url=%s",
-        query,
-        scheme_code,
-        search_url,
-    )
+    logger.info("Scheme network search: query=%r url=%s", query, search_url)
 
     try:
         async with httpx.AsyncClient() as client:
@@ -360,7 +346,6 @@ async def search_schemes(
         results, search_ctx = _parse_scheme_network_response(data)
         status = str(search_ctx.get("status") or "").strip().lower()
         message = str(search_ctx.get("message") or "").strip()
-        resolved = str(search_ctx.get("resolved_scheme_code") or "").strip()
 
         if status and status != "success" and not results:
             logger.info(
@@ -375,7 +360,6 @@ async def search_schemes(
                     "category": SCHEME_AGRI_QDRANT_CATEGORY,
                     "transaction_id": transaction_id,
                     "network_status": status or None,
-                    "resolved_scheme_code": resolved or scheme_code,
                     "hit_count": 0,
                     "doc_ids": [],
                     "chunk_ids": [],
@@ -383,7 +367,7 @@ async def search_schemes(
                     "search_backend": search_ctx.get("search_backend"),
                 }
             )
-            return message or format_scheme_unavailable(query)
+            return message or NO_RESULTS_MESSAGE
 
         if top_k and top_k > 0:
             results = results[:top_k]
@@ -400,7 +384,6 @@ async def search_schemes(
                 "category": SCHEME_AGRI_QDRANT_CATEGORY,
                 "transaction_id": transaction_id,
                 "network_status": status or None,
-                "resolved_scheme_code": resolved or scheme_code,
                 "hit_count": len(results),
                 "doc_ids": doc_ids,
                 "chunk_ids": chunk_ids,
@@ -420,13 +403,14 @@ async def search_schemes(
             }
         )
         logger.info(
-            "TOOL RESULT: search_schemes — resolved_scheme_code=%s hit_count=%d doc_ids=%s",
-            resolved or scheme_code, len(results), doc_ids,
+            "TOOL RESULT: search_schemes — hit_count=%d doc_ids=%s",
+            len(results), doc_ids,
         )
 
-        formatted = format_search_results(results, query, scheme_list)
+        formatted = format_search_results(results, query)
         if results:
-            formatted += format_status_check_offer(resolved or scheme_code)
+            # No resolved scheme any more: offer status checks for the top-ranked hit's scheme.
+            formatted += format_status_check_offer(results[0].get("scheme_code"))
         return formatted
 
     except httpx.TimeoutException as e:
@@ -449,24 +433,6 @@ async def search_schemes(
             metadata={"tool": "scheme.search", "error_type": "exception"}
         )
         raise ModelRetry("Error searching schemes, please try again") from e
-
-
-if search_schemes.__doc__:
-    _startup_scheme_codes = format_qdrant_scheme_codes_for_doc()
-    search_schemes.__doc__ = search_schemes.__doc__.replace(
-        "PLACEHOLDER_SCHEME_CODES",
-        f"Available Qdrant scheme codes: {_startup_scheme_codes}.",
-    )
-    # This docstring becomes part of the tool-calling schema sent to the model
-    # and is frozen at process start — unlike the system prompt (rendered
-    # fresh every turn via format_vector_schemes_prompt_block), a scheme
-    # synced to Redis *after* this process started won't appear here until
-    # the next restart. Logged once at startup so "why isn't my new scheme
-    # showing up in the tool schema" is answerable from the boot log alone.
-    logger.info(
-        "STARTUP: search_schemes tool docstring frozen with scheme codes: %s",
-        _startup_scheme_codes,
-    )
 
 
 @observe(name="tool:search_documents", as_type="tool")
