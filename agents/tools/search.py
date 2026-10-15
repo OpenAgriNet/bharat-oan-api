@@ -22,7 +22,6 @@ from helpers.scheme_qdrant_search import (
     format_qdrant_scheme_codes_for_doc,
     format_scheme_unavailable,
     format_search_results,
-    format_status_check_offer,
     get_builtin_scheme_list,
     query_names_unindexed_scheme,
     resolve_scheme_code,
@@ -278,9 +277,8 @@ async def search_schemes(
 
     PLACEHOLDER_SCHEME_CODES
 
-    Covers every catalog scheme, including PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM and N.B.M.
-    For a direct status/grievance request (e.g. "check my PM-KISAN status"), call the
-    status tools instead — do not call this first.
+    Do NOT use for legacy integrated schemes handled by get_scheme_info
+    (pmkisan, pmfby, kcc, pmksy, shc, sathi, pmasha, aif, smam, pdmc, nfsm, rad, ffs, nbhm).
 
     Args:
         query: Natural-language question in English (eligibility, benefits, application process)
@@ -424,10 +422,7 @@ async def search_schemes(
             resolved or scheme_code, len(results), doc_ids,
         )
 
-        formatted = format_search_results(results, query, scheme_list)
-        if results:
-            formatted += format_status_check_offer(resolved or scheme_code)
-        return formatted
+        return format_search_results(results, query, scheme_list)
 
     except httpx.TimeoutException as e:
         logger.error("Scheme network search timed out: %s", e)

@@ -121,9 +121,10 @@ def _log_if_new_sync(tier: str, payload: dict[str, Any]) -> None:
 
 
 def get_vector_scheme_entries(tier: Optional[str] = None) -> list[dict[str, Any]]:
-    """Entries routed to search_schemes (tool_routing="qdrant" in docs-pipeline).
-    Every scheme, including PM-KISAN, PMFBY, AIF, etc., must be tagged that way
-    to be listed — get_scheme_info is no longer registered."""
+    """Return catalog entries assigned to search_schemes by docs-pipeline.
+
+    Legacy get_scheme_info registrations are maintained separately.
+    """
     snapshot = get_master_catalog_snapshot(tier)
     if not snapshot:
         return []

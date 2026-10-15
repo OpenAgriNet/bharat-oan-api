@@ -626,7 +626,8 @@ def _fetch_all_pages(
     The provider returns the N most-recent arrivals within the requested window.
     We walk backward: after each call we find the oldest arrival date returned,
     set to_date = oldest - 1 day, and repeat until we reach from_date or get
-    no new items.  Returns None on HTTP/network error.
+    no new items. Returns None if the first page fails; later failures retain
+    the successfully fetched items.
     """
     all_items: List[MandiItem] = []
     seen_keys: set = set()
@@ -675,15 +676,14 @@ def _fetch_all_pages(
             logger.error("Mandi API page %d returned status %s", page, response.status_code)
             return None if not all_items else all_items
 
-        data = response.json()
-        if "message" in data and "responses" not in data:
-            data = {"context": data["context"], "responses": [data]}
-
         try:
+            data = response.json()
+            if "message" in data and "responses" not in data:
+                data = {"context": data["context"], "responses": [data]}
             parsed = MandiResponse.model_validate(data)
-        except Exception as e:
+        except (ValueError, KeyError, TypeError) as e:
             logger.error("Mandi API page %d parse error: %s", page, e)
-            break
+            return all_items or None
 
         page_items: List[MandiItem] = []
         for resp in parsed.responses:
