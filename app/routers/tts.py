@@ -23,7 +23,7 @@ async def tts(
 ):
     """Convert text to speech using the specified service."""
     session_id = request.session_id or str(uuid.uuid4())
-    authenticated_user = current_user.get("mobile")
+    authenticated_user = current_user.get("mobile") or "system"
 
     logger.info(
         "TTS input | target_lang=%s session_id=%s text_length=%s",
@@ -39,7 +39,7 @@ async def tts(
     start_time = time.time()
     success, status_code, error_code, error_message = False, 500, None, None
     audio_data = None
-    uid = str(authenticated_user)if authenticated_user is not None else "system"
+    uid = str(authenticated_user) if authenticated_user is not None else "system"
 
     try:
         audio_bytes = text_to_speech_bhashini(
@@ -71,7 +71,7 @@ async def tts(
             )
             telemetry_data = TelemetryRequest(events=[telemetry_event]).model_dump()
             background_tasks.add_task(send_telemetry, telemetry_data)
-        except Exception :
+        except Exception:
             logger.exception(
                 "TTS telemetry event build failed | session_id=%s target_lang=%s",
                 session_id, request.target_lang

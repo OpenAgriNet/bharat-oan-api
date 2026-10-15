@@ -7,12 +7,12 @@ from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from app.config import settings
 from app.core.cache import cache
-from agents.models import validate_agrinet_routing_config
 from contextlib import asynccontextmanager
+from agents.model_registry import get_registry
 
 load_dotenv()
 
-# Set root/app log level from config so INFO logs (e.g. Bhashini, TTS, Transcribe) appear
+# Set root log level from config so INFO logs (e.g. Bhashini, TTS, Transcribe) appear
 _log_level = getattr(logging, (settings.log_level or "INFO").upper(), logging.INFO)
 logging.basicConfig(level=_log_level, format=settings.log_format, force=True)
 
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
     """Lifespan events for startup and shutdown"""
     # Startup
     token.validate_multi_provider_auth_config()
-    validate_agrinet_routing_config()
+    get_registry().validate()
     print(f"🚀 {settings.app_name} starting up...")
     print(f"📍 Environment: {settings.environment}")
     print(f"🔧 Debug mode: {settings.debug}")

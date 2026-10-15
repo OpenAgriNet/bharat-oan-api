@@ -35,10 +35,6 @@ class Settings(BaseSettings):
     jwt_public_key_path: str = os.getenv("JWT_PUBLIC_KEY_PATH", "jwt_public_key.pem")
     jwt_private_key_path: Optional[str] = os.getenv("JWT_PRIVATE_KEY_PATH")
     jwt_expiry_minutes: int = int(os.getenv("JWT_EXPIRY_MINUTES", "15"))
-    disable_jwt: bool = (
-        os.getenv("DISABLE_JWT", "").strip().lower() in ("1", "true", "yes", "on")
-        or os.getenv("DISABLE_JWT_FOR_LOCAL", "").strip().lower() in ("1", "true", "yes", "on")
-    )
 
     # API Key Auth Configuration
     api_key_auth_token: Optional[str] = os.getenv("API_KEY_AUTH_TOKEN")
@@ -82,6 +78,12 @@ class Settings(BaseSettings):
 
     # External Service URLs
     telemetry_api_url: str = os.getenv("TELEMETRY_API_URL", "https://dev-vistaar.da.gov.in/observability-service/action/data/v3/telemetry")
+    telemetry_origin: str = os.getenv("TELEMETRY_ORIGIN", "https://dev-vistaar.da.gov.in")
+    telemetry_referer: str = os.getenv("TELEMETRY_REFERER", "https://dev-vistaar.da.gov.in/chat")
+    telemetry_channel: Optional[str] = os.getenv("TELEMETRY_CHANNEL")
+    telemetry_auth_token: Optional[str] = os.getenv("TELEMETRY_AUTH_TOKEN")
+    telemetry_auth_key: Optional[str] = os.getenv("TELEMETRY_AUTH_KEY")
+    telemetry_auth_secret: Optional[str] = os.getenv("TELEMETRY_AUTH_SECRET")
     bhashini_api_url: str = ""
     ollama_endpoint_url: Optional[str] = None
     marqo_endpoint_url: Optional[str] = None
@@ -119,26 +121,14 @@ class Settings(BaseSettings):
     # LLM Configuration
     llm_provider: Optional[str] = None
     llm_model_name: Optional[str] = None
-    agrinet_routing_enabled: bool = os.getenv("AGRINET_ROUTING_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
-    agrinet_route_gpt41_weight: int = int(os.getenv("AGRINET_ROUTE_GPT41_WEIGHT", "70"))
-    agrinet_route_gemma_weight: int = int(os.getenv("AGRINET_ROUTE_GEMMA_WEIGHT", "30"))
-    agrinet_route_ttl_seconds: int = int(os.getenv("AGRINET_ROUTE_TTL_SECONDS", "7200"))
-    agrinet_model_timeout_seconds: float = float(os.getenv("AGRINET_MODEL_TIMEOUT_SECONDS", "45"))
-    agrinet_gemma_provider: str = os.getenv("AGRINET_GEMMA_PROVIDER", "vllm")
-    agrinet_gemma_model_name: Optional[str] = os.getenv("AGRINET_GEMMA_MODEL_NAME")
-    agrinet_gemma_base_url: Optional[str] = os.getenv("AGRINET_GEMMA_BASE_URL")
-    agrinet_gemma_api_key: str = os.getenv("AGRINET_GEMMA_API_KEY", "not-needed")
-    # Capacity gate: route to Gemma only while its vLLM engine has spare capacity.
-    agrinet_gemma_max_concurrency: int = int(os.getenv("AGRINET_GEMMA_MAX_CONCURRENCY", "10"))
-    agrinet_gemma_metrics_url: Optional[str] = os.getenv("AGRINET_GEMMA_METRICS_URL")
-    agrinet_gemma_metrics_cache_ttl: int = int(os.getenv("AGRINET_GEMMA_METRICS_CACHE_TTL", "2"))
     marqo_index_name: Optional[str] = None
     marqo_pests_diseases_index_name: Optional[str] = None
 
-    # Qdrant vector search (scheme documents — MIF, PKVY, PM-KMY)
+    # Qdrant vector search (scheme documents)
     qdrant_url: Optional[str] = os.getenv("QDRANT_URL")
     qdrant_api_key: Optional[str] = os.getenv("QDRANT_API_KEY")
     qdrant_collection_name: str = os.getenv("QDRANT_COLLECTION_NAME", "schemes-index")
+    qdrant_video_collection_name: str = os.getenv("QDRANT_VIDEO_COLLECTION_NAME", "video_data_collection")
 
     # HTTP client timeouts for outbound API calls (connect and read; read should be > connect)
     default_api_timeout: float = float(os.getenv("DEFAULT_API_TIMEOUT", 5.0))   # connect timeout (DEFAULT_API_TIMEOUT)

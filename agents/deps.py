@@ -1,5 +1,5 @@
 from typing import Any, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from langcodes import Language
 
 
@@ -11,6 +11,8 @@ class FarmerContext(BaseModel):
         lang_code (str): The language code of the user's question.
         session_id (str): The session ID for the conversation.
         moderation_str (Optional[str]): The moderation result of the user's question.
+        latitude (Optional[float]): User's latitude for geocoding.
+        longitude (Optional[float]): User's longitude for geocoding.
 
 
     Example:
@@ -69,8 +71,22 @@ class FarmerContext(BaseModel):
             return self.moderation_str
         else:
             return None
+
+    def _location_context_string(self):
+        """Give the agent explicit access to browser coordinates when available."""
+        if self.latitude is not None and self.longitude is not None:
+            return (
+                "**Browser Location Coordinates:** "
+                f"Latitude={self.latitude}, Longitude={self.longitude}"
+            )
+        return None
     
     def get_user_message(self):
         """Get the user message for the agrinet agent."""
-        strings = [self._query_string(), self._language_string(), self._moderation_string()]
+        strings = [
+            self._query_string(),
+            self._language_string(),
+            self._moderation_string(),
+            self._location_context_string(),
+        ]
         return "\n".join([x for x in strings if x])

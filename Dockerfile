@@ -13,18 +13,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better Docker layer caching
-COPY requirements.txt .
+COPY requirements.lock .
 
 # Add pip index
 RUN pip config set global.index-url https://pypi.org/simple
 
-# Install Python dependencies
-RUN python3 -m pip install --upgrade pip && python3 -m pip install --upgrade setuptools && python3 -m pip install --upgrade wheel
-# CPU-only torch first — avoids huge NVIDIA CUDA wheels on aarch64 Docker builds
-RUN python3 -m pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-RUN grep -v '^sentence-transformers' requirements.txt > /tmp/requirements-base.txt \
-    && python3 -m pip install --no-cache-dir -r /tmp/requirements-base.txt \
-    && python3 -m pip install --no-cache-dir sentence-transformers
+# Install the complete lock, including the explicitly selected CPU-only Torch wheel.
+RUN python3 -m pip install --no-cache-dir --only-binary=:all: --require-hashes -r requirements.lock
 
 # Bake E5 embedding model into the image (avoids HuggingFace download on first search_schemes call)
 ARG HF_TOKEN=

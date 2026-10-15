@@ -1,4 +1,4 @@
-"""Langfuse: one chain root → agent.moderation → agent.vistaar → tool:* (no duplicate root names)."""
+"""Langfuse: chain.chat → agent.moderation → agent.vistaar → tool:*; trace title via propagate_attributes(trace_name)."""
 
 AGENT_MODERATION = "agent.moderation"
 AGENT_VISTAAR = "agent.vistaar"

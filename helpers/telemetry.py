@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, field_serializer
-import os
 import secrets
+import os
 
 
 def generate_telemetry_mid() -> str:
@@ -891,6 +891,74 @@ def create_asr_event(
             target=target,
             qid=qid or f"asr_{session_id}",
             type="BHASHINI_ASR",
+            state="",
+            errorDetails=error_details,
+        ),
+        uid=uid,
+        sid=session_id,
+        channel=channel,
+        did=did,
+        pdata_id=pdata_id,
+        pdata_ver=pdata_ver,
+        gdata_id=gdata_id,
+        gdata_ver=gdata_ver,
+        timestamp=timestamp
+    )
+
+
+def create_ald_event(
+    success: bool,
+    latency_ms: float,
+    status_code: Optional[int] = None,
+    error_code: Optional[str] = None,
+    error_message: Optional[str] = None,
+    detected_language: Optional[str] = None,
+    session_id: str = "",
+    qid: Optional[str] = None,
+    uid: str = "system",
+    channel: str = "BharatVistaar",
+    did: str = "system",
+    pdata_id: str = "BharatVistaar",
+    pdata_ver: str = "v0.1",
+    gdata_id: str = "content_id",
+    gdata_ver: str = "content_ver",
+    timestamp: Optional[int] = None,
+) -> TelemetryEvent:
+    """Creates an Audio Language Detection (ALD) event for telemetry."""
+    asr_response_details = {
+        "apiType": "ALD",
+        "apiService": "bhashini",
+        "success": success,
+        "latencyMs": latency_ms,
+        "statusCode": status_code,
+        "errorCode": error_code,
+        "errorMessage": error_message,
+        "language": detected_language,
+        "sessionId": session_id,
+        **({"qid": qid} if qid else {})
+    }
+
+    target = Target(
+        id="bhashini_api",
+        ver="v1.0",
+        type="API_CALL",
+        parent={"id": "bhashini", "type": "external_service"},
+        asrResponseDetails=asr_response_details,
+    )
+
+    error_details = None
+    if not success:
+        error_details = {
+            "errorText": error_message or "error",
+            "sessionId": session_id,
+        }
+
+    return create_event(
+        event_type=EventType.OE_ITEM_RESPONSE,
+        event_data=ItemResponseEks(
+            target=target,
+            qid=qid or f"ald_{session_id}",
+            type="BHASHINI_ALD",
             state="",
             errorDetails=error_details,
         ),

@@ -3,6 +3,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
+
 from app.auth.jwt_auth import get_current_user
 from app.models.requests import ChatRequest
 from app.routers.chat_query_utils import (
@@ -13,15 +14,17 @@ from app.routers.chat_query_utils import (
 from app.services.chat import stream_chat_messages
 from helpers.utils import get_logger
 
+
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
 
 @router.get("/")
 async def chat_endpoint(
     background_tasks: BackgroundTasks,
     request: ChatRequest = Depends(),
-    current_user: dict = Depends(get_current_user),  # Authentication required
+    current_user: dict[str, Any] = Depends(get_current_user),  # Authentication required
 ):
     """
     Chat endpoint that streams responses back to the client.
@@ -31,15 +34,16 @@ async def chat_endpoint(
     qid = request.qid or str(uuid.uuid4())
     channel = current_user.get("channel", "BharatVistaar")
     authenticated_user = current_user.get("mobile")
+
     logger.info(
         f"Chat request received - session_id: {session_id}, qid: {qid}, user_id: {request.user_id}, "
         f"authenticated_user: {authenticated_user}, channel: {channel}, source_lang: {request.source_lang}, "
         f"target_lang: {request.target_lang}, query: {request.query}"
     )
-    
     logger.debug(f"Retrieved message history for session {session_id} - length: {len(history)}")
 
     query_text, is_image_analysis = normalize_chat_query(request.query or "")
+
     return StreamingResponse(
         stream_chat_messages(
             query=query_text,
@@ -57,10 +61,7 @@ async def chat_endpoint(
             current_user=current_user,
         ),
         media_type="text/event-stream",
-        headers={
-            "X-QID": qid,
-            "Access-Control-Expose-Headers": "X-QID",
-        },
+        headers={"X-QID": qid, "Access-Control-Expose-Headers": "X-QID"},
         background=background_tasks,
     )
 
@@ -115,5 +116,6 @@ async def chat_analyze_image_endpoint(
             current_user=current_user,
         ),
         media_type="text/event-stream",
+        headers={"X-QID": qid, "Access-Control-Expose-Headers": "X-QID"},
         background=background_tasks,
     )

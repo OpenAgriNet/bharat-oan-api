@@ -355,6 +355,8 @@ class PMfbyInitRequest(BaseModel):
     """
     phone_number: str
     transaction_id: str
+    session_id: str = ""
+    question_id: str = ""
 
     def get_payload(self) -> Dict[str, Any]:
         now = datetime.now(timezone.utc)
@@ -377,7 +379,11 @@ class PMfbyInitRequest(BaseModel):
                 "location": {
                     "country": {"code": "IND"},
                     "city": {"code": "*"}
-                }
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "order": {
@@ -418,6 +424,8 @@ class PMfbyStatusWithOtpRequest(BaseModel):
     year: str
     season: Literal["Kharif", "Rabi", "Summer"]
     phone_number: str
+    session_id: str = ""
+    question_id: str = ""
 
     def get_payload(self) -> Dict[str, Any]:
         now = datetime.now(timezone.utc)
@@ -440,7 +448,11 @@ class PMfbyStatusWithOtpRequest(BaseModel):
                 "location": {
                     "country": {"code": "IND"},
                     "city": {"code": "*"}
-                }
+                },
+                "tags": {
+                    "session_id": self.session_id,
+                    "question_id": self.question_id,
+                },
             },
             "message": {
                 "order_id": self.order_id,
@@ -493,7 +505,9 @@ def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: st
 
         payload = PMfbyInitRequest(
             phone_number=phone_number,
-            transaction_id=transaction_id
+            transaction_id=transaction_id,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
         ).get_payload()
         
         endpoint = os.getenv("BAP_ENDPOINT").rstrip("/") + "/init"
@@ -593,7 +607,9 @@ def check_pmfby_status_with_otp(
             inquiry_type=inquiry_type,
             year=year,
             season=season,
-            phone_number=phone_number
+            phone_number=phone_number,
+            session_id=ctx.deps.session_id,
+            question_id=ctx.deps.question_id,
         ).get_payload()
         
         endpoint = os.getenv("BAP_ENDPOINT").rstrip("/") + "/status"

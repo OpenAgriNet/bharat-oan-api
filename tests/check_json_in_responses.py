@@ -48,7 +48,7 @@ JSON_PATTERNS = [
     (re.compile(r'</think>'), "thinking trace end"),
     (re.compile(r'```json'), "json code block"),
     (re.compile(r'```python'), "python code block"),
-    (re.compile(r'(search_terms|search_documents|search_pests_diseases|search_videos|forward_geocode|reverse_geocode|weather_forecast|get_mandi_prices|search_commodity|get_scheme_info|check_pmfby_status|check_shc_status|initiate_pm_kisan_status_check|check_pm_kisan_status_with_otp|submit_grievance|grievance_status)\s*\('), "raw function call"),
+    (re.compile(r'(search_terms|search_documents|search_pests_diseases|search_videos|forward_geocode|reverse_geocode|weather_forecast|get_mandi_prices|search_commodity|get_scheme_info|check_pmfby_status|check_shc_status|initiate_pm_kisan_status_check|check_pm_kisan_status_with_otp|pmkisan_submit_grievance|pmkisan_grievance_status)\s*\('), "raw function call"),
 ]
 
 # ANSI colors

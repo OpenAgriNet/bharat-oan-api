@@ -1,23 +1,34 @@
 """
 Tools for the BharatVistaar AI Agent.
 """
+
 # from agents.tools.search_beckn import search_documents
+
 from pydantic_ai import Tool
+
 from agents.tools.scheme_info import get_scheme_info
+from agents.tools.amul_vistaar import call_amul_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
-from agents.tools.pmkisan_scheme_status import initiate_pm_kisan_status_check, check_pm_kisan_status_with_otp
-from agents.tools.pmfby_scheme_status import initiate_pmfby_status_check, check_pmfby_status_with_otp
-from agents.tools.pmfby_grievance import (
-    initiate_pmfby_grievance_otp,
-    check_pmfby_grievance_otp,
-    pmfby_grievance_status,
-    pmfby_submit_grievance,
+from agents.tools.pmkisan_scheme_status import (
+    initiate_pm_kisan_status_check,
+    check_pm_kisan_status_with_otp,
+)
+from agents.tools.pmfby_scheme_status import (
+    initiate_pmfby_status_check,
+    check_pmfby_status_with_otp,
 )
 from agents.tools.shc_scheme_status import check_shc_status
 from agents.tools.pmkisan_grievance import (
     pmkisan_grievance_send_otp,
     pmkisan_submit_grievance,
     pmkisan_grievance_status,
+)
+from agents.tools.smam_scheme_status import check_smam_scheme_status
+from agents.tools.pmfby_grievance import (
+    initiate_pmfby_grievance_otp,
+    check_pmfby_grievance_otp,
+    pmfby_grievance_status,
+    pmfby_submit_grievance,
 )
 from agents.tools.aif import (
     initiate_aif_otp,
@@ -26,17 +37,20 @@ from agents.tools.aif import (
     check_aif_grievance_status,
 )
 from agents.tools.terms import search_terms
-from agents.tools.search import search_documents
-from agents.tools.search import search_video
-from agents.tools.search import search_pests_diseases
-from agents.tools.search import search_schemes
+from agents.tools.search import (
+    search_documents,
+    search_video,
+    search_pests_diseases,
+    search_schemes,
+)
 from agents.tools.weather import weather_forecast
-from agents.tools.amul_vistaar import call_amul_vistaar_network
 from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
 from agents.tools.maps import reverse_geocode, forward_geocode
-from agents.tools.smam_scheme_status import check_smam_scheme_status
-from agents.tools.gfr import gfr_get_recommendations, gfr_get_crop_registries
+from agents.tools.gfr import (
+    gfr_get_crop_registries,
+    gfr_get_recommendations,
+)
 from agents.tools.sathi_seed import (
     get_sathi_crop_groups,
     list_sathi_crops_in_group,
@@ -50,19 +64,18 @@ TOOLS = [
         takes_ctx=True,
         strict=False,
     ),
-    # MahaVistaar cross-network (BH → MH, N-N pattern) — NDKSP drip irrigation, farm pond lining, and AIF drip irrigation only
     Tool(
-        call_maha_vistaar_network,
-        takes_ctx=True,
-        strict=False,
-    ),
-     Tool(
         call_amul_vistaar_network,
         takes_ctx=True,
         strict=False,
     ),
     Tool(
-        initiate_pm_kisan_status_check,
+        call_maha_vistaar_network,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        initiate_pm_kisan_status_check, 
         takes_ctx=True,
         strict=False,
     ),
@@ -78,6 +91,31 @@ TOOLS = [
     ),
     Tool(
         check_pmfby_status_with_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        check_shc_status,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        pmkisan_grievance_send_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        check_smam_scheme_status,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        pmkisan_submit_grievance,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        pmkisan_grievance_status,
         takes_ctx=True,
         strict=False,
     ),
@@ -102,22 +140,22 @@ TOOLS = [
         strict=False,
     ),
     Tool(
-        check_shc_status,
-        takes_ctx=False,
-        strict=False,
-    ),
-    Tool(
-        pmkisan_grievance_send_otp,
+        initiate_aif_otp,
         takes_ctx=True,
         strict=False,
     ),
     Tool(
-        pmkisan_submit_grievance,
+        verify_aif_otp,
         takes_ctx=True,
         strict=False,
     ),
     Tool(
-        pmkisan_grievance_status,
+        check_aif_loan_status,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        check_aif_grievance_status,
         takes_ctx=True,
         strict=False,
     ),
@@ -148,7 +186,7 @@ TOOLS = [
     ),
     Tool(
         weather_forecast,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -168,17 +206,17 @@ TOOLS = [
     ),
     Tool(
         reverse_geocode,
-        takes_ctx=False,    
-        strict=False,
-    ),
-    Tool(
-        gfr_get_recommendations,
         takes_ctx=False,
         strict=False,
     ),
     Tool(
         gfr_get_crop_registries,
-        takes_ctx=False,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        gfr_get_recommendations,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -193,12 +231,7 @@ TOOLS = [
     ),
     Tool(
         search_sathi_seed_availability,
-        takes_ctx=False,
-        strict=False,
-    ),
-    Tool(
-        check_smam_scheme_status,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -206,24 +239,5 @@ TOOLS = [
         takes_ctx=True,
         strict=False,
     ),
-      Tool(
-        initiate_aif_otp,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        verify_aif_otp,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        check_aif_loan_status,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        check_aif_grievance_status,
-        takes_ctx=True,
-        strict=False,
-    ),
+
 ]

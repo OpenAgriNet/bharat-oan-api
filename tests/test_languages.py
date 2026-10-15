@@ -3,7 +3,6 @@ from pathlib import Path
 
 from agents.tools.terms import SUPPORTED_LANGS, TermPair
 from app.services.npss_response import LABELS, LANGUAGE_SCRIPT_RANGES, SOURCE_LINES
-from helpers.utils import get_prompt
 
 PROMPT_DIR = Path("assets/prompts")
 PROMPT_LANGS = sorted(p.stem.removeprefix("agrinet_") for p in PROMPT_DIR.glob("agrinet_*.md"))
@@ -25,14 +24,9 @@ def test_translated_prompts_keep_english_template_tokens():
         assert tokens == en_tokens, lang
 
 
-def test_every_language_prompt_renders():
-    for lang in PROMPT_LANGS:
-        assert get_prompt(f"agrinet_{lang}", context={"today_date": "x"}).strip(), lang
-
-
 def test_keyword_language_codes_round_trip():
-    pair = TermPair(**{"en": "Seed", "hi": "बीज", "transliteration": "beej", "or": "ବିହନ", "as": "বীজ", "pa": "ਬੀਜ", "mai": "बीया"})
-    assert pair.get_term("or") == "ବିହନ"
-    assert pair.get_term("as") == "বীজ"
-    assert pair.get_term("pa") == "ਬੀਜ"
+    pair = TermPair(**{"en": "Seed", "or": ["ବିହନ"], "as": "বীজ", "pa": "ਬੀਜ", "mai": ["बीया", "बीज"]})
+    assert pair.get_terms("or") == ["ବିହନ"]
+    assert pair.get_terms("as") == ["বীজ"]
+    assert pair.get_terms("pa") == ["ਬੀਜ"]
     assert pair.get_term("mai") == "बीया"

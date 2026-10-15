@@ -7,26 +7,16 @@ from typing import Any, AsyncGenerator, Optional
 
 from fastapi import BackgroundTasks
 from langfuse import get_client, observe, propagate_attributes
-from pydantic_ai import AgentRunResultEvent, FinalResultEvent, PartDeltaEvent, TextPartDelta
+from pydantic_ai import AgentRunResultEvent, FinalResultEvent, PartDeltaEvent, PartStartEvent, TextPartDelta
+from pydantic_ai.messages import TextPart
 
 from agents.agrinet import agrinet_agent
 from agents.deps import FarmerContext
-from agents.models import (
-    LANGFUSE_MODERATION_MODEL_NAME,
-    AgrinetRoute,
-    get_agrinet_route_model,
-    get_agrinet_route_model_name,
-)
+from agents.model_registry import get_registry
 from agents.moderation import moderation_agent
 from app.config import settings
 from app.core.npss_followup import find_pending_npss_image_url
-from app.services.agrinet_routing import (
-    AgrinetRouteDecision,
-    get_alternate_agrinet_route,
-    refresh_session_agrinet_route_ttl,
-    resolve_agrinet_route,
-    set_session_agrinet_route,
-)
+from app.services.model_routing import ModelRouteDecision, get_model_router
 from app.services.chat_turn_map import write_chat_turn_map
 from app.services.npss_response import post_process_npss_response
 from app.tasks.telemetry import send_telemetry
@@ -71,6 +61,7 @@ class _AgrinetCompletedRun:
 class _AgrinetStreamState:
     final_result_found: bool = False
     inside_think_block: bool = False
+    pending_text_start: str = ""
     raw_chunks: list[str] = field(default_factory=list)
 
 
@@ -92,10 +83,10 @@ class _StreamChunkSink:
 
 
 def _agrinet_route_metadata(
-    decision: AgrinetRouteDecision,
+    decision: ModelRouteDecision,
     *,
     fallback_used: bool,
-    fallback_from: AgrinetRoute | None = None,
+    fallback_from: str | None = None,
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "agrinet_route": decision.route,
@@ -131,6 +122,20 @@ def _strip_streaming_thinking_chunk(chunk: str, state: _AgrinetStreamState) -> s
     return visible
 
 
+async def _emit_final_text_chunk(
+    raw_chunk: str,
+    stream_state: _AgrinetStreamState,
+    chunk_queue: _StreamChunkSink | None,
+) -> None:
+    """Record and stream one final-answer text piece (PartStart prefix or delta)."""
+    if not raw_chunk:
+        return
+    stream_state.raw_chunks.append(raw_chunk)
+    visible_chunk = _strip_streaming_thinking_chunk(raw_chunk, stream_state)
+    if visible_chunk and chunk_queue is not None:
+        await chunk_queue.put(visible_chunk)
+
+
 def _sanitize_streamed_output(raw_output: str) -> str:
     cleaned_output = re.sub(r"<think>[\s\S]*?</think>", "", raw_output)
     cleaned_output = re.sub(r"<think>[\s\S]*$", "", cleaned_output)
@@ -154,8 +159,12 @@ async def _send_telemetry_event(event: Any) -> None:
         logger.exception("Failed to send telemetry event after client disconnect")
 
 
+# How long an in-flight agent run may keep going after the client hangs up, so the turn
+# still reaches history and telemetry instead of disappearing mid-stream.
 _DISCONNECT_FINALIZE_TIMEOUT_SECONDS = 180
 
+# asyncio only holds weak references to running tasks, so detached finalizers need a
+# strong reference here or they can be garbage collected mid-flight.
 _detached_finalizers: set[asyncio.Task] = set()
 
 
@@ -166,113 +175,11 @@ def _spawn_detached(coro) -> None:
     task.add_done_callback(_detached_finalizers.discard)
 
 
-
-@dataclass
-class _ChatTurnContext:
-    route_decision: AgrinetRouteDecision
-    trace_id: Optional[str]
-    telemetry_qid: str
-    session_id: str
-    channel: str
-    telemetry_user: dict
-    query: str
-    background_tasks: BackgroundTasks
-    history: list
-
-
-async def _finalize_chat_turn(
-    ctx: _ChatTurnContext,
-    completed_run: _AgrinetCompletedRun,
-    final_route_decision: AgrinetRouteDecision,
-    fallback_used: bool,
-    output_text: str,
-    *,
-    detached: bool = False,
-) -> None:
-    final_route_metadata = _agrinet_route_metadata(
-        final_route_decision,
-        fallback_used=fallback_used,
-        fallback_from=ctx.route_decision.route if fallback_used else None,
-    )
-
-    if ctx.trace_id and fallback_used:
-        await _record_chat_turn(
-            ctx.trace_id, ctx.telemetry_qid, ctx.session_id, final_route_decision, ctx.channel
-        )
-
-    logger.info(
-        "Agent run complete for session %s via route %s (%s)",
-        ctx.session_id,
-        final_route_decision.route,
-        final_route_decision.model_name,
-    )
-
-    if detached:
-        logger.info("Finalizing session %s turn after client disconnect", ctx.session_id)
-    else:
-        lf_update_current_span(output=output_text, metadata=final_route_metadata)
-
-    answer_event = create_chat_answer_event(
-        current_user=ctx.telemetry_user,
-        qid=ctx.telemetry_qid,
-        question_text=ctx.query,
-        answer_text=output_text,
-        session_id=ctx.session_id,
-    )
-    if detached:
-        await _send_telemetry_event(answer_event)
-    else:
-        _queue_telemetry_event(ctx.background_tasks, answer_event)
-
-    new_messages = completed_run.result.new_messages()
-    clean_new_messages = filter_thinking_from_history(list(new_messages or []))
-    clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
-    messages = [*ctx.history, *clean_new_messages]
-    logger.info(
-        "Updating message history for session %s with %s messages",
-        ctx.session_id,
-        len(messages),
-    )
-    await update_message_history(ctx.session_id, messages)
-    await refresh_session_agrinet_route_ttl(ctx.session_id)
-
-    get_client().flush()
-
-
-async def _finalize_after_client_disconnect(
-    ctx: _ChatTurnContext,
-    pending_run: asyncio.Task,
-) -> None:
-    try:
-        completed_run, final_route_decision, fallback_used = await asyncio.wait_for(
-            pending_run, _DISCONNECT_FINALIZE_TIMEOUT_SECONDS
-        )
-        await _finalize_chat_turn(
-            ctx,
-            completed_run,
-            final_route_decision,
-            fallback_used,
-            completed_run.output_text,
-            detached=True,
-        )
-    except asyncio.TimeoutError:
-        logger.warning(
-            "Agent run for session %s did not finish within %ss of the client "
-            "disconnecting; dropping the turn",
-            ctx.session_id,
-            _DISCONNECT_FINALIZE_TIMEOUT_SECONDS,
-        )
-    except Exception:
-        logger.exception(
-            "Failed to save session %s turn after client disconnect", ctx.session_id
-        )
-
-
 async def _record_chat_turn(
-    trace_id: Optional[str],
+    trace_id: str | None,
     telemetry_qid: str,
     session_id: str,
-    decision: AgrinetRouteDecision,
+    decision: ModelRouteDecision,
     channel: str,
 ) -> None:
     """Persist the qid -> Langfuse trace mapping so user feedback can be scored later."""
@@ -385,12 +292,9 @@ async def stream_chat_messages(
         question_text=query,
         session_id=session_id,
     )
-    background_tasks.add_task(
-        send_telemetry,
-        TelemetryRequest(events=create_frontend_compatible_item_batch(question_event)).model_dump(),
-    )
+    _queue_telemetry_event(background_tasks, question_event)
 
-    route_decision = await resolve_agrinet_route(session_id, has_history=bool(history))
+    route_decision = await get_model_router().resolve("agrinet", session_id, has_history=bool(history))
     logger.info(
         "Resolved agrinet route %s (%s) for session %s via %s",
         route_decision.route,
@@ -423,7 +327,7 @@ async def stream_chat_messages(
                 f"env:{lf_env}",
                 f"channel:{channel}",
                 f"model:{route_decision.model_name}",
-                f"moderation:{LANGFUSE_MODERATION_MODEL_NAME}",
+                f"moderation:{get_registry().get_model_name(get_registry().get_default_alias('moderation'))}",
             ]
         )
     )
@@ -446,6 +350,8 @@ async def stream_chat_messages(
                 lang_code=target_lang,
                 session_id=session_id,
                 question_id=telemetry_qid,
+                latitude=latitude,
+                longitude=longitude,
             )
 
             message_pairs = "\n\n".join(format_message_pairs(history, 3))
@@ -481,18 +387,99 @@ async def stream_chat_messages(
             trimmed_history = filter_thinking_from_history(trimmed_history)
 
             chunk_queue: asyncio.Queue[str | None] = asyncio.Queue()
-            turn_ctx = _ChatTurnContext(
-                route_decision=route_decision,
-                trace_id=trace_id,
-                telemetry_qid=telemetry_qid,
-                session_id=session_id,
-                channel=channel,
-                telemetry_user=telemetry_user,
-                query=query,
-                background_tasks=background_tasks,
-                history=history,
-            )
             defer_npss_output = bool(is_image_analysis or pending_npss_image_url)
+
+            def _resolve_output_text(completed_run: _AgrinetCompletedRun) -> str:
+                return post_process_npss_response(
+                    text=completed_run.output_text,
+                    target_lang=target_lang,
+                    npss_used=deps.npss_used,
+                )
+
+            async def _finalize_turn(
+                completed_run: _AgrinetCompletedRun,
+                final_route_decision: ModelRouteDecision,
+                fallback_used: bool,
+                output_text: str,
+                *,
+                detached: bool = False,
+            ) -> None:
+                """Record the finished turn. Also runs detached after a client disconnect."""
+                final_route_metadata = _agrinet_route_metadata(
+                    final_route_decision,
+                    fallback_used=fallback_used,
+                    fallback_from=route_decision.route if fallback_used else None,
+                )
+
+                if trace_id and fallback_used:
+                    await _record_chat_turn(
+                        trace_id, telemetry_qid, session_id, final_route_decision, channel
+                    )
+
+                logger.info(
+                    "Agent run complete for session %s via route %s (%s)",
+                    session_id,
+                    final_route_decision.route,
+                    final_route_decision.model_name,
+                )
+
+                if detached:
+                    # The span closed when the request task unwound, so there is nothing
+                    # left to attach the output to.
+                    logger.info("Finalizing session %s turn after client disconnect", session_id)
+                else:
+                    lf_update_current_span(output=output_text, metadata=final_route_metadata)
+
+                answer_event = create_chat_answer_event(
+                    current_user=telemetry_user,
+                    qid=telemetry_qid,
+                    question_text=query,
+                    answer_text=output_text,
+                    session_id=session_id,
+                )
+                if detached:
+                    await _send_telemetry_event(answer_event)
+                else:
+                    _queue_telemetry_event(background_tasks, answer_event)
+
+                new_messages = completed_run.result.new_messages()
+                clean_new_messages = filter_thinking_from_history(list(new_messages or []))
+                clean_new_messages = _replace_last_text_output(clean_new_messages, output_text)
+                messages = [*history, *clean_new_messages]
+                logger.info(
+                    "Updating message history for session %s with %s messages",
+                    session_id,
+                    len(messages),
+                )
+                await update_message_history(session_id, messages)
+
+                get_client().flush()
+
+            async def _finalize_after_disconnect(pending_run: asyncio.Task) -> None:
+                """Let the in-flight run finish after a disconnect so the turn is still saved."""
+                try:
+                    completed_run, final_route_decision, fallback_used = await asyncio.wait_for(
+                        pending_run, _DISCONNECT_FINALIZE_TIMEOUT_SECONDS
+                    )
+                    await _finalize_turn(
+                        completed_run,
+                        final_route_decision,
+                        fallback_used,
+                        _resolve_output_text(completed_run),
+                        detached=True,
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "Agent run for session %s did not finish within %ss of the client "
+                        "disconnecting; dropping the turn",
+                        session_id,
+                        _DISCONNECT_FINALIZE_TIMEOUT_SECONDS,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to save session %s turn after client disconnect", session_id
+                    )
+
             with propagate_attributes(tags=[moderation_data.category]):
                 agrinet_task = asyncio.create_task(
                     _run_agrinet_with_failover_streaming(
@@ -522,19 +509,27 @@ async def stream_chat_messages(
                 except (asyncio.CancelledError, GeneratorExit):
                     # Client hung up mid-stream. Hand the still-running agent task to a
                     # detached finalizer, then let the cancellation continue.
-                    _spawn_detached(_finalize_after_client_disconnect(turn_ctx, agrinet_task))
+                    _spawn_detached(_finalize_after_disconnect(agrinet_task))
                     raise
 
-            output_text = post_process_npss_response(
-                text=completed_run.output_text,
-                target_lang=target_lang,
-                npss_used=deps.npss_used,
-            )
+            output_text = _resolve_output_text(completed_run)
             if defer_npss_output:
-                yield output_text
+                try:
+                    yield output_text
+                except (asyncio.CancelledError, GeneratorExit):
+                    _spawn_detached(
+                        _finalize_turn(
+                            completed_run,
+                            final_route_decision,
+                            fallback_used,
+                            output_text,
+                            detached=True,
+                        )
+                    )
+                    raise
 
-            await _finalize_chat_turn(
-                turn_ctx, completed_run, final_route_decision, fallback_used, output_text
+            await _finalize_turn(
+                completed_run, final_route_decision, fallback_used, output_text
             )
         except Exception as exc:
             error_event = create_chat_error_event(
@@ -544,10 +539,7 @@ async def stream_chat_messages(
                 error_text=f"{type(exc).__name__}: {exc}",
                 question_text=query,
             )
-            background_tasks.add_task(
-                send_telemetry,
-                TelemetryRequest(events=create_frontend_compatible_item_batch(error_event)).model_dump(),
-            )
+            _queue_telemetry_event(background_tasks, error_event)
             if "agrinet_task" in locals() and not agrinet_task.done():
                 agrinet_task.cancel()
             raise
@@ -558,25 +550,27 @@ async def _run_moderation(user_message: str, session_id: str):
     """Run moderation agent and trace it in Langfuse."""
     lf_update_current_observation(
         input=user_message,
-        model=LANGFUSE_MODERATION_MODEL_NAME,
         metadata={"session_id": session_id},
     )
 
-    run = await moderation_agent.run(user_message)
+    run, decision, fallback_used = await get_model_router().run_agent(
+        "moderation", session_id, moderation_agent, user_message
+    )
 
     usage_data = run.usage()
     lf_update_current_observation(
         output=str(run.output),
-        model=LANGFUSE_MODERATION_MODEL_NAME,
+        model=decision.model_name,
         input_tokens=usage_data.input_tokens or 0,
         output_tokens=usage_data.output_tokens or 0,
-        metadata={"session_id": session_id},
+        metadata={"session_id": session_id, "model_alias": decision.route,
+                  "route_source": decision.source, "fallback_used": fallback_used},
     )
     return run.output
 
 
 def _replace_last_text_output(messages: list, output_text: str) -> list:
-    """Store the same streamed response that the farmer received."""
+    """Store the same post-processed response that the farmer received."""
     if not messages or not output_text:
         return messages
 
@@ -589,60 +583,6 @@ def _replace_last_text_output(messages: list, output_text: str) -> list:
     return copied
 
 
-async def _run_agrinet_with_failover(
-    user_message: str,
-    trimmed_history: list,
-    deps: FarmerContext,
-    session_id: str,
-    user_id: str,
-    moderation_category: str,
-    initial_decision: AgrinetRouteDecision,
-):
-    try:
-        result = await _run_agrinet_once(
-            user_message=user_message,
-            trimmed_history=trimmed_history,
-            deps=deps,
-            session_id=session_id,
-            user_id=user_id,
-            moderation_category=moderation_category,
-            decision=initial_decision,
-            fallback_used=False,
-        )
-        return result, initial_decision, False
-    except Exception as primary_exc:
-        if not settings.agrinet_routing_enabled:
-            raise
-
-        fallback_route = get_alternate_agrinet_route(initial_decision.route)
-        fallback_decision = AgrinetRouteDecision(
-            route=fallback_route,
-            model_name=get_agrinet_route_model_name(fallback_route),
-            source="failover",
-        )
-        logger.warning(
-            "Agrinet route %s failed for session %s; retrying on %s (%s): %s",
-            initial_decision.route,
-            session_id,
-            fallback_decision.route,
-            fallback_decision.model_name,
-            primary_exc,
-        )
-        result = await _run_agrinet_once(
-            user_message=user_message,
-            trimmed_history=trimmed_history,
-            deps=deps,
-            session_id=session_id,
-            user_id=user_id,
-            moderation_category=moderation_category,
-            decision=fallback_decision,
-            fallback_used=True,
-            fallback_from=initial_decision.route,
-        )
-        await set_session_agrinet_route(session_id, fallback_decision.route)
-        return result, fallback_decision, True
-
-
 async def _run_agrinet_with_failover_streaming(
     user_message: str,
     trimmed_history: list,
@@ -650,67 +590,30 @@ async def _run_agrinet_with_failover_streaming(
     session_id: str,
     user_id: str,
     moderation_category: str,
-    initial_decision: AgrinetRouteDecision,
+    initial_decision: ModelRouteDecision,
     chunk_queue: asyncio.Queue[str | None],
 ):
     sink = _StreamChunkSink(chunk_queue)
-    try:
-        try:
-            completed_run = await _run_agrinet_once_streaming(
-                user_message=user_message,
-                trimmed_history=trimmed_history,
-                deps=deps,
-                session_id=session_id,
-                user_id=user_id,
-                moderation_category=moderation_category,
-                decision=initial_decision,
-                fallback_used=False,
-                chunk_queue=sink,
-            )
-            return completed_run, initial_decision, False
-        except Exception as primary_exc:
-            if not settings.agrinet_routing_enabled:
-                raise
-            if sink.emitted:
-                # Part of the answer is already on its way to the farmer; a retry
-                # would stream a second answer on top of it.
-                logger.warning(
-                    "Agrinet route %s failed for session %s after streaming began; "
-                    "not retrying on the alternate route: %s",
-                    initial_decision.route,
-                    session_id,
-                    primary_exc,
-                )
-                raise
 
-            fallback_route = get_alternate_agrinet_route(initial_decision.route)
-            fallback_decision = AgrinetRouteDecision(
-                route=fallback_route,
-                model_name=get_agrinet_route_model_name(fallback_route),
-                source="failover",
-            )
-            logger.warning(
-                "Agrinet route %s failed for session %s; retrying on %s (%s): %s",
-                initial_decision.route,
-                session_id,
-                fallback_decision.route,
-                fallback_decision.model_name,
-                primary_exc,
-            )
-            completed_run = await _run_agrinet_once_streaming(
-                user_message=user_message,
-                trimmed_history=trimmed_history,
-                deps=deps,
-                session_id=session_id,
-                user_id=user_id,
-                moderation_category=moderation_category,
-                decision=fallback_decision,
-                fallback_used=True,
-                fallback_from=initial_decision.route,
-                chunk_queue=sink,
-            )
-            await set_session_agrinet_route(session_id, fallback_decision.route)
-            return completed_run, fallback_decision, True
+    async def attempt(decision):
+        return await _run_agrinet_once_streaming(
+            user_message=user_message,
+            trimmed_history=trimmed_history,
+            deps=deps,
+            session_id=session_id,
+            user_id=user_id,
+            moderation_category=moderation_category,
+            decision=decision,
+            fallback_used=decision.route != initial_decision.route,
+            fallback_from=initial_decision.route if decision.route != initial_decision.route else None,
+            chunk_queue=sink,
+        )
+
+    try:
+        return await get_model_router().run(
+            "agrinet", session_id, attempt, decision=initial_decision,
+            can_fallback=lambda: not sink.emitted,
+        )
     finally:
         await chunk_queue.put(None)
 
@@ -723,10 +626,10 @@ async def _run_agrinet_once_streaming(
     session_id: str,
     user_id: str,
     moderation_category: str,
-    decision: AgrinetRouteDecision,
+    decision: ModelRouteDecision,
     fallback_used: bool,
     chunk_queue: _StreamChunkSink | None = None,
-    fallback_from: AgrinetRoute | None = None,
+    fallback_from: str | None = None,
 ) -> _AgrinetCompletedRun:
     route_metadata = _agrinet_route_metadata(
         decision,
@@ -750,44 +653,52 @@ async def _run_agrinet_once_streaming(
     result = None
 
     try:
-        async with asyncio.timeout(settings.agrinet_model_timeout_seconds):
-            async for event in agrinet_agent.run_stream_events(
-                user_prompt=user_message,
-                message_history=trimmed_history,
-                deps=deps,
-                model=get_agrinet_route_model(decision.route),
-            ):
-                if isinstance(event, FinalResultEvent):
-                    stream_state.final_result_found = True
+        async for event in agrinet_agent.run_stream_events(
+            user_prompt=user_message,
+            message_history=trimmed_history,
+            deps=deps,
+            model=get_registry().get_model(decision.route),
+        ):
+            # Event order from pydantic-ai for the final answer:
+            #   PartStartEvent(TextPart content="Hello")  # first tokens live here
+            #   FinalResultEvent
+            #   PartDeltaEvent(...content_delta=", I'm here...")
+            # Deltas-only handling drops the PartStart prefix → ", I'm here..." in UI/Langfuse.
+            if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+                prefix = event.part.content or ""
+                if not prefix:
                     continue
+                if stream_state.final_result_found:
+                    await _emit_final_text_chunk(prefix, stream_state, chunk_queue)
+                else:
+                    stream_state.pending_text_start = prefix
+                continue
 
-                if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
-                    if not stream_state.final_result_found:
-                        continue
-                    raw_chunk = event.delta.content_delta or ""
-                    stream_state.raw_chunks.append(raw_chunk)
-                    visible_chunk = _strip_streaming_thinking_chunk(raw_chunk, stream_state)
-                    if visible_chunk and chunk_queue is not None:
-                        await chunk_queue.put(visible_chunk)
+            if isinstance(event, FinalResultEvent):
+                stream_state.final_result_found = True
+                if stream_state.pending_text_start:
+                    pending = stream_state.pending_text_start
+                    stream_state.pending_text_start = ""
+                    await _emit_final_text_chunk(pending, stream_state, chunk_queue)
+                continue
+
+            if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+                if not stream_state.final_result_found:
                     continue
+                await _emit_final_text_chunk(
+                    event.delta.content_delta or "",
+                    stream_state,
+                    chunk_queue,
+                )
+                continue
 
-                if getattr(event, "event_kind", "") == "function_tool_result":
-                    stream_state.final_result_found = False
-                    continue
+            if getattr(event, "event_kind", "") == "function_tool_result":
+                stream_state.final_result_found = False
+                stream_state.pending_text_start = ""
+                continue
 
-                if isinstance(event, AgentRunResultEvent):
-                    result = event.result
-    except TimeoutError as exc:
-        lf_update_current_observation(
-            metadata={
-                **observation_metadata,
-                "error_type": "TimeoutError",
-                "timeout_seconds": settings.agrinet_model_timeout_seconds,
-            }
-        )
-        raise TimeoutError(
-            f"Agrinet route {decision.route} timed out after {settings.agrinet_model_timeout_seconds} seconds"
-        ) from exc
+            if isinstance(event, AgentRunResultEvent):
+                result = event.result
     except Exception as exc:
         lf_update_current_observation(
             metadata={
@@ -800,9 +711,11 @@ async def _run_agrinet_once_streaming(
     if result is None:
         raise RuntimeError("Agrinet stream finished without a final result")
 
-    fallback_output = str(getattr(result, "output", "") or "")
+    # result.output is the fully assembled ModelResponse text (includes PartStart).
+    # Prefer it so history/Langfuse stay complete even if a stream edge case is missed.
+    full_output = _sanitize_streamed_output(str(getattr(result, "output", "") or ""))
     streamed_output = _sanitize_streamed_output("".join(stream_state.raw_chunks))
-    output_text = streamed_output or _sanitize_streamed_output(fallback_output)
+    output_text = full_output or streamed_output
 
     usage_data = result.usage()
     lf_update_current_observation(
@@ -813,75 +726,3 @@ async def _run_agrinet_once_streaming(
         metadata=observation_metadata,
     )
     return _AgrinetCompletedRun(result=result, output_text=output_text)
-
-
-@observe(name=AGENT_VISTAAR, as_type="agent")
-async def _run_agrinet_once(
-    user_message: str,
-    trimmed_history: list,
-    deps: FarmerContext,
-    session_id: str,
-    user_id: str,
-    moderation_category: str,
-    decision: AgrinetRouteDecision,
-    fallback_used: bool,
-    fallback_from: AgrinetRoute | None = None,
-):
-    """Run the agrinet agent for a specific model route and trace it in Langfuse."""
-    route_metadata = _agrinet_route_metadata(
-        decision,
-        fallback_used=fallback_used,
-        fallback_from=fallback_from,
-    )
-    observation_metadata = {
-        "session_id": session_id,
-        "user_id": user_id,
-        "moderation_category": moderation_category,
-        **route_metadata,
-    }
-
-    lf_update_current_observation(
-        input=user_message,
-        model=decision.model_name,
-        metadata=observation_metadata,
-    )
-
-    try:
-        result = await asyncio.wait_for(
-            agrinet_agent.run(
-                user_prompt=user_message,
-                message_history=trimmed_history,
-                deps=deps,
-                model=get_agrinet_route_model(decision.route),
-            ),
-            timeout=settings.agrinet_model_timeout_seconds,
-        )
-    except asyncio.TimeoutError as exc:
-        lf_update_current_observation(
-            metadata={
-                **observation_metadata,
-                "error_type": "TimeoutError",
-                "timeout_seconds": settings.agrinet_model_timeout_seconds,
-            }
-        )
-        raise TimeoutError(
-            f"Agrinet route {decision.route} timed out after {settings.agrinet_model_timeout_seconds} seconds"
-        ) from exc
-    except Exception as exc:
-        lf_update_current_observation(
-            metadata={
-                **observation_metadata,
-                "error_type": type(exc).__name__,
-            }
-        )
-        raise
-
-    usage_data = result.usage()
-    lf_update_current_observation(
-        output=result.output,
-        model=decision.model_name,
-        input_tokens=usage_data.input_tokens or 0,
-        output_tokens=usage_data.output_tokens or 0,
-        metadata=observation_metadata,
-    )
-    return result

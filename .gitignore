@@ -2,6 +2,14 @@
 __pycache__/
 *.py[cod]
 *$py.class
+data/*
+.next/
+viewer/.next/
+viewer/out/
+arena/.next/
+arena/out/
+data/synthetic/
+arena/node_modules/
 *.DS_Store
 .DS_Store
 *.pid
@@ -22,7 +30,6 @@ build/
 develop-eggs/
 dist/
 downloads/
-assets/prompts_backup_20260922_164719
 eggs/
 .eggs/
 lib/
@@ -199,3 +206,11 @@ cython_debug/
 
 # JMeter
 jmeter/
+.next/trace
+
+# Deployment/Build scripts
+localbuild_deployment.md
+run.sh
+
+# Local backup of files (committed versions) from before the legacy scheme removal
+backups/

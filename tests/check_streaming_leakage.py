@@ -57,7 +57,7 @@ LEAKAGE_PATTERNS = [
     (re.compile(r'"(term|threshold|query|scheme_name|phone_number|latitude|longitude|max_results|top_k|place_name|commodity_code|days_back|inquiry_type|season|cycle|reg_no|otp|identity_no|grievance_type|grievance_description)"\s*:'), "tool param key"),
     (re.compile(r'<think>'), "thinking trace start"),
     (re.compile(r'</think>'), "thinking trace end"),
-    (re.compile(r'(search_terms|search_documents|search_pests_diseases|search_videos|forward_geocode|reverse_geocode|weather_forecast|get_mandi_prices|search_commodity|get_scheme_info|check_pmfby_status|check_shc_status|initiate_pm_kisan_status_check|check_pm_kisan_status_with_otp|submit_grievance|grievance_status)\s*\('), "raw function call"),
+    (re.compile(r'(search_terms|search_documents|search_pests_diseases|search_videos|forward_geocode|reverse_geocode|weather_forecast|get_mandi_prices|search_commodity|get_scheme_info|check_pmfby_status|check_shc_status|initiate_pm_kisan_status_check|check_pm_kisan_status_with_otp|pmkisan_submit_grievance|pmkisan_grievance_status)\s*\('), "raw function call"),
     (re.compile(r'```(json|python)'), "code block"),
     (re.compile(r'"tool_call"'), "tool_call marker"),
     (re.compile(r'"function"'), "function marker"),

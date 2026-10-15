@@ -1,13 +1,18 @@
 name: Build and Push to GCP Artifact Registry
 
 on:
+  workflow_dispatch:
+    inputs:
+      push_image:
+        description: Push the built Docker image to Artifact Registry
+        required: true
+        default: true
+        type: boolean
   push:
     branches:
-      - main
       - bh-dev
   pull_request:
     branches:
-      - main
       - bh-dev
 
 env:
@@ -16,7 +21,8 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Use the target branch name as the environment (GitHub Environments must match branch names: main, bh-dev)
+    # Manual runs use the selected source branch for credentials and image tags.
+    if: github.event_name != 'workflow_dispatch' || github.ref_name == 'main' || github.ref_name == 'bh-dev'
     environment: ${{ github.base_ref || github.ref_name }}
 
     steps:
@@ -75,7 +81,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Push Docker image
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push_image)
         run: |
           docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ steps.set-tags.outputs.LATEST_TAG }}
           docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ steps.set-tags.outputs.BUILD_TAG }}

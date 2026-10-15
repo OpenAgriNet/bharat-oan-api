@@ -58,6 +58,12 @@ def get_crop_season(dt: datetime = None) -> str:
     - Kharif (monsoon): June–September (sowing Jun-Jul, harvest Sep-Oct)
     - Rabi (winter): October–February (sowing Oct-Nov, harvest Mar-Apr)
     - Zaid (summer): March–May (short filler season between Rabi and Kharif)
+
+    Args:
+        dt: The date to classify. Defaults to current IST date.
+
+    Returns:
+        One of 'Kharif (Monsoon)', 'Rabi (Winter)', or 'Zaid (Summer)'.
     """
     if dt is None:
         ist = pytz.timezone('Asia/Kolkata')
@@ -65,9 +71,10 @@ def get_crop_season(dt: datetime = None) -> str:
     month = dt.month
     if 6 <= month <= 9:
         return "Kharif (Monsoon)"
-    if month >= 10 or month <= 2:
+    elif month >= 10 or month <= 2:
         return "Rabi (Winter)"
-    return "Zaid (Summer)"
+    else:  # 3, 4, 5
+        return "Zaid (Summer)"
 
 
 def get_logger(name):
@@ -82,15 +89,40 @@ def curl_escape_single_quoted(payload_str: str) -> str:
     return payload_str.replace("'", "'\\''")
 
 
+BASE64_LOG_KEYS = {"audioContent", "audio_data", "audio_content"}
+
+
+def _base64_placeholder(value: str) -> str:
+    return f"<base64 len={len(value)}>"
+
+
+def redact_base64_fields(value: Any, base64_keys: set[str] = BASE64_LOG_KEYS) -> Any:
+    """Return a deep-copied value with known base64 audio fields replaced by one-line placeholders."""
+    if isinstance(value, dict):
+        return {
+            key: _base64_placeholder(item) if key in base64_keys and isinstance(item, str)
+            else redact_base64_fields(item, base64_keys)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_base64_fields(item, base64_keys) for item in value]
+    return copy.deepcopy(value)
+
+
 def payload_for_log(data: Dict[str, Any], audio_content_key: str = "audioContent") -> Dict[str, Any]:
-    """Build a copy of the request payload safe for logging (large base64 replaced by placeholder). Used by transcription; TTS can use for consistency if needed."""
-    out = copy.deepcopy(data)
-    if "inputData" in out and "audio" in out["inputData"]:
-        for item in out["inputData"]["audio"]:
-            if audio_content_key in item and isinstance(item[audio_content_key], str):
-                n = len(item[audio_content_key])
-                item[audio_content_key] = f"<base64 len={n}>"
-    return out
+    """Build a request payload copy safe for logging, replacing audio base64 with placeholders."""
+    return redact_base64_fields(data, BASE64_LOG_KEYS | {audio_content_key})
+
+
+def text_for_log(text: str, max_chars: int = 500) -> str:
+    """Redact JSON-ish response text before logging and keep non-JSON text compact."""
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        return text[:max_chars]
+
+    redacted = json.dumps(redact_base64_fields(parsed), ensure_ascii=False)
+    return redacted[:max_chars]
 
 
 def is_sentence_complete(text: str) -> bool:
