@@ -1,0 +1,4 @@
+# Docker target: CPython 3.11, Linux amd64 (matches build.yml).
+-r requirements.txt
+# Select the CPU wheel explicitly; never resolve Torch from PyPI's CUDA builds.
+torch @ https://download-r2.pytorch.org/whl/cpu/torch-2.14.0%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl#sha256=673dbf5c9bbadfffab7a386b6dd7a0c219f1408a328b7b4e86d0ae551cdafa42

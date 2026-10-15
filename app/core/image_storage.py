@@ -9,11 +9,12 @@ Handles:
 
 The agent NEVER sees raw image bytes — only a URL string.
 """
+import asyncio
 import json
 import os
 import shutil
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Tuple
 from helpers.utils import get_logger
@@ -32,6 +33,11 @@ IMAGE_TTL_MINUTES = int(os.getenv("IMAGE_TTL_MINUTES", "60"))
 BASE_URL = os.getenv("BASE_URL", "")  # e.g. https://api.example.com — used to build absolute URLs
 MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_IMAGE_UPLOAD_SIZE_MB", "10"))
 MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+JPEG_MIMETYPE = "image/jpeg"
+OCTET_STREAM_MIMETYPE = "application/octet-stream"
+JPEG_EXTENSION = ".jpeg"
+WEBP_EXTENSION = ".webp"
+IMAGE_EXTENSIONS = (".jpg", JPEG_EXTENSION, ".png", WEBP_EXTENSION, ".bin")
 
 # Ensure temp directory exists
 TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -66,12 +72,12 @@ def _metadata_path(image_id: str) -> Path:
 
 def _guess_mimetype_from_path(file_path: Path) -> str:
     mapping = {
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
+        ".jpg": JPEG_MIMETYPE,
+        JPEG_EXTENSION: JPEG_MIMETYPE,
         ".png": "image/png",
-        ".webp": "image/webp",
+        WEBP_EXTENSION: "image/webp",
     }
-    return mapping.get(file_path.suffix.lower(), "application/octet-stream")
+    return mapping.get(file_path.suffix.lower(), OCTET_STREAM_MIMETYPE)
 
 
 def _serialize_metadata(entry: dict) -> dict:
@@ -90,10 +96,14 @@ def _deserialize_metadata(data: dict) -> dict:
     if not any(_is_relative_to(stored_path, root) for root in allowed_roots):
         raise ValueError("Image metadata path is outside allowed storage directories")
 
+    created_at = datetime.fromisoformat(data["created_at"])
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+
     return {
         **data,
         "path": stored_path,
-        "created_at": datetime.fromisoformat(data["created_at"]),
+        "created_at": created_at,
     }
 
 
@@ -125,10 +135,10 @@ def _delete_metadata(image_id: str) -> None:
 def _get_extension_from_mimetype(mimetype: str) -> str:
     """Map common image mimetypes to file extensions."""
     mapping = {
-        "image/jpeg": ".jpg",
+        JPEG_MIMETYPE: ".jpg",
         "image/jpg": ".jpg",
         "image/png": ".png",
-        "image/webp": ".webp",
+        "image/webp": WEBP_EXTENSION,
     }
     return mapping.get(mimetype, ".bin")
 
@@ -152,21 +162,22 @@ async def save_uploaded_image(upload_file: UploadFile) -> Tuple[str, str]:
         Tuple of (image_id, image_url)
     """
     image_id = _normalize_image_id(str(uuid.uuid4()))
-    ext = _get_extension_from_mimetype(upload_file.content_type or "application/octet-stream")
+    ext = _get_extension_from_mimetype(upload_file.content_type or OCTET_STREAM_MIMETYPE)
     file_path = _safe_child_path(TEMP_UPLOAD_DIR, f"{image_id}{ext}")
 
     # Write file to disk with a hard size limit so large uploads do not exhaust memory/disk.
     total_bytes = 0
+    chunks: list[bytes] = []
     try:
-        with file_path.open("wb") as out_file:
-            while chunk := await upload_file.read(1024 * 1024):
-                total_bytes += len(chunk)
-                if total_bytes > MAX_UPLOAD_SIZE_BYTES:
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"Image too large. Maximum allowed size is {MAX_UPLOAD_SIZE_MB} MB.",
-                    )
-                out_file.write(chunk)
+        while chunk := await upload_file.read(1024 * 1024):
+            total_bytes += len(chunk)
+            if total_bytes > MAX_UPLOAD_SIZE_BYTES:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Image too large. Maximum allowed size is {MAX_UPLOAD_SIZE_MB} MB.",
+                )
+            chunks.append(chunk)
+        await asyncio.to_thread(file_path.write_bytes, b"".join(chunks))
     except Exception:
         if file_path.exists():
             file_path.unlink()
@@ -174,8 +185,8 @@ async def save_uploaded_image(upload_file: UploadFile) -> Tuple[str, str]:
 
     entry = {
         "path": file_path,
-        "created_at": datetime.utcnow(),
-        "mimetype": upload_file.content_type or "application/octet-stream",
+        "created_at": datetime.now(timezone.utc),
+        "mimetype": upload_file.content_type or OCTET_STREAM_MIMETYPE,
         "original_name": upload_file.filename or "unknown",
         "processed": False,
     }
@@ -199,14 +210,14 @@ def get_image_path(image_id: str) -> Optional[Path]:
         return entry["path"]
 
     # Fallback: check if file exists on disk even if not in registry (e.g. after restart)
-    for ext in (".jpg", ".jpeg", ".png", ".webp", ".bin"):
+    for ext in IMAGE_EXTENSIONS:
         candidate = _safe_child_path(TEMP_UPLOAD_DIR, f"{safe_id}{ext}")
         if candidate.exists():
             return candidate
 
     # Check GCS mount
     if GCS_MOUNT_DIR:
-        for ext in (".jpg", ".jpeg", ".png", ".webp", ".bin"):
+        for ext in IMAGE_EXTENSIONS:
             candidate = _safe_child_path(GCS_MOUNT_DIR, f"{safe_id}{ext}")
             if candidate.exists():
                 return candidate
@@ -236,7 +247,7 @@ def get_image_metadata(image_id: str) -> Optional[dict]:
 
     return {
         "path": file_path,
-        "created_at": datetime.utcfromtimestamp(file_path.stat().st_mtime),
+        "created_at": datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc),
         "mimetype": _guess_mimetype_from_path(file_path),
         "original_name": file_path.name,
         "processed": False,
@@ -316,7 +327,7 @@ def cleanup_expired_images() -> int:
     Remove images older than IMAGE_TTL_MINUTES that have been processed.
     Returns count of cleaned images.
     """
-    cutoff = datetime.utcnow() - timedelta(minutes=IMAGE_TTL_MINUTES)
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=IMAGE_TTL_MINUTES)
     to_clean = []
     for metadata_file in TEMP_UPLOAD_DIR.glob("*.json"):
         image_id = metadata_file.stem
