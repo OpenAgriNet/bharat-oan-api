@@ -1,5 +1,26 @@
 # bharat-oan-api
 
+## PM-KISAN registration validation
+
+Registration numbers contain two letters followed by nine digits (11 characters,
+not 11 digits). Both `TN110700729` and `TN110698429` are valid formats.
+Prompts trim surrounding whitespace and uppercase the letters before checking.
+A valid format proceeds to the relevant tool; it does not establish that a
+beneficiary exists. Portal results must come from the tool, not prompt validation.
+The same rule applies to all supported language prompts and status tool descriptions.
+
+Run the prompt regression check without application dependencies:
+
+```sh
+python3 -m unittest discover -s tests -p test_pmkisan_prompt_validation.py
+```
+
+With application and test dependencies installed, also run:
+
+```sh
+python3 -m pytest tests/test_pmkisan_registration_validation.py
+```
+
 ## Callback endpoints
 
 Use these endpoints for AgriStack callback integration:
@@ -71,4 +92,3 @@ The callback response includes:
 `callbackSessionId` behavior:
 - When callback POST includes `callbackSessionId`, backend stores receipt status in cache.
 - Frontend then checks status via `GET /api/callback/status` using the same `callbackSessionId`.
-
