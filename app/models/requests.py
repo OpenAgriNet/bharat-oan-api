@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Any, Dict, Optional, Literal
 
+SESSION_ID_DESCRIPTION = "Session ID"
+
 class ChatRequest(BaseModel):
     query: str = Field(..., description="The user's chat query")
     session_id: Optional[str] = Field(None, description="Session ID for maintaining conversation context")
@@ -8,12 +10,17 @@ class ChatRequest(BaseModel):
     source_lang: str = Field('hi', description="Source language code")
     target_lang: str = Field('hi', description="Target language code")
     user_id: str = Field('anonymous', description="User identifier")
-    latitude: Optional[float] = Field(None, description="User latitude for geocode lookup")
-    longitude: Optional[float] = Field(None, description="User longitude for geocode lookup")
+    latitude: Optional[float | Literal[""]] = Field(None, description="User latitude for geocode lookup")
+    longitude: Optional[float | Literal[""]] = Field(None, description="User longitude for geocode lookup")
+
+    @field_validator("latitude", "longitude", mode="before")
+    @classmethod
+    def normalize_empty_coordinates(cls, value):
+        return None if value == "" else value
 
 class TelemetryFeedbackRequest(BaseModel):
     qid: str = Field(..., description="Question or message ID for telemetry correlation")
-    session_id: str = Field(..., description="Session ID")
+    session_id: str = Field(..., description=SESSION_ID_DESCRIPTION)
     message_id: Optional[str] = Field(None, description="Assistant message ID")
     feedback_type: str = Field(..., description="Feedback type, e.g. like or dislike")
     feedback_text: str = Field("", description="Feedback text")
@@ -22,7 +29,7 @@ class TelemetryFeedbackRequest(BaseModel):
 
 class TelemetryErrorRequest(BaseModel):
     qid: str = Field(..., description="Question ID for telemetry correlation")
-    session_id: str = Field(..., description="Session ID")
+    session_id: str = Field(..., description=SESSION_ID_DESCRIPTION)
     error_text: str = Field(..., description="Error text")
     question_text: Optional[str] = Field(None, description="Question text")
     message_id: Optional[str] = Field(None, description="Related message ID")
@@ -48,7 +55,7 @@ class TranscribeRequest(BaseModel):
         description="For bhashini, language is auto-detected via Bhashini ALD; only used to override a Hindi detection when the UI selected Maithili (mai)."
     )
     service_type: Literal['bhashini', 'whisper'] = Field('bhashini', description="Transcription service to use")
-    session_id: Optional[str] = Field(None, description="Session ID")
+    session_id: Optional[str] = Field(None, description=SESSION_ID_DESCRIPTION)
     qid: Optional[str] = Field(None, description="Question ID")
 
 class SuggestionsRequest(BaseModel):
@@ -58,11 +65,11 @@ class SuggestionsRequest(BaseModel):
 class TTSRequest(BaseModel):
     text: str = Field(..., description="Text to convert to speech")
     target_lang: str = Field('hi', description="Language code for TTS")
-    session_id: Optional[str] = Field(None, description="Session ID")
+    session_id: Optional[str] = Field(None, description=SESSION_ID_DESCRIPTION)
     service_type: Literal['bhashini', 'eleven_labs'] = Field('bhashini', description="TTS service to use")
     qid: Optional[str] = Field(None, description="Question ID") 
 
 
 class FileRequest(BaseModel):
     file_uuid: str = Field(..., description="File UUID")
-    session_id: Optional[str] = Field(None, description="Session ID")
+    session_id: Optional[str] = Field(None, description=SESSION_ID_DESCRIPTION)

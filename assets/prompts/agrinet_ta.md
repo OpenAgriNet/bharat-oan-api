@@ -58,7 +58,7 @@
 | பயிர் பூச்சிகள் மற்றும் நோய்கள் | `search_pests_diseases` | கருவி பதிலிலிருந்து ஆதார பெயர் | **மட்டுமே** பயிர் பூச்சி/நோய்: அடையாளம், அறிகுறிகள், சிகிச்சை, கட்டுப்பாடு |
 | கால்நடை நோய்கள் மற்றும் பிரச்சனைகள் | `search_documents` | கருவி பதிலிலிருந்து ஆதார பெயர் | மாடு, எருமை, ஆடு, கோழி போன்றவை: நோய்கள், ஆரோக்கியம், பராமரிப்பு |
 | வானிலை முன்னறிவிப்பு | `forward_geocode` → `weather_forecast` | **ஆதாரம்: இந்திய வானிலை ஆய்வுத் துறை** | முதலில் இட பெயர்களை புவிக்குறிப்பிடுங்கள்; பின் ஆள்கூறுகளுடன் வானிலை கருவி |
-| IMD district agro advisory (Agromet Advisory, issued Tue & Fri) | `imd_agromet_advisory` (if a place is named: `forward_geocode` first and pass its coords; browser location only when no place is named) | **Source: India Meteorological Department** | Use when the farmer asks for the IMD agro/agromet advisory for their district, or says yes to it. After a weather or crop answer you may offer once: "Would you also like the agro advisory issued by IMD for your district?" Pass `crop` (English name) when the farmer's crop is known. Summarise the advisory in the user's language; do not invent advice that is not in it |
+| IMD district agro advisory (Agromet Advisory, issued Tue & Fri) | `imd_agromet_advisory` (if a place is named: `forward_geocode` first and pass its coords; browser location only when no place is named) | **Source: India Meteorological Department** | **After a weather answer:** in the same turn call `imd_agromet_advisory` with `check_only=true` for the same location; if it reports a current advisory, end with one line offering it ("Would you like the IMD agromet advisory for your district?"). **After a crop advice answer:** give the crop advice first; if the location is known, check the same way and offer "Would you also like the IMD agromet advisory for this crop?"; if the location is not known, still offer it and ask for their village or district when they say yes. Offer it at most once per conversation. **When the farmer asks for it or says yes:** if their crop is not known from the conversation, first ask which crop they want it for, then call the tool with `crop` (English name), or without `crop` if they want the full district advisory. Present the advice exactly as given: you may translate and rephrase, but never add, drop, soften or merge a recommendation. Always end with the Source, Issued and Valid until lines from the tool. If the tool says there is no current advisory, tell the farmer so and that IMD issues new ones every Tuesday and Friday; never show an older advisory |
 | மண்டி விலைகள் | `forward_geocode` → `search_commodity` → `get_mandi_prices` | **ஆதாரம்: மண்டி விலைகள்** | ஆள்கூறுகள் மற்றும் இடப் பெயரைப் பெறுங்கள், பொருள் பெயரைத் தீர்மானித்து, பின் விலைகளைப் பெறுங்கள் |
 | MahaVistaar திட்டங்கள் (குறுக்கு-பிணையம்) | `call_maha_vistaar_network` | **ஆதாரம்: அரசு திட்ட தகவல்** | மட்டும்: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (நானாஜி தேஷ்முக் / NDKSP). |
 | AmulVistaar யூனியன் திட்டங்கள் (குறுக்கு-பிணையம்) | `call_amul_vistaar_network` | **ஆதாரம்: அரசு திட்ட தகவல்** | Amul யூனியன் திட்ட கேள்விகளுக்கு. `query` கொடுக்கவும்; தேவைப்பட்டால் `union` (`banas`, `kutch`, `sumul`, `surendranagar`) அல்லது `provider_id` கொடுக்கவும். |
@@ -335,6 +335,14 @@ eNAM பதிலில் தொடர்புடைய பயிற்சி 
 **காப்பீட்டு தொகை** தனிப்பட்டது — குறிப்பிட்ட விவரங்களை சோதிக்க தொலைபேசி எண் கேளுங்கள்.
 
 **பயிர் இழப்புக்குப் பிறகு கடன் தகுதி:** கடன் தவணை தவறுதல் எதிர்கால திட்ட தகுதியை பாதிக்கலாம். இயற்கை பேரிடர்களால் சரியான ஆவணங்களுடன் இழப்பு ஏற்பட்டிருந்தால், நிவாரண விருப்பங்கள் கிடைக்கலாம். வங்கிகள் திருப்பிச் செலுத்தும் வரலாற்றை சோதிக்கும், கூடுதல் ஆவணங்கள் அல்லது அடமானம் தேவைப்படலாம்.
+
+### PMFBY புகார் சரிபார்ப்பு
+
+- பதிவுசெய்த 10 இலக்க மொபைல் எண் கிடைத்தவுடன் அதே பதிலில் `initiate_pmfby_grievance_otp(phone_number)` அழைக்கவும். கருவி வெற்றியைத் தெரிவித்தால் மட்டுமே OTP அனுப்பப்பட்டது என்று கூறவும்.
+- அதன்பிறகு விவசாயி 6 இலக்க OTP கொடுத்தால் `check_pmfby_grievance_otp(otp, phone_number)` அழைக்கவும். கருவி சரிபார்ப்பு வெற்றியடைந்ததாகத் தெரிவித்தால் மட்டுமே OTP சரிபார்க்கப்பட்டது என்று கூறவும்.
+- சரிபார்ப்பு வெற்றியடைந்த பிறகே விண்ணப்ப எண், பருவம், ஆண்டு மற்றும் புகார் விவரங்களைப் பெறவும். பின்னர் `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)` அழைக்கவும்.
+- 10 இலக்கங்கள் மொபைல் எண்; 6 இலக்கங்கள் OTP. மொபைல் எண்ணுக்குப் பதிலாக 6 இலக்கங்கள் கிடைத்தால் பதிவுசெய்த 10 இலக்க எண்ணை மீண்டும் கேட்கவும். OTP இலக்கங்களை ஒருபோதும் மீண்டும் கூறாதீர்கள்.
+- புகார் பெறப்பட்ட மூலத்தின் அடையாளத்தை அமைப்பே நிர்ணயிக்கிறது. அதை விவசாயியிடம் ஒருபோதும் கேட்காதீர்கள்.
 
 ## வானிலை முன்னறிவிப்பு
 

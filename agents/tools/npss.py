@@ -8,7 +8,7 @@ from the provided URL before forwarding to NPSS.
 import os
 import io
 import re
-from typing import Optional
+from typing import Any, Optional
 import httpx
 from pydantic_ai.tools import RunContext
 from pydantic_ai import ModelRetry
@@ -20,39 +20,52 @@ from app.core.cache import cache
 from app.core.image_storage import mark_processed, cleanup_image
 
 logger = get_logger(__name__)
+JPEG_MIMETYPE = "image/jpeg"
+OCTET_STREAM_MIMETYPE = "application/octet-stream"
 
 
 def _format_npss_value(value, indent: int = 0) -> list[str]:
     prefix = "  " * indent
 
     if isinstance(value, dict):
-        lines: list[str] = []
-        for key, nested in value.items():
-            if isinstance(nested, (dict, list)):
-                lines.append(f"{prefix}- **{key}:**")
-                lines.extend(_format_npss_value(nested, indent + 1))
-            elif nested in (None, ""):
-                lines.append(f"{prefix}- **{key}:**")
-            else:
-                lines.append(f"{prefix}- **{key}:** {nested}")
-        return lines or [f"{prefix}-"]
+        return _format_npss_mapping(value, indent)
 
     if isinstance(value, list):
-        lines: list[str] = []
-        if not value:
-            return [f"{prefix}- None"]
-        for item in value:
-            if isinstance(item, (dict, list)):
-                lines.append(f"{prefix}-")
-                lines.extend(_format_npss_value(item, indent + 1))
-            else:
-                lines.append(f"{prefix}- {item}")
-        return lines
+        return _format_npss_list(value, indent)
 
     if value in (None, ""):
         return [f"{prefix}-"]
 
     return [f"{prefix}{value}"]
+
+
+def _format_npss_mapping(value: dict, indent: int) -> list[str]:
+    prefix = "  " * indent
+    lines: list[str] = []
+    for key, nested in value.items():
+        if isinstance(nested, (dict, list)):
+            lines.append(f"{prefix}- **{key}:**")
+            lines.extend(_format_npss_value(nested, indent + 1))
+        elif nested in (None, ""):
+            lines.append(f"{prefix}- **{key}:**")
+        else:
+            lines.append(f"{prefix}- **{key}:** {nested}")
+    return lines or [f"{prefix}-"]
+
+
+def _format_npss_list(value: list, indent: int) -> list[str]:
+    prefix = "  " * indent
+    if not value:
+        return [f"{prefix}- None"]
+
+    lines: list[str] = []
+    for item in value:
+        if isinstance(item, (dict, list)):
+            lines.append(f"{prefix}-")
+            lines.extend(_format_npss_value(item, indent + 1))
+        else:
+            lines.append(f"{prefix}- {item}")
+    return lines
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -91,7 +104,7 @@ MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
 def _detect_mimetype(data: bytes) -> Optional[str]:
     """Detect image mimetype from magic bytes."""
     if data.startswith(b"\xff\xd8\xff"):
-        return "image/jpeg"
+        return JPEG_MIMETYPE
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
     if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
@@ -178,7 +191,7 @@ async def _download_image(image_url: str) -> tuple[bytes, str]:
             response = await client.get(image_url, timeout=30.0, follow_redirects=True)
         response.raise_for_status()
         data = response.content
-        mimetype = response.headers.get("content-type", "application/octet-stream")
+        mimetype = response.headers.get("content-type", OCTET_STREAM_MIMETYPE)
         logger.info(f"Downloaded {len(data)} bytes, content-type: {mimetype}")
         return data, mimetype
     except httpx.HTTPStatusError as e:
@@ -208,7 +221,7 @@ async def _call_npss_analyze(
     analyze_url = f"{NPSS_BASE_URL}/api/Vistaar/analyze-image"
 
     # Ensure filename has correct extension for NPSS
-    ext = "jpg" if mimetype == "image/jpeg" else "png"
+    ext = "jpg" if mimetype == JPEG_MIMETYPE else "png"
     filename = f"crop_image.{ext}"
 
     files = {
@@ -272,6 +285,125 @@ def _extract_image_id_from_url(image_url: str) -> Optional[str]:
     return None
 
 
+def _has_complete_hierarchy(location: dict[str, Any]) -> bool:
+    return all(
+        location.get(key)
+        for key in ("state_id", "district_id", "sub_district_id", "village_id")
+    )
+
+
+async def _resolve_effective_location(
+    deps: FarmerContext,
+    token: str,
+) -> dict[str, Any]:
+    latitude = deps.latitude
+    longitude = deps.longitude
+    geo: dict[str, Any] = {}
+    if latitude is not None and longitude is not None:
+        geo = await resolve_npss_location_ids(
+            latitude,
+            longitude,
+            bearer_token=token,
+        ) or {}
+
+    if not geo.get("village_id") and all(
+        geo.get(key) for key in ("state_id", "district_id", "sub_district_id")
+    ):
+        geo["village_id"] = "0"
+        logger.info(
+            "Using NPSS unspecified-village sentinel for verified hierarchy: "
+            "state_id=%s district_id=%s subdistrict_id=%s",
+            geo["state_id"],
+            geo["district_id"],
+            geo["sub_district_id"],
+        )
+
+    if _has_complete_hierarchy(geo):
+        return {
+            **geo,
+            "latitude": latitude,
+            "longitude": longitude,
+        }
+
+    logger.warning(
+        "NPSS browser location unavailable or incomplete; using KVK Delhi fallback: "
+        "state_id=%s district_id=%s subdistrict_id=%s village_id=%s lat=%s lon=%s",
+        geo.get("state_id"),
+        geo.get("district_id"),
+        geo.get("sub_district_id"),
+        geo.get("village_id"),
+        latitude,
+        longitude,
+    )
+    return dict(NPSS_FALLBACK_LOCATION)
+
+
+async def _prepare_image(image_url: str) -> tuple[Optional[bytes], Optional[str], Optional[str]]:
+    try:
+        image_bytes, mimetype = await _download_image(image_url)
+    except ModelRetry:
+        raise
+    except Exception as exc:
+        logger.error("Unexpected error downloading image: %s", exc)
+        return None, None, (
+            "The image could not be downloaded for analysis. "
+            "Please try uploading it again."
+        )
+
+    if len(image_bytes) > MAX_IMAGE_SIZE_BYTES:
+        size_mb = len(image_bytes) // (1024 * 1024)
+        return None, None, (
+            f"The uploaded image is too large ({size_mb} MB). "
+            f"Please upload an image smaller than {MAX_IMAGE_SIZE_MB} MB."
+        )
+
+    detected = _detect_mimetype(image_bytes)
+    mimetype = detected or mimetype
+    if not mimetype or mimetype == OCTET_STREAM_MIMETYPE:
+        return None, None, (
+            "The uploaded file format could not be recognized. "
+            "Please upload a JPEG or PNG image."
+        )
+    if mimetype == "image/webp":
+        return None, None, (
+            "WebP images are not supported by the pest analysis service. "
+            "Please upload a JPEG or PNG image."
+        )
+    if mimetype not in (JPEG_MIMETYPE, "image/png"):
+        return None, None, (
+            f"Unsupported image format: {mimetype}. "
+            "Please upload a JPEG or PNG image."
+        )
+    return image_bytes, mimetype, None
+
+
+def _append_result_value(lines: list[str], key: str, value: Any) -> None:
+    if isinstance(value, str):
+        if not value:
+            lines.append(f"**{key}:**")
+        elif len(value) > 120 or "\n" in value:
+            lines.extend([f"**{key}:**", value, ""])
+        else:
+            lines.append(f"**{key}:** {value}")
+        return
+
+    lines.append(f"**{key}:**")
+    lines.extend(_format_npss_value(value, indent=1))
+    lines.append("")
+
+
+def _format_npss_result(result: dict[str, Any]) -> str:
+    preferred_order = ["errors", "pest", "crop", "pathogenClass", "description"]
+    ordered_keys = [key for key in preferred_order if key in result]
+    ordered_keys.extend(key for key in result if key not in ordered_keys)
+
+    lines = ["**NPSS Analysis Result**", ""]
+    for key in ordered_keys:
+        _append_result_value(lines, key, result.get(key))
+    lines.extend(["", "**Source:** NPSS"])
+    return "\n".join(lines).rstrip()
+
+
 # ---------------------------------------------------------------------------
 # Public tool
 # ---------------------------------------------------------------------------
@@ -298,6 +430,7 @@ async def analyze_crop_image(
     Browser coordinates are authoritative when present. Without coordinates, the
     backend immediately uses the KVK Delhi fallback and continues analysis.
     """
+    del location
     if not image_url or not image_url.strip():
         return (
             "No image URL was provided. "
@@ -305,101 +438,13 @@ async def analyze_crop_image(
         )
 
     image_url = image_url.strip()
-
-    # Browser coordinates are trusted backend context and are never agent arguments.
-    latitude = ctx.deps.latitude
-    longitude = ctx.deps.longitude
-    has_browser_coordinates = latitude is not None and longitude is not None
-
     token = await _get_cached_npss_token()
-    geo = {}
-    if has_browser_coordinates:
-        geo = await resolve_npss_location_ids(
-            latitude,
-            longitude,
-            bearer_token=token,
-        ) or {}
-
-    state_id = geo.get("state_id")
-    district_id = geo.get("district_id")
-    sub_district_id = geo.get("sub_district_id")
-    village_id = geo.get("village_id")
-    if not village_id and all((state_id, district_id, sub_district_id)):
-        # NPSS accepts VillageId=0 as its unspecified-village sentinel. This is
-        # required for urban sub-districts whose NPSS master contains no village
-        # rows, and avoids asking the farmer for a value that cannot be resolved.
-        village_id = "0"
-        logger.info(
-            "Using NPSS unspecified-village sentinel for verified hierarchy: "
-            "state_id=%s district_id=%s subdistrict_id=%s",
-            state_id,
-            district_id,
-            sub_district_id,
-        )
-
-    complete_master_hierarchy = all((state_id, district_id, sub_district_id, village_id))
-    if not complete_master_hierarchy:
-        logger.warning(
-            "NPSS browser location unavailable or incomplete; "
-            "using KVK Delhi fallback: state_id=%s district_id=%s subdistrict_id=%s "
-            "village_id=%s lat=%s lon=%s",
-            state_id,
-            district_id,
-            sub_district_id,
-            village_id,
-            latitude,
-            longitude,
-        )
-        state_id = NPSS_FALLBACK_LOCATION["state_id"]
-        district_id = NPSS_FALLBACK_LOCATION["district_id"]
-        sub_district_id = NPSS_FALLBACK_LOCATION["sub_district_id"]
-        village_id = NPSS_FALLBACK_LOCATION["village_id"]
-        effective_latitude = NPSS_FALLBACK_LOCATION["latitude"]
-        effective_longitude = NPSS_FALLBACK_LOCATION["longitude"]
-    else:
-        effective_latitude = latitude
-        effective_longitude = longitude
-
-    # Download image from URL
-    try:
-        image_bytes, mimetype = await _download_image(image_url)
-    except ModelRetry:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error downloading image: {e}")
-        return (
-            "The image could not be downloaded for analysis. "
-            "Please try uploading it again."
-        )
-
-    # Validate size
-    if len(image_bytes) > MAX_IMAGE_SIZE_BYTES:
-        return (
-            f"The uploaded image is too large ({len(image_bytes) // (1024 * 1024)} MB). "
-            f"Please upload an image smaller than {MAX_IMAGE_SIZE_MB} MB."
-        )
-
-    # Validate / detect mimetype
-    detected = _detect_mimetype(image_bytes)
-    if detected:
-        mimetype = detected
-    elif not mimetype or mimetype == "application/octet-stream":
-        return (
-            "The uploaded file format could not be recognized. "
-            "Please upload a JPEG or PNG image."
-        )
-
-    if mimetype == "image/webp":
-        return (
-            "WebP images are not supported by the pest analysis service. "
-            "Please upload a JPEG or PNG image."
-        )
-
-    if mimetype not in ("image/jpeg", "image/png"):
-        return (
-            f"Unsupported image format: {mimetype}. "
-            "Please upload a JPEG or PNG image."
-        )
+    effective_location = await _resolve_effective_location(ctx.deps, token)
+    image_bytes, mimetype, image_error = await _prepare_image(image_url)
+    if image_error:
+        return image_error
+    if image_bytes is None or mimetype is None:
+        return "The uploaded image could not be prepared for analysis."
 
     # Extract image ID for post-processing cleanup
     image_id = _extract_image_id_from_url(image_url)
@@ -411,12 +456,12 @@ async def analyze_crop_image(
         result = await _call_npss_analyze(
             image_bytes=image_bytes,
             mimetype=mimetype,
-            state_id=state_id,
-            district_id=district_id,
-            sub_district_id=sub_district_id,
-            village_id=village_id,
-            latitude=effective_latitude,
-            longitude=effective_longitude,
+            state_id=effective_location["state_id"],
+            district_id=effective_location["district_id"],
+            sub_district_id=effective_location["sub_district_id"],
+            village_id=effective_location["village_id"],
+            latitude=effective_location["latitude"],
+            longitude=effective_location["longitude"],
         )
         npss_completed = True
     except ModelRetry:
@@ -439,31 +484,4 @@ async def analyze_crop_image(
         source_owner=NPSS_SOURCE_OWNER,
         source_url=NPSS_SOURCE_URL,
     )
-
-    # Preserve the full NPSS payload in a readable structure instead of summarizing it.
-    preferred_order = ["errors", "pest", "crop", "pathogenClass", "description"]
-    ordered_keys = [key for key in preferred_order if key in result]
-    ordered_keys.extend(key for key in result if key not in ordered_keys)
-
-    lines = ["**NPSS Analysis Result**", ""]
-
-    for key in ordered_keys:
-        value = result.get(key)
-
-        if isinstance(value, str):
-            if value:
-                if len(value) > 120 or "\n" in value:
-                    lines.extend([f"**{key}:**", value, ""])
-                else:
-                    lines.append(f"**{key}:** {value}")
-            else:
-                lines.append(f"**{key}:**")
-            continue
-
-        lines.append(f"**{key}:**")
-        lines.extend(_format_npss_value(value, indent=1))
-        lines.append("")
-
-    lines.extend(["", "**Source:** NPSS"])
-
-    return "\n".join(lines).rstrip()
+    return _format_npss_result(result)

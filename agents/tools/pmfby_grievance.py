@@ -45,6 +45,10 @@ _OTP_FAILURE_SUBSTRINGS = (
     "incorrect otp",
 )
 
+_OTP_ERROR_DESCRIPTOR_CODES = frozenset(
+    {"invalid_otp", "farmer_id_not_found", "error", "not_found"}
+)
+
 
 def _today_yyyy_mm_dd() -> str:
     return datetime.now(timezone.utc).date().isoformat()
@@ -63,6 +67,24 @@ def normalize_phone_for_api(phone: str) -> str:
     if len(digits) == 11 and digits.startswith("0"):
         return digits[1:]
     return digits if digits else phone.strip()
+
+
+def _validate_registered_mobile(phone_number: str) -> str:
+    """Require a 10-digit PMFBY-registered mobile; reject OTP-length input."""
+    phone = normalize_phone_for_api(
+        _require_nonempty(phone_number, "Please share your registered mobile number.")
+    )
+    if not phone.isdigit():
+        raise ModelRetry("Please share a valid **10-digit** mobile number registered with PMFBY.")
+    if len(phone) == 6:
+        raise ModelRetry(
+            "The farmer shared a 6-digit number — that is OTP length, not a mobile number. "
+            "If OTP was not sent yet, ask for their **10-digit registered mobile** and call "
+            "`initiate_pmfby_grievance_otp(phone_number)`. Do not ask for grievance details yet."
+        )
+    if len(phone) != 10:
+        raise ModelRetry("Please share a valid **10-digit** mobile number registered with PMFBY.")
+    return phone
 
 
 def _validate_otp(otp: str) -> str:
@@ -96,6 +118,12 @@ def _normalize_request_season_for_pmfby_api(season: str) -> str:
     return raw
 
 
+def _season_name_for_status_api(season: str) -> str:
+    """Map grievance/status season input to BAP `season` tag (Kharif/Rabi/Summer)."""
+    api = _normalize_request_season_for_pmfby_api(season)
+    return {"1": "Kharif", "2": "Rabi", "3": "Summer"}.get(api, season.strip())
+
+
 def _require_nonempty(value: Optional[str], retry_message: str) -> str:
     s = str(value).strip() if value is not None else ""
     if not s:
@@ -115,14 +143,9 @@ def _bap_url(path: str) -> str:
     return f"{base}/{path.lstrip('/')}"
 
 
-def _beckn_context(
-    *,
-    transaction_id: str,
-    action: str,
-    session_id: str = "",
-    question_id: str = "",
-) -> Dict[str, Any]:
+def _beckn_context(*, transaction_id: str, action: str, session_id: str = "", question_id: str = "") -> Dict[str, Any]:
     return {
+        "tags": {"session_id": session_id, "question_id": question_id},
         "domain": "schemes:vistaar",
         "action": action,
         "version": "1.1.0",
@@ -135,14 +158,11 @@ def _beckn_context(
         "timestamp": str(int(datetime.now(timezone.utc).timestamp())),
         "ttl": "PT10M",
         "location": {"country": {"code": "IND"}, "city": {"code": "*"}},
-        "tags": {
-            "session_id": session_id,
-            "question_id": question_id,
-        },
     }
 
 
 def _post_json_logged(url: str, payload: Dict[str, Any], log_prefix: str) -> httpx.Response:
+    lf_update_current_observation(metadata={"tool": log_prefix, "transaction_id": payload["context"]["transaction_id"]})
     logger.info("%s URL: %s", log_prefix, url)
     logger.info("%s Payload: %s", log_prefix, json.dumps(payload, indent=2))
     resp = httpx.post(url, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
@@ -156,20 +176,9 @@ def _post_json_logged(url: str, payload: Dict[str, Any], log_prefix: str) -> htt
 # --------------------------------------------------------------------------------------
 
 
-def _payload_get_otp_grievance_flow(
-    *,
-    transaction_id: str,
-    phone: str,
-    session_id: str = "",
-    question_id: str = "",
-) -> Dict[str, Any]:
+def _payload_get_otp_grievance_flow(*, transaction_id: str, phone: str, session_id: str = "", question_id: str = "") -> Dict[str, Any]:
     return {
-        "context": _beckn_context(
-            transaction_id=transaction_id,
-            action="init",
-            session_id=session_id,
-            question_id=question_id,
-        ),
+        "context": _beckn_context(transaction_id=transaction_id, action="init", session_id=session_id, question_id=question_id),
         "message": {
             "order": {
                 "provider": {"id": "pmfby-agri"},
@@ -193,24 +202,15 @@ def _payload_get_otp_grievance_flow(
 
 
 def _payload_grievance_status(
-    *,
-    transaction_id: str,
-    phone: str,
-    grievance_support_ticket_no: str,
+    *, transaction_id: str, phone: str, grievance_support_ticket_no: str,
     session_id: str = "",
     question_id: str = "",
 ) -> Dict[str, Any]:
-    """Beckn `/status` for PMFBY grievance ticket lookup (`status_grievance`)."""
+    """Beckn `/search` for PMFBY grievance ticket lookup (`status_grievance`)."""
     ticket = str(grievance_support_ticket_no).strip()
     return {
-        "context": _beckn_context(
-            transaction_id=transaction_id,
-            action="status",
-            session_id=session_id,
-            question_id=question_id,
-        ),
+        "context": _beckn_context(transaction_id=transaction_id, action="search", session_id=session_id, question_id=question_id),
         "message": {
-            "order_id": ticket,
             "order": {
                 "provider": {"id": "pmfby-grievance"},
                 "items": [{"id": "pmfby-grievance"}],
@@ -247,43 +247,205 @@ def _payload_status_verify_otp(
     transaction_id: str,
     otp: str,
     phone: str,
+    inquiry_type: str,
+    year: str,
+    season: str,
     session_id: str = "",
     question_id: str = "",
 ) -> Dict[str, Any]:
     return {
-        "context": _beckn_context(
-            transaction_id=transaction_id,
-            action="status",
-            session_id=session_id,
-            question_id=question_id,
-        ),
+        "context": _beckn_context(transaction_id=transaction_id, action="status", session_id=session_id, question_id=question_id),
         "message": {
             "order_id": otp,
             "order": {
                 "id": "order-1",
                 "provider": {"id": "pmfby-agri"},
                 "items": [{"id": "pmfby"}],
-                "fulfillments": [{"customer": {"contact": {"phone": phone}}}],
+                "fulfillments": [
+                    {
+                        "customer": {
+                            "person": {
+                                "tags": [
+                                    {"descriptor": {"code": "inquiry_type"}, "value": inquiry_type},
+                                    {"descriptor": {"code": "year"}, "value": year},
+                                    {"descriptor": {"code": "season"}, "value": season},
+                                ]
+                            },
+                            "contact": {"phone": phone},
+                        }
+                    }
+                ],
             },
         },
     }
+
+
+def _iter_order_tags(order: Dict[str, Any]):
+    for tag in order.get("tags") or []:
+        yield tag
+    for item in order.get("items") or []:
+        for tag in item.get("tags") or []:
+            yield tag
+
+
+def _bap_status_error_message(res_json: Dict[str, Any]) -> Optional[str]:
+    """Extract user-facing error text from BAP on_status (e.g. invalid OTP)."""
+    parts: List[str] = []
+    for block in res_json.get("responses") or []:
+        order = (block.get("message") or {}).get("order") or {}
+        if (order.get("id") or "").strip().lower() == "error":
+            for tag in _iter_order_tags(order):
+                d = tag.get("descriptor") or {}
+                short_desc = (d.get("short_desc") or "").strip()
+                if short_desc:
+                    parts.append(short_desc)
+                    continue
+                name = (d.get("name") or "").strip()
+                code = (d.get("code") or "").strip()
+                if name and name.lower() != "error":
+                    parts.append(name)
+                elif code:
+                    parts.append(code.replace("_", " "))
+            continue
+        for tag in _iter_order_tags(order):
+            d = tag.get("descriptor") or {}
+            code = (d.get("code") or "").lower()
+            if code in _OTP_ERROR_DESCRIPTOR_CODES:
+                short_desc = (d.get("short_desc") or "").strip()
+                parts.append(short_desc or code.replace("_", " "))
+            for item in tag.get("list") or []:
+                d2 = item.get("descriptor") or {}
+                code2 = (d2.get("code") or "").lower()
+                if code2 in _OTP_ERROR_DESCRIPTOR_CODES:
+                    val = item.get("value")
+                    parts.append(str(val) if val else code2.replace("_", " "))
+    unique = list(dict.fromkeys(part for part in parts if part))
+    return "; ".join(unique) if unique else None
+
+
+def _has_otp_verified_signal(order: Dict[str, Any]) -> bool:
+    for tag in _iter_order_tags(order):
+        if tag.get("list"):
+            for item in tag["list"]:
+                code = ((item.get("descriptor") or {}).get("code") or "").lower()
+                val = str(item.get("value") or "").lower()
+                if code == "otp_verified" and val in ("true", "yes", "1", "verified", "success"):
+                    return True
+        d = tag.get("descriptor") or {}
+        if (d.get("code") or "").lower() == "otp_verified":
+            val = str(tag.get("value") or "").lower()
+            if val in ("true", "yes", "1", "verified", "success"):
+                return True
+    return False
+
+
+def _has_policy_catalog_data(message: Dict[str, Any]) -> bool:
+    catalog = message.get("catalog") or {}
+    if isinstance(catalog.get("order"), dict):
+        catalog = catalog["order"]
+    for prov in catalog.get("providers") or []:
+        if prov.get("items"):
+            return True
+
+    order = message.get("order") or {}
+    nested_catalog = order.get("catalog") or {}
+    for prov in nested_catalog.get("providers") or []:
+        if prov.get("items"):
+            return True
+    if order.get("items"):
+        return True
+    for prov in order.get("providers") or []:
+        if prov.get("items"):
+            return True
+    return False
+
+
+def _pmfby_otp_status_verified(res_json: Dict[str, Any]) -> bool:
+    blob = json.dumps(res_json, ensure_ascii=False).lower()
+    if any(s in blob for s in _OTP_FAILURE_SUBSTRINGS):
+        return False
+    if "invalid_otp" in blob:
+        return False
+
+    for block in res_json.get("responses") or []:
+        message = block.get("message") or {}
+        order = message.get("order") or {}
+        if (order.get("id") or "").strip().lower() == "error":
+            continue
+        state = (order.get("state") or "").strip().upper()
+        has_catalog = _has_policy_catalog_data(message)
+        has_otp_flag = _has_otp_verified_signal(order)
+        if has_otp_flag and (has_catalog or state == "COMPLETED"):
+            return True
+        if state == "COMPLETED" and has_catalog:
+            return True
+    return False
+
+
+def _verify_pmfby_otp_with_bap(
+    *,
+    ctx: RunContext[FarmerContext],
+    otp: str,
+    phone_number: str,
+    inquiry_type: str = "policy_status",
+    year: Optional[str] = None,
+    season: str = "Kharif",
+) -> tuple[bool, str]:
+    """Call BAP `/status` and require a real OTP-verified policy response."""
+    otp_str = _validate_otp(otp)
+    phone = _validate_registered_mobile(phone_number)
+    status_year = (year or str(datetime.now(timezone.utc).year)).strip()
+    status_season = _season_name_for_status_api(season)
+    transaction_id = generate_transaction_id(ctx.deps.session_id, phone_number)
+    payload = _payload_status_verify_otp(
+        transaction_id=transaction_id,
+        otp=otp_str,
+        phone=phone,
+        inquiry_type=inquiry_type,
+        year=status_year,
+        season=status_season,
+        session_id=ctx.deps.session_id,
+        question_id=ctx.deps.question_id,
+    )
+    response = _post_json_logged(_bap_url("status"), payload, "[PMFBY_GRIEVANCE_OTP_STATUS]")
+
+    if response.status_code != 200:
+        return False, f"OTP verification failed (service unavailable). Status code: {response.status_code}"
+
+    response_text = response.text.strip()
+    if not response_text:
+        return False, "OTP verification failed. Please re-check the OTP and try again."
+
+    try:
+        response_json = response.json()
+    except json.JSONDecodeError:
+        return False, "OTP verification failed. Please re-check the OTP and try again."
+
+    error_message = _bap_status_error_message(response_json)
+    if error_message:
+        return False, f"OTP verification failed. {error_message}"
+
+    if not _pmfby_otp_status_verified(response_json):
+        return False, "OTP verification failed. Please re-check the OTP and try again."
+
+    return True, "OTP verified."
 
 
 class PMfbyGrievanceInitRequest(BaseModel):
     """Beckn `/init` body for `pmfby-grievance` submit."""
 
     transaction_id: str
+    session_id: str = ""
+    question_id: str = ""
     phone_number: str
     complaint_date: str = Field(default_factory=_today_yyyy_mm_dd)
-    receipt_source_id: str
+    receipt_source_id: str = PMFBY_GRIEVANCE_RECEIPT_SOURCE_ID
     ticket_category_id: str = TICKET_CATEGORY_ID
     ticket_sub_category_id: str = TICKET_SUB_CATEGORY_ID
     request_year: str
     request_season: str
     application_no: str
     grievance_description: str
-    session_id: str = ""
-    question_id: str = ""
 
     def get_payload(self) -> Dict[str, Any]:
         phone = normalize_phone_for_api(self.phone_number)
@@ -301,12 +463,7 @@ class PMfbyGrievanceInitRequest(BaseModel):
         ]
         tag_objs = [{"descriptor": {"code": code}, "value": val} for code, val in tags]
         return {
-            "context": _beckn_context(
-                transaction_id=self.transaction_id,
-                action="init",
-                session_id=self.session_id,
-                question_id=self.question_id,
-            ),
+            "context": _beckn_context(transaction_id=self.transaction_id, action="init", session_id=self.session_id, question_id=self.question_id),
             "message": {
                 "order": {
                     "provider": {"id": "pmfby-grievance"},
@@ -343,8 +500,23 @@ class InitOrder(BaseModel):
     tags: Optional[List[Tag]] = None
 
 
+class CatalogItem(BaseModel):
+    id: Optional[str] = None
+    tags: Optional[List[Tag]] = None
+
+
+class CatalogProvider(BaseModel):
+    id: Optional[str] = None
+    items: Optional[List[CatalogItem]] = None
+
+
+class Catalog(BaseModel):
+    providers: Optional[List[CatalogProvider]] = None
+
+
 class InitMessage(BaseModel):
     order: Optional[InitOrder] = None
+    catalog: Optional[Catalog] = None
 
 
 class InitResponseItem(BaseModel):
@@ -394,27 +566,36 @@ class InitResponse(BaseModel):
         return "PMFBY grievance submitted, but ticket details were not found in the response."
 
     def format_status_result(self) -> str:
-        """Format grievance status from `/status` (status_grievance) responses."""
+        """Format grievance status from `/search` (`on_search` / `status_grievance`) responses."""
         if not self.responses:
             return "No grievance status found for this ticket."
 
         lines: List[str] = []
+        skip_codes = {"responseDynamic", "request_type"}
+
         for r in self.responses:
-            order = (r.message.order if r.message and r.message.order else None) if r.message else None
-            if not order or not order.tags:
+            if not r.message or not r.message.catalog or not r.message.catalog.providers:
                 continue
-            for tag in order.tags:
-                if not tag.display:
+            for provider in r.message.catalog.providers:
+                if not provider.items:
                     continue
-                if tag.list:
-                    for li in tag.list:
-                        if not li.display or not li.descriptor or li.value is None:
+                for item in provider.items:
+                    if not item.tags:
+                        continue
+                    for tag in item.tags:
+                        if not tag.display:
                             continue
-                        name = li.descriptor.name or li.descriptor.code or "Detail"
-                        lines.append(f"{name}: {li.value}")
-                elif tag.descriptor and tag.value is not None:
-                    name = tag.descriptor.name or tag.descriptor.code or "Detail"
-                    lines.append(f"{name}: {tag.value}")
+                        tag_code = (tag.descriptor.code if tag.descriptor else None) or ""
+                        if tag_code != "grievance_status_fetched" or not tag.list:
+                            continue
+                        for li in tag.list:
+                            if not li.display or not li.descriptor or li.value is None:
+                                continue
+                            code = li.descriptor.code or ""
+                            if code in skip_codes:
+                                continue
+                            name = li.descriptor.name or li.descriptor.code or "Detail"
+                            lines.append(f"{name}: {li.value}")
 
         if lines:
             return "\n".join(lines)
@@ -428,19 +609,19 @@ class InitResponse(BaseModel):
 
 @observe(name="tool:initiate_pmfby_grievance_otp", as_type="tool")
 def initiate_pmfby_grievance_otp(ctx: RunContext[FarmerContext], phone_number: str) -> str:
-    """Send OTP to the farmer's registered mobile for PMFBY grievance (`get_otp` /init)."""
+    """Send OTP to the farmer's registered mobile for PMFBY grievance filing.
+
+    Call this as soon as the farmer provides a **10-digit** mobile number.
+    After success, ask for the 6-digit OTP and call `check_pmfby_grievance_otp`.
+    Do not ask for application number or complaint details before OTP is verified.
+
+    Args:
+        phone_number: 10-digit mobile registered with PMFBY (not a 6-digit OTP).
+    """
     try:
+        phone = _validate_registered_mobile(phone_number)
         transaction_id = generate_transaction_id(ctx.deps.session_id, phone_number)
-        lf_update_current_observation(
-            metadata={"tool": "pmfby_grievance.init_otp", "transaction_id": transaction_id}
-        )
-        phone = normalize_phone_for_api(phone_number)
-        payload = _payload_get_otp_grievance_flow(
-            transaction_id=transaction_id,
-            phone=phone,
-            session_id=ctx.deps.session_id,
-            question_id=ctx.deps.question_id,
-        )
+        payload = _payload_get_otp_grievance_flow(transaction_id=transaction_id, phone=phone, session_id=ctx.deps.session_id, question_id=ctx.deps.question_id)
         url = _bap_url("init")
         response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_OTP_INIT]")
 
@@ -465,33 +646,38 @@ def check_pmfby_grievance_otp(
     ctx: RunContext[FarmerContext],
     otp: str,
     phone_number: str,
+    inquiry_type: str = "policy_status",
+    year: str = "",
+    season: str = "Kharif",
 ) -> str:
-    """Verify OTP via `/status` (order_id = OTP, phone-only fulfillments). HTTP 200 + no OTP-failure phrases → success."""
+    """Verify the 6-digit OTP for PMFBY grievance filing via BAP `/status`.
+
+    Call only **after** `initiate_pmfby_grievance_otp` succeeded and the farmer shares
+    their OTP. Requires `otp_verified` plus policy data in the BAP response.
+    Do not proceed to collect grievance details unless this tool returns OTP verified.
+
+    Args:
+        otp: 6-digit OTP from SMS (not the mobile number).
+        phone_number: Same 10-digit mobile used in `initiate_pmfby_grievance_otp`.
+        inquiry_type: Defaults to policy_status.
+        year: Crop year for BAP status check; defaults to current year.
+        season: Kharif, Rabi, or Summer; defaults to Kharif.
+    """
     try:
-        otp_str = _validate_otp(otp)
-        transaction_id = generate_transaction_id(ctx.deps.session_id, phone_number)
-        lf_update_current_observation(
-            metadata={"tool": "pmfby_grievance.check_otp", "transaction_id": transaction_id}
+        verified, message = _verify_pmfby_otp_with_bap(
+            ctx=ctx,
+            otp=otp,
+            phone_number=phone_number,
+            inquiry_type=inquiry_type,
+            year=year or None,
+            season=season,
         )
-        phone = normalize_phone_for_api(phone_number)
-        payload = _payload_status_verify_otp(
-            transaction_id=transaction_id,
-            otp=otp_str,
-            phone=phone,
-            session_id=ctx.deps.session_id,
-            question_id=ctx.deps.question_id,
+        if not verified:
+            return message
+        return (
+            "OTP verified. Please share your PMFBY application number, "
+            "crop season and year, and your complaint details."
         )
-        url = _bap_url("status")
-        response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_OTP_STATUS]")
-
-        if response.status_code != 200:
-            return f"OTP verification failed (service unavailable). Status code: {response.status_code}"
-
-        blob = response.text.lower()
-        if any(s in blob for s in _OTP_FAILURE_SUBSTRINGS):
-            return "OTP verification failed. Please re-check the OTP and try again."
-
-        return "OTP verified. Please share your PMFBY application number…"
 
     except httpx.TimeoutException:
         return "OTP verification request timed out. Please try again."
@@ -523,11 +709,7 @@ def pmfby_grievance_status(
         Grievance status details from the PMFBY grievance portal.
     """
     try:
-        phone = normalize_phone_for_api(
-            _require_nonempty(phone_number, "Please share your registered mobile number.")
-        )
-        if len(phone) != 10:
-            raise ModelRetry("Please share a valid 10-digit mobile number registered with PMFBY.")
+        phone = _validate_registered_mobile(phone_number)
 
         ticket = _require_nonempty(
             grievance_support_ticket_no,
@@ -537,9 +719,6 @@ def pmfby_grievance_status(
         transaction_id = generate_transaction_id(
             ctx.deps.session_id, f"{phone}:{ticket}"
         )
-        lf_update_current_observation(
-            metadata={"tool": "pmfby_grievance.status", "transaction_id": transaction_id}
-        )
         payload = _payload_grievance_status(
             transaction_id=transaction_id,
             phone=phone,
@@ -547,7 +726,7 @@ def pmfby_grievance_status(
             session_id=ctx.deps.session_id,
             question_id=ctx.deps.question_id,
         )
-        url = _bap_url("status")
+        url = _bap_url("search")
         response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_STATUS]")
 
         if response.status_code != 200:
@@ -580,19 +759,18 @@ def pmfby_submit_grievance(
     ctx: RunContext[FarmerContext],
     otp: str,
     phone_number: str,
-    receipt_source_id: str,
     request_year: str,
     request_season: str,
     application_no: str,
     grievance_description: str,
 ) -> str:
-    """Submit PMFBY grievance via Beckn `/init` (pmfby-grievance) after OTP verification."""
-    try:
-        # PMFBY grievance receipt_source_id is intentionally hardcoded per integration requirement.
-        static_receipt_source_id = PMFBY_GRIEVANCE_RECEIPT_SOURCE_ID
+    """Submit PMFBY grievance via Beckn `/init` after OTP verification.
 
-        _ = _validate_otp(otp)
-        _require_nonempty(phone_number, "Please share your registered mobile number.")
+    Call only after `check_pmfby_grievance_otp` returned OTP verified and the farmer
+    has provided application number, season/year, and complaint description.
+    """
+    try:
+        _validate_registered_mobile(phone_number)
         request_year = to_ascii_digits(_require_nonempty(request_year, "Please share the request year."))
         raw_season = _require_nonempty(request_season, "Please share the request season.")
 
@@ -604,6 +782,16 @@ def pmfby_submit_grievance(
                 "pass the season name to this tool."
             )
 
+        verified, otp_message = _verify_pmfby_otp_with_bap(
+            ctx=ctx,
+            otp=otp,
+            phone_number=phone_number,
+            year=request_year.strip(),
+            season=raw_season,
+        )
+        if not verified:
+            return otp_message
+
         if not application_no or not str(application_no).strip():
             raise ModelRetry("Please share your PMFBY application number.")
         application_no = to_ascii_digits(application_no)
@@ -612,13 +800,9 @@ def pmfby_submit_grievance(
             raise ModelRetry("Please provide a brief grievance description (at least 10 characters).")
 
         transaction_id = generate_transaction_id(ctx.deps.session_id, phone_number)
-        lf_update_current_observation(
-            metadata={"tool": "pmfby_grievance.submit", "transaction_id": transaction_id}
-        )
         payload = PMfbyGrievanceInitRequest(
             transaction_id=transaction_id,
             phone_number=phone_number,
-            receipt_source_id=static_receipt_source_id.strip(),
             request_year=request_year.strip(),
             request_season=season_api,
             application_no=application_no.strip(),

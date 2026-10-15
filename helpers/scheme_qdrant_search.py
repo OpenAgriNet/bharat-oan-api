@@ -35,7 +35,8 @@ def get_builtin_scheme_list() -> list[dict[str, Any]]:
     docstrings for the fails-open contract).
 
     Includes the former legacy integrated schemes (PM-KISAN, PMFBY, KCC, ...);
-    get_scheme_info is no longer registered.
+    The development prompt routes their information queries to search_schemes;
+    get_scheme_info remains registered for the production legacy routing.
     """
     scheme_list: list[dict[str, Any]] = []
     for entry in get_vector_scheme_entries():

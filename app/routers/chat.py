@@ -61,6 +61,7 @@ async def chat_endpoint(
             current_user=current_user,
         ),
         media_type="text/event-stream",
+        headers={"X-QID": qid, "Access-Control-Expose-Headers": "X-QID"},
         background=background_tasks,
     )
 
@@ -115,5 +116,6 @@ async def chat_analyze_image_endpoint(
             current_user=current_user,
         ),
         media_type="text/event-stream",
+        headers={"X-QID": qid, "Access-Control-Expose-Headers": "X-QID"},
         background=background_tasks,
     )
