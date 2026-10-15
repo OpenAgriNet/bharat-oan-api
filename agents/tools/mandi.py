@@ -660,6 +660,108 @@ class MandiRequest(BaseModel):
 _MAX_PAGES = 10
 
 
+def _mandi_page_payload(base_payload: dict, current_to: Optional[str], to_date: Optional[str]) -> dict:
+    """Create an independent request for this page, retaining correlation tags."""
+    # Always patch context with a fresh message_id so the provider doesn't
+    # deduplicate repeat calls as cached responses.
+    payload = {
+        **base_payload,
+        "context": {
+            **base_payload["context"],
+            "transaction_id": str(uuid.uuid4()),
+            "message_id": str(uuid.uuid4()),
+        },
+    }
+    if current_to and current_to != to_date:
+        # Patch the to_date tag in the payload for subsequent pages
+        tags = payload.get("message", {}).get("intent", {}).get("tags", [])
+        payload = {
+            **payload,
+            "message": {
+                **payload["message"],
+                "intent": {
+                    **payload["message"]["intent"],
+                    "tags": [
+                        {"code": t["code"], "value": current_to if t["code"] == "to_date" else t["value"]}
+                        for t in tags
+                    ],
+                },
+            },
+        }
+
+    return payload
+
+
+def _request_mandi_page(search_url: str, payload: dict, page: int) -> Optional[MandiResponse]:
+    """Fetch and validate one provider page; failures are distinct from empty data."""
+    sent_tags = payload.get("message", {}).get("intent", {}).get("tags", [])
+    sent_from = next((t["value"] for t in sent_tags if t.get("code") == "from_date"), None)
+    sent_to = next((t["value"] for t in sent_tags if t.get("code") == "to_date"), None)
+    logger.info("Mandi page %d request: from_date=%s to_date=%s", page, sent_from, sent_to)
+
+    try:
+        response = httpx.post(search_url, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
+    except (httpx.TimeoutException, httpx.RequestError) as e:
+        logger.error("Mandi API page %d request failed: %s", page, e)
+        return None
+
+    if response.status_code not in (200, 201):
+        logger.error("Mandi API page %d returned status %s", page, response.status_code)
+        return None
+
+    try:
+        data = response.json()
+        if "message" in data and "responses" not in data:
+            data = {"context": data["context"], "responses": [data]}
+        parsed = MandiResponse.model_validate(data)
+    except (ValueError, KeyError, TypeError) as e:
+        logger.error("Mandi API page %d parse error: %s", page, e)
+        return None
+
+    return parsed
+
+
+def _mandi_page_items(parsed: MandiResponse) -> List[MandiItem]:
+    items: List[MandiItem] = []
+    for response in parsed.responses:
+        for provider in response.message.catalog.providers:
+            items.extend(provider.items or [])
+    return items
+
+
+def _new_mandi_items(page_items: List[MandiItem], seen_keys: set) -> List[MandiItem]:
+    """Keep each commodity/market/date combination once across all pages."""
+    new_items = []
+    for item in page_items:
+        key = (item.descriptor.name, item._get_tag_value("Market"), _arrival_date_sort_key(item))
+        if key not in seen_keys:
+            seen_keys.add(key)
+            new_items.append(item)
+    return new_items
+
+
+def _next_mandi_page_to_date(page_items: List[MandiItem], from_date: Optional[str]) -> Optional[str]:
+    """Move before this page's oldest arrival, stopping at the requested start."""
+    dated = [_parse_mandi_date(item._get_tag_value("Arrival Date")) for item in page_items]
+    dated = [day for day in dated if day is not None]
+    if not dated or not from_date:
+        return None
+    oldest = min(dated)
+    from_dt = _parse_mandi_date(from_date)
+    if from_dt and oldest <= from_dt:
+        return None
+    return (oldest - timedelta(days=1)).strftime("%d-%m-%Y")
+
+
+def _first_mandi_search_context(parsed: MandiResponse) -> Dict[str, str]:
+    """Read the first nonempty provider context from the first search page."""
+    for response in parsed.responses:
+        context = response.message.catalog.search_context()
+        if context:
+            return context
+    return {}
+
+
 def _fetch_all_pages(
     search_url: str,
     base_payload: dict,
@@ -675,8 +777,8 @@ def _fetch_all_pages(
     no new items.
 
     Returns (items, search_context) where search_context is the first page's
-    provider status (see Catalog.search_context), or None on HTTP/network error
-    before any item was fetched.
+    provider status (see Catalog.search_context), or None if the first page
+    fails. Later failures retain the successfully fetched items and context.
     """
     all_items: List[MandiItem] = []
     search_context: Dict[str, str] = {}
@@ -684,103 +786,27 @@ def _fetch_all_pages(
     current_to = to_date
 
     for page in range(_MAX_PAGES):
-        # Always patch context with a fresh message_id so the provider doesn't
-        # deduplicate repeat calls as cached responses.
-        payload = {
-            **base_payload,
-            "context": {
-                **base_payload["context"],
-                "transaction_id": str(uuid.uuid4()),
-                "message_id": str(uuid.uuid4()),
-            },
-        }
-        if current_to and current_to != to_date:
-            # Patch the to_date tag in the payload for subsequent pages
-            tags = payload.get("message", {}).get("intent", {}).get("tags", [])
-            payload = {
-                **payload,
-                "message": {
-                    **payload["message"],
-                    "intent": {
-                        **payload["message"]["intent"],
-                        "tags": [
-                            {"code": t["code"], "value": current_to if t["code"] == "to_date" else t["value"]}
-                            for t in tags
-                        ],
-                    },
-                },
-            }
+        payload = _mandi_page_payload(base_payload, current_to, to_date)
+        parsed = _request_mandi_page(search_url, payload, page)
+        if parsed is None:
+            return (all_items, search_context) if all_items else None
 
-        sent_tags = payload.get("message", {}).get("intent", {}).get("tags", [])
-        sent_from = next((t["value"] for t in sent_tags if t.get("code") == "from_date"), None)
-        sent_to = next((t["value"] for t in sent_tags if t.get("code") == "to_date"), None)
-        logger.info("Mandi page %d request: from_date=%s to_date=%s", page, sent_from, sent_to)
-
-        try:
-            response = httpx.post(search_url, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
-        except (httpx.TimeoutException, httpx.RequestError) as e:
-            logger.error("Mandi API page %d request failed: %s", page, e)
-            return None if not all_items else (all_items, search_context)
-
-        if response.status_code not in (200, 201):
-            logger.error("Mandi API page %d returned status %s", page, response.status_code)
-            return None if not all_items else (all_items, search_context)
-
-        data = response.json()
-        if "message" in data and "responses" not in data:
-            data = {"context": data["context"], "responses": [data]}
-
-        try:
-            parsed = MandiResponse.model_validate(data)
-        except Exception as e:
-            logger.error("Mandi API page %d parse error: %s", page, e)
-            break
-
-        page_items: List[MandiItem] = []
-        for resp in parsed.responses:
-            if page == 0 and not search_context:
-                search_context = resp.message.catalog.search_context()
-            for provider in resp.message.catalog.providers:
-                page_items.extend(provider.items or [])
-
-        if not page_items:
-            break
-
-        # Deduplicate cross-page: same commodity + market + date shouldn't appear twice
-        new_items = []
-        for item in page_items:
-            key = (item.descriptor.name, item._get_tag_value("Market"), _arrival_date_sort_key(item))
-            if key not in seen_keys:
-                seen_keys.add(key)
-                new_items.append(item)
-
+        if page == 0:
+            search_context = _first_mandi_search_context(parsed)
+        page_items = _mandi_page_items(parsed)
+        new_items = _new_mandi_items(page_items, seen_keys)
         all_items.extend(new_items)
         logger.info("Mandi page %d: %d items fetched, %d new", page, len(page_items), len(new_items))
-
-        # A substitute mandi's prices are withheld until the farmer asks for them,
-        # so there is no point paging further back through them.
-        if search_context.get("status") == "nearby_only" and not include_nearby_mandis:
-            break
-
         if not new_items:
             break
 
-        # Find oldest arrival date in this page
-        dated = [_parse_mandi_date(next(
-            (li.value for t in item.tags for li in t.list if li.descriptor.code == "Arrival Date"), None
-        )) for item in page_items]
-        dated = [d for d in dated if d is not None]
-
-        if not dated or not from_date:
+        # Substitute prices stay withheld until the farmer requests nearby mandis.
+        if search_context.get("status") == "nearby_only" and not include_nearby_mandis:
             break
 
-        oldest = min(dated)
-        from_dt = _parse_mandi_date(from_date)
-        if from_dt and oldest <= from_dt:
+        current_to = _next_mandi_page_to_date(page_items, from_date)
+        if current_to is None:
             break
-
-        # Next page: look for arrivals before the oldest we've seen
-        current_to = (oldest - timedelta(days=1)).strftime("%d-%m-%Y")
 
     logger.info("Mandi pagination complete: %d total items across pages", len(all_items))
     return all_items, search_context
