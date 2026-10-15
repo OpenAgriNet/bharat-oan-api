@@ -1,8 +1,4 @@
 # Docker target: CPython 3.13, Linux amd64 (matches build.yml).
 -r requirements.txt
 # Select the CPU wheel explicitly; never resolve Torch from PyPI's CUDA builds.
-# ponytail: URL/tag bumped to cp313 for the 3.13 upgrade, but the sha256 below is
-# still the cp311 wheel's hash (no network access to fetch the real cp313 hash
-# here) — requirements.lock MUST be regenerated (see header comment in that file)
-# before this builds; --require-hashes will fail fast if it's stale.
-torch @ https://download-r2.pytorch.org/whl/cpu/torch-2.14.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=673dbf5c9bbadfffab7a386b6dd7a0c219f1408a328b7b4e86d0ae551cdafa42
+torch @ https://download-r2.pytorch.org/whl/cpu/torch-2.14.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=160e1bc46aeded3111d2801f8ae10dc9a1b946843a7e126b4dbf5e19c5706e95
