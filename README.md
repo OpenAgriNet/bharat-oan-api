@@ -3,7 +3,8 @@
 ## PM-KISAN registration validation
 
 Registration numbers contain two letters followed by nine digits (11 characters,
-not 11 digits). Both `TN110700729` and `TN110698429` are valid formats.
+not 11 digits). Use only a dummy example such as `TN000000000` in user-facing
+format guidance, never a real registration number.
 Prompts trim surrounding whitespace and uppercase the letters before checking.
 A valid format proceeds to the relevant tool; it does not establish that a
 beneficiary exists. Portal results must come from the tool, not prompt validation.

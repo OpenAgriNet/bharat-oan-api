@@ -21,12 +21,14 @@ class PmkisanPromptValidationTests(unittest.TestCase):
                 pattern = rule.split("`")[1]
                 for example in ("TN110700729", "TN110698429"):
                     self.assertIsNotNone(re.fullmatch(pattern, example))
-                    self.assertIn(f"`{example}`", rule)
+                    self.assertNotIn(example, prompt)
                     self.assertIsNotNone(re.fullmatch(pattern, f" {example.lower()} ".strip().upper()))
+                self.assertIn("`TN000000000`", rule)
+                self.assertIn("Never show a real registration number as an example", rule)
                 for invalid in ("TN11069842", "TN1106984290", "TN11069842X", "12110698429"):
                     self.assertIsNone(re.fullmatch(pattern, invalid))
                 self.assertIn("11 characters, not 11 digits", rule)
-                self.assertIn("do not reject them or ask for the number again", rule)
+                self.assertIn("do not reject it or ask for the number again", rule)
                 self.assertIn("call `initiate_pm_kisan_status_check(reg_no)`", rule)
                 self.assertIn("do not claim the portal rejected it", rule)
                 self.assertIn("Only report a missing record if the status tool", rule)

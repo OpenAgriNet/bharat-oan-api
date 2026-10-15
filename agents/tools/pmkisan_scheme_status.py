@@ -474,7 +474,7 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str =
     The farmer can provide either their PM Kisan registration number OR their registered phone number.
 
     Args:
-        reg_no (str): PM Kisan registration number: 2 letters followed by 9 digits (11 characters, not 11 digits), for example TN110700729 or TN110698429. Leave empty if phone_number is provided.
+        reg_no (str): PM Kisan registration number: 2 letters followed by 9 digits (11 characters, not 11 digits), for example TN000000000 (dummy format example only). Leave empty if phone_number is provided.
         phone_number (str): Farmer's registered mobile number (10 digits). Leave empty if reg_no is provided.
 
     Returns:
@@ -567,7 +567,7 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
  
     Args:
         otp (str): A 4 digit OTP received via SMS
-        reg_no (str): PM Kisan registration number: 2 letters followed by 9 digits (11 characters, not 11 digits), for example TN110700729 or TN110698429. Leave empty if phone_number is provided.
+        reg_no (str): PM Kisan registration number: 2 letters followed by 9 digits (11 characters, not 11 digits), for example TN000000000 (dummy format example only). Leave empty if phone_number is provided.
         phone_number (str): Farmer's registered mobile number (10 digits). Leave empty if reg_no is provided.
  
     Returns:
