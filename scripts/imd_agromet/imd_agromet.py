@@ -5,7 +5,7 @@
     python imd_agromet.py fetch [--date D]    # one day's bulletin (default: today, IST)
     python imd_agromet.py status
 
-Env: IMD_DB_URL. Cron: 10 */2 * * 2,5 (IMD publishes on Tue and Fri).
+Env: IMD_DB_URL. Cron: */30 * * * 2,5 (IMD publishes on Tue and Fri).
 """
 from __future__ import annotations
 
@@ -70,6 +70,7 @@ def setup(conn) -> dict:
         cur.execute("UPDATE advisories a SET lgd_district_code = m.lgd_district_code FROM imd_district_map m "
                     "WHERE m.imd_district_id::text = a.district_id AND a.lgd_district_code IS DISTINCT FROM m.lgd_district_code")
         remapped = cur.rowcount
+        cur.execute("UPDATE advisories SET valid_until = imd_valid_until(custom_date::date) WHERE valid_until IS NULL")
         cur.execute("SELECT source, count(*) FROM imd_district_map GROUP BY 1 ORDER BY 1")
         districts = dict(cur.fetchall())
     return {"district_map": districts, "crops": len(_csv("crop_map.csv")), "advisories_remapped": remapped}
@@ -119,6 +120,8 @@ def fetch(conn, date: str) -> dict:
                                 + ", ".join(f"{f}=EXCLUDED.{f}" for f in FIELDS[1:])
                                 + ", raw_json=EXCLUDED.raw_json, lgd_district_code=EXCLUDED.lgd_district_code, updated_at=now()",
                            write, page_size=1000)
+            cur.execute("UPDATE advisories SET valid_until = imd_valid_until(custom_date::date) WHERE id = ANY(%s)",
+                        ([w[0] for w in write],))
         # IMD district IDs not in the map yet: note them so they show up in status
         unknown = {(_int(r.get("district_id")), _int(r.get("state_id"))) for r in rows} - {(None, None)}
         unknown = [(d, s) for d, s in unknown if d is not None and d not in dmap]

@@ -50,9 +50,11 @@ CREATE TABLE IF NOT EXISTS advisories (
   crop_state        text,
   raw_json          jsonb NOT NULL,
   lgd_district_code integer,
+  valid_until       date,                     -- last day (IST) the bulletin may be shown
   fetched_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz
 );
+ALTER TABLE advisories ADD COLUMN IF NOT EXISTS valid_until date;
 CREATE INDEX IF NOT EXISTS advisories_lgd_date_idx ON advisories (lgd_district_code, custom_date);
 CREATE INDEX IF NOT EXISTS advisories_date_idx ON advisories (custom_date);
 
@@ -66,7 +68,28 @@ CREATE TABLE IF NOT EXISTS fetches (
   fetched_at   timestamptz NOT NULL DEFAULT now()
 );
 
--- Districts whose keys overlap the given keys, with their latest bulletin.
+-- IMD issues on Tuesday and Friday. A bulletin is valid until 11:59 PM IST on the day before the next
+-- issue day (Tuesday -> Thursday, Friday -> Monday), even if the next bulletin is late.
+CREATE OR REPLACE FUNCTION imd_valid_until(issued date)
+RETURNS date
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT min(day)::date - 1
+  FROM generate_series(issued + 1, issued + 7, interval '1 day') AS day
+  WHERE extract(isodow FROM day) IN (2, 5)
+$$;
+
+-- IMD text comes with tabs, \r\n and a private-use bullet character; keep one bullet item per line.
+CREATE OR REPLACE FUNCTION imd_clean_text(t text)
+RETURNS text
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT btrim(regexp_replace(regexp_replace(regexp_replace(
+           replace(replace(t, E'\r', ''), U&'\F0D8', '•'),
+           E'[\t ]+', ' ', 'g'),
+           E' ?\n ?', E'\n', 'g'),
+           E'\n{2,}', E'\n', 'g'), E' \n')
+$$;
+
+-- Districts whose keys overlap the given keys, with their latest bulletin that is still valid today (IST).
 CREATE OR REPLACE FUNCTION imd_lookup(p_keys text[], p_crop text DEFAULT NULL, p_date text DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE plpgsql STABLE AS $$
@@ -90,11 +113,12 @@ d AS (
 ),
 dt AS (
   SELECT COALESCE(p_date, (SELECT max(a.custom_date) FROM advisories a
-                            WHERE a.lgd_district_code IN (SELECT lgd_district_code FROM d))) AS v
+                            WHERE a.lgd_district_code IN (SELECT lgd_district_code FROM d)
+                              AND a.valid_until >= (now() AT TIME ZONE 'Asia/Kolkata')::date)) AS v
 ),
 adv AS (
   SELECT a.id, a.custom_date, a.lgd_district_code, d.district_name, a.cat_id, a.type_id, c.crop,
-         a.crop_stage, a.advisory_eng, a.advisory_reg
+         a.crop_stage, imd_clean_text(a.advisory_eng) AS advisory_eng, imd_clean_text(a.advisory_reg) AS advisory_reg
   FROM advisories a
   JOIN d ON d.lgd_district_code = a.lgd_district_code
   LEFT JOIN imd_crop_map c ON c.type_id::text = a.type_id
@@ -106,6 +130,7 @@ SELECT jsonb_build_object(
                                                              'name', district_name) ORDER BY lgd_district_code)
                          FROM d), '[]'::jsonb),
   'date', (SELECT v FROM dt),
+  'valid_until', (SELECT imd_valid_until(v::date) FROM dt),
   'advisories', COALESCE((SELECT jsonb_agg(to_jsonb(adv) ORDER BY lgd_district_code, length(id), id)
                           FROM adv), '[]'::jsonb)
 )
