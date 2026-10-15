@@ -675,8 +675,8 @@ def _fetch_all_pages(
     no new items.
 
     Returns (items, search_context) where search_context is the first page's
-    provider status (see Catalog.search_context), or None on HTTP/network error
-    before any item was fetched.
+    provider status (see Catalog.search_context), or None if the first page
+    fails. Later failures retain the successfully fetched items and context.
     """
     all_items: List[MandiItem] = []
     search_context: Dict[str, str] = {}
@@ -726,15 +726,14 @@ def _fetch_all_pages(
             logger.error("Mandi API page %d returned status %s", page, response.status_code)
             return None if not all_items else (all_items, search_context)
 
-        data = response.json()
-        if "message" in data and "responses" not in data:
-            data = {"context": data["context"], "responses": [data]}
-
         try:
+            data = response.json()
+            if "message" in data and "responses" not in data:
+                data = {"context": data["context"], "responses": [data]}
             parsed = MandiResponse.model_validate(data)
-        except Exception as e:
+        except (ValueError, KeyError, TypeError) as e:
             logger.error("Mandi API page %d parse error: %s", page, e)
-            break
+            return (all_items, search_context) if all_items else None
 
         page_items: List[MandiItem] = []
         for resp in parsed.responses:

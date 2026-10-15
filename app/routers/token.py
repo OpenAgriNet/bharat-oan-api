@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from fastapi import APIRouter, Header, HTTPException, status
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2 import service_account
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from app.config import get_default_httpx_timeout, settings
 from app.core.cache import cache
@@ -149,8 +149,9 @@ def _resolve_service_account_path(client_code: Optional[str] = None) -> Path:
     if client_code:
         normalized = _normalize_client_code(client_code)
 
-        if settings.play_integrity_service_account_base_path:
-            candidate = Path(f"{settings.play_integrity_service_account_base_path}{normalized.lower()}.json")
+        service_account_base_path = getattr(settings, "play_integrity_service_account_base_path", None)
+        if service_account_base_path:
+            candidate = Path(f"{service_account_base_path}{normalized.lower()}.json")
             resolved = candidate if candidate.is_absolute() else settings.base_dir / candidate
             if resolved.exists():
                 return resolved
@@ -241,22 +242,22 @@ async def _get_play_integrity_access_token(client_code: Optional[str] = None) ->
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Play Integrity service account file not found: {service_account_path}"
                 )
-            
+
             # Load JSON and replace private_key from env if client_code is provided
-            with open(service_account_path, 'r') as f:
+            with open(service_account_path, "r", encoding="utf-8") as f:
                 service_account_info = json.load(f)
-            
+
             # If client_code exists, try to load private key from environment variable
             if client_code:
                 normalized = _normalize_client_code(client_code)
                 env_key = f"{settings.play_integrity_private_key_prefix}{normalized}"
                 private_key_from_env = os.getenv(env_key)
-                
+
                 if private_key_from_env:
                     # Replace the private_key in JSON with env value
                     service_account_info["private_key"] = private_key_from_env.replace("\\n", "\n")
                     logger.info(f"Loaded private key for {client_key} from env var {env_key}")
-            
+
             _play_integrity_credentials[client_key] = service_account.Credentials.from_service_account_info(
                 service_account_info,
                 scopes=[PLAY_INTEGRITY_SCOPE],
@@ -382,6 +383,83 @@ def _validate_play_integrity_payload(
         )
 
 
+def _parse_json_metadata_string(raw_metadata: str) -> Dict[str, Any]:
+    try:
+        parsed_metadata = json.loads(raw_metadata)
+    except json.JSONDecodeError:
+        return {"raw": raw_metadata}
+    if isinstance(parsed_metadata, dict):
+        return dict(parsed_metadata)
+    return {"raw": raw_metadata}
+
+
+def _parse_metadata_field(raw_metadata: Any) -> Dict[str, Any]:
+    if isinstance(raw_metadata, dict):
+        return dict(raw_metadata)
+    if isinstance(raw_metadata, str):
+        return _parse_json_metadata_string(raw_metadata)
+    return {"raw": str(raw_metadata)}
+
+
+def _finalize_auth_metadata(
+    metadata: Dict[str, Any],
+    fingerprint_id: Optional[str],
+) -> Dict[str, Any]:
+    if fingerprint_id:
+        metadata["fingerprint_id"] = fingerprint_id
+    metadata["surface"] = metadata.get("surface") or "public_chat"
+    return metadata
+
+
+def _parse_auth_request_metadata(request: Optional[AuthRequest]) -> tuple[Dict[str, Any], Optional[str]]:
+    fingerprint_id = request.fingerprint_id if request and request.fingerprint_id else None
+    if not request or not request.metadata:
+        return _finalize_auth_metadata({}, fingerprint_id), fingerprint_id
+
+    metadata = _parse_metadata_field(request.metadata)
+    return _finalize_auth_metadata(metadata, fingerprint_id), fingerprint_id
+
+
+def _build_guest_auth_payload(
+    request: Optional[AuthRequest],
+    metadata: Dict[str, Any],
+    fingerprint_id: Optional[str],
+) -> tuple[Dict[str, Any], int]:
+    mobile = request.mobile if request and request.mobile else None
+    name = request.name if request and request.name else "guest"
+    # Public token issuance must never accept a caller-controlled role.
+    role = "public"
+    channel = "BharatVistaar"
+    guest_sub = f"guest:{fingerprint_id}" if fingerprint_id else "guest:anon"
+
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=settings.jwt_expiry_minutes)
+    payload = {
+        "sub": guest_sub,
+        "name": name,
+        "role": role,
+        "channel": channel,
+        "client_code": channel,
+        "auth_source": "guest_token",
+        "is_guest_user": True,
+        "telemetry_context": {
+            "uid": "guest",
+            "did": fingerprint_id,
+            "channel": channel,
+            "pdata_id": "BharatVistaar",
+            "pdata_ver": "v0.1",
+        },
+        "metadata": metadata,
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+    }
+    if mobile:
+        payload["mobile"] = mobile
+
+    expires_in = int(exp.timestamp() - now.timestamp())
+    return payload, expires_in
+
+
 async def _ensure_nonce_not_reused(nonce: str) -> None:
     cache_key = f"integrity_nonce:{nonce}"
     try:
@@ -417,76 +495,11 @@ async def create_auth_token(request: Optional[AuthRequest] = None):
         )
 
     try:
-        fingerprint_id = request.fingerprint_id if request and request.fingerprint_id else None
-        metadata: Dict[str, Any] = {}
-        if request and request.metadata:
-            if isinstance(request.metadata, dict):
-                metadata.update(request.metadata)
-            elif isinstance(request.metadata, str):
-                try:
-                    parsed_metadata = json.loads(request.metadata)
-                    if isinstance(parsed_metadata, dict):
-                        metadata.update(parsed_metadata)
-                    else:
-                        metadata["raw"] = request.metadata
-                except json.JSONDecodeError:
-                    metadata["raw"] = request.metadata
-            else:
-                metadata["raw"] = str(request.metadata)
-        if fingerprint_id:
-            metadata["fingerprint_id"] = fingerprint_id
-        metadata["surface"] = metadata.get("surface") or "public_chat"
-
-        # Use request data if provided, otherwise issue a logged-out guest token.
-        mobile = request.mobile if request and request.mobile else None
-        name = request.name if request and request.name else "guest"
-        # Public token issuance must never accept a caller-controlled role.
-        role = "public"
-        channel = "BharatVistaar"
-        guest_sub = f"guest:{fingerprint_id}" if fingerprint_id else "guest:anon"
-
-        # Create JWT payload
-        now = datetime.now(timezone.utc)
-        exp = now + timedelta(minutes=settings.jwt_expiry_minutes)
-
-        payload = {
-            "sub": guest_sub,
-            "name": name,
-            "role": role,
-            "channel": channel,
-            "client_code": channel,
-            "auth_source": "guest_token",
-            "is_guest_user": True,
-            "telemetry_context": {
-                "uid": "guest",
-                "did": fingerprint_id,
-                "channel": channel,
-                "pdata_id": "BharatVistaar",
-                "pdata_ver": "v0.1",
-            },
-            "metadata": metadata,
-            "iat": int(now.timestamp()),
-            "exp": int(exp.timestamp())
-        }
-        if mobile:
-            payload["mobile"] = mobile
-
-        # Encode JWT token using private key
-        token = jwt.encode(
-            payload,
-            private_key,
-            algorithm=settings.jwt_algorithm
-        )
-
+        metadata, fingerprint_id = _parse_auth_request_metadata(request)
+        payload, expires_in = _build_guest_auth_payload(request, metadata, fingerprint_id)
+        token = jwt.encode(payload, private_key, algorithm=settings.jwt_algorithm)
         logger.debug("JWT token created successfully")
-
-        # Calculate expiration time in seconds
-        expires_in = int(exp.timestamp() - now.timestamp())
-
-        return AuthResponse(
-            token=token,
-            expires_in=expires_in
-        )
+        return AuthResponse(token=token, expires_in=expires_in)
 
     except Exception as e:
         logger.error(f"Error creating JWT token: {str(e)}")
@@ -515,9 +528,9 @@ async def create_auth_token_with_api_key(
 
     token, expires_in = _issue_jwt_token(
         channel=client_code,
-        role="public",
         expires_minutes=settings.jwt_expiry_minutes,
         include_issued_at=True,
+        role="public",
     )
     return StaticAuthResponse(token=token, expires_in=expires_in)
 
