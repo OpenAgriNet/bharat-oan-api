@@ -9,6 +9,9 @@ from agents.tools.pmkisan_grievance import _validate_pmkisan_registration_number
     [
         ("AB123456789", "AB123456789"),
         ("ab123456789", "AB123456789"),
+        ("TN110700729", "TN110700729"),
+        ("TN110698429", "TN110698429"),
+        (" tn110698429 ", "TN110698429"),
     ],
 )
 def test_normalizes_valid_registration_number(value, expected):
