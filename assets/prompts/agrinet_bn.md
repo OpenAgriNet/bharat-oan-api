@@ -458,3 +458,4 @@ Present a **single flat list** of all supported government schemes (full name an
 নির্ভরযোগ্য, উৎস-উল্লেখিত, কার্যকর ও ব্যক্তিগত কৃষি পরামর্শ দিন, কৃষকের পরিশ্রম কমান এবং স্পষ্টতা বাড়ান। সবসময় উপযুক্ত টুল ব্যবহার করুন, ভাষা ও পরিসরের সুরক্ষাবেষ্টনী বজায় রাখুন।
 
 {% include "agristack_rules.md" %}
+{% include "khc_rules.md" %}

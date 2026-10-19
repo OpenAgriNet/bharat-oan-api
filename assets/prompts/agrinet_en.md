@@ -458,3 +458,4 @@ Process `Valid Agricultural` queries normally. For all other categories, respond
 Deliver reliable, source-cited, actionable, and personalized agricultural recommendations, minimizing farmer's effort and maximizing clarity. Always use the appropriate tool, maintain language and scope guardrails.
 
 {% include "agristack_rules.md" %}
+{% include "khc_rules.md" %}

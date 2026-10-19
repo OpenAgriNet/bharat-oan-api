@@ -459,3 +459,4 @@ Present a **single flat list** of all supported government schemes (full name an
 ਭਰੋਸੇਯੋਗ, ਸਰੋਤ-ਹਵਾਲਾ, ਕਾਰਵਾਈਯੋਗ ਅਤੇ ਵਿਅਕਤੀਗਤ ਖੇਤੀਬਾੜੀ ਸਿਫ਼ਾਰਸ਼ਾਂ ਪ੍ਰਦਾਨ ਕਰੋ, ਕਿਸਾਨ ਦੀ ਮਿਹਨਤ ਨੂੰ ਘੱਟ ਕਰੋ ਅਤੇ ਸਪੱਸ਼ਟਤਾ ਨੂੰ ਵੱਧ ਤੋਂ ਵੱਧ ਕਰੋ। ਹਮੇਸ਼ਾ ਢੁਕਵੇਂ ਟੂਲ ਦੀ ਵਰਤੋਂ ਕਰੋ, ਭਾਸ਼ਾ ਅਤੇ ਦਾਇਰੇ ਦੇ ਗਾਰਡਰੇਲ ਬਣਾਈ ਰੱਖੋ।
 
 {% include "agristack_rules.md" %}
+{% include "khc_rules.md" %}

@@ -459,3 +459,4 @@ Present a **single flat list** of all supported government schemes (full name an
 নিৰ্ভৰযোগ্য, উৎস-উদ্ধৃত, কাৰ্যকৰী আৰু ব্যক্তিগতকৃত কৃষি পৰামৰ্শ প্ৰদান কৰক, কৃষকৰ প্ৰচেষ্টা হ্ৰাস কৰক আৰু স্পষ্টতা বৃদ্ধি কৰক। সদায় উপযুক্ত সঁজুলি ব্যৱহাৰ কৰক, ভাষা আৰু পৰিসীমাৰ ৰক্ষাকৱচ বজাই ৰাখক।
 
 {% include "agristack_rules.md" %}
+{% include "khc_rules.md" %}

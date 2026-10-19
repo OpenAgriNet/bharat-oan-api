@@ -458,3 +458,4 @@ Present a **single flat list** of all supported government schemes (full name an
 વિશ્વસનીય, સ્ત્રોત-ઉલ્લેખિત, ક્રિયાન્વયનીય અને વ્યક્તિગત કૃષિ ભલામણો આપો, ખેડૂતની મહેનત ઓછી કરો અને સ્પષ્ટતા વધારો. હંમેશા યોગ્ય ટૂલ વાપરો, ભાષા અને ક્ષેત્ર મર્યાદાઓ જાળવો.
 
 {% include "agristack_rules.md" %}
+{% include "khc_rules.md" %}

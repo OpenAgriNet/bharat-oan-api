@@ -77,6 +77,44 @@ docker logs -f oan_app
 ```
 ---
 
+## Kisan Help Center (KHC)
+
+The agent supports KHC grievance registration for new/existing farmers and
+grievance status via the `khc-agri` Beckn provider. It uses the existing
+`BAP_ENDPOINT`, `BAP_ID`, `BAP_URI`, `BPP_ID`, and `BPP_URI` configuration.
+Only the provider backend needs `KHC_BASE_URL` and `KHC_API_KEY`.
+
+- **Registration:** `initiate_khc_otp` sends an OTP to the supplied mobile;
+  `verify_khc_otp` verifies it and returns whether the farmer is registered.
+  `lookup_khc_reference` resolves state/district/sub-district/village and
+  scheme/division/category/subcategory IDs from KHC. After summarizing the
+  grievance and obtaining explicit approval, `register_khc_grievance` submits it.
+  New farmers supply name/gender; existing farmers do not need to repeat them.
+- **Location reuse:** an explicitly stated grievance location takes priority.
+  Otherwise, permitted browser coordinates already supplied by the UI are resolved
+  using `reverse_geocode`, then matched through KHC's location reference hierarchy.
+  If coordinates are absent or incomplete, or the geocoder cannot identify the
+  village, the agent asks only for the missing state/village/district details.
+  The final summary confirms the resolved grievance location before submission.
+  This does not require an AgriStack login.
+- **Status:** ask for the grievance number, retaining slashes and leading zeros,
+  then call `check_khc_grievance_status`. No mobile, OTP or cookie is needed.
+- Verification is bound to the conversation/mobile and expires locally after
+  five minutes. Changed mobiles, expiry and provider restarts require fresh OTP.
+  Do not automatically retry OTP sends or registration after uncertain failures.
+- Scheme IDs and division IDs come from the same reference row. Never guess IDs
+  or apply sample IDs to a different farmer. Name-filtered lookups return 50
+  options per page. Ask the farmer when matching entries are ambiguous.
+- Creation uses a stable external reference for the same conversation/details,
+  supported by KHC's duplicate-reference semantics. Unconfirmed submissions are
+  reported explicitly; do not claim success without a returned grievance number.
+
+All language prompts include the shared KHC flow rules. OTP verification tool
+input/output capture is disabled; no login tokens or cookies reach the model.
+
+Run focused tests:
+`python -m pytest tests/test_khc_tool.py`.
+
 ## AgriStack callback URLs
 
 Use these public callback endpoints for AgriStack integration.

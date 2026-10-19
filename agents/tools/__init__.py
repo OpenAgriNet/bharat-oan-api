@@ -41,6 +41,13 @@ from agents.tools.kcc import (
     check_kcc_application_status,
     select_kcc_application,
 )
+from agents.tools.khc import (
+    initiate_khc_otp,
+    verify_khc_otp,
+    lookup_khc_reference,
+    check_khc_grievance_status,
+    register_khc_grievance,
+)
 from agents.tools.terms import search_terms
 from agents.tools.search import (
     search_documents,
@@ -183,6 +190,31 @@ TOOLS = [
     ),
     Tool(
         select_kcc_application,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        check_khc_grievance_status,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        initiate_khc_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        verify_khc_otp,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        lookup_khc_reference,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        register_khc_grievance,
         takes_ctx=True,
         strict=False,
     ),
