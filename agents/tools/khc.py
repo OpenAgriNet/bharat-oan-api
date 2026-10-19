@@ -97,8 +97,27 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "Use only returned IDs in the payload. Ask a focused clarification only when the problem "
                 "does not distinguish the matching options. If a keyword filter returns no match, "
                 "fetch the unfiltered list and remaining pages before concluding there is no match. "
+                "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme; "
+                "match the named scheme to the returned row in this state's list. "
+                "Do not ask the farmer to reconfirm AIF when already stated. "
+                "A failed lookup is not evidence that a scheme is unsupported; explain the lookup failure. "
+                "For sub-categories, review the unfiltered list under the verified category and its remaining "
+                "pages, matching the meaning of the complaint rather than requiring identical wording. "
+                "If several options fit, show the relevant returned sub-category names for selection by name "
+                "or ask a focused question that distinguishes them. If none fit, explain that registration "
+                "is blocked; do not invent an ID or choose an unrelated option. "
+                "Do not offer to proceed with only a category. "
+                "Never claim readiness or ask for final submission confirmation until all required IDs are resolved. "
                 "For location lists, match the supplied/geocoded place within the returned hierarchy "
-                f"and ask only when missing or ambiguous.\n{SOURCE}"
+                "and ask only when missing or ambiguous. If the district is unknown, ask for it first; "
+                "never guess it from a village name. Once the district is verified, fetch sub-districts "
+                "with its districtId and name=\"\". If the sub-district is missing, show a bulleted list "
+                "of returned sub-district names (tehsils/blocks) for the farmer to select by name only, "
+                "rather than asking them to know the name. Offer remaining pages when available. "
+                "Never invent options or present an empty list as a choice; explain lookup failures. "
+                "After selection, fetch villages under the selected subdistrictid and match the village "
+                "already supplied, asking only if ambiguous or absent. "
+                f"Resolve the village ID before asking for final submission confirmation.\n{SOURCE}"
             )
         if not fields.get("grievanceNo") or (action == "status" and (
             not fields.get("currentStatus") or fields["grievanceNo"] != values.get("grievanceNo")
@@ -165,9 +184,22 @@ async def lookup_khc_reference(
     Then match categoryname under the selected scheme and subcategoryname under the
     selected category. Use a focused clarification when several schemes fit; a generic
     loan complaint alone does not establish AIF. Reuse a scheme already stated.
+    AIF, A.I.F. and Agriculture Infrastructure Fund are equivalent names; verify
+    against the state's returned schemes without asking the farmer to repeat AIF.
+    Match sub-categories by meaning, not exact complaint wording. If ambiguous,
+    show relevant API-returned names for selection by name or ask a focused question.
+    If no match exists after unfiltered lookup and pagination, explain the blocker.
+    Do not offer category-only submission or final confirmation with unresolved IDs.
     Reuse an explicitly stated grievance location first. Otherwise use reverse_geocode
     on available Browser Location Coordinates, then look up the returned place names.
     Only ask the farmer for location details not already resolved; never guess a village.
+    If the district cannot be established from the village details, ask for the district;
+    never infer it from the village name alone. Verify the district in the state's list.
+    When the sub-district is missing, fetch sub-districts for that district with name=""
+    and show the returned names as bulleted choices, with further pages if available.
+    Ask the farmer to select by name only, then fetch villages under the selected subdistrictid and
+    match the village already supplied. Do not ask the farmer for internal IDs.
+    Resolve the village ID before requesting final submission confirmation.
     name is a literal substring filter on reference names, NOT a semantic problem search.
     Do not pass the entire complaint as name. Use name="" to review options when no
     reliable name keyword is known or a filter finds nothing. Review further pages
@@ -267,6 +299,10 @@ async def register_khc_grievance(
             "mappings are required. Call lookup_khc_reference to resolve them from the farmer's "
             "location and problem description: state -> schemes (take scheme and division from the same row) "
             "-> categories -> sub-categories, and state -> districts -> sub-districts -> villages. "
+            "If the district is unknown, ask for it; once verified, fetch its sub-districts with name=\"\" "
+            "and show the returned names as bulleted choices for selection by name only when the sub-district is missing. "
+            "Fetch villages under the selected sub-district and match the village already supplied. "
+            "Resolve all mappings before requesting final submission confirmation. "
             "Match returned names to the problem; ask a focused clarification only if ambiguous. "
             "Do not guess IDs or ask the farmer for a scheme name or internal codes upfront."
         )

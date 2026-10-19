@@ -88,6 +88,12 @@ KHC is intent-gated: the agent does not proactively suggest it. For an
 unspecified grievance request, it may ask whether the user wants KHC and must
 wait for explicit agreement before calling KHC. A grievance for another named
 service stays on that service; unrelated questions do not trigger KHC suggestions.
+An explicit registration/status request naming KHC, Kisan Help Center/Centre or
+Kisan Helpline Center/Centre already satisfies this opt-in; do not ask it again.
+Registration proceeds to collecting a missing mobile number or sending OTP to
+the supplied mobile, while status proceeds to collecting a missing grievance
+number or checking it. OTP verification and final submission confirmation are
+still required for registration.
 
 - **Registration:** `initiate_khc_otp` sends an OTP to the supplied mobile;
   `verify_khc_otp` verifies it and returns whether the farmer is registered.
@@ -109,6 +115,15 @@ service stays on that service; unrelated questions do not trigger KHC suggestion
   using `reverse_geocode`, then matched through KHC's location reference hierarchy.
   If coordinates are absent or incomplete, or the geocoder cannot identify the
   village, the agent asks only for the missing state/village/district details.
+  If the district cannot be established from the village details, the agent asks
+  for it rather than guessing. After verifying the district in KHC, it fetches
+  the district's sub-district list and presents bulleted API-backed choices
+  (with further pages when available) if the sub-district is missing. Farmers
+  select by name only from the list, not by number.
+  The selected sub-district is used to fetch villages and match the village
+  already supplied. Empty/failed lookups are explained, not replaced with guesses.
+  Village and all other required IDs are resolved before final submission
+  confirmation; already supplied/resolved location details are reused.
   The final summary confirms the resolved grievance location before submission.
   This does not require an AgriStack login.
 - **Status:** ask for the grievance number, retaining slashes and leading zeros,
@@ -127,6 +142,13 @@ service stays on that service; unrelated questions do not trigger KHC suggestion
   filter is a literal substring, not semantic search; unfiltered options and
   further pages are checked when a keyword has no match. Already supplied details
   are reused instead of requesting a full registration questionnaire after OTP.
+  AIF, A.I.F. and Agriculture Infrastructure Fund are treated as equivalent
+  names when matching returned schemes; an already named AIF is not reconfirmed.
+  Categories/sub-categories are matched by meaning, with API-backed names or a
+  focused clarification if ambiguous. Empty filters trigger unfiltered lookup
+  and pagination; API failures are not reported as unsupported schemes.
+  Missing mappings block readiness claims and final confirmation: there is no
+  category-only submission or invented sub-category fallback.
 - Creation uses a stable external reference for the same conversation/details,
   supported by KHC's duplicate-reference semantics. Unconfirmed submissions are
   reported explicitly; do not claim success without a returned grievance number.

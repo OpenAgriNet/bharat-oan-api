@@ -266,7 +266,20 @@ def test_all_language_prompts_include_khc_rules():
         assert "Do not proactively suggest KHC" in prompt
         assert "If the user asks for help with a grievance but does not name a service" in prompt
         assert "Would you like to register or check it with Kisan Help Center?" in prompt
-        assert "Do not call any KHC tool until the user explicitly agrees" in prompt
+        assert "For this unspecified-service case, do not call any KHC tool until the user explicitly agrees" in prompt
+        assert "Kisan Helpline Center/Centre" in prompt
+        assert "Do not ask for KHC opt-in again" in prompt
+        assert "i want to create one kisan helpline center grivance" in prompt
+        assert "ask for the mobile number immediately if missing" in prompt
+        assert "**Sub-district selection:**" in prompt
+        assert 'reference_type="sub-districts", parent_id=<resolved districtId>, name=""' in prompt
+        assert "show a bulleted list of the returned subdistrictname values" in prompt
+        assert "select by name only, not by number" in prompt
+        assert "If the district cannot be established from the village details, ask the farmer for the district" in prompt
+        assert "Resolve the village ID and all other required mappings before asking for final submission confirmation" in prompt
+        assert "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme" in prompt
+        assert "Do not ask the farmer to reconfirm AIF when already stated" in prompt
+        assert "Do not offer to proceed with only a category" in prompt
 
 
 @pytest.mark.parametrize("coordinates,expected", [
@@ -364,6 +377,54 @@ def test_reference_results_direct_problem_matching_without_asking_for_ids(monkey
     assert "scheme and division from the same row" in output
     assert "categories" in output and "sub-categories" in output
     assert "unfiltered list and remaining pages" in output
+
+
+@pytest.mark.parametrize("kind,parent,options", [
+    ("schemes", 9, '[{"scheme":38,"schemename":"Agriculture Infrastructure Fund (AIF)","division":31}]'),
+    ("sub-categories", 39, '[{"problemsubcategory":1725,"subcategoryname":"Bank refused loan"}]'),
+    ("sub-categories", 39, "[]"),
+])
+def test_reference_guidance_reuses_named_scheme_and_blocks_incomplete_confirmation(
+    monkeypatch, kind, parent, options,
+):
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_reference", {
+        "options": options, "total": "0" if options == "[]" else "1", "page": "1",
+    })), [])
+    output = asyncio.run(khc.lookup_khc_reference(ctx(), kind, parent))
+    assert "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme" in output
+    assert "Do not ask the farmer to reconfirm AIF when already stated" in output
+    assert "show the relevant returned sub-category names for selection by name" in output
+    assert "Do not offer to proceed with only a category" in output
+    assert "Never claim readiness or ask for final submission confirmation until all required IDs are resolved" in output
+
+
+@pytest.mark.parametrize("options,total,page", [
+    ('[{"subdistrictid":"1067","subdistrictname":"Test Tehsil"}]', "1", "1"),
+    ('[{"subdistrictid":"1068","subdistrictname":"Another Tehsil"}]', "51", "2"),
+    ("[]", "0", "1"),
+])
+def test_location_reference_results_guide_api_backed_subdistrict_selection(
+    monkeypatch, options, total, page,
+):
+    import json
+
+    calls = []
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_reference", {
+        "options": options, "total": total, "page": page,
+    })), calls)
+    output = asyncio.run(khc.lookup_khc_reference(
+        ctx(), "sub-districts", 221, page=int(page),
+    ))
+    rendered_options = output.split(" options: ", 1)[1].split("\n", 1)[0]
+    assert json.loads(rendered_options) == json.loads(options)
+    assert f"Total matches: {total}; page: {page}" in output
+    assert "show a bulleted list of returned sub-district names" in output
+    assert "select by name only" in output
+    assert "Never invent options or present an empty list as a choice" in output
+    assert "fetch villages under the selected subdistrictid" in output
+    assert "If the district is unknown, ask for it first" in output
+    assert "Resolve the village ID before asking for final submission confirmation" in output
+    assert len(calls) == 1
 
 
 def test_reference_hierarchy_ids_are_forwarded_to_registration_payload(monkeypatch):
