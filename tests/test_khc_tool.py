@@ -184,6 +184,15 @@ def test_all_language_prompts_include_khc_rules():
         assert "call `reverse_geocode`" in prompt
         assert "If browser coordinates are unavailable, ask the farmer for their state and village" in prompt
         assert "Never substitute a nearby village" in prompt
+        assert "**Problem-to-scheme matching:**" in prompt
+        assert "Do not ask for a scheme name or any internal IDs upfront" in prompt
+        assert "a generic bank-loan complaint" in prompt
+        assert "name` is a literal name substring filter" in prompt
+        assert "include the matched scheme/category names in the final confirmation summary" in prompt
+        assert "Do not proactively suggest KHC" in prompt
+        assert "If the user asks for help with a grievance but does not name a service" in prompt
+        assert "Would you like to register or check it with Kisan Help Center?" in prompt
+        assert "Do not call any KHC tool until the user explicitly agrees" in prompt
 
 
 @pytest.mark.parametrize("coordinates,expected", [
@@ -259,6 +268,87 @@ def test_verification_rendering_requires_registration_state(monkeypatch, registe
     )), [])
     result = asyncio.run(khc.verify_khc_otp(ctx(), "9876543210", "123456"))
     assert ("already registered" in result) if registered == "true" else ("unavailable" in result)
+
+
+def test_verified_farmer_is_directed_to_resolve_scheme_from_problem(monkeypatch):
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(
+        "init", "otp_verified", {"isRegistered": "false"},
+    )), [])
+    result = asyncio.run(khc.verify_khc_otp(ctx(), "9876543210", "123456"))
+    assert "problem in their own words" in result
+    assert "lookup_khc_reference" in result
+    assert "Do not ask for a scheme name or any internal IDs upfront" in result
+
+
+def test_reference_results_direct_problem_matching_without_asking_for_ids(monkeypatch):
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_reference", {
+        "options": '[{"scheme":38,"schemename":"Agriculture Infrastructure Fund (AIF)","division":31}]',
+        "total": "1", "page": "1",
+    })), [])
+    output = asyncio.run(khc.lookup_khc_reference(ctx(), "schemes", 10))
+    assert "Match the farmer's problem" in output
+    assert "scheme and division from the same row" in output
+    assert "categories" in output and "sub-categories" in output
+    assert "unfiltered list and remaining pages" in output
+
+
+def test_reference_hierarchy_ids_are_forwarded_to_registration_payload(monkeypatch):
+    import json
+
+    reference_rows = [
+        ("states", None, {"stateid": 10, "statename": "Bihar"}),
+        ("districts", 10, {"districtid": 221, "districtname": "Test District"}),
+        ("sub-districts", 221, {"subdistrictid": "1067", "subdistrictname": "Test Sub-district"}),
+        ("villages", 1067, {"villageid": 219159, "villagename": "Test Village"}),
+        ("schemes", 10, {"scheme": 38, "schemename": "Agriculture Infrastructure Fund (AIF)", "division": 31}),
+        ("categories", 38, {"problemcategory": 39, "categoryname": "Loan"}),
+        ("sub-categories", 39, {"problemsubcategory": 1725, "subcategoryname": "Bank refused loan"}),
+    ]
+    responses = [envelope("init", "khc_reference", {
+        "options": json.dumps([row]), "total": "1", "page": "1",
+    }) for _, _, row in reference_rows] + [envelope("init", "grievance_created")]
+    calls = []
+    real_client = khc.httpx.AsyncClient
+
+    def respond(request):
+        calls.append(json.loads(request.content))
+        return khc.httpx.Response(200, json=responses.pop(0))
+
+    monkeypatch.setenv("BAP_ENDPOINT", "https://bap.test")
+    monkeypatch.setattr(khc.httpx, "AsyncClient", lambda **kwargs: real_client(
+        transport=khc.httpx.MockTransport(respond), **kwargs,
+    ))
+    resolved = {}
+    for kind, parent, _ in reference_rows:
+        output = asyncio.run(khc.lookup_khc_reference(ctx(), kind, parent))
+        options = json.loads(output.split(" options: ", 1)[1].split("\n", 1)[0])
+        resolved[kind] = options[0]
+
+    output = asyncio.run(khc.register_khc_grievance(ctx(), **registration(
+        state_id=resolved["states"]["stateid"],
+        village_id=resolved["villages"]["villageid"],
+        scheme_id=resolved["schemes"]["scheme"],
+        division_id=resolved["schemes"]["division"],
+        problem_category_id=resolved["categories"]["problemcategory"],
+        problem_subcategory_id=resolved["sub-categories"]["problemsubcategory"],
+    )))
+    assert "BR/240926/2" in output
+    for call, (kind, parent, _) in zip(calls, reference_rows):
+        tags = {
+            tag["descriptor"]["code"]: tag["value"]
+            for tag in call["message"]["order"]["fulfillments"][0]["customer"]["person"]["tags"]
+        }
+        assert tags["reference_type"] == kind
+        assert tags.get("parent_id") == (str(parent) if parent is not None else None)
+        assert "name" not in tags  # No full complaint passed as a substring filter.
+    submitted = {
+        tag["descriptor"]["code"]: tag["value"]
+        for tag in calls[-1]["message"]["order"]["fulfillments"][0]["customer"]["person"]["tags"]
+    }
+    assert {key: submitted[key] for key in khc._MASTER_FIELDS} == {
+        "stateId": "10", "villageId": "219159", "scheme": "38", "division": "31",
+        "problemCategory": "39", "problemSubCategory": "1725",
+    }
 
 
 @pytest.mark.parametrize("kind,parent,page,name,expected", [

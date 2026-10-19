@@ -84,6 +84,11 @@ grievance status via the `khc-agri` Beckn provider. It uses the existing
 `BAP_ENDPOINT`, `BAP_ID`, `BAP_URI`, `BPP_ID`, and `BPP_URI` configuration.
 Only the provider backend needs `KHC_BASE_URL` and `KHC_API_KEY`.
 
+KHC is intent-gated: the agent does not proactively suggest it. For an
+unspecified grievance request, it may ask whether the user wants KHC and must
+wait for explicit agreement before calling KHC. A grievance for another named
+service stays on that service; unrelated questions do not trigger KHC suggestions.
+
 - **Registration:** `initiate_khc_otp` sends an OTP to the supplied mobile;
   `verify_khc_otp` verifies it and returns whether the farmer is registered.
   `lookup_khc_reference` resolves state/district/sub-district/village and
@@ -105,6 +110,14 @@ Only the provider backend needs `KHC_BASE_URL` and `KHC_API_KEY`.
 - Scheme IDs and division IDs come from the same reference row. Never guess IDs
   or apply sample IDs to a different farmer. Name-filtered lookups return 50
   options per page. Ask the farmer when matching entries are ambiguous.
+- **Problem-based routing:** after resolving the state, the agent fetches its
+  schemes and matches the farmer's complaint to returned scheme names, then
+  resolves category/subcategory using their parent IDs. Farmers are not asked
+  for scheme names or internal IDs upfront. A generic complaint that fits several
+  schemes triggers a focused clarification, not an assumed scheme. The `name`
+  filter is a literal substring, not semantic search; unfiltered options and
+  further pages are checked when a keyword has no match. Already supplied details
+  are reused instead of requesting a full registration questionnaire after OTP.
 - Creation uses a stable external reference for the same conversation/details,
   supported by KHC's duplicate-reference semantics. Unconfirmed submissions are
   reported explicitly; do not claim success without a returned grievance number.

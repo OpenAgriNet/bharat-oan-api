@@ -71,7 +71,13 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
             return (
                 "Mobile verified successfully. Farmer is "
                 + ("already registered" if fields["isRegistered"] == "true" else "not yet registered")
-                + " with KHC. Collect the remaining grievance details and ask for confirmation before submission."
+                + " with KHC. Reuse details already supplied. Ask for the problem in their own words "
+                "only if it is not already known. Do not ask for a scheme name or any internal IDs upfront. "
+                "Resolve the grievance location from permitted browser coordinates or supplied place names; "
+                "ask only for missing location details. Use lookup_khc_reference to fetch schemes for the "
+                "resolved state, match the problem to the returned scheme names, then fetch categories and "
+                "sub-categories. Ask a focused clarification if the problem does not identify a unique match. "
+                "For a new farmer collect missing name and gender; obtain confirmation before submission."
             )
         if code == "khc_reference":
             options = json.loads(fields.get("options", "null"))
@@ -80,7 +86,14 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
             return (
                 f"KHC {values.get('reference_type')} options: {json.dumps(options, ensure_ascii=False)}\n"
                 f"Total matches: {fields.get('total', '')}; page: {fields.get('page', '')} (50 per page).\n"
-                f"Choose only a confirmed matching entry; ask the farmer when ambiguous.\n{SOURCE}"
+                "Match the farmer's problem to the returned scheme/category/subcategory names; "
+                "do not ask for a scheme name or internal IDs upfront. Take scheme and division from the same row, "
+                "then fetch categories using scheme and sub-categories using problemcategory. "
+                "Use only returned IDs in the payload. Ask a focused clarification only when the problem "
+                "does not distinguish the matching options. If a keyword filter returns no match, "
+                "fetch the unfiltered list and remaining pages before concluding there is no match. "
+                "For location lists, match the supplied/geocoded place within the returned hierarchy "
+                f"and ask only when missing or ambiguous.\n{SOURCE}"
             )
         if not fields.get("grievanceNo") or (action == "status" and (
             not fields.get("currentStatus") or fields["grievanceNo"] != values.get("grievanceNo")
@@ -142,10 +155,18 @@ async def lookup_khc_reference(
     villages (subDistrictId), schemes (stateId), categories (scheme),
     sub-categories (problemCategory). Choose the scheme and division from the SAME
     returned row. Follow the farmer's location through each level to the village.
+    For schemes, fetch options for the resolved state and match the farmer's problem
+    to schemename; do not require the farmer to know the scheme name or any IDs.
+    Then match categoryname under the selected scheme and subcategoryname under the
+    selected category. Use a focused clarification when several schemes fit; a generic
+    loan complaint alone does not establish AIF. Reuse a scheme already stated.
     Reuse an explicitly stated grievance location first. Otherwise use reverse_geocode
     on available Browser Location Coordinates, then look up the returned place names.
     Only ask the farmer for location details not already resolved; never guess a village.
-    Pass name to filter a list; request further pages if needed (50 options/page).
+    name is a literal substring filter on reference names, NOT a semantic problem search.
+    Do not pass the entire complaint as name. Use name="" to review options when no
+    reliable name keyword is known or a filter finds nothing. Review further pages
+    before concluding no suitable option exists (50 options/page).
     """
     parents = {
         "states": None, "districts": "stateId", "sub-districts": "districtId",
@@ -200,7 +221,9 @@ async def register_khc_grievance(
 
     First send and verify OTP with initiate_khc_otp / verify_khc_otp. Use the verified
     registration state for farmer_type (new/existing). Collect mobile, preferred
-    language, location, scheme and grievance details. New farmers also need name and
+    language, location and grievance details. Resolve scheme/category/subcategory from
+    the problem using the reference APIs; do not ask for scheme names or IDs upfront.
+    New farmers also need name and
     gender code. All six numeric IDs MUST come from verified KHC master data, not LGD
     assumptions, memory, example requests or guesses. Resolve IDs using lookup_khc_reference.
     Reuse permitted browser location via reverse_geocode and KHC reference lookups
@@ -225,7 +248,10 @@ async def register_khc_grievance(
         return (
             "Verified KHC state, village, scheme, division, problem category and subcategory "
             "mappings are required. Call lookup_khc_reference to resolve them from the farmer's "
-            "location and scheme. Do not guess IDs or ask the farmer to invent internal codes."
+            "location and problem description: state -> schemes (take scheme and division from the same row) "
+            "-> categories -> sub-categories, and state -> districts -> sub-districts -> villages. "
+            "Match returned names to the problem; ask a focused clarification only if ambiguous. "
+            "Do not guess IDs or ask the farmer for a scheme name or internal codes upfront."
         )
     if not confirmed:
         return "Summarize the farmer's grievance and registration details, then ask for explicit confirmation to submit."
