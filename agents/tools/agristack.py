@@ -58,7 +58,7 @@ _MAX_SECTION_CHARS = 4000
 async def get_agristack_link(session_id: str) -> Optional[dict[str, Any]]:
     """Farmer ID and consent for this chat session, from the cached AgriStack callback.
 
-    Returns ``{"farmer_id": str, "has_consent": bool}`` or None when the session has no
+    Returns farmer_id, has_consent and state_lgd_code, or None when the session has no
     AgriStack login (or Redis is unavailable).
     """
     if not session_id:
@@ -79,7 +79,12 @@ async def get_agristack_link(session_id: str) -> Optional[dict[str, Any]]:
         return None
 
     consent_name = str(body.get("consentName") or "").strip().upper()
-    return {"farmer_id": str(farmer_id), "has_consent": consent_name == CONSENT_GIVEN}
+    state_lgd_code = str(body.get("stateLgdCode") or "")
+    return {
+        "farmer_id": str(farmer_id),
+        "has_consent": consent_name == CONSENT_GIVEN,
+        "state_lgd_code": state_lgd_code if re.fullmatch(r"[1-9][0-9]?", state_lgd_code) else None,
+    }
 
 
 # -----------------------
@@ -117,9 +122,15 @@ def build_payload(
     question_id: str = "",
     season: Optional[str] = None,
     year: Optional[str] = None,
+    state_lgd_code: str = "",
 ) -> dict[str, Any]:
     """Beckn search for the provider's AgristackService. Categories B and C also need season/year."""
-    tags = [{"descriptor": {"code": "farmerId"}, "value": farmer_id}]
+    if not re.fullmatch(r"[1-9][0-9]?", state_lgd_code):
+        raise ValueError("A valid state LGD code is required for AgriStack requests")
+    tags = [
+        {"descriptor": {"code": "farmerId"}, "value": farmer_id},
+        {"descriptor": {"code": "stateLgdCode"}, "value": state_lgd_code},
+    ]
     if category in _SEASONAL_CATEGORIES:
         season, year = (season, year) if season and year else current_season_and_year()
         tags += [
@@ -201,8 +212,9 @@ async def _fetch_agristack_for_season(
     question_id: str,
     season: str,
     year: str,
+    state_lgd_code: str,
 ) -> tuple[dict[str, Any], Optional[str]]:
-    cache_key = f"{session_id}:{farmer_id}:{category}:{season}:{year}"
+    cache_key = f"{session_id}:{state_lgd_code}:{farmer_id}:{category}:{season}:{year}"
     try:
         cached = await cache.get(cache_key, namespace=PROFILE_CACHE_NAMESPACE)
         if isinstance(cached, dict) and cached:
@@ -216,7 +228,7 @@ async def _fetch_agristack_for_season(
     bep = bap_endpoint.rstrip("/")
     search_url = bep if bep.endswith("/search") else bep + "/search"
 
-    payload = build_payload(farmer_id, category, session_id, question_id, season, year)
+    payload = build_payload(farmer_id, category, session_id, question_id, season, year, state_lgd_code)
     lf_update_current_observation(
         metadata={
             "tool": f"agristack.{category}",
@@ -239,18 +251,23 @@ async def _fetch_agristack_for_season(
 
 
 async def fetch_agristack(
-    farmer_id: str, category: str, session_id: str = "", question_id: str = ""
+    farmer_id: str, category: str, session_id: str = "", question_id: str = "", state_lgd_code: str = ""
 ) -> tuple[dict[str, Any], Optional[str]]:
     """Category A/B/C sections for a farmer, cached per session for PROFILE_CACHE_TTL_SECONDS.
 
     Categories B and C fall back to Kharif of the same year when Rabi's crop survey isn't
     uploaded yet.
     """
+    if not re.fullmatch(r"[1-9][0-9]?", state_lgd_code):
+        logger.error("agristack.invalid_state_lgd_code session=%s", session_id)
+        return {}, "A valid state LGD code is required. Please log in with AgriStack again."
     season, year = current_season_and_year()
-    sections, error = await _fetch_agristack_for_season(farmer_id, category, session_id, question_id, season, year)
+    sections, error = await _fetch_agristack_for_season(
+        farmer_id, category, session_id, question_id, season, year, state_lgd_code
+    )
     if category in _SEASONAL_CATEGORIES and season == "Rabi" and not sections.get("crop_survey"):
         fallback_sections, _ = await _fetch_agristack_for_season(
-            farmer_id, category, session_id, question_id, "Kharif", year
+            farmer_id, category, session_id, question_id, "Kharif", year, state_lgd_code
         )
         if fallback_sections.get("crop_survey"):
             sections = {**sections, "crop_survey": fallback_sections["crop_survey"]}
@@ -287,10 +304,14 @@ async def _run(ctx: RunContext[FarmerContext], category: str, heading: str, hint
         return f"Farmer is not logged in with AgriStack. {_ASK_FARMER}"
     if not link["has_consent"]:
         return f"Farmer logged in with AgriStack without consent to share land and crop data. {_ASK_FARMER}"
+    if not link["state_lgd_code"]:
+        logger.error("agristack.callback_missing_state_lgd_code session=%s", ctx.deps.session_id)
+        return f"AgriStack login is missing a valid state LGD code. Please log in with AgriStack again. {_ASK_FARMER}"
 
     try:
         sections, error = await fetch_agristack(
-            link["farmer_id"], category, session_id=ctx.deps.session_id, question_id=ctx.deps.question_id
+            link["farmer_id"], category, session_id=ctx.deps.session_id, question_id=ctx.deps.question_id,
+            state_lgd_code=link["state_lgd_code"],
         )
     except httpx.TimeoutException:
         logger.error("AgriStack %s timed out", category)

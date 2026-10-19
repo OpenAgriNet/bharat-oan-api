@@ -72,3 +72,19 @@ The callback response includes:
 - When callback POST includes `callbackSessionId`, backend stores receipt status in cache.
 - Frontend then checks status via `GET /api/callback/status` using the same `callbackSessionId`.
 
+### AgriStack synchronous farmer data
+
+The login callback must include a top-level `stateLgdCode` (for example, `22`).
+It is retained in the cached callback and sent as a `stateLgdCode` Beckn item tag
+alongside `farmerId` for Categories A, B and C, including seasonal fallback calls.
+The provider forwards it as the mandatory `X-State-LGD-Code` gateway header and
+maps `farmerId` to the gateway's `frCentralId` query parameter. Profile caches are
+scoped by state as well as session, farmer, category and season.
+
+Consent is still required. Missing or malformed state codes prevent data requests;
+the farmer is prompted to log in again. Old cached callbacks without a state code
+must be replaced by a new login. Response decryption and private-key configuration
+belong only to the provider backend, not the browser or this chat API.
+
+Run the relevant unit tests with:
+`python -m pytest tests/test_agristack_tool.py tests/test_callback_router.py`.
