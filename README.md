@@ -97,6 +97,11 @@ still required for registration.
 
 - **Registration:** `initiate_khc_otp` sends an OTP to the supplied mobile;
   `verify_khc_otp` verifies it and returns whether the farmer is registered.
+  While awaiting OTP, a six-digit reply goes directly to verification using the
+  same mobile; leading zeros are preserved and regional digits are normalized.
+  The agent must not reject it or request it again without a verification result.
+  Actual invalid/expired OTP responses and service failures are distinguished;
+  language and other remaining details are collected only after verification succeeds.
   `lookup_khc_reference` resolves state/district/sub-district/village and
   scheme/division/category/subcategory IDs from KHC. After summarizing the
   grievance and obtaining explicit approval, `register_khc_grievance` submits it.
@@ -111,6 +116,10 @@ still required for registration.
   rejected without submission; no silent language fallback is used. Normalized
   values are used before deriving the duplicate-safe external reference.
 - **Location reuse:** an explicitly stated grievance location takes priority.
+  Reference name filters ignore case and whitespace (`uttarpradesh` matches
+  `Uttar Pradesh`), preserving official names/IDs and ambiguous results.
+  The agent does not demand spacing corrections; it resolves state before
+  requesting district and asks one focused location question at a time.
   Otherwise, permitted browser coordinates already supplied by the UI are resolved
   using `reverse_geocode`, then matched through KHC's location reference hierarchy.
   If coordinates are absent or incomplete, or the geocoder cannot identify the

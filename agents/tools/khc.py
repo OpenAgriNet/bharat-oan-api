@@ -69,7 +69,12 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 return message or failure
             raise ValueError("Missing KHC outcome tag")
         if code == "otp_sent":
-            return "OTP sent successfully. Ask the farmer for the OTP received on their mobile."
+            return (
+                "OTP sent successfully. Ask the farmer for the OTP received on their mobile. "
+                "When they supply six digits, call verify_khc_otp with the same mobile and the supplied OTP. "
+                "Do not reject a six-digit reply without a verification tool result. "
+                "Do not ask for grievance language or other remaining details until verification succeeds."
+            )
         if code == "otp_verified":
             if fields.get("isRegistered") not in ("true", "false"):
                 raise ValueError("Missing KHC registration state")
@@ -97,6 +102,10 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "Use only returned IDs in the payload. Ask a focused clarification only when the problem "
                 "does not distinguish the matching options. If a keyword filter returns no match, "
                 "fetch the unfiltered list and remaining pages before concluding there is no match. "
+                "Treat missing spaces and case differences as name variations, not invalid input: "
+                "uttarpradesh matches Uttar Pradesh. Never ask for a proper name just to fix spacing. "
+                "If still unmatched, review unfiltered states before asking a focused clarification; "
+                "resolve the state before requesting its district. "
                 "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme; "
                 "match the named scheme to the returned row in this state's list. "
                 "Do not ask the farmer to reconfirm AIF when already stated. "
@@ -156,6 +165,10 @@ async def verify_khc_otp(
 
     Use the same mobile number as initiate_khc_otp. The result identifies new versus
     existing farmers. Never invent OTPs or report verification without a tool result.
+    While waiting for OTP, call this tool for a six-digit reply; do not ask the farmer
+    to repeat a correctly formatted OTP without attempting verification. Preserve leading
+    zeros. Only the tool result can establish acceptance, rejection or service failure.
+    Do not collect language or other grievance details until verification succeeds.
     """
     mobile = _mobile(mobile_number)
     if not mobile:
@@ -200,7 +213,9 @@ async def lookup_khc_reference(
     Ask the farmer to select by name only, then fetch villages under the selected subdistrictid and
     match the village already supplied. Do not ask the farmer for internal IDs.
     Resolve the village ID before requesting final submission confirmation.
-    name is a literal substring filter on reference names, NOT a semantic problem search.
+    name is a case/whitespace-insensitive literal substring filter on reference names,
+    NOT a semantic problem search. uttarpradesh matches Uttar Pradesh; do not ask
+    the farmer to reformat a recognizable name. Resolve state before district.
     Do not pass the entire complaint as name. Use name="" to review options when no
     reliable name keyword is known or a filter finds nothing. Review further pages
     before concluding no suitable option exists (50 options/page).

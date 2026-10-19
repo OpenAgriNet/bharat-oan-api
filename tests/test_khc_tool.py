@@ -280,6 +280,10 @@ def test_all_language_prompts_include_khc_rules():
         assert "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme" in prompt
         assert "Do not ask the farmer to reconfirm AIF when already stated" in prompt
         assert "Do not offer to proceed with only a category" in prompt
+        assert "When waiting for a KHC OTP, treat a six-digit reply as the OTP" in prompt
+        assert "uttarpradesh" in prompt
+        assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
+        assert "Do not ask for grievance language or other remaining details until verification succeeds" in prompt
 
 
 @pytest.mark.parametrize("coordinates,expected", [
@@ -317,6 +321,39 @@ def test_verify_otp_requires_valid_inputs(monkeypatch, mobile, otp, session, exp
     monkeypatch.setattr(khc, "_call", call)
     assert expected in asyncio.run(khc.verify_khc_otp(ctx(session), mobile, otp))
     call.assert_not_called()
+
+
+@pytest.mark.parametrize("otp,expected", [
+    ("654321", "654321"), (" 012345 ", "012345"), ("१२३४५६", "123456"),
+])
+def test_six_digit_otp_is_sent_to_verification_without_reasking(monkeypatch, otp, expected):
+    call = AsyncMock(return_value="Mobile verified successfully.")
+    monkeypatch.setattr(khc, "_call", call)
+    assert "verified successfully" in asyncio.run(khc.verify_khc_otp(ctx(), "9876543210", otp))
+    call.assert_awaited_once_with(
+        ctx(), "init", request_type="verify_otp", farmerMobileNumber="9876543210", otp=expected,
+    )
+
+
+def test_otp_sent_result_directs_verification_before_collecting_details(monkeypatch):
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "otp_sent", {})), [])
+    output = asyncio.run(khc.initiate_khc_otp(ctx(), "9876543210"))
+    assert "call verify_khc_otp with the same mobile" in output
+    assert "Do not reject a six-digit reply without a verification tool result" in output
+    assert "Do not ask for grievance language or other remaining details until verification succeeds" in output
+
+
+@pytest.mark.parametrize("code,message", [
+    ("invalid_otp", "OTP is invalid or expired"),
+    ("upstream_error", "KHC service is unavailable"),
+])
+def test_verification_preserves_actual_failure_without_claiming_success(monkeypatch, code, message):
+    calls = []
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(
+        "init", code, {}, message=message,
+    )), calls)
+    assert asyncio.run(khc.verify_khc_otp(ctx(), "9876543210", "123456")) == message
+    assert len(calls) == 1
 
 
 def test_otp_and_registration_share_transaction_without_exposing_otp(monkeypatch):
@@ -377,6 +414,7 @@ def test_reference_results_direct_problem_matching_without_asking_for_ids(monkey
     assert "scheme and division from the same row" in output
     assert "categories" in output and "sub-categories" in output
     assert "unfiltered list and remaining pages" in output
+    assert "Treat missing spaces and case differences as name variations" in output
 
 
 @pytest.mark.parametrize("kind,parent,options", [
