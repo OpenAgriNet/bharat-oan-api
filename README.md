@@ -95,6 +95,15 @@ service stays on that service; unrelated questions do not trigger KHC suggestion
   scheme/division/category/subcategory IDs from KHC. After summarizing the
   grievance and obtaining explicit approval, `register_khc_grievance` submits it.
   New farmers supply name/gender; existing farmers do not need to repeat them.
+  Registration accepts only OAN UI languages also accepted by the KHC provider:
+  `hi`, `en`, `mr`, `bn`, `gu`, `kn`, `ta`, `te`, `as`, `ml`.
+  UI language Maithili (`mai`) is not currently accepted by the KHC provider;
+  the farmer must choose a supported grievance language explicitly.
+  Registration normalizes these English language names and case/whitespace
+  to KHC codes (for example, `Hindi` -> `hi`, `English` -> `en`), and new-farmer
+  gender names to `M`/`F`/`O` (`male` -> `M`). Unknown languages/genders are still
+  rejected without submission; no silent language fallback is used. Normalized
+  values are used before deriving the duplicate-safe external reference.
 - **Location reuse:** an explicitly stated grievance location takes priority.
   Otherwise, permitted browser coordinates already supplied by the UI are resolved
   using `reverse_geocode`, then matched through KHC's location reference hierarchy.

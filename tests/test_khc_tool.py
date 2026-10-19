@@ -107,6 +107,80 @@ def test_registration_uses_verified_ids_and_stable_reference(monkeypatch, farmer
     assert call.call_args.kwargs["externalReferenceNo"] == first_reference
 
 
+@pytest.mark.parametrize("name,code", [
+    ("Hindi", "hi"), ("English", "en"), ("Marathi", "mr"), ("Bengali", "bn"),
+    ("Gujarati", "gu"), ("Kannada", "kn"), ("Tamil", "ta"), ("Telugu", "te"),
+    ("Assamese", "as"), ("Malayalam", "ml"),
+])
+def test_registration_normalizes_language_names_and_codes(monkeypatch, name, code):
+    call = AsyncMock(return_value="Registered")
+    monkeypatch.setattr(khc, "_call", call)
+    for value in (f" {name} ", code.upper(), code):
+        assert asyncio.run(khc.register_khc_grievance(
+            ctx(), **registration(farmer_language=value),
+        )) == "Registered"
+        assert call.call_args.kwargs["farmerLanguage"] == code
+
+
+@pytest.mark.parametrize("name,code", [
+    ("male", "M"), ("FEMALE", "F"), (" Other ", "O"),
+    ("m", "M"), ("f", "F"), ("o", "O"),
+])
+def test_new_farmer_normalizes_gender_and_preserves_external_reference(monkeypatch, name, code):
+    call = AsyncMock(return_value="Registered")
+    monkeypatch.setattr(khc, "_call", call)
+    for language, gender in (("Hindi", name), ("hi", code)):
+        assert asyncio.run(khc.register_khc_grievance(ctx(), **registration(
+            farmer_type="new", farmer_name="Test Farmer",
+            farmer_language=language, gender=gender,
+        ))) == "Registered"
+        assert call.call_args.kwargs["farmerLanguage"] == "hi"
+        assert call.call_args.kwargs["gender"] == code
+    assert call.call_args_list[0].kwargs["externalReferenceNo"] == call.call_args_list[1].kwargs["externalReferenceNo"]
+
+
+def test_new_farmer_payload_matches_khc_field_contract(monkeypatch):
+    call = AsyncMock(return_value="Registered")
+    monkeypatch.setattr(khc, "_call", call)
+    assert asyncio.run(khc.register_khc_grievance(ctx(), **registration(
+        farmer_type="new", farmer_name="UAT New Farmer", gender="male",
+        farmer_language="Hindi", grievance_text="Bank refused loan under AIF",
+    ))) == "Registered"
+    sent = call.call_args.kwargs
+    assert sent == {
+        "externalReferenceNo": sent["externalReferenceNo"],
+        "farmerMobileNumber": "9876543210",
+        "farmerName": "UAT New Farmer", "gender": "M", "farmerLanguage": "hi",
+        "stateId": "10", "villageId": "219159", "scheme": "38", "division": "31",
+        "problemCategory": "39", "problemSubCategory": "1725",
+        "farmerText": "Bank refused loan under AIF",
+        "farmerType": "new", "confirmed": "true", "request_type": "create_grievance",
+    }
+    assert sent["externalReferenceNo"].startswith("BV-")
+
+
+@pytest.mark.parametrize("changes,expected", [
+    ({"farmer_language": "French"}, "supported KHC language"),
+    ({"farmer_language": "mai"}, "supported KHC language"),
+    ({"farmer_language": "Maithili"}, "supported KHC language"),
+    *[
+        ({"farmer_language": language}, "supported KHC language")
+        for language in (
+            "Punjabi", "pa", "Odia", "or", "Urdu", "ur",
+            "Nepali", "ne", "Manipuri", "mni",
+        )
+    ],
+    ({"gender": "unknown"}, "name and gender"),
+])
+def test_registration_rejects_unsupported_language_or_gender(monkeypatch, changes, expected):
+    call = AsyncMock()
+    monkeypatch.setattr(khc, "_call", call)
+    assert expected in asyncio.run(khc.register_khc_grievance(ctx(), **registration(
+        **{"farmer_type": "new", "farmer_name": "Test Farmer", "gender": "M", **changes},
+    )))
+    call.assert_not_called()
+
+
 def test_registration_requires_session(monkeypatch):
     call = AsyncMock()
     monkeypatch.setattr(khc, "_call", call)

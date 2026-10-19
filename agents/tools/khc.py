@@ -18,6 +18,11 @@ from helpers.utils import get_logger, to_ascii_digits
 logger = get_logger(__name__)
 SOURCE = "**Source:** Kisan Help Center"
 _MASTER_FIELDS = ("stateId", "villageId", "scheme", "division", "problemCategory", "problemSubCategory")
+_LANGUAGE_CODES = {
+    "hindi": "hi", "english": "en", "marathi": "mr", "bengali": "bn",
+    "gujarati": "gu", "kannada": "kn", "tamil": "ta", "telugu": "te",
+    "assamese": "as", "malayalam": "ml",
+}
 _UNCONFIRMED = (
     "KHC grievance submission was not confirmed. Do not submit again automatically; "
     "verify with KHC first."
@@ -229,6 +234,9 @@ async def register_khc_grievance(
     Reuse permitted browser location via reverse_geocode and KHC reference lookups
     when the farmer did not state a grievance location; otherwise ask for state/village.
     Summarize the details and obtain explicit confirmation before setting confirmed=True.
+    farmer_language must use a supported KHC code such as hi or en; English language
+    names such as Hindi or English are also normalized to codes before sending.
+    gender uses M/F/O; Male/Female/Other are normalized for new farmers.
     The provider rejects creation without a verified mobile. Never retry automatically
     after an unconfirmed submission.
     """
@@ -239,8 +247,17 @@ async def register_khc_grievance(
         return "Send and verify the farmer's mobile OTP first, then use the registration state returned by KHC."
     if not grievance_text.strip() or len(grievance_text) > 5000:
         return "Ask the farmer to describe their grievance in up to 5000 characters."
-    if farmer_language not in ("hi", "en", "mr", "bn", "gu", "kn", "ta", "te", "pa", "or", "as", "ml", "ur", "ne", "mni"):
-        return "Ask the farmer for a supported KHC language: Hindi, English, Marathi, Bengali, Gujarati, Kannada, Tamil, Telugu, Punjabi, Odia, Assamese, Malayalam, Urdu, Nepali or Manipuri."
+    farmer_language = farmer_language.strip().lower()
+    farmer_language = _LANGUAGE_CODES.get(farmer_language, farmer_language)
+    if farmer_language not in _LANGUAGE_CODES.values():
+        return (
+            "Ask the farmer for a supported KHC language from the OAN UI: Hindi, English, "
+            "Marathi, Bengali, Gujarati, Kannada, Tamil, Telugu, Assamese or Malayalam. "
+            "Maithili is available in the UI but is not currently accepted by the KHC provider; "
+            "ask the farmer to choose a supported language without silently substituting one."
+        )
+    gender = gender.strip().upper()
+    gender = {"MALE": "M", "FEMALE": "F", "OTHER": "O"}.get(gender, gender)
     if farmer_type == "new" and (not farmer_name.strip() or gender not in ("M", "F", "O")):
         return "Ask the new farmer for their name and gender before registering."
     ids = (state_id, village_id, scheme_id, division_id, problem_category_id, problem_subcategory_id)
