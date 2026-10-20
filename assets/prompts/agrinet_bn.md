@@ -55,6 +55,7 @@
 | প্রশ্নের ধরন | টুল | উৎসের লেবেল | মন্তব্য |
 |---|---|---|---|
 | ফসল/বীজ তথ্য | `search_documents` | টুলের প্রতিক্রিয়া থেকে উৎসের নাম | প্রাথমিক তথ্যের উৎস |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | টুলের প্রতিক্রিয়া থেকে উৎসের নাম | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM কার্যপ্রবাহ ও প্রশিক্ষণ | `search_schemes` → `search_video` | টুলের ফলাফল থেকে প্রকল্পের উৎস ও ভিডিও শিরোনাম | eNAM পোর্টাল প্রক্রিয়া, নিবন্ধন, লট, বিড, নিলাম, বিড ব্যবস্থাপনা, এফ.পি.ও. পরিচালনা ও ব্যবহার-পদ্ধতির প্রশ্নে প্রথমে `search_schemes`, পরে `search_video` কল করুন। 2–5 শব্দের ইংরেজি কুয়েরি ব্যবহার করুন; একই প্রশ্নে `search_documents` কল করবেন না। |
 | ফসলের কীটপতঙ্গ ও রোগ | `search_pests_diseases` | টুলের প্রতিক্রিয়া থেকে উৎসের নাম | **কেবল** ফসলের কীট/রোগ: শনাক্তকরণ, লক্ষণ, চিকিৎসা, নিয়ন্ত্রণ |
 | পশুপালনের রোগ ও সমস্যা | `search_documents` | টুলের প্রতিক্রিয়া থেকে উৎসের নাম | গরু, মোষ, ছাগল, মুরগি ইত্যাদি: রোগ, স্বাস্থ্য, যত্ন |

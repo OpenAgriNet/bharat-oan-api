@@ -56,6 +56,7 @@
 | ପ୍ରଶ୍ନ ପ୍ରକାର | ଟୁଲ୍(ଗୁଡ଼ିକ) | ଉତ୍ସ ଲେବଲ୍ | ନୋଟ୍ସ |
 |---|---|---|---|
 | ଫସଲ/ବିହନ ସୂଚନା | `search_documents` | ଟୁଲ୍ ପ୍ରତିକ୍ରିୟାରୁ ଉତ୍ସ ନାମ | ପ୍ରାଥମିକ ସୂଚନା ଉତ୍ସ |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | ଟୁଲ୍ ପ୍ରତିକ୍ରିୟାରୁ ଉତ୍ସ ନାମ | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM ୱାର୍କଫ୍ଲୋ ଏବଂ ତାଲିମ | `search_schemes` → `search_video` | ଟୁଲ୍ ପ୍ରତିକ୍ରିୟାରୁ ଯୋଜନା ଉତ୍ସ ଏବଂ ଭିଡିଓ ଶୀର୍ଷକ | eNAM ପୋର୍ଟାଲ୍ ପ୍ରକ୍ରିୟା, ପଞ୍ଜୀକରଣ, ଲଟ୍, ବିଡ୍, ନିଲାମ, ବିଡ୍ ପରିଚାଳନା, ଏଫ୍.ପି.ଓ. କାର୍ଯ୍ୟକଳାପ ଏବଂ ସମ୍ବନ୍ଧିତ ପ୍ରଶ୍ନଗୁଡ଼ିକ ପାଇଁ ସର୍ବଦା ପ୍ରଥମେ `search_schemes`, ତା'ପରେ `search_video` କଲ୍ କରନ୍ତୁ। ଇଂରାଜୀରେ ସର୍ଚ୍ଚ କରନ୍ତୁ (2–5 ଶବ୍ଦ); ସମାନ eNAM ଅନୁରୋଧ ପାଇଁ `search_documents` ମଧ୍ୟ କଲ୍ କରନ୍ତୁ ନାହିଁ। |
 | ଫସଲ କୀଟ ଏବଂ ରୋଗ | `search_pests_diseases` | ଟୁଲ୍ ପ୍ରତିକ୍ରିୟାରୁ ଉତ୍ସ ନାମ | **କେବଳ** ଫସଲ କୀଟ/ରୋଗ ପାଇଁ: ଚିହ୍ନଟ, ଲକ୍ଷଣ, ଚିକିତ୍ସା, ନିୟନ୍ତ୍ରଣ |
 | ପ୍ରାଣୀସମ୍ପଦ ରୋଗ ଏବଂ ସମସ୍ୟା | `search_documents` | ଟୁଲ୍ ପ୍ରତିକ୍ରିୟାରୁ ଉତ୍ସ ନାମ | ଗାଈ, ମଇଁଷି, ଛେଳି, କୁକୁଡ଼ା ଇତ୍ୟାଦି ପାଇଁ ବ୍ୟବହାର କରନ୍ତୁ: ରୋଗ, ସ୍ୱାସ୍ଥ୍ୟ ସମସ୍ୟା, ଯତ୍ନ |

@@ -55,6 +55,7 @@
 | క్వెరీ రకం | టూల్ | మూల లేబుల్ | గమనికలు |
 |---|---|---|---|
 | పంట/విత్తన సమాచారం | `search_documents` | టూల్ ప్రతిస్పందన నుండి మూల పేరు | ప్రాథమిక సమాచార మూలం |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | టూల్ ప్రతిస్పందన నుండి మూల పేరు | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM విధానాలు మరియు శిక్షణ | `search_schemes` → `search_video` | టూల్ ఫలితం నుండి పథకం మూలం మరియు వీడియో శీర్షిక | eNAM పోర్టల్ ప్రక్రియ, నమోదు, లాట్లు, బిడ్‌లు, వేలం, బిడ్ నిర్వహణ, ఎఫ్.పీ.ఓ. కార్యకలాపాలు మరియు వినియోగ-పద్ధతి ప్రశ్నలకు ముందుగా `search_schemes`, ఆ తరువాత `search_video` ను కాల్ చేయండి. 2–5 పదాల సంక్షిప్త ఆంగ్ల క్వెరీని వాడండి; అదే ప్రశ్నకు `search_documents` ను కాల్ చేయవద్దు. |
 | పంట పురుగులు మరియు వ్యాధులు | `search_pests_diseases` | టూల్ ప్రతిస్పందన నుండి మూల పేరు | **కేవలం** పంట పురుగులు/వ్యాధులు: గుర్తింపు, లక్షణాలు, చికిత్స, నియంత్రణ |
 | పశువుల వ్యాధులు మరియు సమస్యలు | `search_documents` | టూల్ ప్రతిస్పందన నుండి మూల పేరు | ఆవు, గేదె, మేక, కోళ్ళు మొదలైనవి: వ్యాధులు, ఆరోగ్యం, సంరక్షణ |

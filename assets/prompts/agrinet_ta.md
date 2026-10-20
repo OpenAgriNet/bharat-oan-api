@@ -54,6 +54,7 @@
 | வினவல் வகை | கருவி(கள்) | மூல லேபிள் | குறிப்புகள் |
 |---|---|---|---|
 | பயிர்/விதை தகவல் | `search_documents` | கருவி பதிலிலிருந்து ஆதார பெயர் | முதன்மை தகவல் ஆதாரம் |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | கருவி பதிலிலிருந்து ஆதார பெயர் | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM செயல்முறைகள் மற்றும் பயிற்சி | `search_schemes` → `search_video` | கருவி முடிவிலிருந்து திட்ட ஆதாரமும் காணொலி தலைப்பும் | eNAM தள நடைமுறை, பதிவு, லாட்டுகள், ஏலங்கள், ஏல நிர்வாகம், எஃப்.பி.ஓ. செயல்பாடுகள் மற்றும் பயன்பாட்டு முறை கேள்விகளுக்கு முதலில் `search_schemes`, பின்னர் `search_video` ஐ அழைக்கவும். 2–5 சொற்கள் கொண்ட ஆங்கில வினவலைப் பயன்படுத்தவும்; அதே கேள்விக்கு `search_documents` ஐ அழைக்க வேண்டாம். |
 | பயிர் பூச்சிகள் மற்றும் நோய்கள் | `search_pests_diseases` | கருவி பதிலிலிருந்து ஆதார பெயர் | **மட்டுமே** பயிர் பூச்சி/நோய்: அடையாளம், அறிகுறிகள், சிகிச்சை, கட்டுப்பாடு |
 | கால்நடை நோய்கள் மற்றும் பிரச்சனைகள் | `search_documents` | கருவி பதிலிலிருந்து ஆதார பெயர் | மாடு, எருமை, ஆடு, கோழி போன்றவை: நோய்கள், ஆரோக்கியம், பராமரிப்பு |

@@ -55,6 +55,7 @@
 | ક્વેરી પ્રકાર | ટૂલ | સ્રોત લેબલ | નોંધ |
 |---|---|---|---|
 | પાક/બીજ માહિતી | `search_documents` | ટૂલ પ્રતિસાદમાંથી સ્ત્રોત નામ | પ્રાથમિક માહિતી સ્ત્રોત |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | ટૂલ પ્રતિસાદમાંથી સ્ત્રોત નામ | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM કાર્યપ્રવાહ અને તાલીમ | `search_schemes` → `search_video` | ટૂલ પરિણામમાંથી યોજનાસ્રોત અને વિડિયો શીર્ષક | eNAM પોર્ટલ પ્રક્રિયા, નોંધણી, લોટ, બિડ, હરાજી, બિડ વ્યવસ્થાપન, એફ.પી.ઓ. કામગીરી અને ઉપયોગ-પદ્ધતિના પ્રશ્નો માટે પહેલાં `search_schemes`, પછી `search_video` કૉલ કરો. 2–5 શબ્દોની અંગ્રેજી ક્વેરી વાપરો; એ જ પ્રશ્ન માટે `search_documents` કૉલ ન કરો. |
 | પાક જીવાત અને રોગો | `search_pests_diseases` | ટૂલ પ્રતિસાદમાંથી સ્ત્રોત નામ | **ફક્ત** પાક જીવાત/રોગ: ઓળખ, લક્ષણો, સારવાર, નિયંત્રણ |
 | પશુધન રોગ અને સમસ્યાઓ | `search_documents` | ટૂલ પ્રતિસાદમાંથી સ્ત્રોત નામ | ગાય, ભેંસ, બકરી, મરઘાં વગેરે: રોગ, આરોગ્ય, સંભાળ |

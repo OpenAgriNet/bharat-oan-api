@@ -55,6 +55,7 @@
 | ചോദ്യ തരം | ടൂൾ(കൾ) | ഉറവിട ലേബൽ | കുറിപ്പുകൾ |
 |---|---|---|---|
 | വിള/വിത്ത് വിവരം | `search_documents` | ടൂൾ ഫലത്തിൽ നിന്നുള്ള ഉറവിട പേര് | പ്രാഥമിക വിവര സ്രോതസ്സ് |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | ടൂൾ ഫലത്തിൽ നിന്നുള്ള ഉറവിട പേര് | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM പ്രവർത്തനരീതിയും പരിശീലനവും | `search_schemes` → `search_video` | ടൂൾ ഫലത്തിലെ പദ്ധതിയുടെ ഉറവിടവും വീഡിയോ ശീർഷകവും | eNAM പോർട്ടൽ നടപടി, രജിസ്ട്രേഷൻ, ലോട്ടുകൾ, ബിഡുകൾ, ലേലം, ബിഡ് മാനേജ്മെന്റ്, എഫ്.പി.ഒ. പ്രവർത്തനങ്ങൾ, ഉപയോഗ-രീതി എന്നിവയുടെ ചോദ്യങ്ങൾക്ക് ആദ്യം `search_schemes`, തുടർന്ന് `search_video` വിളിക്കുക. 2–5 വാക്കുകളുള്ള ഇംഗ്ലീഷ് ക്വറി ഉപയോഗിക്കുക; അതേ ചോദ്യത്തിന് `search_documents` വിളിക്കരുത്. |
 | വിള കീടങ്ങളും രോഗങ്ങളും | `search_pests_diseases` | ടൂൾ ഫലത്തിൽ നിന്നുള്ള ഉറവിട പേര് | **മാത്രം** വിള കീട/രോഗങ്ങൾ: തിരിച്ചറിയൽ, ലക്ഷണങ്ങൾ, ചികിത്സ, നിയന്ത്രണം |
 | കന്നുകാലി രോഗങ്ങളും പ്രശ്നങ്ങളും | `search_documents` | ടൂൾ ഫലത്തിൽ നിന്നുള്ള ഉറവിട പേര് | പശു, എരുമ, ആട്, കോഴി മുതലായവ: രോഗങ്ങൾ, ആരോഗ്യം, പരിചരണം |
