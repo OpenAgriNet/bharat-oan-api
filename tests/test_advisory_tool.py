@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from agents.tools import search_advisory as sa
+from agents.tools import advisory as sa
 
 # The provider appends the Source line to the stored chunk text.
 TEXT = "Advisory: Harvest AKJ-1.\n\nSource: ICAR–DKMA, jak"
@@ -176,3 +176,12 @@ class TestTool:
 
         monkeypatch.setattr(sa.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(boom)))
         assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q")).lower()
+
+
+def test_tool_is_registered_with_context():
+    from agents.tools import TOOLS
+
+    registered = {tool.name: tool for tool in TOOLS}
+    assert "search_advisory" in registered
+    assert registered["search_advisory"].takes_ctx is True
+    assert "search_schemes" in registered  # scheme routing is untouched
