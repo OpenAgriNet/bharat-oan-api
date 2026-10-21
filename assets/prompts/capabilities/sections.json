@@ -1,0 +1,2782 @@
+{
+  "agrinet_as": [
+    {
+      "path": "capabilities/agrinet_as/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_as/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_bn": [
+    {
+      "path": "capabilities/agrinet_bn/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_bn/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_en": [
+    {
+      "path": "capabilities/agrinet_en/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/pmkisan_instalments.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_en/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_gu": [
+    {
+      "path": "capabilities/agrinet_gu/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_gu/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_hi": [
+    {
+      "path": "capabilities/agrinet_hi/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/pmkisan_instalments.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_hi/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_kn": [
+    {
+      "path": "capabilities/agrinet_kn/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_kn/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_mai": [
+    {
+      "path": "capabilities/agrinet_mai/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/pmkisan_instalments.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mai/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_ml": [
+    {
+      "path": "capabilities/agrinet_ml/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ml/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_mr": [
+    {
+      "path": "capabilities/agrinet_mr/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_mr/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_or": [
+    {
+      "path": "capabilities/agrinet_or/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/pmkisan_instalments.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_or/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_pa": [
+    {
+      "path": "capabilities/agrinet_pa/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/pmkisan_instalments.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_pa/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_ta": [
+    {
+      "path": "capabilities/agrinet_ta/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_ta/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ],
+  "agrinet_te": [
+    {
+      "path": "capabilities/agrinet_te/maha_schemes.md",
+      "tools": [
+        "call_maha_vistaar_network"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/amul_and_scheme_disambiguation.md",
+      "tools": [
+        "call_amul_vistaar_network",
+        "call_maha_vistaar_network",
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/scheme_catalog.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/scheme_eligibility.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/related_videos.md",
+      "tools": [
+        "get_scheme_info",
+        "search_schemes",
+        "search_video"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/grievances.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/payment_issues.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/insurance_and_loan_eligibility.md",
+      "tools": [
+        "check_kcc_application_status",
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "get_scheme_info",
+        "initiate_kcc_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance",
+        "search_schemes",
+        "search_video",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/pmfby_grievance_verification.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/weather.md",
+      "tools": [
+        "imd_agromet_advisory",
+        "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/seed_availability.md",
+      "tools": [
+        "get_sathi_crop_groups",
+        "list_sathi_crops_in_group",
+        "search_sathi_seed_availability"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/mandi_prices.md",
+      "tools": [
+        "get_mandi_prices",
+        "search_commodity"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/pmfby_status.md",
+      "tools": [
+        "check_pmfby_grievance_otp",
+        "check_pmfby_status_with_otp",
+        "initiate_pmfby_grievance_otp",
+        "initiate_pmfby_status_check",
+        "pmfby_grievance_status",
+        "pmfby_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/soil_health_status.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/smam_status.md",
+      "tools": [
+        "check_smam_scheme_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/fertilizer.md",
+      "tools": [
+        "gfr_get_crop_registries",
+        "gfr_get_recommendations"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/soil_health_report.md",
+      "tools": [
+        "check_shc_status"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/pmkisan_status.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/pmkisan_validation.md",
+      "tools": [
+        "check_pm_kisan_status_with_otp",
+        "initiate_pm_kisan_status_check",
+        "pmkisan_grievance_send_otp",
+        "pmkisan_grievance_status",
+        "pmkisan_submit_grievance"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/aif_status.md",
+      "tools": [
+        "check_aif_grievance_status",
+        "check_aif_loan_status",
+        "initiate_aif_otp",
+        "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/kcc_status.md",
+      "tools": [
+        "check_kcc_application_status",
+        "initiate_kcc_otp",
+        "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/agristack_rules.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet_te/khc_rules.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
+      ]
+    }
+  ]
+}

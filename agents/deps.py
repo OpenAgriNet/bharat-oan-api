@@ -1,6 +1,7 @@
 from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 from langcodes import Language
+from agents.capability_policy import CapabilityState
 
 
 class FarmerContext(BaseModel):
@@ -20,6 +21,7 @@ class FarmerContext(BaseModel):
         **Selected Language:** Hindi
         **Moderation Compliance:** "Valid Agricultural (This is a valid agricultural question.)"
     """
+    capabilities: CapabilityState = Field(default_factory=CapabilityState)
     query: str = Field(description="The user's question.")
     lang_code: str = Field(description="The language code of the user's question.", default='hi')
     session_id: str = Field(description="The session ID for the conversation.")
