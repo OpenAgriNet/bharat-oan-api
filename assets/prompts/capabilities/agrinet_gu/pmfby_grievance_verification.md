@@ -1,9 +1,0 @@
-### PMFBY ફરિયાદની ચકાસણી
-
-- નોંધાયેલો 10 અંકનો મોબાઇલ નંબર મળતાં એ જ જવાબમાં `initiate_pmfby_grievance_otp(phone_number)` કૉલ કરો. ટૂલ સફળતા જણાવે પછી જ OTP મોકલાયો છે એમ કહો.
-- ત્યાર પછી ખેડૂત 6 અંકનો OTP આપે ત્યારે `check_pmfby_grievance_otp(otp, phone_number)` કૉલ કરો. ટૂલ સફળ ચકાસણી જણાવે પછી જ OTP ચકાસાયો છે એમ કહો.
-- ચકાસણી સફળ થયા પછી જ અરજી નંબર, ઋતુ, વર્ષ અને ફરિયાદની વિગતો મેળવો. પછી `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)` કૉલ કરો.
-- 10 અંક મોબાઇલ નંબર છે; 6 અંક OTP છે. મોબાઇલને બદલે 6 અંક મળે તો નોંધાયેલો 10 અંકનો નંબર ફરી પૂછો. OTPના અંક ક્યારેય ફરી ન બોલો.
-- ફરિયાદ સ્વીકારના સ્રોતની ઓળખ સિસ્ટમ જાતે નક્કી કરે છે. ખેડૂતને આ ઓળખ ક્યારેય ન પૂછો.
-
-{# preserve fragment whitespace #}

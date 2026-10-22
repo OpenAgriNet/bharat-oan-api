@@ -1,9 +1,7 @@
 """Offline tests: no model, Redis, business API, or production access required."""
 import ast
 import asyncio
-import hashlib
 import json
-import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -22,7 +20,7 @@ from agents.capability_policy import ALL_TOOLS, CapabilityState, ToolPolicy, con
 from agents.deps import FarmerContext
 
 ROOT = Path(__file__).resolve().parents[1]
-HASHES = json.loads((PROMPT_DIR / 'capabilities/original_sha256.json').read_text())
+PROMPTS = sorted(p.stem for p in PROMPT_DIR.glob('agrinet_*.md'))
 CONTEXT = dict(today_date='21 October 2026', crop_season='Rabi', last_weekday_table='Tuesday',
                vector_scheme_count=2, vector_schemes_bullets='- Scheme one\n- Scheme two',
                vector_schemes_identifiers='one, two')
@@ -44,23 +42,16 @@ def test_manifest_covers_registered_tools_exactly():
         validate_manifest([SimpleNamespace(name=name) for name in names[:-1]])
 
 
-@pytest.mark.parametrize('prompt_file', HASHES)
-def test_all_loaded_prompt_is_exact_original_in_every_language(prompt_file):
-    template = (PROMPT_DIR / f'{prompt_file}.md').read_text()
-    def original_fragment(match):
-        return (PROMPT_DIR / match[1]).read_text().removesuffix('{# preserve fragment whitespace #}')
-    restored = re.sub(r'{% if capability_enabled.*?%}{% include "([^"]+)" %}{% endif %}',
-                      original_fragment, template)
-    assert hashlib.sha256(restored.encode()).hexdigest() == HASHES[prompt_file]
+@pytest.mark.parametrize('prompt_file', PROMPTS)
+def test_default_and_explicit_all_loaded_prompts_match(prompt_file):
     env = Environment(loader=FileSystemLoader(PROMPT_DIR), autoescape=False)
     deps = deps_for()
     actual = env.get_template(f'{prompt_file}.md').render(
         **capability_prompt_context(deps, prompt_file, CONTEXT)) + capability_routing(deps)
-    assert actual == env.from_string(restored).render(**CONTEXT)
     assert actual == env.get_template(f'{prompt_file}.md').render(**CONTEXT)
 
 
-@pytest.mark.parametrize('prompt_file', HASHES)
+@pytest.mark.parametrize('prompt_file', PROMPTS)
 def test_lazy_loading_returns_original_instructions(prompt_file):
     deps = deps_for(preloaded=frozenset())
     capability_prompt_context(deps, prompt_file, CONTEXT)
@@ -176,10 +167,8 @@ def test_unavailable_tool_is_not_executed_even_if_model_requests_it():
     assert agent.run_sync('rice', deps=deps_for(allowed=set())).output == 'unavailable'
 
 
-@pytest.mark.parametrize('prompt_file', HASHES)
+@pytest.mark.parametrize('prompt_file', PROMPTS)
 def test_unloaded_workflow_is_removed_but_defaults_restore_it(prompt_file):
-    if prompt_file == 'voice_other':
-        return  # This fallback contains only shared instructions in the original.
     env = Environment(loader=FileSystemLoader(PROMPT_DIR), autoescape=False)
     deps = deps_for(preloaded=set())
     small = env.get_template(f'{prompt_file}.md').render(

@@ -21,7 +21,7 @@ def test_translated_prompts_keep_english_template_tokens():
     for lang in ("or", "pa", "mai"):
         tokens = JINJA.findall((PROMPT_DIR / f"agrinet_{lang}.md").read_text(encoding="utf-8"))
         # Capability includes point to each language's own verbatim fragments.
-        normalized = [token.replace(f'agrinet_{lang}/', 'agrinet_en/') for token in tokens]
+        normalized = [token.replace(f'_{lang}.md', '_en.md') for token in tokens]
         assert normalized == en_tokens, lang
 
 

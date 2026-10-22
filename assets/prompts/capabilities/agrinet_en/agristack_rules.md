@@ -1,1 +1,0 @@
-{% include "agristack_rules.md" %}{# preserve fragment whitespace #}

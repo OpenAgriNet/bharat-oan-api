@@ -34,7 +34,7 @@ class FarmerContext(BaseModel):
     longitude: Optional[float] = Field(default=None, description="User's longitude for geocoding.")
     agristack_status: Literal["not_logged_in", "no_consent", "consent"] = Field(
         default="not_logged_in",
-        description="AgriStack login state for this session (see assets/prompts/agristack_rules.md).",
+        description="AgriStack login state for this session (see assets/prompts/capabilities/agrinet/agristack/rules/agristack_rules_common.md).",
     )
     npss_used: bool = Field(default=False, description="Whether NPSS image analysis was used in this turn.")
     npss_source_name: Optional[str] = Field(default=None, description="Official NPSS source name.")

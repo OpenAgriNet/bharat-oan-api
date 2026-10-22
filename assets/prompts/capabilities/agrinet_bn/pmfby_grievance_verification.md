@@ -1,9 +1,0 @@
-### PMFBY অভিযোগ যাচাই
-
-- নিবন্ধিত 10 অঙ্কের মোবাইল নম্বর পেলে সেই উত্তরেই `initiate_pmfby_grievance_otp(phone_number)` কল করুন। টুল সফল হলে তবেই বলুন OTP পাঠানো হয়েছে।
-- এরপর কৃষক 6 অঙ্কের OTP দিলে `check_pmfby_grievance_otp(otp, phone_number)` কল করুন। টুল যাচাই সফল বললে তবেই বলুন OTP যাচাই হয়েছে।
-- যাচাই সফল হওয়ার পরেই আবেদন নম্বর, মৌসুম, বছর এবং অভিযোগের বিবরণ নিন। তারপর `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)` কল করুন।
-- 10 অঙ্ক মোবাইল নম্বর; 6 অঙ্ক OTP। মোবাইলের বদলে 6 অঙ্ক দিলে নিবন্ধিত 10 অঙ্কের নম্বর আবার চান। OTP-র অঙ্ক কখনও পুনরাবৃত্তি করবেন না।
-- অভিযোগ গ্রহণের উৎসের পরিচয় ব্যবস্থা নিজেই নির্ধারণ করে। কৃষকের কাছে এই পরিচয় কখনও চাইবেন না।
-
-{# preserve fragment whitespace #}

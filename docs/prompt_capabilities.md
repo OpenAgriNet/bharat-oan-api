@@ -54,17 +54,20 @@ Tool descriptions, schemas, model settings, and business implementations are unc
 `sections.json` maps fragments to tools. If any mapped tool is loaded, the full
 original block is included. A loader also returns the matching blocks, which is
 necessary for agents whose system prompt is not reevaluated during a tool loop.
-`original_sha256.json` records pre-migration source hashes; tests reconstruct and
-compare the original template and rendered text for **every language**. Intentional
-future prompt edits must deliberately update that preservation baseline.
+Browse [capability → section → language](../assets/prompts/capabilities/agrinet/README.md).
+Common KHC/AgriStack sources are included directly; shared cross-capability blocks
+live under `_shared`. Git preserves prior wording; no frozen hash files are used.
+For a structural change, set `PROMPT_COMPARE_REF` to the preceding Git revision to
+compare every rendered language prompt and lazy-loaded instructions byte-for-byte.
 
 Run offline checks from the repository root, with its pinned Pydantic AI installed:
 
 ```bash
-python -m pytest tests/test_capabilities.py -q
+python -m pytest tests/test_capabilities.py tests/test_prompt_structure.py -q
 ```
 
-These check prompt equality, all-tool coverage, policy validation, session/topic
+These check default/all-loaded equality, prompt inventory, language coverage,
+all-tool coverage, policy validation, session/topic
 switches, original tool ordering, and an actual Pydantic AI load→execute loop using
 a deterministic local model. They do not establish selective-mode model accuracy
 or latency; those require a separate inference benchmark.
