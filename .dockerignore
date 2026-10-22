@@ -10,4 +10,5 @@ __pycache__
 tests/
 logs/
 *.md
+!assets/prompts/**/*.md
 .claude/
