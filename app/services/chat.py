@@ -669,7 +669,7 @@ async def _run_moderation(user_message: str, session_id: str):
         "moderation", session_id, moderation_agent, user_message
     )
 
-    usage_data = run.usage()
+    usage_data = run.usage
     lf_update_current_observation(
         output=str(run.output),
         model=decision.model_name,
@@ -765,56 +765,57 @@ async def _run_agrinet_once_streaming(
     result = None
 
     try:
-        async for event in agrinet_agent.run_stream_events(
+        async with agrinet_agent.run_stream_events(
             user_prompt=user_message,
             message_history=trimmed_history,
             deps=deps,
             model=get_registry().get_model(decision.route),
-        ):
-            # Event order from pydantic-ai for the final answer:
-            #   PartStartEvent(TextPart content="Hello")  # first tokens live here
-            #   FinalResultEvent
-            #   PartDeltaEvent(...content_delta=", I'm here...")
-            # Deltas-only handling drops the PartStart prefix → ", I'm here..." in UI/Langfuse.
-            if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
-                prefix = event.part.content or ""
-                if not prefix:
+        ) as events:
+            async for event in events:
+                # Event order from pydantic-ai for the final answer:
+                #   PartStartEvent(TextPart content="Hello")  # first tokens live here
+                #   FinalResultEvent
+                #   PartDeltaEvent(...content_delta=", I'm here...")
+                # Deltas-only handling drops the PartStart prefix → ", I'm here..." in UI/Langfuse.
+                if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+                    prefix = event.part.content or ""
+                    if not prefix:
+                        continue
+                    if stream_state.final_result_found:
+                        # A new text part in the same response can repeat the previous one.
+                        stream_state.deduper.tool_boundary()
+                        await _emit_final_text_chunk(prefix, stream_state, chunk_queue)
+                    else:
+                        stream_state.pending_text_start = prefix
                     continue
-                if stream_state.final_result_found:
-                    # A new text part in the same response can repeat the previous one.
+
+                if isinstance(event, FinalResultEvent):
+                    stream_state.final_result_found = True
+                    if stream_state.pending_text_start:
+                        pending = stream_state.pending_text_start
+                        stream_state.pending_text_start = ""
+                        await _emit_final_text_chunk(pending, stream_state, chunk_queue)
+                    continue
+
+                if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+                    if not stream_state.final_result_found:
+                        continue
+                    await _emit_final_text_chunk(
+                        event.delta.content_delta or "",
+                        stream_state,
+                        chunk_queue,
+                    )
+                    continue
+
+                if getattr(event, "event_kind", "") == "function_tool_result":
                     stream_state.deduper.tool_boundary()
-                    await _emit_final_text_chunk(prefix, stream_state, chunk_queue)
-                else:
-                    stream_state.pending_text_start = prefix
-                continue
-
-            if isinstance(event, FinalResultEvent):
-                stream_state.final_result_found = True
-                if stream_state.pending_text_start:
-                    pending = stream_state.pending_text_start
+                    stream_state.tool_boundaries += 1
+                    stream_state.final_result_found = False
                     stream_state.pending_text_start = ""
-                    await _emit_final_text_chunk(pending, stream_state, chunk_queue)
-                continue
-
-            if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
-                if not stream_state.final_result_found:
                     continue
-                await _emit_final_text_chunk(
-                    event.delta.content_delta or "",
-                    stream_state,
-                    chunk_queue,
-                )
-                continue
 
-            if getattr(event, "event_kind", "") == "function_tool_result":
-                stream_state.deduper.tool_boundary()
-                stream_state.tool_boundaries += 1
-                stream_state.final_result_found = False
-                stream_state.pending_text_start = ""
-                continue
-
-            if isinstance(event, AgentRunResultEvent):
-                result = event.result
+                if isinstance(event, AgentRunResultEvent):
+                    result = event.result
     except Exception as exc:
         lf_update_current_observation(
             metadata={
@@ -843,7 +844,7 @@ async def _run_agrinet_once_streaming(
             session_id, len(streamed_text), len(output_text), stream_state.tool_boundaries,
         )
 
-    usage_data = result.usage()
+    usage_data = result.usage
     lf_update_current_observation(
         output=output_text,
         model=decision.model_name,
