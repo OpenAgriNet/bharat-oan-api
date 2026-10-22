@@ -256,7 +256,8 @@ def test_all_language_prompts_include_khc_rules():
         assert "verify_khc_otp" in prompt
         assert "**Location reuse:**" in prompt
         assert "call `reverse_geocode`" in prompt
-        assert "If browser coordinates are unavailable, ask the farmer for state, district and village" in prompt
+        assert "call `forward_geocode` first" in prompt
+        assert "If browser coordinates are unavailable, ask the farmer for village/place name first" in prompt
         assert "Never substitute a nearby village" in prompt
         assert "**Problem-to-scheme matching:**" in prompt
         assert "Do not ask for a scheme name or any internal IDs upfront" in prompt
@@ -267,6 +268,7 @@ def test_all_language_prompts_include_khc_rules():
         assert "If the grievance is for PM-Kisan, PMFBY, or AIF" in prompt
         assert "run the existing scheme grievance flow by default" in prompt
         assert "Use KHC for these schemes only when the user explicitly asks to use KHC" in prompt
+        assert "keep that grievance in KHC flow for subsequent turns" in prompt
         assert "scheme without an existing grievance flow" in prompt
         assert "Kisan Helpline Center/Centre" in prompt
         assert "Do not ask for KHC opt-in again" in prompt
@@ -278,6 +280,7 @@ def test_all_language_prompts_include_khc_rules():
         assert "select by name only, not by number" in prompt
         assert "If the district cannot be established from the village details, ask the farmer for the district" in prompt
         assert "Resolve the village ID and all other required mappings before asking for final submission confirmation" in prompt
+        assert "If the farmer-provided scheme, sub-district, village, category, or sub-category does not match a returned row" in prompt
         assert "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme" in prompt
         assert "Do not ask the farmer to reconfirm AIF when already stated" in prompt
         assert "Do not offer to proceed with only a category" in prompt
@@ -417,6 +420,7 @@ def test_reference_results_direct_problem_matching_without_asking_for_ids(monkey
     assert "categories" in output and "sub-categories" in output
     assert "unfiltered list and remaining pages" in output
     assert "Treat missing spaces and case differences as name variations" in output
+    assert "show the relevant returned names for selection by name" in output
 
 
 @pytest.mark.parametrize("kind,parent,options", [
@@ -462,6 +466,7 @@ def test_location_reference_results_guide_api_backed_subdistrict_selection(
     assert "select by name only" in output
     assert "Never invent options or present an empty list as a choice" in output
     assert "fetch villages under the selected subdistrictid" in output
+    assert "use forward_geocode and reverse_geocode to derive missing district/state fields" in output
     assert "If the district is unknown, ask for it first" in output
     assert "Resolve the village ID before asking for final submission confirmation" in output
     assert len(calls) == 1

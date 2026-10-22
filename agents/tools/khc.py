@@ -97,6 +97,8 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
             return (
                 f"KHC {values.get('reference_type')} options: {json.dumps(options, ensure_ascii=False)}\n"
                 f"Total matches: {fields.get('total', '')}; page: {fields.get('page', '')} (50 per page).\n"
+                "If the farmer-provided scheme/location/category value does not match a returned row, "
+                "show the relevant returned names for selection by name and offer next pages when available. "
                 "Match the farmer's problem to the returned scheme/category/subcategory names; "
                 "do not ask for a scheme name or internal IDs upfront. Take scheme and division from the same row, "
                 "then fetch categories using scheme and sub-categories using problemcategory. "
@@ -127,6 +129,8 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "Never invent options or present an empty list as a choice; explain lookup failures. "
                 "After selection, fetch villages under the selected subdistrictid and match the village "
                 "already supplied, asking only if ambiguous or absent. "
+                "If only a village/place name is provided, use forward_geocode and reverse_geocode to "
+                "derive missing district/state fields before asking the farmer again. "
                 f"Resolve the village ID before asking for final submission confirmation.\n{SOURCE}"
             )
         if not fields.get("grievanceNo") or (action == "status" and (

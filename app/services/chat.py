@@ -64,6 +64,7 @@ class _AgrinetStreamState:
     inside_think_block: bool = False
     pending_text_start: str = ""
     raw_chunks: list[str] = field(default_factory=list)
+    visible_output: str = ""
 
 
 class _StreamChunkSink:
@@ -133,14 +134,33 @@ async def _emit_final_text_chunk(
         return
     stream_state.raw_chunks.append(raw_chunk)
     visible_chunk = _strip_streaming_thinking_chunk(raw_chunk, stream_state)
+    if visible_chunk and stream_state.visible_output:
+        # Streams can occasionally resend overlapping text. Trim overlap so the
+        # farmer does not see repeated prefixes/sentences.
+        max_overlap = min(len(stream_state.visible_output), len(visible_chunk))
+        overlap = 0
+        for size in range(max_overlap, 0, -1):
+            if stream_state.visible_output.endswith(visible_chunk[:size]):
+                overlap = size
+                break
+        visible_chunk = visible_chunk[overlap:]
     if visible_chunk and chunk_queue is not None:
+        stream_state.visible_output += visible_chunk
         await chunk_queue.put(visible_chunk)
 
 
 def _sanitize_streamed_output(raw_output: str) -> str:
     cleaned_output = re.sub(r"<think>[\s\S]*?</think>", "", raw_output)
     cleaned_output = re.sub(r"<think>[\s\S]*$", "", cleaned_output)
-    return cleaned_output.strip()
+    cleaned_output = cleaned_output.strip()
+    # Defensive collapse for exact accidental full duplication, e.g. "X...X...".
+    while len(cleaned_output) >= 2 and len(cleaned_output) % 2 == 0:
+        half = len(cleaned_output) // 2
+        if cleaned_output[:half] == cleaned_output[half:]:
+            cleaned_output = cleaned_output[:half].strip()
+            continue
+        break
+    return cleaned_output
 
 
 def _queue_telemetry_event(background_tasks: BackgroundTasks, event: Any) -> None:
