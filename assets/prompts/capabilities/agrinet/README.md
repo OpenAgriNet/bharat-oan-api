@@ -37,7 +37,7 @@ Supported prompt languages: `as`, `bn`, `en`, `gu`, `hi`, `kn`, `mai`, `ml`, `mr
 
 | Section | Coverage |
 |---|---|
-| [_shared/amul_and_scheme_disambiguation](_shared/amul_and_scheme_disambiguation/) | Localized files, all 13 languages |
+| [amul/amul_and_scheme_disambiguation](amul/amul_and_scheme_disambiguation/) | Localized files, all 13 languages |
 | [_shared/grievances](_shared/grievances/) | Localized files, all 13 languages |
 | [_shared/insurance_and_loan_eligibility](_shared/insurance_and_loan_eligibility/) | Localized files, all 13 languages |
 | [agristack/rules](agristack/rules/) | Common English source, all 13 languages |

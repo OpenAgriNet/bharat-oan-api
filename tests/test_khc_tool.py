@@ -256,21 +256,22 @@ def test_all_language_prompts_include_khc_rules():
         assert "verify_khc_otp" in prompt
         assert "**Location reuse:**" in prompt
         assert "call `reverse_geocode`" in prompt
-        assert "If browser coordinates are unavailable, ask the farmer for their state and village" in prompt
+        assert "If browser coordinates are unavailable, ask the farmer for state, district and village" in prompt
         assert "Never substitute a nearby village" in prompt
         assert "**Problem-to-scheme matching:**" in prompt
         assert "Do not ask for a scheme name or any internal IDs upfront" in prompt
         assert "a generic bank-loan complaint" in prompt
         assert "name` is a literal name substring filter" in prompt
         assert "include the matched scheme/category names in the final confirmation summary" in prompt
-        assert "Do not proactively suggest KHC" in prompt
-        assert "If the user asks for help with a grievance but does not name a service" in prompt
-        assert "Would you like to register or check it with Kisan Help Center?" in prompt
-        assert "For this unspecified-service case, do not call any KHC tool until the user explicitly agrees" in prompt
+        assert "Do not proactively suggest KHC for unrelated questions" in prompt
+        assert "If the grievance is for PM-Kisan, PMFBY, or AIF" in prompt
+        assert "run the existing scheme grievance flow by default" in prompt
+        assert "Use KHC for these schemes only when the user explicitly asks to use KHC" in prompt
+        assert "scheme without an existing grievance flow" in prompt
         assert "Kisan Helpline Center/Centre" in prompt
         assert "Do not ask for KHC opt-in again" in prompt
         assert "i want to create one kisan helpline center grivance" in prompt
-        assert "ask for the mobile number immediately if missing" in prompt
+        assert "start the KHC grievance flow" in prompt
         assert "**Sub-district selection:**" in prompt
         assert 'reference_type="sub-districts", parent_id=<resolved districtId>, name=""' in prompt
         assert "show a bulleted list of the returned subdistrictname values" in prompt
@@ -283,7 +284,8 @@ def test_all_language_prompts_include_khc_rules():
         assert "When waiting for a KHC OTP, treat a six-digit reply as the OTP" in prompt
         assert "uttarpradesh" in prompt
         assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
-        assert "Do not ask for grievance language or other remaining details until verification succeeds" in prompt
+        assert "collect scheme + location + concern -> map category/sub-category" in prompt
+        assert "show summary with mapped sub-category -> allow sub-category change" in prompt
 
 
 @pytest.mark.parametrize("coordinates,expected", [
@@ -335,12 +337,12 @@ def test_six_digit_otp_is_sent_to_verification_without_reasking(monkeypatch, otp
     )
 
 
-def test_otp_sent_result_directs_verification_before_collecting_details(monkeypatch):
+def test_otp_sent_result_directs_verification_before_submission(monkeypatch):
     fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "otp_sent", {})), [])
     output = asyncio.run(khc.initiate_khc_otp(ctx(), "9876543210"))
     assert "call verify_khc_otp with the same mobile" in output
     assert "Do not reject a six-digit reply without a verification tool result" in output
-    assert "Do not ask for grievance language or other remaining details until verification succeeds" in output
+    assert "If scheme, location, concern and sub-category summary are already confirmed" in output
 
 
 @pytest.mark.parametrize("code,message", [

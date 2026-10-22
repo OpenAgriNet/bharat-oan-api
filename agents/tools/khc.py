@@ -73,7 +73,8 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "OTP sent successfully. Ask the farmer for the OTP received on their mobile. "
                 "When they supply six digits, call verify_khc_otp with the same mobile and the supplied OTP. "
                 "Do not reject a six-digit reply without a verification tool result. "
-                "Do not ask for grievance language or other remaining details until verification succeeds."
+                "If scheme, location, concern and sub-category summary are already confirmed, "
+                "proceed to submission after verification."
             )
         if code == "otp_verified":
             if fields.get("isRegistered") not in ("true", "false"):
@@ -168,7 +169,7 @@ async def verify_khc_otp(
     While waiting for OTP, call this tool for a six-digit reply; do not ask the farmer
     to repeat a correctly formatted OTP without attempting verification. Preserve leading
     zeros. Only the tool result can establish acceptance, rejection or service failure.
-    Do not collect language or other grievance details until verification succeeds.
+    Collect and confirm grievance details as per flow; use this result before final submission.
     """
     mobile = _mobile(mobile_number)
     if not mobile:
