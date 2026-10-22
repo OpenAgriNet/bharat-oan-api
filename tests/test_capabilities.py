@@ -111,6 +111,57 @@ def test_restore_across_topic_switches_and_policy_changes():
     assert not another_session.capabilities.visible
 
 
+@pytest.mark.parametrize('content', [
+    None, 'not a loader result', [], {},
+    {'capability': ['weather'], 'loaded_tools': ['weather_forecast']},
+    {'capability': {'name': 'weather'}, 'loaded_tools': ['weather_forecast']},
+    {'capability': None, 'loaded_tools': ['weather_forecast']},
+    {'capability': 42, 'loaded_tools': ['weather_forecast']},
+    {'capability': 'unknown', 'loaded_tools': ['weather_forecast']},
+    {'capability': 'weather'},
+    {'capability': 'weather', 'loaded_tools': None},
+    {'capability': 'weather', 'loaded_tools': 'weather_forecast'},
+    {'capability': 'weather', 'loaded_tools': {'weather_forecast': True}},
+    {'capability': 'weather', 'loaded_tools': ['weather_forecast', []]},
+    {'capability': 'weather', 'loaded_tools': ['weather_forecast', 42]},
+])
+def test_restore_ignores_malformed_results_and_continues(content):
+    state = deps_for(preloaded=set()).capabilities
+    bad = ToolReturnPart(tool_name='load_capability', content=content)
+    state.restore([ModelRequest(parts=[bad])])
+    assert state.loaded_tools == set()
+    good = ToolReturnPart(tool_name='load_capability', content={
+        'capability': 'soil_health', 'loaded_tools': ['check_shc_status']})
+    state.restore([ModelRequest(parts=[bad]), ModelRequest(parts=[good])])
+    assert state.loaded_tools == {'check_shc_status'}
+
+
+@pytest.mark.parametrize('container', [list, tuple])
+def test_restore_enforces_group_and_current_policy_and_is_idempotent(container):
+    state = deps_for(allowed={'weather_forecast', 'search_terms'}, preloaded=set()).capabilities
+    result = ToolReturnPart(tool_name='load_capability', content={
+        'capability': 'weather',
+        'loaded_tools': container(['weather_forecast', 'weather_forecast',
+                                   'imd_agromet_advisory', 'search_terms', 'unknown']),
+    })
+    history = [ModelRequest(parts=[result])]
+    state.restore(history)
+    state.restore(history)
+    # Exclude a forbidden group member, an allowed tool from another group, and unknown tools.
+    assert state.loaded_tools == state.visible == {'weather_forecast'}
+
+
+def test_restore_ignores_non_loader_and_non_return_parts():
+    content = {'capability': 'weather', 'loaded_tools': ['weather_forecast']}
+    state = deps_for(preloaded=set()).capabilities
+    state.restore([SimpleNamespace(), ModelRequest(parts=[
+        TextPart('load_capability weather'),
+        ToolCallPart('load_capability', content),
+        ToolReturnPart(tool_name='another_tool', content=content),
+    ])])
+    assert state.loaded_tools == set()
+
+
 def test_default_tools_preserve_objects_order_and_hide_loader():
     tools = [SimpleNamespace(name=name) for name in sorted(ALL_TOOLS)]
     ctx = SimpleNamespace(deps=deps_for())

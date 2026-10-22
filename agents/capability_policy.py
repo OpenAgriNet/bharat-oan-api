@@ -39,6 +39,22 @@ def configured_tool_policy() -> ToolPolicy:
     return ToolPolicy(allowed_tools=allowed, preloaded_tools=preloaded)
 
 
+def _loaded_tools_from_return(part: object) -> set[str]:
+    """Ignore unrelated or malformed history; accept only tools in the named group."""
+    if getattr(part, "part_kind", None) != "tool-return" or getattr(part, "tool_name", None) != "load_capability":
+        return set()
+    content = getattr(part, "content", None)
+    if not isinstance(content, dict):
+        return set()
+    capability = content.get("capability")
+    if not isinstance(capability, str) or capability not in CAPABILITIES:
+        return set()
+    loaded = content.get("loaded_tools", ())
+    if not isinstance(loaded, (list, tuple)) or not all(isinstance(name, str) for name in loaded):
+        return set()
+    return set(loaded) & CAPABILITIES[capability]
+
+
 class CapabilityState(BaseModel):
     policy: ToolPolicy = Field(default_factory=configured_tool_policy)
     loaded_tools: set[str] = Field(default_factory=set)
@@ -56,18 +72,5 @@ class CapabilityState(BaseModel):
         """Restore only successful loader results, before callers trim history."""
         for message in history:
             for part in getattr(message, "parts", ()):
-                if getattr(part, "part_kind", None) != "tool-return":
-                    continue
-                if getattr(part, "tool_name", None) != "load_capability":
-                    continue
-                content = getattr(part, "content", None)
-                if isinstance(content, dict) and content.get("capability") in CAPABILITIES:
-                    loaded = content.get("loaded_tools", ())
-                    if not isinstance(loaded, (list, tuple)) or not all(isinstance(name, str) for name in loaded):
-                        continue
-                    # Never trust persisted names to bypass the current policy.
-                    self.loaded_tools.update(
-                        set(loaded)
-                        & CAPABILITIES[content["capability"]]
-                        & self.policy.allowed_tools
-                    )
+                # Never trust persisted names to bypass the current policy.
+                self.loaded_tools.update(_loaded_tools_from_return(part) & self.policy.allowed_tools)
