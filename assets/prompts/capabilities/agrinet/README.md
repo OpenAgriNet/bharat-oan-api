@@ -20,7 +20,7 @@ copies per capability. Folder ownership does not change tool permissions.
 - [aif](aif/README.md) — 4 tools
 - [kcc](kcc/README.md) — 3 tools
 - [khc](khc/README.md) — 5 tools
-- [crop_advice](crop_advice/README.md) — 4 tools
+- [crop_advice](crop_advice/README.md) — 5 tools
 - [weather](weather/README.md) — 2 tools
 - [location](location/README.md) — 2 tools
 - [mandi](mandi/README.md) — 2 tools

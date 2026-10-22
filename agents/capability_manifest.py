@@ -14,7 +14,7 @@ CAPABILITIES = {
     "kcc": {"initiate_kcc_otp", "check_kcc_application_status", "select_kcc_application"},
     "khc": {"initiate_khc_otp", "verify_khc_otp", "lookup_khc_reference",
             "check_khc_grievance_status", "register_khc_grievance"},
-    "crop_advice": {"search_terms", "search_documents", "search_pests_diseases", "analyze_crop_image"},
+    "crop_advice": {"search_terms", "search_documents", "search_advisory", "search_pests_diseases", "analyze_crop_image"},
     "weather": {"weather_forecast", "imd_agromet_advisory"},
     "location": {"forward_geocode", "reverse_geocode"},
     "mandi": {"search_commodity", "get_mandi_prices"},
