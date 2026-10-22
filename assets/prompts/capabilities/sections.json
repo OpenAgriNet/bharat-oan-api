@@ -103,6 +103,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/weather/agromet/agromet_as.md",
+      "tools": [
+        "imd_agromet_advisory"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/seeds/availability/seed_availability_as.md",
       "tools": [
         "get_sathi_crop_groups",
@@ -313,6 +319,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/weather/agromet/agromet_bn.md",
+      "tools": [
+        "imd_agromet_advisory"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/seeds/availability/seed_availability_bn.md",
       "tools": [
         "get_sathi_crop_groups",
@@ -520,6 +532,12 @@
       "tools": [
         "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_en.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -743,6 +761,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/weather/agromet/agromet_gu.md",
+      "tools": [
+        "imd_agromet_advisory"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/seeds/availability/seed_availability_gu.md",
       "tools": [
         "get_sathi_crop_groups",
@@ -950,6 +974,12 @@
       "tools": [
         "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_hi.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -1173,6 +1203,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/weather/agromet/agromet_kn.md",
+      "tools": [
+        "imd_agromet_advisory"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/seeds/availability/seed_availability_kn.md",
       "tools": [
         "get_sathi_crop_groups",
@@ -1380,6 +1416,12 @@
       "tools": [
         "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_mai.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -1603,6 +1645,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/weather/agromet/agromet_ml.md",
+      "tools": [
+        "imd_agromet_advisory"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/seeds/availability/seed_availability_ml.md",
       "tools": [
         "get_sathi_crop_groups",
@@ -1813,6 +1861,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/weather/agromet/agromet_mr.md",
+      "tools": [
+        "imd_agromet_advisory"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/seeds/availability/seed_availability_mr.md",
       "tools": [
         "get_sathi_crop_groups",
@@ -2020,6 +2074,12 @@
       "tools": [
         "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_or.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -2243,6 +2303,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/weather/agromet/agromet_pa.md",
+      "tools": [
+        "imd_agromet_advisory"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/seeds/availability/seed_availability_pa.md",
       "tools": [
         "get_sathi_crop_groups",
@@ -2463,6 +2529,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/weather/agromet/agromet_ta.md",
+      "tools": [
+        "imd_agromet_advisory"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/seeds/availability/seed_availability_ta.md",
       "tools": [
         "get_sathi_crop_groups",
@@ -2670,6 +2742,12 @@
       "tools": [
         "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_te.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
