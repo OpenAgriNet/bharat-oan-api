@@ -296,6 +296,8 @@ def test_all_language_prompts_include_khc_rules():
         assert "If scheme is missing, ask scheme first" in prompt
         assert "Do not ask for phone number, OTP, or registration status in this opening turn" in prompt
         assert "Ask only the next missing step from the registration order in each turn" in prompt
+        assert "Follow collection order exactly: scheme -> location -> concern" in prompt
+        assert "If scheme is missing, ask only for scheme and wait" in prompt
 
 
 @pytest.mark.parametrize("coordinates,expected", [

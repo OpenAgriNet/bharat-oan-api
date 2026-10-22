@@ -144,6 +144,13 @@ async def _emit_final_text_chunk(
                 overlap = size
                 break
         visible_chunk = visible_chunk[overlap:]
+    if visible_chunk and stream_state.visible_output:
+        # Also guard against a full repeated sentence re-sent as a new chunk.
+        normalized_chunk = re.sub(r"\s+", " ", visible_chunk).strip()
+        if len(normalized_chunk) >= 20:
+            normalized_seen = re.sub(r"\s+", " ", stream_state.visible_output).strip()
+            if normalized_seen.endswith(normalized_chunk):
+                return
     if visible_chunk and chunk_queue is not None:
         stream_state.visible_output += visible_chunk
         await chunk_queue.put(visible_chunk)
@@ -153,6 +160,11 @@ def _sanitize_streamed_output(raw_output: str) -> str:
     cleaned_output = re.sub(r"<think>[\s\S]*?</think>", "", raw_output)
     cleaned_output = re.sub(r"<think>[\s\S]*$", "", cleaned_output)
     cleaned_output = cleaned_output.strip()
+    # Collapse one full accidental adjacent duplication with optional spacing
+    # between copies, e.g. "Question?Question?" or "Question?  Question?".
+    repeated = re.fullmatch(r"(?s)(.{20,}?)\s*\1", cleaned_output)
+    if repeated:
+        cleaned_output = repeated.group(1).strip()
     # Defensive collapse for exact accidental full duplication, e.g. "X...X...".
     while len(cleaned_output) >= 2 and len(cleaned_output) % 2 == 0:
         half = len(cleaned_output) // 2
