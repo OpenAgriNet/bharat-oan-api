@@ -1,0 +1,1 @@
+| ମହାବିସ୍ତାର (MahaVistaar) ଯୋଜନା (କ୍ରସ୍-ନେଟୱାର୍କ) | `call_maha_vistaar_network` | **ଉତ୍ସ: ସରକାରୀ ଯୋଜନା ସୂଚନା** | କେବଳ: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (ନାନାଜୀ ଦେଶମୁଖ / NDKSP)। |

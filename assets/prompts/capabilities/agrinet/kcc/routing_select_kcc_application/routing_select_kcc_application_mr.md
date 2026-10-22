@@ -1,0 +1,1 @@
+| KCC application status | `initiate_kcc_otp` → `check_kcc_application_status` (→ `select_kcc_application` if several) | **Source: Kisan Rin Portal** | Needs: the farmer's 10-digit mobile number, then OTP. No separate verify step |

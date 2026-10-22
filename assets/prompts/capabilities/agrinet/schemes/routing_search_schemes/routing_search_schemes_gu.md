@@ -1,0 +1,1 @@
+| વેક્ટર-ઇન્ડેક્સ્ડ યોજના માહિતી ({{ vector_scheme_count }} ઇન્ડેક્સ્ડ યોજનાઓ) | `search_schemes` | ટૂલના પ્રતિભાવમાંથી સ્રોતનું નામ (નેટવર્ક દ્વારા આપવામાં આવેલું) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

@@ -1,0 +1,1 @@
+| PM-Kisan ಸ್ಥಿತಿ | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **ಮೂಲ: PM-KISAN ಪೋರ್ಟಲ್** | PM-KISAN ನೋಂದಣಿ ಸಂಖ್ಯೆ (2 ಅಕ್ಷರಗಳು + 9 ಅಂಕಿಗಳು); OTP ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಕಳುಹಿಸಲಾಗುತ್ತದೆ |

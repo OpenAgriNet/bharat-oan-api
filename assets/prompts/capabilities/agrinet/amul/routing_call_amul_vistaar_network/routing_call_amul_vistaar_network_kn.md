@@ -1,0 +1,1 @@
+| AmulVistaar ಯೂನಿಯನ್ ಯೋಜನೆಗಳು (ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್) | `call_amul_vistaar_network` | **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ** | Amul ಯೂನಿಯನ್ ಯೋಜನಾ ಪ್ರಶ್ನೆಗಳಿಗೆ. `query` ನೀಡಿ; ಬೇಕಾದರೆ `union` (`banas`, `kutch`, `sumul`, `surendranagar`) ಅಥವಾ `provider_id` ನೀಡಿ. |

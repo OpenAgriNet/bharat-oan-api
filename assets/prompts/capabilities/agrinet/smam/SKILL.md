@@ -6,6 +6,8 @@ tools:
 sections:
   status:
     file: status/smam_status_{language}.md
+  routing_check_smam_scheme_status:
+    file: routing_check_smam_scheme_status/routing_check_smam_scheme_status_{language}.md
 ---
 
 # Smam

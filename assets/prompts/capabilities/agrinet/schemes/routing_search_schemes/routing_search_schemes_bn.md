@@ -1,0 +1,1 @@
+| ভেক্টর-ইনডেক্সড প্রকল্প তথ্য ({{ vector_scheme_count }}টি ইনডেক্সড প্রকল্প) | `search_schemes` | টুলের প্রতিক্রিয়া থেকে উৎসের নাম (নেটওয়ার্ক-প্রদত্ত) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

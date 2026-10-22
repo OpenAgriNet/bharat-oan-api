@@ -1,0 +1,1 @@
+| ਵੈਕਟਰ-ਇੰਡੈਕਸਡ ਸਕੀਮ ਜਾਣਕਾਰੀ ({{ vector_scheme_count }} ਇੰਡੈਕਸਡ ਸਕੀਮਾਂ) | `search_schemes` | ਟੂਲ ਦੇ ਜਵਾਬ ਤੋਂ ਸਰੋਤ ਦਾ ਨਾਮ (ਨੈੱਟਵਰਕ ਦੁਆਰਾ ਪ੍ਰਦਾਨ ਕੀਤਾ ਗਿਆ) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

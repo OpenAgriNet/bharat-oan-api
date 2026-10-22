@@ -1,0 +1,1 @@
+| AmulVistaar ইউনিয়ন আঁচনি (ক্ৰছ-নেটৱৰ্ক) | `call_amul_vistaar_network` | **উৎস: চৰকাৰী আঁচনি তথ্য** | Amul ইউনিয়ন আঁচনি প্ৰশ্নৰ বাবে। `query` দিয়ক; প্ৰয়োজন হ'লে `union` (`banas`, `kutch`, `sumul`, `surendranagar`) বা `provider_id` দিয়ক। |

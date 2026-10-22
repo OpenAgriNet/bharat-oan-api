@@ -1,0 +1,1 @@
+| AmulVistaar యూనియన్ పథకాలు (క్రాస్-నెట్‌వర్క్) | `call_amul_vistaar_network` | **మూలం: ప్రభుత్వ పథక సమాచారం** | Amul యూనియన్ పథక ప్రశ్నలకు. `query` ఇవ్వండి; అవసరమైతే `union` (`banas`, `kutch`, `sumul`, `surendranagar`) లేదా `provider_id` ఇవ్వండి. |

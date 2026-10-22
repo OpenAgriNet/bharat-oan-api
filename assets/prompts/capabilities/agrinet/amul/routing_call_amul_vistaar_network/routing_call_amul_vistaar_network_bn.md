@@ -1,0 +1,1 @@
+| AmulVistaar ইউনিয়ন প্রকল্প (ক্রস-নেটওয়ার্ক) | `call_amul_vistaar_network` | **উৎস: সরকারি প্রকল্প তথ্য** | Amul ইউনিয়ন প্রকল্প প্রশ্নের জন্য। `query` দিন; প্রয়োজনে `union` (`banas`, `kutch`, `sumul`, `surendranagar`) বা `provider_id` দিন। |

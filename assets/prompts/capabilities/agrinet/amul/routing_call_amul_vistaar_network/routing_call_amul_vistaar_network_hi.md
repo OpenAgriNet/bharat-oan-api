@@ -1,0 +1,1 @@
+| AmulVistaar यूनियन योजनाएं (क्रॉस-नेटवर्क) | `call_amul_vistaar_network` | **स्रोत: सरकारी योजना जानकारी** | Amul यूनियन योजना प्रश्नों के लिए। `query` दें; वैकल्पिक `union` (`banas`, `kutch`, `sumul`, `surendranagar`) या `provider_id` भी दे सकते हैं। |

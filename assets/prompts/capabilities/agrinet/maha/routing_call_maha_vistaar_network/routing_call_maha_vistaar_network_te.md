@@ -1,0 +1,1 @@
+| MahaVistaar పథకాలు (క్రాస్-నెట్‌వర్క్) | `call_maha_vistaar_network` | **మూలం: ప్రభుత్వ పథక సమాచారం** | మాత్రమే: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (నానాజీ దేశ్‌ముఖ్ / NDKSP). |

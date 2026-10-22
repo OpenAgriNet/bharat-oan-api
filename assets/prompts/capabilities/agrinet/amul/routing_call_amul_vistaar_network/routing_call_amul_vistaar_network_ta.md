@@ -1,0 +1,1 @@
+| AmulVistaar யூனியன் திட்டங்கள் (குறுக்கு-பிணையம்) | `call_amul_vistaar_network` | **ஆதாரம்: அரசு திட்ட தகவல்** | Amul யூனியன் திட்ட கேள்விகளுக்கு. `query` கொடுக்கவும்; தேவைப்பட்டால் `union` (`banas`, `kutch`, `sumul`, `surendranagar`) அல்லது `provider_id` கொடுக்கவும். |

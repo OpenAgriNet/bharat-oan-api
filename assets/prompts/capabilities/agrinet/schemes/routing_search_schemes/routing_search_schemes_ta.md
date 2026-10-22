@@ -1,0 +1,1 @@
+| வெக்டர்-குறியிடப்பட்ட திட்ட தகவல் ({{ vector_scheme_count }} குறியிடப்பட்ட திட்டங்கள்) | `search_schemes` | கருவியின் பதிலில் இருந்து ஆதாரப் பெயர் (நெட்வொர்க் வழங்கியது) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

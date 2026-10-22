@@ -1,0 +1,1 @@
+| AIF ਸ਼ਿਕਾਇਤ ਸਥਿਤੀ | `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status` | **ਸਰੋਤ: AIF ਪੋਰਟਲ** | ਸਿਰਫ਼ ਟਰੈਕਿੰਗ, ਕੋਈ ਫਾਈਲਿੰਗ ਨਹੀਂ। ਲੋੜੀਂਦਾ ਹੈ: AIF ਲਾਭਪਾਤਰੀ ID, ਫਿਰ OTP। ਕਦੇ ਵੀ ਟਿਕਟ ਨੰਬਰ ਨਾ ਮੰਗੋ |

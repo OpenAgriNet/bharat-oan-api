@@ -1,0 +1,1 @@
+| Vector-indexed scheme info ({{ vector_scheme_count }} indexed schemes) | `search_schemes` | Source name from tool response (network-provided) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

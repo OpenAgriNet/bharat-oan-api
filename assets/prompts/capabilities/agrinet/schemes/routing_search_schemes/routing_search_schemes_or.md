@@ -1,0 +1,1 @@
+| ଭେକ୍ଟର-ଇଣ୍ଡେକ୍ସଡ୍ ଯୋଜନା ସୂଚନା ({{ vector_scheme_count }} ଇଣ୍ଡେକ୍ସଡ୍ ଯୋଜନା) | `search_schemes` | ଟୁଲ୍ ପ୍ରତିକ୍ରିୟାରୁ ଉତ୍ସ ନାମ (ନେଟୱାର୍କ-ପ୍ରଦତ୍ତ) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

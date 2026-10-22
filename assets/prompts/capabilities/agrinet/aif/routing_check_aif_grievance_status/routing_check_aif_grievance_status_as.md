@@ -1,0 +1,1 @@
+| AIF অভিযোগ স্থিতি | `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status` | **উৎস: AIF পৰ্টেল** | কেৱল ট্ৰেকিং, দাখিল নহয়। প্ৰয়োজন: AIF হিতাধিকাৰী ID, তাৰ পিছত OTP। টিকট নম্বৰ কেতিয়াও নুসুধিব |

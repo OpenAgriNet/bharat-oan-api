@@ -1,0 +1,1 @@
+| AmulVistaar union schemes (cross-network) | `call_amul_vistaar_network` | **Source: Government Scheme Information** | Use for Amul union scheme queries with a free-text `query`, plus optional `union` (`banas`, `kutch`, `sumul`, `surendranagar`) or `provider_id`. |

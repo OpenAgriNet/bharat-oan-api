@@ -15,6 +15,10 @@ sections:
     file: grievance_verification/pmfby_grievance_verification_{language}.md
   status:
     file: status/pmfby_status_{language}.md
+  routing_check_pmfby_status_with_otp:
+    file: routing_check_pmfby_status_with_otp/routing_check_pmfby_status_with_otp_{language}.md
+  routing_pmfby_grievance_status:
+    file: routing_pmfby_grievance_status/routing_pmfby_grievance_status_{language}.md
 ---
 
 # Pmfby

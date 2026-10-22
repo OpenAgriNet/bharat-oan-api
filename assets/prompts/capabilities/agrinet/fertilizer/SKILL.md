@@ -7,6 +7,8 @@ tools:
 sections:
   recommendations:
     file: recommendations/fertilizer_{language}.md
+  routing_gfr_get_recommendations:
+    file: routing_gfr_get_recommendations/routing_gfr_get_recommendations_{language}.md
 ---
 
 # Fertilizer

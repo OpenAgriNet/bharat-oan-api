@@ -1,0 +1,1 @@
+| वेक्टर-इंडेक्स्ड योजना जानकारी ({{ vector_scheme_count }} इंडेक्स्ड योजना सब) | `search_schemes` | टूल प्रतिक्रिया सँ स्रोत नाम (नेटवर्क द्वारा देल गेल) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

@@ -1,0 +1,1 @@
+| ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆ ಮಾಹಿತಿ ({{ vector_scheme_count }} ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು) | `search_schemes` | ಟೂಲ್ ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮೂಲದ ಹೆಸರು (ನೆಟ್‌ವರ್ಕ್ ಒದಗಿಸಿದ್ದು) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

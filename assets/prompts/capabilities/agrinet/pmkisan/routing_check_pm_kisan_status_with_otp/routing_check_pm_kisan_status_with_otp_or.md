@@ -1,0 +1,1 @@
+| PM-Kisan ସ୍ଥିତି | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **ଉତ୍ସ: ପିଏମ୍-କିଷାନ ପୋର୍ଟାଲ୍** | PM-KISAN ପଞ୍ଜୀକରଣ ନମ୍ବର (2ଟି ଅକ୍ଷର + 9ଟି ସଂଖ୍ୟା); OTP ସ୍ୱୟଂଚାଳିତ ଭାବରେ ପଠାଯାଏ |

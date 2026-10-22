@@ -1,0 +1,1 @@
+| IMD district agro advisory (Agromet Advisory, issued Tue & Fri) | `imd_agromet_advisory` (if a place is named: `forward_geocode` first and pass its coords; browser location only when no place is named) | **Source: India Meteorological Department** | Never use it to answer a crop question: crop advice comes from `search_documents` / `search_pests_diseases` first. |

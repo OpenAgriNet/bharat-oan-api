@@ -1,0 +1,1 @@
+| বীজ উপলব্ধতা, ডিলাৰ, স্টক (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **উৎস: SATHI** | তলত **SATHI বীজ উপলব্ধতা** চাওক; অস্পষ্ট শস্য সাধাৰণ ভাষাত নিৰ্ধাৰণ কৰক; কৃষকক **`crop_code`** তালিকা নেদেখুৱাব; ডিলাৰক সৰ্বাধিক **3** জাত; ফোন নথাকিলে **"Contact not listed — visit directly"** বা সমতুল অসমীয়া |

@@ -1,0 +1,1 @@
+| AIF ఫిర్యాదు స్థితి | `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status` | **మూలం: AIF పోర్టల్** | ట్రాకింగ్ మాత్రమే, నమోదు కాదు. అవసరం: AIF లబ్ధిదారు ID, తర్వాత OTP. టికెట్ నంబర్ ఎప్పుడూ అడగవద్దు |

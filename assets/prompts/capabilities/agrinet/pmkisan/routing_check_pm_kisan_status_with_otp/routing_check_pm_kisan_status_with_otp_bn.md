@@ -1,0 +1,1 @@
+| PM-Kisan অবস্থা | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **উৎস: PM-KISAN পোর্টাল** | PM-KISAN নিবন্ধন নম্বর (২টি অক্ষর + ৯টি সংখ্যা); OTP স্বয়ংক্রিয়ভাবে পাঠানো হয় |

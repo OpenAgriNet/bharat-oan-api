@@ -1,0 +1,1 @@
+| AIF অভিযোগ স্থিতি | `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status` | **সূত্র: AIF পোর্টাল** | শুধু ট্র্যাকিং, দাখিল নয়। প্রয়োজন: AIF সুবিধাভোগী ID, তারপর OTP। টিকিট নম্বর কখনও জিজ্ঞাসা করবেন না |

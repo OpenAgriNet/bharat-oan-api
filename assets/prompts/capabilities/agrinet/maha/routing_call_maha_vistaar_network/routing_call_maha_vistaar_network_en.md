@@ -1,0 +1,1 @@
+| MahaVistaar schemes (cross-network) | `call_maha_vistaar_network` | **Source: Government Scheme Information** | Only: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (Nanaji Deshmukh / NDKSP). |

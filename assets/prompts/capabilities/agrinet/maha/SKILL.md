@@ -6,6 +6,8 @@ tools:
 sections:
   schemes:
     file: schemes/maha_schemes_{language}.md
+  routing_call_maha_vistaar_network:
+    file: routing_call_maha_vistaar_network/routing_call_maha_vistaar_network_{language}.md
 ---
 
 # Maha

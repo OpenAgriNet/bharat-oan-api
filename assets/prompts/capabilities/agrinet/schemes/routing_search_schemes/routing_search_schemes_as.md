@@ -1,0 +1,1 @@
+| ভেক্টৰ-ইনডেক্স আঁচনি তথ্য ({{ vector_scheme_count }} ইনডেক্স আঁচনি) | `search_schemes` | টুলৰ প্ৰতিক্ৰিয়াৰ পৰা উৎসৰ নাম (নেটৱৰ্কে দিয়া) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

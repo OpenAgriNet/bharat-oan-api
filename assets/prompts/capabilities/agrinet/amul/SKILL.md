@@ -10,6 +10,8 @@ sections:
     - schemes
     - amul
     - maha
+  routing_call_amul_vistaar_network:
+    file: routing_call_amul_vistaar_network/routing_call_amul_vistaar_network_{language}.md
 ---
 
 # Amul

@@ -7,6 +7,10 @@ tools:
 sections:
   prices:
     file: prices/mandi_prices_{language}.md
+  routing_get_mandi_prices:
+    file: routing_get_mandi_prices/routing_get_mandi_prices_{language}.md
+  routing_get_mandi_prices_2:
+    file: routing_get_mandi_prices_2/routing_get_mandi_prices_2_{language}.md
 ---
 
 # Mandi

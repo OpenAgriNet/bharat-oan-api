@@ -20,6 +20,12 @@ sections:
     - mai
     - or
     - pa
+  routing_check_pm_kisan_status_with_otp:
+    file: routing_check_pm_kisan_status_with_otp/routing_check_pm_kisan_status_with_otp_{language}.md
+  routing_pmkisan_submit_grievance:
+    file: routing_pmkisan_submit_grievance/routing_pmkisan_submit_grievance_{language}.md
+  routing_pmkisan_grievance_status:
+    file: routing_pmkisan_grievance_status/routing_pmkisan_grievance_status_{language}.md
 ---
 
 # Pmkisan

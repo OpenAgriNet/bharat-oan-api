@@ -12,6 +12,10 @@ sections:
     when_any: []
     tools:
     - imd_agromet_advisory
+  routing_weather_forecast:
+    file: routing_weather_forecast/routing_weather_forecast_{language}.md
+  routing_imd_agromet_advisory:
+    file: routing_imd_agromet_advisory/routing_imd_agromet_advisory_{language}.md
 ---
 
 # Weather

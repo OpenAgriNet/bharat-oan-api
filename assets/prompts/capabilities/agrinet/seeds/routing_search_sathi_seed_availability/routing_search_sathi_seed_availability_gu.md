@@ -1,0 +1,1 @@
+| બીજ ઉપલબ્ધતા, ડીલર, સ્ટોક (SATHI) | `get_sathi_crop_groups` → `list_sathi_crops_in_group` → `forward_geocode` → `search_sathi_seed_availability` | **સ્રોત: SATHI** | નીચે **SATHI બીજ ઉપલબ્ધતા** જુઓ; અસ્પષ્ટ પાકને સરળ ભાષામાં નક્કી કરો; ખેડૂતને **`crop_code`** યાદી ન બતાવો; ડીલરને વધુમાં વધુ **3** જાત; ફોન ન હોય તો **"Contact not listed — visit directly"** અથવા સમાન ગુજરાતી |

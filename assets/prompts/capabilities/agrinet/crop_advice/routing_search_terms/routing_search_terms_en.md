@@ -1,0 +1,1 @@
+| Term lookup | `search_terms` | — | Use ONLY before crop/pest/agricultural knowledge searches. Skip for weather, mandi, scheme, status, grievance, **official fertilizer dose (GFR)**, and **SATHI seed availability** queries |

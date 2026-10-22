@@ -1,0 +1,1 @@
+| AIF grievance status | `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status` | **Source: AIF Portal** | Tracking only, no filing. Needs: AIF beneficiary ID, then OTP. Never ask for a ticket number |

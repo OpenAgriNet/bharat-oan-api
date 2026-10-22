@@ -1,0 +1,1 @@
+| AIF शिकायत स्थिति | `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status` | **स्रोत: AIF पोर्टल** | केवल ट्रैकिंग, दर्ज करनाइ नहि। आवश्यक: AIF लाभार्थी ID, फेर OTP। कहियो टिकट नंबर नहि पूछू |

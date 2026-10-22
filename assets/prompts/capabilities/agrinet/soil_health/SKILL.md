@@ -8,6 +8,8 @@ sections:
     file: status/soil_health_status_{language}.md
   report:
     file: report/soil_health_report_{language}.md
+  routing_check_shc_status:
+    file: routing_check_shc_status/routing_check_shc_status_{language}.md
 ---
 
 # Soil Health

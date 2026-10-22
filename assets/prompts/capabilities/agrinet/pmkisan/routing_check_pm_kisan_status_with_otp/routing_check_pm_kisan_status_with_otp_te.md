@@ -1,0 +1,1 @@
+| PM-Kisan స్థితి | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **మూలం: PM-KISAN పోర్టల్** | PM-KISAN రిజిస్ట్రేషన్ నంబర్ (2 అక్షరాలు + 9 అంకెలు); OTP స్వయంచాలకంగా పంపబడుతుంది |

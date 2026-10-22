@@ -12,6 +12,12 @@ sections:
     file: eligibility/scheme_eligibility_{language}.md
   related_videos:
     file: related_videos/related_videos_{language}.md
+  routing_search_video:
+    file: routing_search_video/routing_search_video_{language}.md
+  routing_search_schemes:
+    file: routing_search_schemes/routing_search_schemes_{language}.md
+  routing_policy:
+    file: routing_policy/routing_policy_{language}.md
 ---
 
 # Schemes

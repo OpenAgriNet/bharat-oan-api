@@ -1,0 +1,1 @@
+| Grievance submit | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **Source: PM-KISAN Grievance Portal** | OTP-first flow. Needs: PM-KISAN registration number for OTP and grievance submission |

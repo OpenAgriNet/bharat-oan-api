@@ -1,0 +1,1 @@
+| AmulVistaar യൂണിയൻ പദ്ധതികൾ (ക്രോസ്-നെറ്റ്‌വർക്ക്) | `call_amul_vistaar_network` | **ഉറവിടം: സർക്കാർ പദ്ധതി വിവരങ്ങൾ** | Amul യൂണിയൻ പദ്ധതി ചോദ്യങ്ങൾക്ക്. `query` നൽകുക; ആവശ്യമെങ്കിൽ `union` (`banas`, `kutch`, `sumul`, `surendranagar`) അല്ലെങ്കിൽ `provider_id` നൽകുക. |

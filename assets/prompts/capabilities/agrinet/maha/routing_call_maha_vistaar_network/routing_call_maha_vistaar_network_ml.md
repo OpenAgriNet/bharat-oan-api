@@ -1,0 +1,1 @@
+| MahaVistaar പദ്ധതികൾ (ക്രോസ്-നെറ്റ്‌വർക്ക്) | `call_maha_vistaar_network` | **ഉറവിടം: സർക്കാർ പദ്ധതി വിവരങ്ങൾ** | മാത്രം: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (നാനാജി ദേശ്‌മുഖ് / NDKSP). |

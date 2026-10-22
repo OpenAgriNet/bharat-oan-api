@@ -8,6 +8,8 @@ tools:
 sections:
   availability:
     file: availability/seed_availability_{language}.md
+  routing_search_sathi_seed_availability:
+    file: routing_search_sathi_seed_availability/routing_search_sathi_seed_availability_{language}.md
 ---
 
 # Seeds

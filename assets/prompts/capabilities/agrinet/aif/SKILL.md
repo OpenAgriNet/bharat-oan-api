@@ -9,6 +9,10 @@ tools:
 sections:
   status:
     file: status/aif_status_{language}.md
+  routing_check_aif_loan_status:
+    file: routing_check_aif_loan_status/routing_check_aif_loan_status_{language}.md
+  routing_check_aif_grievance_status:
+    file: routing_check_aif_grievance_status/routing_check_aif_grievance_status_{language}.md
 ---
 
 # Aif

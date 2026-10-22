@@ -8,6 +8,8 @@ tools:
 sections:
   status:
     file: status/kcc_status_{language}.md
+  routing_select_kcc_application:
+    file: routing_select_kcc_application/routing_select_kcc_application_{language}.md
 ---
 
 # Kcc

@@ -1,0 +1,1 @@
+| MahaVistaar திட்டங்கள் (குறுக்கு-பிணையம்) | `call_maha_vistaar_network` | **ஆதாரம்: அரசு திட்ட தகவல்** | மட்டும்: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (நானாஜி தேஷ்முக் / NDKSP). |

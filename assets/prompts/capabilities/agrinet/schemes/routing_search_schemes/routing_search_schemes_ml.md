@@ -1,0 +1,1 @@
+| വെക്ടർ-ഇൻഡെക്സ്ഡ് പദ്ധതി വിവരങ്ങൾ ({{ vector_scheme_count }} ഇൻഡെക്സ്ഡ് പദ്ധതികൾ) | `search_schemes` | ടൂളിന്റെ പ്രതികരണത്തിൽ നിന്നുള്ള ഉറവിടനാമം (നെറ്റ്‌വർക്ക് നൽകിയത്) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

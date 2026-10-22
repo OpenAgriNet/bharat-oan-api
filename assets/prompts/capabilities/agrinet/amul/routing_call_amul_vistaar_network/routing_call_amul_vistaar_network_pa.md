@@ -1,0 +1,1 @@
+| AmulVistaar ਯੂਨੀਅਨ ਸਕੀਮਾਂ (ਕ੍ਰਾਸ-ਨੈੱਟਵਰਕ) | `call_amul_vistaar_network` | **ਸਰੋਤ: ਸਰਕਾਰੀ ਸਕੀਮ ਦੀ ਜਾਣਕਾਰੀ** | Amul ਯੂਨੀਅਨ ਸਕੀਮ ਦੇ ਸਵਾਲਾਂ ਲਈ ਇੱਕ ਮੁਫਤ-ਟੈਕਸਟ `query` ਦੇ ਨਾਲ ਵਰਤੋ, ਨਾਲ ਹੀ ਵਿਕਲਪਿਕ `union` (`banas`, `kutch`, `sumul`, `surendranagar`) ਜਾਂ `provider_id`। |

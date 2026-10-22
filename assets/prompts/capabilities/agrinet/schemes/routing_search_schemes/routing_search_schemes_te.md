@@ -1,0 +1,1 @@
+| వెక్టర్-ఇండెక్స్ యోజన సమాచారం ({{ vector_scheme_count }} ఇండెక్స్ యోజనలు) | `search_schemes` | టూల్ స్పందన నుండి మూలం పేరు (నెట్‌వర్క్ నుండి అందించబడింది) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |

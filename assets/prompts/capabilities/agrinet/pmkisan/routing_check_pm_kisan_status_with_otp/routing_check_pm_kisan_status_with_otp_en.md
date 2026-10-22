@@ -1,0 +1,1 @@
+| PM-Kisan status | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **Source: PM-KISAN Portal** | Needs PM-KISAN registration number (2 letters + 9 digits); OTP sent automatically |
