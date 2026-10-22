@@ -27,6 +27,7 @@ def test_callback_post_stores_status_and_supports_nested_session_id(monkeypatch)
     client = _build_test_client(monkeypatch)
 
     payload = {
+        "stateLgdCode": 22,
         "data": {
             "sessionId": "ABC123",
             "farmerId": "FARMER-9",
@@ -51,6 +52,7 @@ def test_callback_post_stores_status_and_supports_nested_session_id(monkeypatch)
     assert status_body["callbackSessionId"] == "ABC123"
     assert status_body["source"] == "agristack"
     assert status_body["body"]["data"]["farmerId"] == "FARMER-9"
+    assert status_body["body"]["stateLgdCode"] == 22
 
 
 def test_callback_status_not_found(monkeypatch):

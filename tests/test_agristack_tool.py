@@ -1,7 +1,10 @@
 import asyncio
 import json
+import copy
 from datetime import datetime
 from types import SimpleNamespace
+
+import pytest
 
 from agents.deps import FarmerContext
 from agents.tools import agristack
@@ -13,6 +16,7 @@ WITH_CONSENT_CALLBACK = {
         "status": "success",
         "statusCode": 200,
         "consentName": "CONTINUE WITH CONSENT",
+        "stateLgdCode": 22,
         "data": {
             "farmerData": {"centralId": "30187009346", "frNameEn": "Manohar Singh"},
             "landData": [],
@@ -26,6 +30,7 @@ WITHOUT_CONSENT_CALLBACK = {
     "callbackSessionId": "S2",
     "body": {
         "consentName": "CONTINUE WITHOUT CONSENT",
+        "stateLgdCode": 22,
         "data": {"farmerData": {"centralId": "30187009346"}, "landData": [], "sessionId": "S2"},
     },
 }
@@ -67,13 +72,27 @@ def _ctx(session_id):
 def test_link_with_consent(monkeypatch):
     _fake_cache(monkeypatch, {("callback-status", "S1"): WITH_CONSENT_CALLBACK})
     link = asyncio.run(agristack.get_agristack_link("S1"))
-    assert link == {"farmer_id": "30187009346", "has_consent": True}
+    assert link == {"farmer_id": "30187009346", "has_consent": True, "state_lgd_code": "22"}
 
 
 def test_link_without_consent(monkeypatch):
     _fake_cache(monkeypatch, {("callback-status", "S2"): WITHOUT_CONSENT_CALLBACK})
     link = asyncio.run(agristack.get_agristack_link("S2"))
-    assert link == {"farmer_id": "30187009346", "has_consent": False}
+    assert link == {"farmer_id": "30187009346", "has_consent": False, "state_lgd_code": "22"}
+
+
+@pytest.mark.parametrize("state_code", [None, True, 0, "abc", "22\r\nbad", "123"])
+def test_invalid_callback_state_does_not_reach_provider(monkeypatch, state_code):
+    callback = copy.deepcopy(WITH_CONSENT_CALLBACK)
+    callback["body"]["stateLgdCode"] = state_code
+    _fake_cache(monkeypatch, {("callback-status", "S1"): callback})
+
+    async def must_not_run(*args, **kwargs):
+        raise AssertionError("Invalid state must not reach provider")
+
+    monkeypatch.setattr(agristack, "fetch_agristack", must_not_run)
+    out = asyncio.run(agristack.get_agristack_farmer_location(_ctx("S1")))
+    assert "state LGD code" in out
 
 
 def test_link_missing_session(monkeypatch):
@@ -98,27 +117,70 @@ def _intent_tags(payload):
 
 
 def test_category_a_payload_sends_farmer_id_only():
-    payload = agristack.build_payload("F1", agristack.CATEGORY_A, session_id="S1")
+    payload = agristack.build_payload("F1", agristack.CATEGORY_A, session_id="S1", state_lgd_code="22")
     intent = payload["message"]["intent"]
     assert intent["provider"]["id"] == "agristack-agri"
     assert intent["item"]["id"] == "agristack-category-a"
-    assert _intent_tags(payload) == {"farmerId": "F1"}
+    assert _intent_tags(payload) == {"farmerId": "F1", "stateLgdCode": "22"}
 
 
 def test_category_b_payload_adds_season_and_year(monkeypatch):
     monkeypatch.setenv("AGRISTACK_SEASON", "Kharif")
     monkeypatch.setenv("AGRISTACK_YEAR", "2025-2026")
-    payload = agristack.build_payload("F1", agristack.CATEGORY_B, session_id="S1")
+    payload = agristack.build_payload("F1", agristack.CATEGORY_B, session_id="S1", state_lgd_code="22")
     assert payload["message"]["intent"]["item"]["id"] == "agristack-category-b"
-    assert _intent_tags(payload) == {"farmerId": "F1", "season": "Kharif", "year": "2025-2026"}
+    assert _intent_tags(payload) == {"farmerId": "F1", "stateLgdCode": "22", "season": "Kharif", "year": "2025-2026"}
 
 
 def test_category_c_payload_adds_season_and_year(monkeypatch):
     monkeypatch.setenv("AGRISTACK_SEASON", "Kharif")
     monkeypatch.setenv("AGRISTACK_YEAR", "2025-2026")
-    payload = agristack.build_payload("F1", agristack.CATEGORY_C, session_id="S1")
+    payload = agristack.build_payload("F1", agristack.CATEGORY_C, session_id="S1", state_lgd_code="22")
     assert payload["message"]["intent"]["item"]["id"] == "agristack-category-c"
-    assert _intent_tags(payload) == {"farmerId": "F1", "season": "Kharif", "year": "2025-2026"}
+    assert _intent_tags(payload) == {"farmerId": "F1", "stateLgdCode": "22", "season": "Kharif", "year": "2025-2026"}
+
+
+def test_category_payload_rejects_missing_state():
+    with pytest.raises(ValueError, match="state LGD code"):
+        agristack.build_payload("F1", agristack.CATEGORY_A)
+
+
+def test_fetch_passes_state_to_rabi_and_kharif_and_scopes_cache(monkeypatch):
+    store = {}
+    _fake_cache(monkeypatch, store)
+    monkeypatch.setenv("BAP_ENDPOINT", "https://bap.test")
+    monkeypatch.setenv("AGRISTACK_SEASON", "Rabi")
+    monkeypatch.setenv("AGRISTACK_YEAR", "2026-2027")
+    calls = []
+
+    def respond(request):
+        payload = json.loads(request.content)
+        tags = _intent_tags(payload)
+        calls.append(tags)
+        sections = [_raw_tag("land-data", [{"plotVillageName": "Test Village"}])]
+        if tags["season"] == "Kharif":
+            sections.append(_raw_tag("crop-survey-data", [{"cropName": "Rice"}]))
+        return agristack.httpx.Response(200, json=_catalog_response(tags=sections))
+
+    real_client = agristack.httpx.AsyncClient
+    monkeypatch.setattr(
+        agristack.httpx, "AsyncClient",
+        lambda **kwargs: real_client(transport=agristack.httpx.MockTransport(respond), **kwargs),
+    )
+    monkeypatch.setattr(agristack, "lf_update_current_observation", lambda **kwargs: None)
+    for state in ("22", "23"):
+        sections, error = asyncio.run(agristack.fetch_agristack(
+            "F1", agristack.CATEGORY_B, session_id="S1", state_lgd_code=state,
+        ))
+        assert error is None
+        assert sections["crop_survey"] == [{"cropName": "Rice"}]
+    assert [(c["stateLgdCode"], c["season"]) for c in calls] == [
+        ("22", "Rabi"), ("22", "Kharif"), ("23", "Rabi"), ("23", "Kharif"),
+    ]
+    asyncio.run(agristack.fetch_agristack(
+        "F1", agristack.CATEGORY_B, session_id="S1", state_lgd_code="22",
+    ))
+    assert len(calls) == 4
 
 
 def test_season_and_year(monkeypatch):
@@ -182,7 +244,8 @@ def test_tools_without_consent_do_not_call_agristack(monkeypatch):
 
 
 def _record_fetch(monkeypatch, calls):
-    async def fake_fetch(farmer_id, category, session_id="", question_id=""):
+    async def fake_fetch(farmer_id, category, session_id="", question_id="", state_lgd_code=""):
+        assert state_lgd_code == "22"
         calls.append((farmer_id, category))
         return {"land": [{"villageName": "Raisara", "districtName": "Bemetara"}], "crop_survey": [{"cropName": "Paddy"}]}, None
 

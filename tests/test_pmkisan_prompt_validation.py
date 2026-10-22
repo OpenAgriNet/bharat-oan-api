@@ -1,6 +1,7 @@
 import re
 import unittest
 from pathlib import Path
+from jinja2 import Environment, FileSystemLoader
 
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "assets" / "prompts"
@@ -12,7 +13,7 @@ class PmkisanPromptValidationTests(unittest.TestCase):
         self.assertTrue(prompts)
         for path in prompts:
             with self.subTest(language=path.stem):
-                prompt = path.read_text(encoding="utf-8")
+                prompt = Environment(loader=FileSystemLoader(PROMPT_DIR)).get_template(path.name).render()
                 rule = next(
                     line for line in prompt.splitlines()
                     if line.startswith("**PM-KISAN Registration Number Validation:**")

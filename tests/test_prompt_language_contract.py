@@ -1,10 +1,11 @@
-"""Stdlib-only guard for newly added PMFBY instructions in language prompts.
+"""Guard for newly added PMFBY instructions in rendered language prompts.
 
 This checks script and identifiers, not translation quality or model behavior.
 """
 from pathlib import Path
 import re
 import unittest
+from jinja2 import Environment, FileSystemLoader
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_RANGES = {
@@ -19,7 +20,7 @@ class PromptLanguageContract(unittest.TestCase):
     def test_pmfby_safeguards_keep_language_and_tool_arguments(self):
         for language in ["en", *SCRIPT_RANGES]:
             with self.subTest(language=language):
-                text = (ROOT / "assets/prompts" / f"agrinet_{language}.md").read_text()
+                text = Environment(loader=FileSystemLoader(ROOT / "assets/prompts")).get_template(f"agrinet_{language}.md").render()
                 self.assertNotIn("### PMFBY grievance verification rules", text)
                 headings = list(re.finditer(r"^### .*PMFBY.*$", text, re.M))
                 self.assertTrue(headings, "Missing localized PMFBY safeguards")

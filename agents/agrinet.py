@@ -5,8 +5,13 @@ from agents.models import configured_agent
 from agents.tools import TOOLS
 from pydantic_ai.models.openai import OpenAIChatModelSettings
 from agents.deps import FarmerContext
+from agents.capabilities import (
+    CAPABILITY_LOADER, prepare_capability_tools, validate_manifest,
+    capability_prompt_context, capability_routing,
+)
 
 logger = get_logger(__name__)
+validate_manifest(TOOLS)
 
 
 agrinet_agent = configured_agent(
@@ -16,7 +21,8 @@ agrinet_agent = configured_agent(
     output_type=str,
     deps_type=FarmerContext,
     retries=3,
-    tools=TOOLS,
+    tools=[*TOOLS, CAPABILITY_LOADER],
+    prepare_tools=prepare_capability_tools,
     end_strategy='exhaustive',
     model_settings=OpenAIChatModelSettings(
         temperature=0.7,
@@ -45,4 +51,7 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
         "System prompt rendered for session=%s lang=%s — %s vector schemes live",
         getattr(deps, "session_id", None), lang_code, scheme_block.get("vector_scheme_count"),
     )
-    return get_prompt(f'agrinet_{lang_code}', context=context)
+    deps.capabilities.restore(ctx.messages)
+    prompt_file = f'agrinet_{lang_code}'
+    context = capability_prompt_context(deps, prompt_file, context)
+    return get_prompt(prompt_file, context=context) + capability_routing(deps)
