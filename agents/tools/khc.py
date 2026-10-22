@@ -16,7 +16,7 @@ from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.utils import get_logger, to_ascii_digits
 
 logger = get_logger(__name__)
-SOURCE = "**Source:** Kisan Help Center"
+SOURCE = "**Source:** Kisan Helpline Center"
 _MASTER_FIELDS = ("stateId", "villageId", "scheme", "division", "problemCategory", "problemSubCategory")
 _LANGUAGE_CODES = {
     "hindi": "hi", "english": "en", "marathi": "mr", "bengali": "bn",
@@ -27,6 +27,122 @@ _UNCONFIRMED = (
     "KHC grievance submission was not confirmed. Do not submit again automatically; "
     "verify with KHC first."
 )
+
+
+def _chain(match: dict) -> str:
+    """'Block X, District Y, State Z' for the levels above the match."""
+    names = [(match.get(key) or {}).get("name") for key in ("subDistrict", "district", "state")]
+    return ", ".join(name for name in names if name and name != match.get("name"))
+
+
+def _ids(match: dict) -> str:
+    keys = (("state", "stateId"), ("district", "districtId"), ("subDistrict", "subDistrictId"))
+    parts = [f"{label}={match[key]['id']}" for key, label in keys if match.get(key)]
+    if match.get("level") == "village":
+        parts.append(f"villageId={match['id']}")
+    return ", ".join(parts)
+
+
+def _render_location(fields: dict[str, str], place: str) -> str:
+    matches = json.loads(fields.get("matches", "[]"))
+    district = json.loads(fields.get("district", "null"))
+    district_id = district.get("id", "<districtId>") if isinstance(district, dict) else "<districtId>"
+    needs = fields.get("needs", "").strip('"')
+    if not isinstance(matches, list) or not all(isinstance(m, dict) for m in matches):
+        raise ValueError("Invalid location matches")
+    if needs == "state" and matches:
+        names = "\n".join(f"- {m['name']}" for m in matches)
+        return (
+            "Several or no states matched what the farmer said. Show these state names and ask "
+            f"'Which state are you from?' (select by name):\n{names}"
+        )
+    if not matches:
+        ask = {
+            "state": "Ask 'Which state are you from?', then call this tool again with that state.",
+            "district": "Ask 'Which district are you from?', then call this tool again with that district.",
+            "geocode": (
+                "Not found in this district's lists. Steps: (1) call forward_geocode and reverse_geocode on "
+                "the place to fix the spelling, then call this tool again. (2) If still not found, call "
+                f"lookup_khc_reference(reference_type=\"sub-districts\", parent_id={district_id}, name=\"\"), "
+                "show the block names, and ask 'Which block are you from?'; then call "
+                "lookup_khc_reference(reference_type=\"villages\", parent_id=<that block's id>, name=\"\") and show "
+                "the village names to pick from. (3) If the village is not listed, ask which listed village is "
+                "nearest; use it only if the farmer clearly says yes, and write their real village name in the "
+                "complaint text."
+            ),
+        }.get(needs, "Ask the farmer for the place name again.")
+        return f"No place named '{place}' was found. {ask}"
+    lines = []
+    for index, match in enumerate(matches, 1):
+        level = match.get("level", "place").replace("-", " ")
+        chain = _chain(match)
+        lines.append(f"{index}. {level} {match['name']}" + (f" - {chain}" if chain else "") + f" [{_ids(match)}]")
+    listing = "\n".join(lines)
+    if len(matches) == 1:
+        match = matches[0]
+        if match.get("level") == "village":
+            return (
+                f"Found one place:\n{listing}\nUse it for the grievance location and do not ask the farmer "
+                "for state, district, block or village again. Keep the IDs internal."
+            )
+        return (
+            f"Matched a {match.get('level')} only:\n{listing}\nKeep the IDs internal. Still ask "
+            "'Which village are you from?' (or the next missing level), then call this tool again with "
+            "the village and this district/state."
+        )
+    districts = {(m.get("district") or {}).get("name") for m in matches} - {None}
+    if len(districts) > 1:
+        names = "\n".join(f"- {name}" for name in sorted(districts))
+        return (
+            f"Several places named '{place}' are in different districts:\n{names}\nAsk "
+            "'Which district are you from?' and show only these district names (no IDs). Then call "
+            "this tool again with the chosen district.\n(For your use only, the rows with IDs:)\n"
+            f"{listing}"
+        )
+    return (
+        f"Several places match, all in one district:\n{listing}\nShow them as 'Village, Block' (no IDs) "
+        "and ask 'Which block are you from?'. Use the chosen row's IDs."
+    )
+
+
+def _render_tree(fields: dict[str, str], scheme_name: str = "") -> str:
+    needs = fields.get("needs", "").strip('"')
+    if needs == "state":
+        names = "\n".join(f"- {m['name']}" for m in json.loads(fields.get("matches", "[]")))
+        return f"Ask 'Which state are you from?' and show these names:\n{names}"
+    state = json.loads(fields.get("state", "null"))
+    if not isinstance(state, dict):
+        raise ValueError("Missing state")
+    if needs == "scheme":
+        schemes = json.loads(fields.get("schemes", "[]"))
+        lines = "\n".join(f"- {s['name']} [schemeId={s['id']}, divisionId={s['division']}]" for s in schemes)
+        if fields.get("match", "").strip('"') == "none":
+            return (
+                f"State: {state['name']} [stateId={state['id']}]. '{scheme_name}' is not a scheme KHC takes "
+                "complaints for in this state. Say so in simple words, show only these scheme names "
+                f"(no IDs) and ask if the complaint is about one of them:\n{lines}\n"
+                "If it is not, tell the farmer you cannot register this complaint here and that they can "
+                "contact that scheme's own helpline or the nearest agriculture office. Do not pick a scheme for them."
+            )
+        return (
+            f"State: {state['name']} [stateId={state['id']}]. No single scheme matched. "
+            f"Show only the scheme names (no IDs) and ask which one:\n{lines}"
+        )
+    scheme = json.loads(fields.get("scheme", "null"))
+    categories = json.loads(fields.get("categories", "[]"))
+    lines = [
+        f"State: {state['name']} [stateId={state['id']}]",
+        f"Scheme: {scheme['name']} [schemeId={scheme['id']}, divisionId={scheme['division']}]",
+        "Categories and sub-categories:",
+    ]
+    for category in categories:
+        subs = "; ".join(f"{sub['name']} [{sub['id']}]" for sub in category["subCategories"])
+        lines.append(f"- {category['name']} [problemCategoryId={category['id']}]: {subs or 'none listed'}")
+    lines.append(
+        "Pick the single best-fit category and sub-category from the complaint yourself and carry on. "
+        "Ask the farmer to choose from these names only if none fits. Keep IDs internal."
+    )
+    return "\n".join(lines)
 
 
 async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> str:
@@ -60,6 +176,7 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
         expected = "grievance_status" if action == "status" else {
             "get_otp": "otp_sent", "verify_otp": "otp_verified",
             "get_reference": "khc_reference", "create_grievance": "grievance_created",
+            "find_location": "khc_location", "grievance_tree": "khc_grievance_tree",
         }.get(values.get("request_type"), "grievance_created")
         if code != expected:
             if (
@@ -76,7 +193,7 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 )
             if code in (
                 "not_found", "invalid_request", "submission_unconfirmed", "upstream_error",
-                "configuration_error", "otp_required", "invalid_otp",
+                "configuration_error", "otp_required", "invalid_otp", "rate_limited",
             ):
                 return message or failure
             raise ValueError("Missing KHC outcome tag")
@@ -103,6 +220,10 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "sub-categories. Ask a focused clarification if the problem does not identify a unique match. "
                 "For a new farmer collect missing name and gender; obtain confirmation before submission."
             )
+        if code == "khc_location":
+            return f"{_render_location(fields, values.get('name', ''))}\n{SOURCE}"
+        if code == "khc_grievance_tree":
+            return f"{_render_tree(fields, values.get('scheme_name', ''))}\n{SOURCE}"
         if code == "khc_reference":
             options = json.loads(fields.get("options", "null"))
             if not isinstance(options, list) or not all(isinstance(option, dict) for option in options):
@@ -201,6 +322,44 @@ async def verify_khc_otp(
     if not ctx.deps.session_id:
         return "KHC registration requires an active conversation."
     return await _call(ctx, "init", request_type="verify_otp", farmerMobileNumber=mobile, otp=code)
+
+
+@observe(name="tool:find_khc_location", as_type="tool")
+async def find_khc_location(
+    ctx: RunContext[FarmerContext], place: str, state: str = "", district: str = "",
+) -> str:
+    """Find where a place is: its state, district, block and village IDs, in one call.
+
+    Use this first for the KHC grievance location, with the village or place name the
+    farmer gave (ask for the village first). Pass state and/or district when known; names
+    may have spacing, case or small spelling differences. A place that is a district also
+    matches. If nothing matches, the result says what to ask next. Do not use for status.
+    """
+    place, state, district = place.strip(), state.strip(), district.strip()
+    if not place or len(place) > 200 or len(state) > 100 or len(district) > 100:
+        return "Ask the farmer for their village or place name (up to 200 characters)."
+    return await _call(
+        ctx, "init", request_type="find_location", name=place, state_name=state, district_name=district,
+    )
+
+
+@observe(name="tool:get_khc_grievance_options", as_type="tool")
+async def get_khc_grievance_options(
+    ctx: RunContext[FarmerContext], state: str, scheme: str = "",
+) -> str:
+    """Get a state's KHC grievance options in one call.
+
+    Without a scheme it lists the state's schemes. With the scheme the farmer named
+    (AIF, A.I.F. and the full name all work) it returns that scheme's categories with all
+    their sub-categories and the IDs needed to register. Prefer this over three separate
+    lookup_khc_reference calls.
+    """
+    state, scheme = state.strip(), scheme.strip()
+    if not state or len(state) > 100 or len(scheme) > 100:
+        return "Ask the farmer which state they are from."
+    return await _call(
+        ctx, "init", request_type="grievance_tree", state_name=state, scheme_name=scheme,
+    )
 
 
 @observe(name="tool:lookup_khc_reference", as_type="tool")

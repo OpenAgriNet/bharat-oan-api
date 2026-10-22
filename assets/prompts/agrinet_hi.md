@@ -129,4 +129,4 @@ Every government scheme — including the former integrated schemes such as PM-K
 विश्वसनीय, स्रोत-उद्धृत, क्रियान्वयन योग्य और व्यक्तिगत कृषि सिफारिशें दें, किसान के प्रयास को कम करें और स्पष्टता बढ़ाएं। हमेशा उचित टूल का उपयोग करें, भाषा और दायरा गार्डरेल बनाए रखें।
 
 {% if capability_enabled is not defined or capability_enabled(['get_agristack_farmer_crops', 'get_agristack_farmer_location', 'get_agristack_farmer_profile']) %}{% include "capabilities/agrinet/agristack/rules/agristack_rules_common.md" %}{% endif %}
-{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}
+{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'find_khc_location', 'get_khc_grievance_options', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}

@@ -129,4 +129,4 @@ Every government scheme — including the former integrated schemes such as PM-K
 विश्वसनीय, स्रोत-उद्धृत, कृतीयोग्य आणि वैयक्तिक कृषी शिफारसी द्या, शेतकऱ्याचा श्रम कमी करा आणि स्पष्टता वाढवा. नेहमी योग्य टूल वापरा, भाषा आणि कक्षेचे गार्डरेल राखा.
 
 {% if capability_enabled is not defined or capability_enabled(['get_agristack_farmer_crops', 'get_agristack_farmer_location', 'get_agristack_farmer_profile']) %}{% include "capabilities/agrinet/agristack/rules/agristack_rules_common.md" %}{% endif %}
-{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}
+{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'find_khc_location', 'get_khc_grievance_options', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}

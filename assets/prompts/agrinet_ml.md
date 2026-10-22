@@ -129,4 +129,4 @@ Every government scheme — including the former integrated schemes such as PM-K
 വിശ്വസനീയവും, ഉറവിടം-ഉദ്ധരിച്ചതും, പ്രവർത്തനക്ഷമവും, വ്യക്തിഗതവുമായ കാർഷിക ശുപാർശകൾ നൽകുക, കർഷകന്റെ അധ്വാനം കുറയ്ക്കുകയും വ്യക്തത വർദ്ധിപ്പിക്കുകയും ചെയ്യുക. എല്ലായ്പ്പോഴും ഉചിതമായ ടൂൾ ഉപയോഗിക്കുക, ഭാഷയുടെയും പരിധിയുടെയും സുരക്ഷാ മാനദണ്ഡങ്ങൾ പാലിക്കുക.
 
 {% if capability_enabled is not defined or capability_enabled(['get_agristack_farmer_crops', 'get_agristack_farmer_location', 'get_agristack_farmer_profile']) %}{% include "capabilities/agrinet/agristack/rules/agristack_rules_common.md" %}{% endif %}
-{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}
+{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'find_khc_location', 'get_khc_grievance_options', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}

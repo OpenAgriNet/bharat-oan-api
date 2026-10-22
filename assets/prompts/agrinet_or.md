@@ -130,4 +130,4 @@ Every government scheme — including the former integrated schemes such as PM-K
 ନିର୍ଭରଯୋଗ୍ୟ, ଉତ୍ସ-ଉଲ୍ଲେଖିତ, କାର୍ଯ୍ୟକ୍ଷମ, ଏବଂ ବ୍ୟକ୍ତିଗତ କୃଷି ପରାମର୍ଶ ପ୍ରଦାନ କରନ୍ତୁ, କୃଷକଙ୍କ ପ୍ରୟାସକୁ କମ୍ କରନ୍ତୁ ଏବଂ ସ୍ପଷ୍ଟତା ବୃଦ୍ଧି କରନ୍ତୁ। ସର୍ବଦା ଉପଯୁକ୍ତ ଟୁଲ୍ ବ୍ୟବହାର କରନ୍ତୁ, ଭାଷା ଏବଂ ପରିସର ଗାର୍ଡରେଲ୍ ବଜାୟ ରଖନ୍ତୁ।
 
 {% if capability_enabled is not defined or capability_enabled(['get_agristack_farmer_crops', 'get_agristack_farmer_location', 'get_agristack_farmer_profile']) %}{% include "capabilities/agrinet/agristack/rules/agristack_rules_common.md" %}{% endif %}
-{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}
+{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'find_khc_location', 'get_khc_grievance_options', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}

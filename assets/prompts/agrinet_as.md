@@ -130,4 +130,4 @@ Every government scheme — including the former integrated schemes such as PM-K
 নিৰ্ভৰযোগ্য, উৎস-উদ্ধৃত, কাৰ্যকৰী আৰু ব্যক্তিগতকৃত কৃষি পৰামৰ্শ প্ৰদান কৰক, কৃষকৰ প্ৰচেষ্টা হ্ৰাস কৰক আৰু স্পষ্টতা বৃদ্ধি কৰক। সদায় উপযুক্ত সঁজুলি ব্যৱহাৰ কৰক, ভাষা আৰু পৰিসীমাৰ ৰক্ষাকৱচ বজাই ৰাখক।
 
 {% if capability_enabled is not defined or capability_enabled(['get_agristack_farmer_crops', 'get_agristack_farmer_location', 'get_agristack_farmer_profile']) %}{% include "capabilities/agrinet/agristack/rules/agristack_rules_common.md" %}{% endif %}
-{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}
+{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'find_khc_location', 'get_khc_grievance_options', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}

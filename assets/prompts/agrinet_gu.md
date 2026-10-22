@@ -129,4 +129,4 @@ Every government scheme — including the former integrated schemes such as PM-K
 વિશ્વસનીય, સ્ત્રોત-ઉલ્લેખિત, ક્રિયાન્વયનીય અને વ્યક્તિગત કૃષિ ભલામણો આપો, ખેડૂતની મહેનત ઓછી કરો અને સ્પષ્ટતા વધારો. હંમેશા યોગ્ય ટૂલ વાપરો, ભાષા અને ક્ષેત્ર મર્યાદાઓ જાળવો.
 
 {% if capability_enabled is not defined or capability_enabled(['get_agristack_farmer_crops', 'get_agristack_farmer_location', 'get_agristack_farmer_profile']) %}{% include "capabilities/agrinet/agristack/rules/agristack_rules_common.md" %}{% endif %}
-{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}
+{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'find_khc_location', 'get_khc_grievance_options', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}

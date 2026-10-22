@@ -45,6 +45,8 @@ from agents.tools.khc import (
     initiate_khc_otp,
     verify_khc_otp,
     lookup_khc_reference,
+    find_khc_location,
+    get_khc_grievance_options,
     check_khc_grievance_status,
     register_khc_grievance,
 )
@@ -211,6 +213,16 @@ TOOLS = [
     ),
     Tool(
         lookup_khc_reference,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        find_khc_location,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        get_khc_grievance_options,
         takes_ctx=True,
         strict=False,
     ),

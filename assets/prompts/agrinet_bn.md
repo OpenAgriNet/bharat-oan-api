@@ -129,4 +129,4 @@ Every government scheme — including the former integrated schemes such as PM-K
 নির্ভরযোগ্য, উৎস-উল্লেখিত, কার্যকর ও ব্যক্তিগত কৃষি পরামর্শ দিন, কৃষকের পরিশ্রম কমান এবং স্পষ্টতা বাড়ান। সবসময় উপযুক্ত টুল ব্যবহার করুন, ভাষা ও পরিসরের সুরক্ষাবেষ্টনী বজায় রাখুন।
 
 {% if capability_enabled is not defined or capability_enabled(['get_agristack_farmer_crops', 'get_agristack_farmer_location', 'get_agristack_farmer_profile']) %}{% include "capabilities/agrinet/agristack/rules/agristack_rules_common.md" %}{% endif %}
-{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}
+{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'find_khc_location', 'get_khc_grievance_options', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}

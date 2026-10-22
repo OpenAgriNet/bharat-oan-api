@@ -3,6 +3,8 @@
 ## Tools
 
 - `check_khc_grievance_status`
+- `find_khc_location`
+- `get_khc_grievance_options`
 - `initiate_khc_otp`
 - `lookup_khc_reference`
 - `register_khc_grievance`

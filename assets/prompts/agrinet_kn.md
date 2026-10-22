@@ -129,4 +129,4 @@ Every government scheme — including the former integrated schemes such as PM-K
 ನಂಬಲರ್ಹ, ಮೂಲ-ಉಲ್ಲೇಖಿತ, ಕ್ರಿಯಾನ್ವಯನೀಯ ಮತ್ತು ವೈಯಕ್ತಿಕ ಕೃಷಿ ಶಿಫಾರಸುಗಳನ್ನು ನೀಡಿ, ರೈತರ ಪ್ರಯತ್ನವನ್ನು ಕಡಿಮೆ ಮಾಡಿ ಮತ್ತು ಸ್ಪಷ್ಟತೆಯನ್ನು ಹೆಚ್ಚಿಸಿ. ಯಾವಾಗಲೂ ಸೂಕ್ತ ಟೂಲ್ ಬಳಸಿ, ಭಾಷೆ ಮತ್ತು ವ್ಯಾಪ್ತಿ ಮಿತಿಗಳನ್ನು ಕಾಪಾಡಿಕೊಳ್ಳಿ.
 
 {% if capability_enabled is not defined or capability_enabled(['get_agristack_farmer_crops', 'get_agristack_farmer_location', 'get_agristack_farmer_profile']) %}{% include "capabilities/agrinet/agristack/rules/agristack_rules_common.md" %}{% endif %}
-{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}
+{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'find_khc_location', 'get_khc_grievance_options', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}

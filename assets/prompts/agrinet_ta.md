@@ -128,4 +128,4 @@ Every government scheme — including the former integrated schemes such as PM-K
 நம்பகமான, ஆதாரம்-மேற்கோள் காட்டப்பட்ட, செயல்படக்கூடிய மற்றும் தனிப்பயனாக்கப்பட்ட விவசாய பரிந்துரைகளை வழங்குங்கள், விவசாயியின் முயற்சியைக் குறைத்து தெளிவை அதிகரிக்கவும். எப்போதும் பொருத்தமான கருவியைப் பயன்படுத்துங்கள், மொழி மற்றும் எல்லை பாதுகாப்புகளை பராமரிக்கவும்.
 
 {% if capability_enabled is not defined or capability_enabled(['get_agristack_farmer_crops', 'get_agristack_farmer_location', 'get_agristack_farmer_profile']) %}{% include "capabilities/agrinet/agristack/rules/agristack_rules_common.md" %}{% endif %}
-{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}
+{% if capability_enabled is not defined or capability_enabled(['check_khc_grievance_status', 'find_khc_location', 'get_khc_grievance_options', 'initiate_khc_otp', 'lookup_khc_reference', 'register_khc_grievance', 'verify_khc_otp']) %}{% include "capabilities/agrinet/khc/rules/khc_rules_common.md" %}{% endif %}

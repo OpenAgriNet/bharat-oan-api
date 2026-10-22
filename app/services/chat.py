@@ -20,6 +20,7 @@ from app.core.npss_followup import find_pending_npss_image_url
 from app.services.model_routing import ModelRouteDecision, get_model_router
 from app.services.chat_turn_map import write_chat_turn_map
 from app.services.npss_response import post_process_npss_response
+from app.services.stream_dedupe import ToolBoundaryDeduper
 from app.tasks.telemetry import send_telemetry
 from app.utils import (
     filter_thinking_from_history,
@@ -65,6 +66,8 @@ class _AgrinetStreamState:
     pending_text_start: str = ""
     raw_chunks: list[str] = field(default_factory=list)
     visible_output: str = ""
+    deduper: ToolBoundaryDeduper = field(default_factory=ToolBoundaryDeduper)
+    tool_boundaries: int = 0
 
 
 class _StreamChunkSink:
@@ -134,7 +137,7 @@ async def _emit_final_text_chunk(
         return
     stream_state.raw_chunks.append(raw_chunk)
     visible_chunk = _strip_streaming_thinking_chunk(raw_chunk, stream_state)
-    visible_chunk = _collapse_adjacent_duplicate_text(visible_chunk)
+    visible_chunk = stream_state.deduper.feed(visible_chunk)
     if visible_chunk and stream_state.visible_output:
         # Streams can occasionally resend overlapping text. Trim overlap so the
         # farmer does not see repeated prefixes/sentences.
@@ -778,6 +781,8 @@ async def _run_agrinet_once_streaming(
                 if not prefix:
                     continue
                 if stream_state.final_result_found:
+                    # A new text part in the same response can repeat the previous one.
+                    stream_state.deduper.tool_boundary()
                     await _emit_final_text_chunk(prefix, stream_state, chunk_queue)
                 else:
                     stream_state.pending_text_start = prefix
@@ -802,6 +807,8 @@ async def _run_agrinet_once_streaming(
                 continue
 
             if getattr(event, "event_kind", "") == "function_tool_result":
+                stream_state.deduper.tool_boundary()
+                stream_state.tool_boundaries += 1
                 stream_state.final_result_found = False
                 stream_state.pending_text_start = ""
                 continue
@@ -825,6 +832,16 @@ async def _run_agrinet_once_streaming(
     full_output = _sanitize_streamed_output(str(getattr(result, "output", "") or ""))
     streamed_output = _sanitize_streamed_output("".join(stream_state.raw_chunks))
     output_text = full_output or streamed_output
+
+    # What the farmer saw should equal the final answer. A difference means text was streamed that
+    # the final answer does not contain (for example text written before a tool call).
+    streamed_text = " ".join(stream_state.visible_output.split())
+    if chunk_queue is not None and streamed_text and streamed_text != " ".join(output_text.split()):
+        logger.warning(
+            "Streamed text differs from final answer session=%s streamed_chars=%d final_chars=%d "
+            "tool_calls_in_run=%d",
+            session_id, len(streamed_text), len(output_text), stream_state.tool_boundaries,
+        )
 
     usage_data = result.usage()
     lf_update_current_observation(
