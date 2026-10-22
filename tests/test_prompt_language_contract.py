@@ -1,4 +1,4 @@
-"""Guard for newly added PMFBY instructions in rendered language prompts.
+"""Guard for localized PMFBY and IMD agromet instructions in rendered language prompts.
 
 This checks script and identifiers, not translation quality or model behavior.
 """
@@ -16,11 +16,15 @@ SCRIPT_RANGES = {
 }
 
 
+def render(language):
+    return Environment(loader=FileSystemLoader(ROOT / "assets/prompts")).get_template(f"agrinet_{language}.md").render()
+
+
 class PromptLanguageContract(unittest.TestCase):
     def test_pmfby_safeguards_keep_language_and_tool_arguments(self):
         for language in ["en", *SCRIPT_RANGES]:
             with self.subTest(language=language):
-                text = Environment(loader=FileSystemLoader(ROOT / "assets/prompts")).get_template(f"agrinet_{language}.md").render()
+                text = render(language)
                 self.assertNotIn("### PMFBY grievance verification rules", text)
                 headings = list(re.finditer(r"^### .*PMFBY.*$", text, re.M))
                 self.assertTrue(headings, "Missing localized PMFBY safeguards")
@@ -44,6 +48,24 @@ class PromptLanguageContract(unittest.TestCase):
                 for line in block.splitlines():
                     if line.startswith("- "):
                         self.assertTrue(any(lo <= ord(char) <= hi for char in line), "Instruction is missing the language's script")
+
+    def test_imd_agromet_row_keeps_language_and_tool_names(self):
+        for language in ["en", *SCRIPT_RANGES]:
+            with self.subTest(language=language):
+                rows = [line for line in render(language).splitlines()
+                        if line.startswith("|") and "`imd_agromet_advisory`" in line]
+                self.assertEqual(len(rows), 1, "Expected exactly one IMD agromet tool row")
+                row = rows[0]
+                for name in ["forward_geocode", "crop", "search_documents", "search_pests_diseases"]:
+                    self.assertIn(f"`{name}`", row)
+                if language == "en":
+                    continue
+                prose = re.sub(r"`[^`]+`", "", row)
+                prose = re.sub(r"(?<![A-Za-z])IMD(?![A-Za-z])", "", prose)
+                self.assertIsNone(re.search(r"[A-Za-z]{2,}", prose), "English prose in the localized IMD row")
+                lo, hi = SCRIPT_RANGES[language]
+                for cell in row.strip("|").split("|"):
+                    self.assertTrue(any(lo <= ord(char) <= hi for char in cell), "Cell is missing the language's script")
 
 
 if __name__ == "__main__":

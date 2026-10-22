@@ -4,6 +4,7 @@ IMD district agromet advisory tool: farmer location -> resolver keys -> imd_agro
 import asyncio
 import datetime
 import os
+import re
 import threading
 import uuid
 from typing import List, Optional
@@ -30,6 +31,10 @@ IMD_DB_URL = os.getenv("IMD_DB_URL")
 POINT_KEYS_NAMESPACE = "resolver-point-keys"
 POINT_KEYS_TTL_SECONDS = 30 * 24 * 3600
 POINT_RADIUS_KM = 0.1
+
+# One IMD mention per conversation: set when a note is added or the advisory is shared.
+MENTIONED_NAMESPACE = "imd-agromet-mentioned"
+MENTIONED_TTL_SECONDS = 24 * 3600
 
 
 async def _location_keys(latitude: float, longitude: float) -> Optional[List[str]]:
@@ -100,27 +105,29 @@ def _display_date(value: str) -> str:
 def _validity_block(data: dict) -> str:
     return "\n".join([
         "End the answer with these three lines as a separate block, translated but otherwise unchanged. "
-        "Do not mix these dates into the advice:",
+        "Do not mix these dates into the advice, and write nothing after them: no question, offer or "
+        "mention of other crops.",
         "Source: India Meteorological Department (IMD Agromet)",
         f"Issued: {_display_date(data['date'])}",
         f"Valid until: {_display_date(data['valid_until'])}, 11:59 PM IST",
     ])
 
 
-def _ask_for_crop(districts: str, data: dict, rows: List[dict], note: str = "") -> str:
+def _available_crops(districts: str, rows: List[dict], note: str = "") -> str:
     crops = sorted({r["crop"] for r in rows if r.get("crop")})
     lines = [note, f"A current IMD agromet advisory is available for {districts}."]
     if crops:
         lines.append(f"Crops covered: {', '.join(crops)}")
-    lines.append("Do not give any advice yet and do not add any other offer. Ask the farmer which of these crops "
-                 "they want the advisory for, then call this tool again with that crop.")
-    return "\n".join([line for line in lines if line] + [_validity_block(data)])
+    lines.append("Do not give any advice yet. Tell the farmer which crops it covers and ask which one they want, "
+                 "then call this tool again with that crop.")
+    return "\n".join(line for line in lines if line)
 
 
 def _format_advisory(districts: str, data: dict, rows: List[dict], show_regional: bool) -> str:
     lines = [f"IMD District Agromet Advisory — {districts}",
              "Present every item below as given: you may translate and rephrase, but do not add, drop, soften "
-             "or merge any recommendation. This answer is the IMD agromet advisory, so do not offer it again."]
+             "or merge any recommendation. Give only this crop's advisory: do not ask about or offer it for "
+             "other crops."]
     for r in rows:
         label = r.get("crop") or "General"
         lines.append(f"[{label}] {r.get('advisory_eng') or ''}")
@@ -138,9 +145,9 @@ async def imd_agromet_advisory(
 ) -> str:
     """Get the current IMD district Agromet Advisory (issued every Tuesday and Friday) for the farmer's location.
 
-    Use when the farmer wants the agro advisory / agromet advisory issued by IMD for their district,
-    or agrees to receive it. Without a crop it only says whether a current advisory exists and which crops
-    it covers (use this alongside a weather or crop answer before offering the advisory).
+    Use only when the farmer asks for the agro advisory / agromet advisory issued by IMD for their district,
+    or chooses a crop after being told it is available. Without a crop it lists the crops the current
+    advisory covers so the farmer can choose one.
     IMPORTANT: if the farmer names a place (village, district, city), you MUST first call forward_geocode
     for that place and pass its latitude/longitude here. Leave latitude/longitude empty ONLY when no place
     is named; the farmer's browser location is then used.
@@ -187,11 +194,60 @@ async def imd_agromet_advisory(
         return (f"There is no current IMD agromet advisory for {districts}. IMD issues a new one every Tuesday "
                 "and Friday; an expired advisory must not be shown.")
     if not crop:
-        return _ask_for_crop(districts, data, rows)
+        return _available_crops(districts, rows)
 
     crop_rows = [r for r in rows if (r.get("crop") or "").lower() == crop.strip().lower()]
     if not crop_rows:
         logger.warning(f"IMD advisory: crop {crop!r} not matched in the bulletin for {districts}")
-        return _ask_for_crop(districts, data, rows, f"The current bulletin has no advisory for {crop}.")
+        return _available_crops(districts, rows, f"The current bulletin has no advisory for {crop}.")
     show_regional = (ctx.deps.lang_code or "en") != "en"
+    await cache.set(ctx.deps.session_id, True, ttl=MENTIONED_TTL_SECONDS, namespace=MENTIONED_NAMESPACE)
     return _format_advisory(districts, data, crop_rows, show_regional)
+
+
+async def agromet_note(
+    ctx: RunContext[FarmerContext],
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    query: Optional[str] = None,
+) -> str:
+    """Line to append to a weather result (no query) or a crop-advice search result (its English query).
+
+    Returns a note only when a current IMD advisory exists for the location (and, for a crop search, covers
+    a crop named in the query) and the advisory has not been mentioned or shared in this conversation yet.
+    Returns an empty string otherwise, including on any lookup failure, so the calling tool is never affected.
+    """
+    lat = latitude if latitude is not None else ctx.deps.latitude
+    lon = longitude if longitude is not None else ctx.deps.longitude
+    if "imd_agromet_advisory" not in ctx.deps.capabilities.policy.allowed_tools:
+        return ""
+    if lat is None or lon is None or not resolver_configured() or not IMD_DB_URL:
+        return ""
+    try:
+        if await cache.get(ctx.deps.session_id, namespace=MENTIONED_NAMESPACE):
+            return ""
+        keys = await _location_keys(lat, lon)
+        if not keys:
+            return ""
+        data = await asyncio.to_thread(_lookup_sync, keys)
+    except Exception as exc:  # best effort: a failed check must not break the weather or search answer
+        logger.warning(f"IMD advisory check skipped: {exc}")
+        return ""
+
+    districts = ", ".join(d.get("name") or str(d.get("lgd_district_code")) for d in data.get("districts", []))
+    crops = sorted({r["crop"] for r in data.get("advisories", []) if r.get("crop")})
+    if not districts or not crops:
+        return ""
+    if query is None:
+        line = (f"End the answer with one line saying that IMD has a current agromet advisory for {districts} "
+                f"covering {', '.join(crops)}, and asking which crop the farmer wants it for.")
+    else:
+        matched = [c for c in crops if re.search(rf"\b{re.escape(c)}s?\b", query, re.IGNORECASE)]
+        if not matched:
+            return ""
+        line = f"End the answer with one line asking if the farmer would also like the IMD agromet advisory for {matched[0]}."
+    try:
+        await cache.set(ctx.deps.session_id, True, ttl=MENTIONED_TTL_SECONDS, namespace=MENTIONED_NAMESPACE)
+    except Exception as exc:  # the note is still correct; only the once-per-conversation guard is lost
+        logger.warning(f"IMD advisory mention flag not saved: {exc}")
+    return f"\n\n[IMD agromet advisory note] {line} Do not add anything else about it."

@@ -16,6 +16,7 @@ from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
+from agents.tools.imd_advisory import agromet_note
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.scheme_qdrant_search import (
@@ -471,6 +472,7 @@ if search_schemes.__doc__:
 
 @observe(name="tool:search_documents", as_type="tool")
 async def search_documents(
+    ctx: RunContext[FarmerContext],
     query: str, 
     top_k: int = 10, 
 ) -> str:
@@ -522,7 +524,7 @@ async def search_documents(
             search_hits = [SearchHit(**hit) for hit in results]            
             # Convert back to dict format for compatibility
             document_string = '\n\n----\n\n'.join([str(document) for document in search_hits])
-            return "> Search Results for `" + query + "`\n\n" + document_string
+            return "> Search Results for `" + query + "`\n\n" + document_string + await agromet_note(ctx, query=query)
     except Exception as e:
         logger.error(f"Error searching documents: {e} for query: {query}")
         raise ModelRetry(f"Error searching documents, please try again")
@@ -566,6 +568,7 @@ async def search_video(
 
 @observe(name="tool:search_pests_diseases", as_type="tool")
 async def search_pests_diseases(
+    ctx: RunContext[FarmerContext],
     query: str, 
     top_k: int = 10, 
 ) -> str:
@@ -616,7 +619,7 @@ async def search_pests_diseases(
             search_hits = [SearchHit(**hit) for hit in results]            
             # Convert back to dict format for compatibility
             document_string = '\n\n----\n\n'.join([str(document) for document in search_hits])
-            return "> Pests & Diseases Search Results for `" + query + "`\n\n" + document_string
+            return "> Pests & Diseases Search Results for `" + query + "`\n\n" + document_string + await agromet_note(ctx, query=query)
     except Exception as e:
         logger.error(f"Error searching pests and diseases: {e} for query: {query}")
         raise ModelRetry(f"Error searching pests and diseases, please try again")

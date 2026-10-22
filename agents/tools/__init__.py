@@ -225,7 +225,7 @@ TOOLS = [
     ),
     Tool(
         search_documents,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -240,7 +240,7 @@ TOOLS = [
     ),
     Tool(
         search_pests_diseases,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
