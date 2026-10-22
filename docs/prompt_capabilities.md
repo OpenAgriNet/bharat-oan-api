@@ -10,11 +10,16 @@ Browse `assets/prompts/capabilities/agrinet/<skill>/SKILL.md`. Its YAML frontmat
 is the single source for tool bindings and localized sections. Edit workflow text
 inside its section/language files. `_shared` owns cross-workflow instructions.
 
-A root prompt is a layout: `{{ skill_section('pmkisan/status') }}` renders the
+A root prompt retains common behavior rules and layout: `{{ skill_section('pmkisan/status') }}` renders the
 section selected by language and policy in its original position. It does not
 repeat the tool list. `helpers/prompt_skills.py` derives the inventory from the
 packages and layouts; there is no hand-maintained `sections.json`. `README.md`
 files are navigation, not another source of tool bindings.
+
+This migration is structural, not a workflow rewrite. The English root currently
+has 130 lines (about 17.7 KB); some routing fragments are a single line, while
+KHC, schemes and mandi have substantial guidance. That is intentional for now.
+Reviewing business behavior and further splitting common rules is a separate task.
 
 To add a tool, register its implementation once in `agents/tools`, reference its
 name in the appropriate skill's `tools`, and add its usage guidance in every

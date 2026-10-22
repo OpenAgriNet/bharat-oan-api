@@ -738,7 +738,8 @@ def test_grievance_options_returns_categories_and_sub_categories_in_one_result(m
     }
     assert "schemeId=38, divisionId=31" in output
     assert "problemCategoryId=39" in output and "Bank refused loan [1725]" in output
-    assert "Pick the single best-fit category and sub-category" in output
+    assert "The complaint is not known yet. Ask for it" in output
+    assert "then call this tool again with it as concern" in output
 
 
 def test_grievance_options_lists_schemes_when_none_named(monkeypatch):
