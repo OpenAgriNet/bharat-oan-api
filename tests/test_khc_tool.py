@@ -300,6 +300,9 @@ def test_all_language_prompts_include_khc_rules():
         assert "Ask only the next missing step from the registration order in each turn" in prompt
         assert "Never repeat the same sentence, clause, or question in the same response" in prompt
         assert "Use simple wording" in prompt
+        assert "call `get_khc_grievance_options(state, scheme, concern)`" in prompt
+        assert "Which one is closest to your problem?" in prompt
+        assert "Phone number and OTP come last" in prompt
         assert "Never write any text before calling a tool" in prompt
         assert "Never pick a scheme for the farmer" in prompt
         assert "At most 3 OTPs can be sent per hour" in prompt
@@ -313,7 +316,7 @@ def test_all_language_prompts_include_khc_rules():
         assert "Never ask where \"the grievance\" or \"this complaint\" is from" in prompt
         assert "show \"Source: Kisan Helpline Center\" at all times" in prompt
         assert "Location order: state, then village; district only if needed." in prompt
-        assert "If several villages with that name are in different districts, ask \"Which district are you from?\"" in prompt
+        assert "If several villages have that name, ask \"Which block are you from?\"" in prompt
         assert "if it matches a district, use it as the district and do not ask for the district" in prompt
         assert "Do not offer another scheme such as e-NAM unless the farmer names it" in prompt
         assert "Avoid technical terms like \"mapping\", \"resolved\", \"determine automatically\"" in prompt
@@ -376,7 +379,7 @@ def test_otp_sent_result_directs_verification_before_submission(monkeypatch):
     output = asyncio.run(khc.initiate_khc_otp(ctx(), "9876543210"))
     assert "call verify_khc_otp with the same mobile" in output
     assert "Do not reject a six-digit reply without a verification tool result" in output
-    assert "If scheme, location, concern and sub-category summary are already confirmed" in output
+    assert "proceed to submission after verification" not in output
 
 
 @pytest.mark.parametrize("code,message", [
@@ -441,15 +444,17 @@ def test_verification_rendering_requires_registration_state(monkeypatch, registe
     assert ("already registered" in result) if registered == "true" else ("unavailable" in result)
 
 
-def test_verified_farmer_is_directed_to_resolve_scheme_from_problem(monkeypatch):
+@pytest.mark.parametrize("registered,asks_name", [("false", True), ("true", False)])
+def test_verified_farmer_goes_straight_to_registration(monkeypatch, registered, asks_name):
     fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(
-        "init", "otp_verified", {"isRegistered": "false"},
+        "init", "otp_verified", {"isRegistered": registered},
     )), [])
     result = asyncio.run(khc.verify_khc_otp(ctx(), "9876543210", "123456"))
-    assert "problem in their own words" in result
-    assert "lookup_khc_reference" in result
-    assert "ask for the scheme name" in result
-    assert "Never ask for internal IDs/codes from the farmer" in result
+    assert "This is the last step" in result
+    assert "do not ask for them again" in result
+    assert ("Ask only for the farmer's name and gender" in result) is asks_name
+    assert "Call register_khc_grievance now" in result
+    assert "lookup_khc_reference" not in result and "own words" not in result
 
 
 def test_reference_results_direct_problem_matching_without_asking_for_ids(monkeypatch):
@@ -661,34 +666,36 @@ def test_find_location_without_a_match_says_what_to_ask(monkeypatch, needs, expe
     assert expected in asyncio.run(khc.find_khc_location(ctx(), "nowhere"))
 
 
-def test_find_location_asks_district_when_villages_are_in_different_districts(monkeypatch):
+def test_find_location_offers_blocks_when_several_villages_share_the_name(monkeypatch):
     import json
 
-    base = {"level": "village", "name": "Abupur", "state": {"id": 9, "name": "UP"}}
-    rows = [{**base, "id": 5, "district": {"id": 221, "name": "Meerut"}, "subDistrict": {"id": 1, "name": "A"}},
-            {**base, "id": 7, "district": {"id": 222, "name": "Ghaziabad"}, "subDistrict": {"id": 2, "name": "B"}}]
+    base = {"level": "village", "name": "Abupur", "state": {"id": 9, "name": "Uttar Pradesh"}}
+    rows = [{**base, "id": 5, "district": {"id": 221, "name": "Meerut"}, "subDistrict": {"id": 1, "name": "Meerut Block"}},
+            {**base, "id": 7, "district": {"id": 222, "name": "Ghaziabad"}, "subDistrict": {"id": 2, "name": "Loni"}}]
     fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_location", {
-        "matches": json.dumps(rows),
+        "matches": json.dumps(rows), "total": "2",
     })), [])
     output = asyncio.run(khc.find_khc_location(ctx(), "abupur", "Uttar Pradesh"))
-    assert "Which district are you from?" in output
-    assert "- Meerut" in output and "- Ghaziabad" in output
-    assert "call this tool again with the chosen district" in output
+    assert "Which block are you from?" in output
+    assert "- Abupur: Meerut Block block, Meerut district" in output
+    assert "- Abupur: Loni block, Ghaziabad district" in output
+    assert "do not call the tool again" in output
+    assert "villageId=5" in output and "villageId=7" in output
+    assert "list was cut" not in output
 
 
-def test_find_location_asks_block_when_villages_are_in_one_district(monkeypatch):
+def test_find_location_asks_for_district_only_when_the_list_was_cut(monkeypatch):
     import json
 
-    base = {"level": "village", "name": "Abupur", "state": {"id": 9, "name": "UP"},
+    base = {"level": "village", "name": "Rampur", "state": {"id": 9, "name": "UP"},
             "district": {"id": 221, "name": "Meerut"}}
-    rows = [{**base, "id": 5, "subDistrict": {"id": 1, "name": "A"}},
-            {**base, "id": 7, "subDistrict": {"id": 2, "name": "B"}}]
+    rows = [{**base, "id": i, "subDistrict": {"id": i, "name": f"B{i}"}} for i in range(10)]
     fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_location", {
-        "matches": json.dumps(rows),
+        "matches": json.dumps(rows), "total": "51",
     })), [])
-    output = asyncio.run(khc.find_khc_location(ctx(), "abupur"))
-    assert "Which block are you from?" in output
-    assert "villageId=5" in output and "villageId=7" in output
+    output = asyncio.run(khc.find_khc_location(ctx(), "rampur", "Uttar Pradesh"))
+    assert "The list was cut" in output
+    assert "ask 'Which district are you from?'" in output
 
 
 def test_find_location_malformed_result_is_not_trusted(monkeypatch):
@@ -777,3 +784,47 @@ def test_place_not_found_gives_block_and_village_fallback_with_the_district_id(m
     assert 'reference_type="sub-districts", parent_id=221' in output
     assert "Which block are you from?" in output
     assert "write their real village name in the complaint text" in output
+
+
+def test_tree_shows_the_suggested_match_and_how_to_change_it(monkeypatch):
+    import json
+
+    calls = []
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
+        "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}),
+        "scheme": json.dumps({"id": 38, "name": "AIF", "division": 31}),
+        "suggested": json.dumps({"category": {"id": 39, "name": "Bank Loan Sanction Issues"},
+                                 "subCategory": {"id": 1725, "name": "Bank refused loan"}}),
+        "categories": json.dumps([{"id": 39, "name": "Bank Loan Sanction Issues",
+                                   "subCategories": [{"id": 1725, "name": "Bank refused loan"}]}]),
+    })), calls)
+    output = asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh", "AIF", "  bank   refused my loan "))
+    assert _tags(calls[0])["concern"] == "bank refused my loan"
+    assert "Best match for the complaint: category 'Bank Loan Sanction Issues'" in output
+    assert "sub-category 'Bank refused loan'" in output
+    assert "confirm or change" in output
+
+
+@pytest.mark.parametrize("concern,expected", [
+    ("rain damaged my crop", "No clear match for the complaint. Do not guess."),
+    ("", "The complaint is not known yet."),
+])
+def test_tree_without_a_match_lists_or_asks_for_the_complaint(monkeypatch, concern, expected):
+    import json
+
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
+        "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}),
+        "scheme": json.dumps({"id": 38, "name": "AIF", "division": 31}),
+        "categories": json.dumps([{"id": 39, "name": "Bank Loan Sanction Issues",
+                                   "subCategories": [{"id": 1725, "name": "Bank refused loan"}]}]),
+    })), [])
+    output = asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh", "AIF", concern))
+    assert expected in output
+    assert "Bank Loan Sanction Issues [problemCategoryId=39]" in output
+
+
+def test_complaint_longer_than_500_characters_is_rejected_without_http(monkeypatch):
+    call = AsyncMock()
+    monkeypatch.setattr(khc, "_call", call)
+    asyncio.run(khc.get_khc_grievance_options(ctx(), "Bihar", "AIF", "x" * 501))
+    call.assert_not_called()
