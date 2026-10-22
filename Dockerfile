@@ -22,6 +22,10 @@ RUN pip config set global.index-url https://pypi.org/simple
 # Install the complete lock, including the explicitly selected CPU-only Torch wheel.
 RUN python3 -m pip install --no-cache-dir --only-binary=:all: --require-hashes -r requirements.lock
 
+# History sizing must work without tokenizer downloads in production.
+ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken-cache
+RUN python3 -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
+
 # Bake E5 embedding model into the image (avoids HuggingFace download on first search_schemes call)
 ARG HF_TOKEN=
 ENV HF_TOKEN=${HF_TOKEN}

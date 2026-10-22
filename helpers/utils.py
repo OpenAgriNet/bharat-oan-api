@@ -13,8 +13,26 @@ from datetime import datetime, timedelta
 import simplejson as json
 from jinja2 import Environment, FileSystemLoader
 import pytz
+from functools import lru_cache
+import tiktoken
 
 load_dotenv()
+
+
+@lru_cache(maxsize=1)
+def _history_encoder():
+    return tiktoken.get_encoding(os.getenv("TIKTOKEN_ENCODING", "cl100k_base"))
+
+
+def count_tokens_for_part(part) -> int:
+    """Estimate stored content size, as voice does; never count billed request usage."""
+    if hasattr(part, "content"):
+        content = str(part.content)
+    elif getattr(part, "part_kind", "") == "tool-call":
+        content = f"tool: {part.tool_name}, args: {json.dumps(part.args)}"
+    else:
+        return 0
+    return len(_history_encoder().encode(content, disallowed_special=()))
 
 
 def get_today_date_str() -> str:

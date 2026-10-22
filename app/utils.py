@@ -1,6 +1,6 @@
 from typing import List
 from app.core.cache import cache  # Import cache instance from core
-from helpers.utils import get_logger
+from helpers.utils import get_logger, count_tokens_for_part
 from copy import deepcopy
 from pydantic_ai.messages import (
     ModelMessagesTypeAdapter,
@@ -233,11 +233,12 @@ def group_convos(history: List[ModelMessage]):
     return convos
 
 def convo_token_usage(convo: list[ModelMessage]) -> int:
-    tokens = 0
-    for msg in convo:
-        if getattr(msg, "kind", "") == "response" and getattr(msg, "usage", None):
-            tokens += msg.usage.total_tokens
-    return tokens
+    # Request usage includes the full prompt and prior history. Summing it
+    # double-counts context and drops history once streaming reports real usage.
+    # The fixed system prompt is retained separately, like voice instructions;
+    # it must not consume the conversation-history budget on every turn.
+    return sum(count_tokens_for_part(part) for msg in convo for part in msg.parts
+               if getattr(part, "part_kind", "") != "system-prompt")
 
 def trim_history(
     history: List[ModelMessage],
