@@ -260,7 +260,8 @@ def test_all_language_prompts_include_khc_rules():
         assert "If browser coordinates are unavailable, ask the farmer for village/place name first" in prompt
         assert "Never substitute a nearby village" in prompt
         assert "**Problem-to-scheme matching:**" in prompt
-        assert "Do not ask for a scheme name or any internal IDs upfront" in prompt
+        assert "If scheme is still missing, ask for scheme name" in prompt
+        assert "Never ask for internal IDs/codes from the farmer" in prompt
         assert "a generic bank-loan complaint" in prompt
         assert "name` is a literal name substring filter" in prompt
         assert "include the matched scheme/category names in the final confirmation summary" in prompt
@@ -289,6 +290,10 @@ def test_all_language_prompts_include_khc_rules():
         assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
         assert "collect scheme + location + concern -> map category/sub-category" in prompt
         assert "show summary with mapped sub-category -> allow sub-category change" in prompt
+        assert "do not ask for mobile number in the first response" in prompt
+        assert "Do not call `initiate_khc_otp` until summary and sub-category are confirmed" in prompt
+        assert "If scheme is missing, ask scheme first" in prompt
+        assert "Do not ask for phone number, OTP, or registration status in this opening turn" in prompt
 
 
 @pytest.mark.parametrize("coordinates,expected", [
@@ -406,7 +411,8 @@ def test_verified_farmer_is_directed_to_resolve_scheme_from_problem(monkeypatch)
     result = asyncio.run(khc.verify_khc_otp(ctx(), "9876543210", "123456"))
     assert "problem in their own words" in result
     assert "lookup_khc_reference" in result
-    assert "Do not ask for a scheme name or any internal IDs upfront" in result
+    assert "ask for the scheme name" in result
+    assert "Never ask for internal IDs/codes from the farmer" in result
 
 
 def test_reference_results_direct_problem_matching_without_asking_for_ids(monkeypatch):

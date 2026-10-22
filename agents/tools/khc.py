@@ -83,7 +83,8 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "Mobile verified successfully. Farmer is "
                 + ("already registered" if fields["isRegistered"] == "true" else "not yet registered")
                 + " with KHC. Reuse details already supplied. Ask for the problem in their own words "
-                "only if it is not already known. Do not ask for a scheme name or any internal IDs upfront. "
+                "only if it is not already known. Reuse scheme already provided, and if scheme is still missing "
+                "ask for the scheme name. Never ask for internal IDs/codes from the farmer. "
                 "Resolve the grievance location from permitted browser coordinates or supplied place names; "
                 "ask only for missing location details. Use lookup_khc_reference to fetch schemes for the "
                 "resolved state, match the problem to the returned scheme names, then fetch categories and "
@@ -100,7 +101,8 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "If the farmer-provided scheme/location/category value does not match a returned row, "
                 "show the relevant returned names for selection by name and offer next pages when available. "
                 "Match the farmer's problem to the returned scheme/category/subcategory names; "
-                "do not ask for a scheme name or internal IDs upfront. Take scheme and division from the same row, "
+                "reuse a scheme already stated and ask for scheme only when still missing; never ask for internal IDs/codes. "
+                "Take scheme and division from the same row, "
                 "then fetch categories using scheme and sub-categories using problemcategory. "
                 "Use only returned IDs in the payload. Ask a focused clarification only when the problem "
                 "does not distinguish the matching options. If a keyword filter returns no match, "
@@ -153,6 +155,8 @@ async def initiate_khc_otp(ctx: RunContext[FarmerContext], mobile_number: str = 
     """Send a KHC OTP before grievance registration, to a mobile supplied by the farmer.
 
     Ask for the farmer's mobile if absent. Do not send OTPs for a status-only lookup.
+    Call this only after scheme, location, concern, mapped sub-category, and farmer
+    confirmation are complete for the current grievance.
     """
     mobile = _mobile(mobile_number)
     if not mobile:
@@ -279,7 +283,8 @@ async def register_khc_grievance(
     First send and verify OTP with initiate_khc_otp / verify_khc_otp. Use the verified
     registration state for farmer_type (new/existing). Collect mobile, preferred
     language, location and grievance details. Resolve scheme/category/subcategory from
-    the problem using the reference APIs; do not ask for scheme names or IDs upfront.
+    the problem using the reference APIs; reuse scheme already provided and ask for
+    scheme name only when missing. Never ask for internal IDs/codes from the farmer.
     New farmers also need name and
     gender code. All six numeric IDs MUST come from verified KHC master data, not LGD
     assumptions, memory, example requests or guesses. Resolve IDs using lookup_khc_reference.
@@ -324,7 +329,8 @@ async def register_khc_grievance(
             "Fetch villages under the selected sub-district and match the village already supplied. "
             "Resolve all mappings before requesting final submission confirmation. "
             "Match returned names to the problem; ask a focused clarification only if ambiguous. "
-            "Do not guess IDs or ask the farmer for a scheme name or internal codes upfront."
+            "Do not guess IDs. Reuse scheme already provided and ask for scheme only when missing. "
+            "Never ask the farmer for internal IDs/codes."
         )
     if not confirmed:
         return "Summarize the farmer's grievance and registration details, then ask for explicit confirmation to submit."
