@@ -10,7 +10,6 @@ suggestions_agent = configured_agent(
     "suggestions",
     name="Suggestions Agent",
     instructions=get_prompt('suggestions_system'),
-    instrument=False,
     output_type=PromptedOutput(List[str]),
     retries=3,
     end_strategy='exhaustive',

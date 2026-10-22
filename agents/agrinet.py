@@ -1,4 +1,5 @@
 from pydantic_ai import RunContext
+from pydantic_ai.capabilities import PrepareTools
 from helpers.utils import get_prompt, get_today_date_str, get_crop_season, get_last_weekday_table, get_logger
 from helpers.scheme_qdrant_search import format_vector_schemes_prompt_block
 from agents.models import configured_agent
@@ -17,12 +18,11 @@ validate_manifest(TOOLS)
 agrinet_agent = configured_agent(
     "agrinet",
     name="Vistaar Agent",
-    instrument=False,
     output_type=str,
     deps_type=FarmerContext,
     retries=3,
     tools=[*TOOLS, CAPABILITY_LOADER],
-    prepare_tools=prepare_capability_tools,
+    capabilities=[PrepareTools(prepare_capability_tools)],
     end_strategy='exhaustive',
     model_settings=OpenAIChatModelSettings(
         temperature=0.7,

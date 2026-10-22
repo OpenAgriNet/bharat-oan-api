@@ -13,7 +13,7 @@ simplejson==4.1.1
 # requests  # Replaced with httpx
 
 # LLM
-openai==2.48.0
+openai==3.36.1
 pydantic==2.13.4
 tenacity==9.1.4
 
@@ -31,12 +31,8 @@ python-decouple==3.8
 
 openpyxl==3.1.5
 
-### Pydantic AI (Updated to resolve conflicts)
-# 1.2.1 through 1.31.0 unconditionally do `from opentelemetry._events import
-# Event` in pydantic_ai/messages.py, which no released opentelemetry-api
-# version actually provides -- ModuleNotFoundError at import time, on any
-# opentelemetry-api version. Fixed upstream in pydantic-ai-slim 1.32.0.
-pydantic-ai==1.32.0
+# All configured model providers use the OpenAI-compatible API.
+pydantic-ai-slim[openai]==2.59.0
 asgiref==3.12.1
 
 # Web Server

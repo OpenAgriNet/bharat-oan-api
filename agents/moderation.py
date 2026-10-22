@@ -29,7 +29,6 @@ moderation_agent = configured_agent(
     "moderation",
     name="Moderation Agent",
     system_prompt=get_prompt('moderation_system'),
-    instrument=False,
     output_type=PromptedOutput(QueryModerationResult),
     retries=2,
     model_settings=ModelSettings(

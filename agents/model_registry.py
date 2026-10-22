@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 from httpx import TransportError
+from httpx2 import TransportError as ModelTransportError
 from openai import APIConnectionError, AsyncAzureOpenAI
 from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.models import Model
@@ -192,7 +193,8 @@ class ModelRegistry:
     def get_fallback_errors(self, alias: str) -> tuple[type[Exception], ...]:
         names = self._models_cfg[alias].get("fallback", {}).get("on_error", [])
         try:
-            return tuple(_ERROR_TYPES[name] for name in names)
+            errors = tuple(_ERROR_TYPES[name] for name in names)
+            return errors + ((ModelTransportError,) if "TransportError" in names else ())
         except KeyError as exc:
             raise ValueError(f"Alias '{alias}': unknown fallback error {exc}") from exc
 

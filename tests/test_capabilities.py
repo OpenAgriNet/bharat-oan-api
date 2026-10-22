@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 from jinja2 import Environment, FileSystemLoader
 from pydantic_ai import Agent, ModelRetry, Tool
+from pydantic_ai.capabilities import PrepareTools
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import FunctionModel
 
@@ -196,7 +197,7 @@ def test_real_agent_loader_then_execution_and_existing_prepare_guard():
         return response
     agent = Agent(FunctionModel(model), deps_type=FarmerContext,
                   tools=[Tool(search_terms), Tool(search_documents, prepare=deny), CAPABILITY_LOADER],
-                  prepare_tools=prepare_capability_tools)
+                  capabilities=[PrepareTools(prepare_capability_tools)])
     deps = deps_for(allowed={'search_terms', 'search_documents'}, preloaded=set())
     assert agent.run_sync('rice', deps=deps).output == 'done'
     assert calls == ['rice']
@@ -214,7 +215,7 @@ def test_unavailable_tool_is_not_executed_even_if_model_requests_it():
             return ModelResponse(parts=[ToolCallPart('search_documents', {'query': 'rice'})])
         return ModelResponse(parts=[TextPart('unavailable')])
     agent = Agent(FunctionModel(model), deps_type=FarmerContext,
-                  tools=[Tool(search_documents), CAPABILITY_LOADER], prepare_tools=prepare_capability_tools)
+                  tools=[Tool(search_documents), CAPABILITY_LOADER], capabilities=[PrepareTools(prepare_capability_tools)])
     assert agent.run_sync('rice', deps=deps_for(allowed=set())).output == 'unavailable'
 
 
