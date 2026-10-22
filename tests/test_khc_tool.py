@@ -291,9 +291,11 @@ def test_all_language_prompts_include_khc_rules():
         assert "collect scheme + location + concern -> map category/sub-category" in prompt
         assert "show summary with mapped sub-category -> allow sub-category change" in prompt
         assert "do not ask for mobile number in the first response" in prompt
+        assert "Ask for mobile number only after the user confirms the final grievance summary and sub-category" in prompt
         assert "Do not call `initiate_khc_otp` until summary and sub-category are confirmed" in prompt
         assert "If scheme is missing, ask scheme first" in prompt
         assert "Do not ask for phone number, OTP, or registration status in this opening turn" in prompt
+        assert "Ask only the next missing step from the registration order in each turn" in prompt
 
 
 @pytest.mark.parametrize("coordinates,expected", [
@@ -393,6 +395,17 @@ def test_otp_and_registration_share_transaction_without_exposing_otp(monkeypatch
     ))
     assert len(calls) == 3
     assert len({call["context"]["transaction_id"] for call in calls}) == 1
+
+
+def test_registration_otp_required_reuses_same_mobile_without_reasking(monkeypatch):
+    calls = []
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(
+        "init", "otp_required", {}, message="OTP verification required",
+    )), calls)
+    output = asyncio.run(khc.register_khc_grievance(ctx(), **registration()))
+    assert "same mobile number (9876543210)" in output
+    assert "Do not ask the farmer for the mobile number again" in output
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize("registered", ["true", "invalid"])

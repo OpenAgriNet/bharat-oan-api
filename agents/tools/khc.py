@@ -62,6 +62,18 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
             "get_reference": "khc_reference", "create_grievance": "grievance_created",
         }.get(values.get("request_type"), "grievance_created")
         if code != expected:
+            if (
+                code == "otp_required"
+                and action == "init"
+                and values.get("request_type") == "create_grievance"
+            ):
+                mobile_hint = values.get("farmerMobileNumber")
+                return (
+                    "KHC asked to re-verify mobile before submission. Send a fresh OTP to the same mobile number"
+                    + (f" ({mobile_hint})" if mobile_hint else "")
+                    + ", then verify it with verify_khc_otp before retrying submission. "
+                    "Do not ask the farmer for the mobile number again if it is already captured."
+                )
             if code in (
                 "not_found", "invalid_request", "submission_unconfirmed", "upstream_error",
                 "configuration_error", "otp_required", "invalid_otp",
