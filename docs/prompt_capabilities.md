@@ -1,73 +1,68 @@
-# Prompt capabilities
+# Prompt skills
 
-Default behavior is unchanged: every permitted business tool is loaded initially,
-no loader is exposed, and every existing language prompt renders exactly as before.
-Existing tool-specific restrictions (including AgriStack consent) still apply.
-All 48 tools and 13 language prompts in the current chat `bh-dev` are covered.
+All 51 business tools and 13 supported languages are packaged here. All
+permitted tools remain preloaded by default. Tool implementations, schemas,
+consent guards and API contracts are unchanged.
 
-## Configuration
+## Authoring
 
-Set these in the application's environment or `.env`:
+Browse `assets/prompts/capabilities/agrinet/<skill>/SKILL.md`. Its YAML frontmatter
+is the single source for tool bindings and localized sections. Edit workflow text
+inside its section/language files. `_shared` owns cross-workflow instructions.
+
+A root prompt is a layout: `{{ skill_section('pmkisan/status') }}` renders the
+section selected by language and policy in its original position. It does not
+repeat the tool list. `helpers/prompt_skills.py` derives the inventory from the
+packages and layouts; there is no hand-maintained `sections.json`. `README.md`
+files are navigation, not another source of tool bindings.
+
+To add a tool, register its implementation once in `agents/tools`, reference its
+name in the appropriate skill's `tools`, and add its usage guidance in every
+supported language. The same tool may be referenced by multiple skills. It has
+one schema and one executor, not duplicated implementations. A section normally
+uses its package's tool bindings; `when_any` references other skill bindings for
+shared sections. Explicit `tools` is only for a narrower section-level condition.
+`languages` declares inherited section differences; missing translations never
+silently fall back to English. Existing common KHC/AgriStack English files remain
+explicitly common, not claimed as translations.
+
+## Loading policy
 
 ```dotenv
 CAPABILITY_ALLOWED_TOOLS=all
 CAPABILITY_PRELOADED_TOOLS=all
 ```
 
-Each accepts `all`, `none`, or comma-separated **exact tool names**. The allowed
-list is the hard ceiling, including tools that might be loaded later. Preloaded
-tools must be a subset of it; `all` for preload means all allowed tools. Unknown
-names or an invalid subset raise an error, rather than silently exposing tools.
+Both accept `all`, `none`, or comma-separated exact tool names. Preloads must be a
+subset of allowed tools. `all` for preload means all permitted tools. Unknown names
+fail validation. The allowlist is a ceiling, including tools loaded later.
 
-For example, permit crop retrieval and PM-KISAN but initially expose crop retrieval:
+`FarmerContext.capabilities.policy` is the future request-level integration point;
+no new public API parameter is added. With selective preloading, Pydantic's native
+`load_capability({"id": "pmkisan"})` supplies workflow instructions and exposes
+only permitted members on the next step. Loading is not a business action.
 
-```dotenv
-CAPABILITY_ALLOWED_TOOLS=search_terms,search_documents,initiate_pm_kisan_status_check,check_pm_kisan_status_with_otp
-CAPABILITY_PRELOADED_TOOLS=search_terms,search_documents
-```
+Preloaded instructions retain their original prompt placement. Deferred guidance
+comes from the same files. Within a run the base prompt's tool selection is stable;
+new guidance is returned by the loader. Shared sections are delivered once in that
+run. Loaded workflows remain available after topic switches; there is no automatic
+eviction. Successful native and legacy loader history restores state before history
+trimming. A narrower current policy always wins. Shared business tools are registered
+once and filtered with `PrepareTools`, preserving their own prepare/consent hooks.
 
-Tools in `allowed - preloaded` can be loaded later via `load_capability`. Related
-tools are grouped in `agents/capability_manifest.py`; loading a group enables only
-its **allowed** members. It returns the original workflow instructions and never
-executes a business action. Location helpers are separately configurable: include
-them in the allowed/preloaded lists when the workflow needs geocoding.
-
-Loaded groups stay loaded for the session (no automatic topic-change eviction).
-Successful loader results restore state on subsequent turns; service callers
-restore from full history **before trimming**. A tighter policy on a later turn
-always takes precedence over previously loaded names. Session state is not global.
-
-The future request-level integration point is `FarmerContext.capabilities.policy`
-(`ToolPolicy(allowed_tools=..., preloaded_tools=...)`). There are deliberately no
-new public API fields yet. Policy controls these agents' business tools, not
-moderation, auxiliary agents, authentication, or external service authorization.
-
-## Prompt preservation
-
-Workflow blocks were moved verbatim into `assets/prompts/capabilities/` and included
-in their original positions. Shared routing, safety, language, and cross-workflow
-rules remain in the main prompt. Some mixed-workflow blocks remain shared to avoid
-losing prerequisites; selective mode is not intended to remove every reference to
-an unloaded tool. A short availability rule overrides general service descriptions.
-Tool descriptions, schemas, model settings, and business implementations are unchanged.
-
-`sections.json` maps fragments to tools. If any mapped tool is loaded, the full
-original block is included. A loader also returns the matching blocks, which is
-necessary for agents whose system prompt is not reevaluated during a tool loop.
-Browse [capability → section → language](../assets/prompts/capabilities/agrinet/README.md).
-Common KHC/AgriStack sources are included directly; shared cross-capability blocks
-live under `_shared`. Git preserves prior wording; no frozen hash files are used.
-For a structural change, set `PROMPT_COMPARE_REF` to the preceding Git revision to
-compare every rendered language prompt and lazy-loaded instructions byte-for-byte.
-
-Run offline checks from the repository root, with its pinned Pydantic AI installed:
+## Verification
 
 ```bash
-python -m pytest tests/test_capabilities.py tests/test_prompt_structure.py -q
+python -m pytest tests/test_capabilities.py tests/test_native_skills.py tests/test_prompt_structure.py -q
+PROMPT_COMPARE_REF=<pre-structural-commit> python -m pytest tests/test_prompt_structure.py -q
 ```
 
-These check default/all-loaded equality, prompt inventory, language coverage,
-all-tool coverage, policy validation, session/topic
-switches, original tool ordering, and an actual Pydantic AI load→execute loop using
-a deterministic local model. They do not establish selective-mode model accuracy
-or latency; those require a separate inference benchmark.
+CI checks all languages, package/section inventory and tool coverage. Native-loading
+tests cover preload defaults, allowlists, shared tools, history serialization,
+topic switches, tool guards and streaming. Git comparisons check full and selective
+rendering, including whitespace; Pydantic itself strips the outside whitespace of
+loaded instruction messages. No permanent prompt hashes are stored.
+
+These offline checks do not establish model quality or latency. Paired inference
+and judging must use `oan-evaluation` against an isolated model endpoint before
+claiming no regression.

@@ -60,6 +60,8 @@ class CapabilityState(BaseModel):
     loaded_tools: set[str] = Field(default_factory=set)
     # Rendered workflow instructions for loader results; not persisted as session state.
     sections: list[tuple[frozenset[str], str]] = Field(default_factory=list, exclude=True)
+    prompt_tools: frozenset[str] | None = Field(default=None, exclude=True)
+    delivered_sections: set[int] = Field(default_factory=set, exclude=True)
 
     @property
     def visible(self) -> frozenset[str]:
@@ -70,7 +72,18 @@ class CapabilityState(BaseModel):
 
     def restore(self, history: list) -> None:
         """Restore only successful loader results, before callers trim history."""
+        native_calls = {}
         for message in history:
             for part in getattr(message, "parts", ()):
+                if getattr(part, "tool_kind", None) == "capability-load":
+                    if getattr(part, "part_kind", None) == "tool-call":
+                        name = getattr(part, "capability_id", None)
+                        if name in CAPABILITIES:
+                            native_calls[part.tool_call_id] = name
+                    elif getattr(part, "part_kind", None) == "tool-return":
+                        name = native_calls.get(part.tool_call_id)
+                        if name is not None:
+                            self.loaded_tools.update(CAPABILITIES[name] & self.policy.allowed_tools)
                 # Never trust persisted names to bypass the current policy.
+                # Retain compatibility with sessions created by the previous loader.
                 self.loaded_tools.update(_loaded_tools_from_return(part) & self.policy.allowed_tools)

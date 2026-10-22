@@ -5,6 +5,7 @@ This checks script and identifiers, not translation quality or model behavior.
 from pathlib import Path
 import re
 import unittest
+from helpers.prompt_skills import prompt_environment, section_index, SECTION_CALL
 from jinja2 import Environment, FileSystemLoader
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +18,7 @@ SCRIPT_RANGES = {
 
 
 def render(language):
-    return Environment(loader=FileSystemLoader(ROOT / "assets/prompts")).get_template(f"agrinet_{language}.md").render()
+    return prompt_environment(ROOT / "assets/prompts").get_template(f"agrinet_{language}.md").render()
 
 
 class PromptLanguageContract(unittest.TestCase):
