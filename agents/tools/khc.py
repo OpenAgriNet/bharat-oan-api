@@ -30,7 +30,7 @@ _UNCONFIRMED = (
 
 
 def _chain(match: dict) -> str:
-    """'Block X, District Y, State Z' for the levels above the match."""
+    """'Sub-district X, District Y, State Z' for the levels above the match."""
     names = [(match.get(key) or {}).get("name") for key in ("subDistrict", "district", "state")]
     return ", ".join(name for name in names if name and name != match.get("name"))
 
@@ -64,8 +64,8 @@ def _render_location(fields: dict[str, str], place: str) -> str:
                 "Not found in this district's lists. Steps: (1) call forward_geocode and reverse_geocode on "
                 "the place to fix the spelling, then call this tool again. (2) If still not found, call "
                 f"lookup_khc_reference(reference_type=\"sub-districts\", parent_id={district_id}, name=\"\"), "
-                "show the block names, and ask 'Which block are you from?'; then call "
-                "lookup_khc_reference(reference_type=\"villages\", parent_id=<that block's id>, name=\"\") and show "
+                "show the sub-district names, and ask 'Which sub-district are you from?'; then call "
+                "lookup_khc_reference(reference_type=\"villages\", parent_id=<that sub-district's id>, name=\"\") and show "
                 "the village names to pick from. (3) If the village is not listed, ask which listed village is "
                 "nearest; use it only if the farmer clearly says yes, and write their real village name in the "
                 "complaint text."
@@ -83,16 +83,16 @@ def _render_location(fields: dict[str, str], place: str) -> str:
         if match.get("level") == "village":
             return (
                 f"Found one place:\n{listing}\nUse it for the grievance location and do not ask the farmer "
-                "for state, district, block or village again. Keep the IDs internal."
+                "for state, district, sub-district or village again. Keep the IDs internal."
             )
         return (
             f"Matched a {match.get('level')} only:\n{listing}\nKeep the IDs internal. Still ask "
             "'Which village are you from?' (or the next missing level), then call this tool again with "
             "the village and this district/state."
         )
-    # Every row already carries its full chain, so one pick of a "Block, District" option is enough.
+    # Every row already carries its full chain, so one pick of a "Sub-district, District" option is enough.
     options = "\n".join(
-        f"- {m['name']}: {(m.get('subDistrict') or {}).get('name', '?')} block, "
+        f"- {m['name']}: {(m.get('subDistrict') or {}).get('name', '?')} sub-district, "
         f"{(m.get('district') or {}).get('name', '?')} district"
         for m in matches
     )
@@ -104,9 +104,10 @@ def _render_location(fields: dict[str, str], place: str) -> str:
     )
     return (
         f"Several places named '{place}' in this state:\n{options}\n(For your use only, the rows with IDs:)\n"
-        f"{listing}\nAsk 'Which block are you from?' and show the options above as a list "
-        "(block and district names, no IDs) for the farmer to pick by name. Use the chosen row's IDs; "
-        f"do not call the tool again.{more}"
+        f"{listing}\nAsk 'Which sub-district are you from?' and show the options above as a list "
+        "(sub-district and district names, no IDs) for the farmer to pick by name. When they pick one, the village "
+        f"is already known: call this tool again with place='{place}', the same state, and sub_district=<their pick>. "
+        f"Do not search for the sub-district name as a place and do not ask for the village again.{more}"
     )
 
 
@@ -280,7 +281,7 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "and ask only when missing or ambiguous. If the district is unknown, ask for it first; "
                 "never guess it from a village name. Once the district is verified, fetch sub-districts "
                 "with its districtId and name=\"\". If the sub-district is missing, show a bulleted list "
-                "of returned sub-district names (tehsils/blocks) for the farmer to select by name only, "
+                "of returned sub-district names (sub-districts/tehsils) for the farmer to select by name only, "
                 "rather than asking them to know the name. Offer remaining pages when available. "
                 "Never invent options or present an empty list as a choice; explain lookup failures. "
                 "After selection, fetch villages under the selected subdistrictid and match the village "
@@ -347,19 +348,24 @@ async def verify_khc_otp(
 @observe(name="tool:find_khc_location", as_type="tool")
 async def find_khc_location(
     ctx: RunContext[FarmerContext], place: str, state: str = "", district: str = "",
+    sub_district: str = "",
 ) -> str:
-    """Find where a place is: its state, district, block and village IDs, in one call.
+    """Find where a place is: its state, district, sub-district and village IDs, in one call.
 
     Use this first for the KHC grievance location, with the village or place name the
-    farmer gave (ask for the village first). Pass state and/or district when known; names
+    farmer gave (ask for the village first). Pass state and/or district when known. When the farmer has
+    picked a sub-district from a list, call again with the same village as place and that sub-district
+    as sub_district; it then returns exactly one place. Names
     may have spacing, case or small spelling differences. A place that is a district also
     matches. If nothing matches, the result says what to ask next. Do not use for status.
     """
     place, state, district = place.strip(), state.strip(), district.strip()
-    if not place or len(place) > 200 or len(state) > 100 or len(district) > 100:
+    sub_district = sub_district.strip()
+    if not place or len(place) > 200 or max(len(state), len(district), len(sub_district)) > 100:
         return "Ask the farmer for their village or place name (up to 200 characters)."
     return await _call(
         ctx, "init", request_type="find_location", name=place, state_name=state, district_name=district,
+        sub_district_name=sub_district,
     )
 
 

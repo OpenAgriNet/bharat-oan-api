@@ -290,16 +290,15 @@ def test_all_language_prompts_include_khc_rules():
         assert "When waiting for a KHC OTP, treat a six-digit reply as the OTP" in prompt
         assert "uttarpradesh" in prompt
         assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
-        assert "collect scheme + location + concern -> map category/sub-category" in prompt
-        assert "show summary with mapped sub-category -> allow sub-category change" in prompt
-        assert "do not ask for mobile number in the first response" in prompt
-        assert "Ask for mobile number only after the user confirms the final grievance summary and sub-category" in prompt
-        assert "Do not call `initiate_khc_otp` until summary and sub-category are confirmed" in prompt
-        assert "If scheme is missing, ask scheme first" in prompt
-        assert "Do not ask for phone number, OTP, or registration status in this opening turn" in prompt
-        assert "Ask only the next missing step from the registration order in each turn" in prompt
         assert "Never repeat the same sentence, clause, or question in the same response" in prompt
         assert "Use simple wording" in prompt
+        assert "call `find_khc_location` again with the same village as `place`" in prompt
+        assert "never ask for the village again" in prompt
+        assert "KHC step order (follow exactly; every reply asks ONE question)" in prompt
+        assert "Never ask for a later step early, never ask for two steps in one reply" in prompt
+        assert "never ask for the mobile number or an OTP before the farmer has confirmed the summary" in prompt
+        assert "end every reply with the line \"Source: Kisan Helpline Center\"" in prompt
+        assert "Never put it between two sentences or before a question" in prompt
         assert "call `get_khc_grievance_options(state, scheme, concern)`" in prompt
         assert "Which one is closest to your problem?" in prompt
         assert "Phone number and OTP come last" in prompt
@@ -312,17 +311,14 @@ def test_all_language_prompts_include_khc_rules():
         assert "Then call `find_khc_location(place=<village>, state=<state>)`" in prompt
         assert "Get scheme, category and sub-category with `get_khc_grievance_options`" in prompt
         assert "Which state are you from?" in prompt
-        assert "For every location question (state, district, sub-district/tehsil/block, village, or any other place)" in prompt
+        assert "For every location question (state, district, sub-district/tehsil, village, or any other place)" in prompt
         assert "Never ask where \"the grievance\" or \"this complaint\" is from" in prompt
-        assert "show \"Source: Kisan Helpline Center\" at all times" in prompt
         assert "Location order: state, then village; district only if needed." in prompt
-        assert "If several villages have that name, ask \"Which block are you from?\"" in prompt
+        assert "If several villages have that name, ask \"Which sub-district are you from?\"" in prompt
         assert "if it matches a district, use it as the district and do not ask for the district" in prompt
         assert "Do not offer another scheme such as e-NAM unless the farmer names it" in prompt
         assert "Avoid technical terms like \"mapping\", \"resolved\", \"determine automatically\"" in prompt
         assert "Please share your complaint in one sentence." in prompt
-        assert "Follow collection order exactly: scheme -> location -> concern" in prompt
-        assert "If scheme is missing, ask only for scheme and wait" in prompt
 
 
 @pytest.mark.parametrize("coordinates,expected", [
@@ -648,7 +644,7 @@ def test_find_location_sends_known_details_and_reports_one_village(monkeypatch):
     }
     assert "Abupur - Meerut Block, Meerut, Uttar Pradesh" in output
     assert "stateId=9, districtId=221, subDistrictId=1067, villageId=5" in output
-    assert "do not ask the farmer for state, district, block or village again" in output
+    assert "do not ask the farmer for state, district, sub-district or village again" in output
     assert khc.SOURCE in output
 
 
@@ -666,7 +662,7 @@ def test_find_location_without_a_match_says_what_to_ask(monkeypatch, needs, expe
     assert expected in asyncio.run(khc.find_khc_location(ctx(), "nowhere"))
 
 
-def test_find_location_offers_blocks_when_several_villages_share_the_name(monkeypatch):
+def test_find_location_offers_sub_districts_when_several_villages_share_the_name(monkeypatch):
     import json
 
     base = {"level": "village", "name": "Abupur", "state": {"id": 9, "name": "Uttar Pradesh"}}
@@ -676,10 +672,12 @@ def test_find_location_offers_blocks_when_several_villages_share_the_name(monkey
         "matches": json.dumps(rows), "total": "2",
     })), [])
     output = asyncio.run(khc.find_khc_location(ctx(), "abupur", "Uttar Pradesh"))
-    assert "Which block are you from?" in output
-    assert "- Abupur: Meerut Block block, Meerut district" in output
-    assert "- Abupur: Loni block, Ghaziabad district" in output
-    assert "do not call the tool again" in output
+    assert "Which sub-district are you from?" in output
+    assert "- Abupur: Meerut Block sub-district, Meerut district" in output
+    assert "- Abupur: Loni sub-district, Ghaziabad district" in output
+    assert "block" not in output.lower().replace("meerut block", "")
+    assert "call this tool again with place='abupur', the same state, and sub_district=<their pick>" in output
+    assert "do not ask for the village again" in output
     assert "villageId=5" in output and "villageId=7" in output
     assert "list was cut" not in output
 
@@ -774,7 +772,7 @@ def test_scheme_not_offered_by_khc_is_explained(monkeypatch):
     assert "- AIF" in output
 
 
-def test_place_not_found_gives_block_and_village_fallback_with_the_district_id(monkeypatch):
+def test_place_not_found_gives_sub_district_and_village_fallback_with_the_district_id(monkeypatch):
     import json
 
     fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_location", {
@@ -782,7 +780,7 @@ def test_place_not_found_gives_block_and_village_fallback_with_the_district_id(m
     })), [])
     output = asyncio.run(khc.find_khc_location(ctx(), "nowhere", "Uttar Pradesh", "Meerut"))
     assert 'reference_type="sub-districts", parent_id=221' in output
-    assert "Which block are you from?" in output
+    assert "Which sub-district are you from?" in output
     assert "write their real village name in the complaint text" in output
 
 
@@ -828,3 +826,21 @@ def test_complaint_longer_than_500_characters_is_rejected_without_http(monkeypat
     monkeypatch.setattr(khc, "_call", call)
     asyncio.run(khc.get_khc_grievance_options(ctx(), "Bihar", "AIF", "x" * 501))
     call.assert_not_called()
+
+
+def test_find_location_sends_the_picked_sub_district(monkeypatch):
+    import json
+
+    calls = []
+    village = {"level": "village", "id": 8, "name": "Abupur", "state": {"id": 9, "name": "Uttar Pradesh"},
+               "district": {"id": 222, "name": "Ghaziabad"}, "subDistrict": {"id": 2001, "name": "Modinagar"}}
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_location", {
+        "matches": json.dumps([village]), "total": "1",
+    })), calls)
+    output = asyncio.run(khc.find_khc_location(ctx(), "abupur", "Uttar Pradesh", "", " Modinagar "))
+    assert _tags(calls[0]) == {
+        "request_type": "find_location", "name": "abupur", "state_name": "Uttar Pradesh",
+        "sub_district_name": "Modinagar",
+    }
+    assert "Found one place" in output and "villageId=8" in output
+    assert "Still ask" not in output
