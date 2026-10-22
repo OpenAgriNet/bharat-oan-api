@@ -177,13 +177,27 @@ def _sanitize_streamed_output(raw_output: str) -> str:
     return cleaned_output
 
 
+def _canonicalize_for_duplicate_check(text: str) -> str:
+    return "".join(ch.lower() for ch in text if ch.isalnum())
+
+
 def _collapse_adjacent_duplicate_text(text: str) -> str:
-    """Collapse one immediate full-text repetition, preserving original spacing around it."""
+    """Collapse one immediate full-text repetition, allowing minor punctuation differences."""
     if not text:
         return text
-    repeated = re.fullmatch(r"(?s)(.{20,}?)(\s*)\1", text.strip())
+    stripped = text.strip()
+    repeated = re.fullmatch(r"(?s)(.{20,}?)(\s*)\1", stripped)
     if repeated:
         return repeated.group(1).strip()
+    # ponytail: O(n) split scan on short chat replies; upgrade to sentence-level token hashes if needed.
+    minimum = 20
+    for split in range(minimum, len(stripped) - minimum + 1):
+        left = stripped[:split].strip()
+        right = stripped[split:].strip()
+        if abs(len(left) - len(right)) > 8:
+            continue
+        if _canonicalize_for_duplicate_check(left) == _canonicalize_for_duplicate_check(right):
+            return left
     return text
 
 

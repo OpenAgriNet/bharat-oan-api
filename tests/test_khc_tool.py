@@ -284,6 +284,8 @@ def test_all_language_prompts_include_khc_rules():
         assert "If the farmer-provided scheme, sub-district, village, category, or sub-category does not match a returned row" in prompt
         assert "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme" in prompt
         assert "Do not ask the farmer to reconfirm AIF when already stated" in prompt
+        assert "Pick the single best-fit category/sub-category automatically and proceed with that mapping" in prompt
+        assert "Ask the farmer to choose from a returned list only when no supported fit can be determined automatically" in prompt
         assert "Do not offer to proceed with only a category" in prompt
         assert "When waiting for a KHC OTP, treat a six-digit reply as the OTP" in prompt
         assert "uttarpradesh" in prompt
@@ -297,6 +299,9 @@ def test_all_language_prompts_include_khc_rules():
         assert "Do not ask for phone number, OTP, or registration status in this opening turn" in prompt
         assert "Ask only the next missing step from the registration order in each turn" in prompt
         assert "Never repeat the same sentence, clause, or question in the same response" in prompt
+        assert "Use simple wording" in prompt
+        assert "Avoid technical terms like \"mapping\", \"resolved\", \"determine automatically\"" in prompt
+        assert "Please share your complaint in one sentence." in prompt
         assert "Follow collection order exactly: scheme -> location -> concern" in prompt
         assert "If scheme is missing, ask only for scheme and wait" in prompt
 
@@ -443,6 +448,7 @@ def test_reference_results_direct_problem_matching_without_asking_for_ids(monkey
     assert "unfiltered list and remaining pages" in output
     assert "Treat missing spaces and case differences as name variations" in output
     assert "show the relevant returned names for selection by name" in output
+    assert "Pick the single best-fit category/sub-category automatically and proceed with that mapping" in output
 
 
 @pytest.mark.parametrize("kind,parent,options", [
