@@ -29,6 +29,11 @@ _UNCONFIRMED = (
 )
 
 
+def _loose(text: str) -> str:
+    """Lowercase letters and digits only, so 'Uttar Pradesh' and 'uttarpradesh' compare equal."""
+    return "".join(ch for ch in text.lower() if ch.isalnum())
+
+
 def _chain(match: dict) -> str:
     """'Sub-district X, District Y, State Z' for the levels above the match."""
     names = [(match.get(key) or {}).get("name") for key in ("subDistrict", "district", "state")]
@@ -72,41 +77,46 @@ def _render_location(fields: dict[str, str], place: str) -> str:
             ),
         }.get(needs, "Ask the farmer for the place name again.")
         return f"No place named '{place}' was found. {ask}"
+    # The farmer was asked for a village, so a village match beats a district or sub-district of the same name.
+    villages = [m for m in matches if m.get("level") == "village"]
+    matches = villages or matches
     lines = []
     for index, match in enumerate(matches, 1):
         level = match.get("level", "place").replace("-", " ")
         chain = _chain(match)
         lines.append(f"{index}. {level} {match['name']}" + (f" - {chain}" if chain else "") + f" [{_ids(match)}]")
     listing = "\n".join(lines)
-    if len(matches) == 1:
-        match = matches[0]
-        if match.get("level") == "village":
-            return (
-                f"Found one place:\n{listing}\nUse it for the grievance location and do not ask the farmer "
-                "for state, district, sub-district or village again. Keep the IDs internal."
-            )
+    if not villages:
         return (
-            f"Matched a {match.get('level')} only:\n{listing}\nKeep the IDs internal. Still ask "
-            "'Which village are you from?' (or the next missing level), then call this tool again with "
-            "the village and this district/state."
+            f"'{place}' is the name of a district or sub-district, not a village:\n{listing}\nKeep the IDs "
+            "internal. Use it as that district or sub-district and now ask 'Which village are you from?'. "
+            "Then call this tool with the village as place, the state, and this district (or sub_district). "
+            "Do not list these as villages."
+        )
+    if len(matches) == 1:
+        return (
+            f"Found one place:\n{listing}\nUse it for the grievance location and do not ask the farmer "
+            "for state, district, sub-district or village again. Keep the IDs internal."
         )
     # Every row already carries its full chain, so one pick of a "Sub-district, District" option is enough.
+    one_district = len({(m.get("district") or {}).get("name") for m in matches}) == 1
     options = "\n".join(
-        f"- {m['name']}: {(m.get('subDistrict') or {}).get('name', '?')} sub-district, "
-        f"{(m.get('district') or {}).get('name', '?')} district"
+        f"- {m['name']}: {(m.get('subDistrict') or {}).get('name', '?')} sub-district"
+        + ("" if one_district else f", {(m.get('district') or {}).get('name', '?')} district")
         for m in matches
     )
     cut = int(fields.get("total", "0") or 0) > len(matches)
     more = (
-        " The list was cut: if the farmer does not see their place, ask 'Which district are you from?' "
-        "and call this tool again with that district."
+        " The list was cut: if the farmer does not see theirs, ask them to type their sub-district name "
+        "and call this tool again with it as sub_district."
         if cut else ""
     )
     return (
         f"Several places named '{place}' in this state:\n{options}\n(For your use only, the rows with IDs:)\n"
         f"{listing}\nAsk 'Which sub-district are you from?' and show the options above as a list "
-        "(sub-district and district names, no IDs) for the farmer to pick by name. When they pick one, the village "
-        f"is already known: call this tool again with place='{place}', the same state, and sub_district=<their pick>. "
+        "(sub-district names, plus the district only when they differ; no IDs) for the farmer to pick by name. When "
+        f"they pick one, the village is already known: call this tool again with place='{place}', the same state "
+        "and district, and sub_district=<their pick>. "
         f"Do not search for the sub-district name as a place and do not ask for the village again.{more}"
     )
 
@@ -353,7 +363,7 @@ async def find_khc_location(
     """Find where a place is: its state, district, sub-district and village IDs, in one call.
 
     Use this first for the KHC grievance location, with the village or place name the
-    farmer gave (ask for the village first). Pass state and/or district when known. When the farmer has
+    farmer gave (ask state, then district, then village). Pass the state and district. When the farmer has
     picked a sub-district from a list, call again with the same village as place and that sub-district
     as sub_district; it then returns exactly one place. Names
     may have spacing, case or small spelling differences. A place that is a district also
@@ -363,6 +373,16 @@ async def find_khc_location(
     sub_district = sub_district.strip()
     if not place or len(place) > 200 or max(len(state), len(district), len(sub_district)) > 100:
         return "Ask the farmer for their village or place name (up to 200 characters)."
+    if state and _loose(place) == _loose(state):
+        return (
+            "That is the state, not a village. Do not search with it. Ask 'Which district are you from?' "
+            "and then 'Which village are you from?', and call this tool with the village as place."
+        )
+    if district and _loose(place) == _loose(district):
+        return (
+            "That is the district, not a village. Do not search with it. Ask 'Which village are you from?' "
+            "and call this tool with the village as place, this state and this district."
+        )
     return await _call(
         ctx, "init", request_type="find_location", name=place, state_name=state, district_name=district,
         sub_district_name=sub_district,

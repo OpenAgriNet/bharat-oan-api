@@ -257,7 +257,7 @@ def test_all_language_prompts_include_khc_rules():
         assert "**Location reuse:**" in prompt
         assert "call `reverse_geocode`" in prompt
         assert "call `forward_geocode` first" in prompt
-        assert "If browser coordinates are unavailable, ask \"Which state are you from?\" and then \"Which village are you from?\"" in prompt
+        assert "If browser coordinates are unavailable, ask \"Which state are you from?\", then \"Which district are you from?\", then \"Which village are you from?\"" in prompt
         assert "Never substitute a nearby village" in prompt
         assert "**Problem-to-scheme matching:**" in prompt
         assert "If scheme is still missing, ask for scheme name" in prompt
@@ -292,7 +292,16 @@ def test_all_language_prompts_include_khc_rules():
         assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
         assert "Never repeat the same sentence, clause, or question in the same response" in prompt
         assert "Use simple wording" in prompt
-        assert "call `find_khc_location` again with the same village as `place`" in prompt
+        assert '3. District: "Which district are you from?"' in prompt
+        assert "7. Mobile number (only now, after the summary is confirmed)." in prompt
+        assert "8. OTP: `initiate_khc_otp`, then `verify_khc_otp` (the last thing before submitting)." in prompt
+        assert "Use what the farmer already said (do not ask again)" in prompt
+        assert '"...with KHC for AIF, I am from Uttarpradesh" -> ask only "Which district are you from?"' in prompt
+        assert '"...for AIF, Uttar Pradesh, Meerut district" -> ask only "Which village are you from?"' in prompt
+        assert "Do not ask for anything the farmer already gave" in prompt
+        assert "the location (village, sub-district, district, state), the category and the sub-category" in prompt
+        assert "Never call it with the state or district name as the place, and never ask for the village before the district" in prompt
+        assert "call `find_khc_location` again with the same village as `place`, the same state and district" in prompt
         assert "never ask for the village again" in prompt
         assert "KHC step order (follow exactly; every reply asks ONE question)" in prompt
         assert "Never ask for a later step early, never ask for two steps in one reply" in prompt
@@ -308,13 +317,13 @@ def test_all_language_prompts_include_khc_rules():
         assert "A wrong OTP gives 5 tries" in prompt
         assert "ask which listed village is nearest and use it only if the farmer clearly says yes" in prompt
         assert "Do not submit again on your own" in prompt
-        assert "Then call `find_khc_location(place=<village>, state=<state>)`" in prompt
+        assert "Then call `find_khc_location(place=<village>, state=<state>, district=<district>)`" in prompt
         assert "Get scheme, category and sub-category with `get_khc_grievance_options`" in prompt
         assert "Which state are you from?" in prompt
         assert "For every location question (state, district, sub-district/tehsil, village, or any other place)" in prompt
         assert "Never ask where \"the grievance\" or \"this complaint\" is from" in prompt
-        assert "Location order: state, then village; district only if needed." in prompt
-        assert "If several villages have that name, ask \"Which sub-district are you from?\"" in prompt
+        assert "Location order: state, then district, then village." in prompt
+        assert "If several villages in that district have that name, ask \"Which sub-district are you from?\"" in prompt
         assert "if it matches a district, use it as the district and do not ask for the district" in prompt
         assert "Do not offer another scheme such as e-NAM unless the farmer names it" in prompt
         assert "Avoid technical terms like \"mapping\", \"resolved\", \"determine automatically\"" in prompt
@@ -673,10 +682,10 @@ def test_find_location_offers_sub_districts_when_several_villages_share_the_name
     })), [])
     output = asyncio.run(khc.find_khc_location(ctx(), "abupur", "Uttar Pradesh"))
     assert "Which sub-district are you from?" in output
-    assert "- Abupur: Meerut Block sub-district, Meerut district" in output
+    assert "- Abupur: Meerut Block sub-district, Meerut district" in output  # different districts: show both
     assert "- Abupur: Loni sub-district, Ghaziabad district" in output
     assert "block" not in output.lower().replace("meerut block", "")
-    assert "call this tool again with place='abupur', the same state, and sub_district=<their pick>" in output
+    assert "call this tool again with place='abupur', the same state and district, and sub_district=<their pick>" in output
     assert "do not ask for the village again" in output
     assert "villageId=5" in output and "villageId=7" in output
     assert "list was cut" not in output
@@ -693,7 +702,7 @@ def test_find_location_asks_for_district_only_when_the_list_was_cut(monkeypatch)
     })), [])
     output = asyncio.run(khc.find_khc_location(ctx(), "rampur", "Uttar Pradesh"))
     assert "The list was cut" in output
-    assert "ask 'Which district are you from?'" in output
+    assert "type their sub-district name" in output and "as sub_district" in output
 
 
 def test_find_location_malformed_result_is_not_trusted(monkeypatch):
@@ -844,3 +853,76 @@ def test_find_location_sends_the_picked_sub_district(monkeypatch):
     }
     assert "Found one place" in output and "villageId=8" in output
     assert "Still ask" not in output
+
+
+@pytest.mark.parametrize("place,state", [("uttar pradesh", "Uttar Pradesh"), ("UttarPradesh", "uttar pradesh")])
+def test_find_location_refuses_the_state_name_as_a_place(monkeypatch, place, state):
+    call = AsyncMock()
+    monkeypatch.setattr(khc, "_call", call)
+    output = asyncio.run(khc.find_khc_location(ctx(), place, state))
+    assert "That is the state, not a village" in output
+    assert "Which district are you from?" in output and "Which village are you from?" in output
+    call.assert_not_called()
+
+
+def test_a_district_and_sub_district_of_the_same_name_are_not_listed_as_villages(monkeypatch):
+    import json
+
+    state = {"id": 9, "name": "Uttar Pradesh"}
+    district = {"id": 222, "name": "Ghaziabad"}
+    rows = [
+        {"level": "district", "id": 222, "name": "Ghaziabad", "state": state, "district": district, "subDistrict": None},
+        {"level": "sub-district", "id": 2001, "name": "Ghaziabad", "state": state, "district": district,
+         "subDistrict": {"id": 2001, "name": "Ghaziabad"}},
+    ]
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_location", {
+        "matches": json.dumps(rows), "total": "2",
+    })), [])
+    output = asyncio.run(khc.find_khc_location(ctx(), "ghaziabad", "Uttar Pradesh"))
+    assert "is the name of a district or sub-district, not a village" in output
+    assert "ask 'Which village are you from?'" in output
+    assert "Do not list these as villages" in output
+    assert "Which sub-district are you from?" not in output
+
+
+def test_a_village_match_beats_a_district_of_the_same_name(monkeypatch):
+    import json
+
+    state = {"id": 9, "name": "Uttar Pradesh"}
+    district = {"id": 222, "name": "Ghaziabad"}
+    rows = [
+        {"level": "district", "id": 222, "name": "Ghaziabad", "state": state, "district": district, "subDistrict": None},
+        {"level": "village", "id": 5, "name": "Ghaziabad", "state": state, "district": {"id": 9, "name": "Meerut"},
+         "subDistrict": {"id": 1, "name": "Daurala"}},
+    ]
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_location", {
+        "matches": json.dumps(rows), "total": "2",
+    })), [])
+    output = asyncio.run(khc.find_khc_location(ctx(), "ghaziabad", "Uttar Pradesh"))
+    assert "Found one place" in output and "villageId=5" in output
+    assert "districtId=222" not in output
+
+
+def test_find_location_refuses_the_district_name_as_a_place(monkeypatch):
+    call = AsyncMock()
+    monkeypatch.setattr(khc, "_call", call)
+    output = asyncio.run(khc.find_khc_location(ctx(), "Meerut", "Uttar Pradesh", "meerut"))
+    assert "That is the district, not a village" in output
+    assert "Which village are you from?" in output
+    call.assert_not_called()
+
+
+def test_sub_district_options_omit_the_district_when_they_share_one(monkeypatch):
+    import json
+
+    base = {"level": "village", "name": "Abupur", "state": {"id": 9, "name": "Uttar Pradesh"},
+            "district": {"id": 222, "name": "Ghaziabad"}}
+    rows = [{**base, "id": 5, "subDistrict": {"id": 1, "name": "Loni"}},
+            {**base, "id": 7, "subDistrict": {"id": 2, "name": "Modinagar"}}]
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_location", {
+        "matches": json.dumps(rows), "total": "2",
+    })), [])
+    output = asyncio.run(khc.find_khc_location(ctx(), "abupur", "Uttar Pradesh", "Ghaziabad"))
+    assert "- Abupur: Loni sub-district\n" in output
+    assert "- Abupur: Modinagar sub-district\n" in output
+    assert "sub-district, Ghaziabad district" not in output
