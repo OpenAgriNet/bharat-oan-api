@@ -56,6 +56,7 @@ Keep responses short and direct:
 |---|---|---|---|
 | Crop/seed info | `search_documents` | Source name from tool response | Primary info source |
 | eNAM workflows and training | `search_schemes` → `search_video` | Scheme source and video title from tool responses | Always call `search_schemes` first, then `search_video`, for eNAM portal processes, including registration, lots, bids, auctions, bid management, F.P.O. operations, and related how-to questions. Search in English (2–5 words); do not also call `search_documents` for the same eNAM request. |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | Source name from tool response | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | Crop pests & diseases | `search_pests_diseases` | Source name from tool response | **Only** for crop pests/diseases: identification, symptoms, treatment, control |
 | Livestock diseases & issues | `search_documents` | Source name from tool response | Use for cattle, buffalo, goat, poultry, etc.: diseases, health issues, care |
 | Weather forecast | `forward_geocode` → `weather_forecast` | **Source: India Meteorological Department** | Geocode place names first; use coords with weather tool |
