@@ -60,13 +60,14 @@ Supported prompt languages: `as`, `bn`, `en`, `gu`, `hi`, `kn`, `mai`, `ml`, `mr
 | [smam/status](smam/status/) | Localized files, all 13 languages |
 | [soil_health/report](soil_health/report/) | Localized files, all 13 languages |
 | [soil_health/status](soil_health/status/) | Localized files, all 13 languages |
+| [weather/agromet](weather/agromet/) | Localized files, all 13 languages |
 | [weather/forecast](weather/forecast/) | Localized files, all 13 languages |
 
 KHC and AgriStack previously had 13 wrappers each around the same English source;
 `*_common.md` now exposes that fact directly. PM-KISAN instalments have no standalone
 section in the other eight languages; that inherited difference is preserved, not
 filled with an implicit English fallback. Crop advice and location have no extracted
-sections. Weather/IMD also has instructions in the main routing table.
+sections. Weather and IMD agromet also keep a short row in the main routing table.
 
 ## Editing and checks
 
