@@ -98,6 +98,17 @@ def _lookup_sync(keys: List[str]) -> dict:
         _pool.putconn(conn)
 
 
+def _coords(ctx: RunContext[FarmerContext], latitude: Optional[float], longitude: Optional[float]):
+    """The given point, or the farmer's browser location when none is given."""
+    lat = latitude if latitude is not None else ctx.deps.latitude
+    lon = longitude if longitude is not None else ctx.deps.longitude
+    return lat, lon
+
+
+def _district_names(data: dict) -> str:
+    return ", ".join(d.get("name") or str(d.get("lgd_district_code")) for d in data.get("districts", []))
+
+
 def _display_date(value: str) -> str:
     return datetime.date.fromisoformat(value).strftime("%d %b %Y")
 
@@ -161,8 +172,7 @@ async def imd_agromet_advisory(
     Returns:
         str: The advisory texts with source, issue date and valid-until date, or a message explaining what is missing.
     """
-    lat = latitude if latitude is not None else ctx.deps.latitude
-    lon = longitude if longitude is not None else ctx.deps.longitude
+    lat, lon = _coords(ctx, latitude, longitude)
     if lat is None or lon is None:
         return ("Location not available. Ask the farmer to share their location, or their village/district name "
                 "(then use forward_geocode and call this tool with the coordinates).")
@@ -185,7 +195,7 @@ async def imd_agromet_advisory(
         logger.error(f"IMD advisory DB lookup failed: {exc}")
         return "The IMD advisory service is not reachable right now. Please try again later."
 
-    districts = ", ".join(d.get("name") or str(d.get("lgd_district_code")) for d in data.get("districts", []))
+    districts = _district_names(data)
     if not districts:
         logger.warning(f"IMD advisory: no district mapped for location {lat:.3f},{lon:.3f}")
         return "Could not identify the district for this location. Ask the farmer for their district name."
@@ -217,8 +227,7 @@ async def agromet_note(
     a crop named in the query) and the advisory has not been mentioned or shared in this conversation yet.
     Returns an empty string otherwise, including on any lookup failure, so the calling tool is never affected.
     """
-    lat = latitude if latitude is not None else ctx.deps.latitude
-    lon = longitude if longitude is not None else ctx.deps.longitude
+    lat, lon = _coords(ctx, latitude, longitude)
     if "imd_agromet_advisory" not in ctx.deps.capabilities.policy.allowed_tools:
         return ""
     if lat is None or lon is None or not resolver_configured() or not IMD_DB_URL:
@@ -234,7 +243,7 @@ async def agromet_note(
         logger.warning(f"IMD advisory check skipped: {exc}")
         return ""
 
-    districts = ", ".join(d.get("name") or str(d.get("lgd_district_code")) for d in data.get("districts", []))
+    districts = _district_names(data)
     crops = sorted({r["crop"] for r in data.get("advisories", []) if r.get("crop")})
     if not districts or not crops:
         return ""
