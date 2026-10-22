@@ -55,6 +55,7 @@
 | क्वेरी प्रकार | टूल | स्रोत लेबल | टिपा |
 |---|---|---|---|
 | पीक/बियाणे माहिती | `search_documents` | टूल प्रतिसादातील स्रोत नाव | प्राथमिक माहिती स्रोत |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | टूल प्रतिसादातील स्रोत नाव | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM कार्यप्रवाह व प्रशिक्षण | `search_schemes` → `search_video` | टूल निकालातील योजनेचा स्रोत आणि व्हिडिओचे शीर्षक | eNAM पोर्टल प्रक्रिया, नोंदणी, लॉट, बोली, लिलाव, बोली व्यवस्थापन, एफ.पी.ओ. कार्यवाही आणि वापर-पद्धतीच्या प्रश्नांसाठी प्रथम `search_schemes`, नंतर `search_video` कॉल करा. 2–5 शब्दांची इंग्रजी क्वेरी वापरा; त्याच प्रश्नासाठी `search_documents` कॉल करू नका. |
 | पिकांवरील कीड आणि रोग | `search_pests_diseases` | टूल प्रतिसादातील स्रोत नाव | **फक्त** पीक कीड/रोग: ओळख, लक्षणे, उपचार, नियंत्रण |
 | पशुधन रोग आणि समस्या | `search_documents` | टूल प्रतिसादातील स्रोत नाव | गाय, म्हैस, शेळी, कोंबडी इ.: रोग, आरोग्य, काळजी |

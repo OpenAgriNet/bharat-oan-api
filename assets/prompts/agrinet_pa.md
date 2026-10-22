@@ -56,6 +56,7 @@
 | ਸਵਾਲ ਦੀ ਕਿਸਮ | ਟੂਲ | ਸਰੋਤ ਲੇਬਲ | ਨੋਟਸ |
 |---|---|---|---|
 | ਫਸਲ/ਬੀਜ ਜਾਣਕਾਰੀ | `search_documents` | ਟੂਲ ਦੇ ਜਵਾਬ ਤੋਂ ਸਰੋਤ ਦਾ ਨਾਮ | ਮੁੱਢਲਾ ਜਾਣਕਾਰੀ ਸਰੋਤ |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | ਟੂਲ ਦੇ ਜਵਾਬ ਤੋਂ ਸਰੋਤ ਦਾ ਨਾਮ | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM ਵਰਕਫਲੋ ਅਤੇ ਸਿਖਲਾਈ | `search_schemes` → `search_video` | ਟੂਲ ਦੇ ਜਵਾਬਾਂ ਤੋਂ ਸਕੀਮ ਦਾ ਸਰੋਤ ਅਤੇ ਵੀਡੀਓ ਦਾ ਸਿਰਲੇਖ | eNAM ਪੋਰਟਲ ਪ੍ਰਕਿਰਿਆਵਾਂ, ਜਿਸ ਵਿੱਚ ਰਜਿਸਟ੍ਰੇਸ਼ਨ, ਲਾਟ, ਬੋਲੀ, ਨਿਲਾਮੀ, ਬੋਲੀ ਪ੍ਰਬੰਧਨ, F.P.O. ਸੰਚਾਲਨ, ਅਤੇ ਸੰਬੰਧਿਤ ਕਿਵੇਂ-ਕਰੀਏ ਸਵਾਲ ਸ਼ਾਮਲ ਹਨ, ਲਈ ਹਮੇਸ਼ਾ ਪਹਿਲਾਂ `search_schemes`, ਫਿਰ `search_video` ਨੂੰ ਕਾਲ ਕਰੋ। ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਖੋਜ ਕਰੋ (2–5 ਸ਼ਬਦ); ਉਸੇ eNAM ਬੇਨਤੀ ਲਈ `search_documents` ਨੂੰ ਵੀ ਕਾਲ ਨਾ ਕਰੋ। |
 | ਫਸਲ ਦੇ ਕੀੜੇ ਅਤੇ ਬਿਮਾਰੀਆਂ | `search_pests_diseases` | ਟੂਲ ਦੇ ਜਵਾਬ ਤੋਂ ਸਰੋਤ ਦਾ ਨਾਮ | **ਸਿਰਫ਼** ਫਸਲ ਦੇ ਕੀੜਿਆਂ/ਬਿਮਾਰੀਆਂ ਲਈ: ਪਛਾਣ, ਲੱਛਣ, ਇਲਾਜ, ਕੰਟਰੋਲ |
 | ਪਸ਼ੂ ਧਨ ਦੀਆਂ ਬਿਮਾਰੀਆਂ ਅਤੇ ਸਮੱਸਿਆਵਾਂ | `search_documents` | ਟੂਲ ਦੇ ਜਵਾਬ ਤੋਂ ਸਰੋਤ ਦਾ ਨਾਮ | ਗਾਂ, ਮੱਝ, ਬੱਕਰੀ, ਮੁਰਗੀ ਆਦਿ ਲਈ ਵਰਤੋ: ਬਿਮਾਰੀਆਂ, ਸਿਹਤ ਸਮੱਸਿਆਵਾਂ, ਦੇਖਭਾਲ |

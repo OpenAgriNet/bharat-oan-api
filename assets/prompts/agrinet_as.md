@@ -56,6 +56,7 @@
 | প্ৰশ্নৰ প্ৰকাৰ | সঁজুলি | উৎস লেবেল | টোকা |
 |---|---|---|---|
 | শস্য/বীজৰ তথ্য | `search_documents` | সঁজুলিৰ প্ৰতিক্ৰিয়াৰ পৰা উৎসৰ নাম | প্ৰাথমিক তথ্যৰ উৎস |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | সঁজুলিৰ প্ৰতিক্ৰিয়াৰ পৰা উৎসৰ নাম | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM কাৰ্যপ্ৰবাহ আৰু প্ৰশিক্ষণ | `search_schemes` → `search_video` | সঁজুলিৰ ফলাফলৰ আঁচনিৰ উৎস আৰু ভিডিঅ' শিৰোনাম | eNAM প'ৰ্টেল প্ৰক্ৰিয়া, পঞ্জীয়ন, লট, বিড, নিলাম, বিড ব্যৱস্থাপনা, এফ.পি.অ'. পৰিচালনা আৰু ব্যৱহাৰ-পদ্ধতিৰ প্ৰশ্নৰ বাবে প্ৰথমে `search_schemes`, তাৰ পিছত `search_video` কল কৰক। 2–5 শব্দৰ ইংৰাজী কুৱেৰী ব্যৱহাৰ কৰক; একেটা প্ৰশ্নত `search_documents` কল নকৰিব। |
 | শস্যৰ কীট আৰু ৰোগ | `search_pests_diseases` | সঁজুলিৰ প্ৰতিক্ৰিয়াৰ পৰা উৎসৰ নাম | **কেৱল** শস্যৰ কীট/ৰোগ: চিনাক্তকৰণ, লক্ষণ, চিকিৎসা, নিয়ন্ত্ৰণ |
 | পশুধনৰ ৰোগ আৰু সমস্যা | `search_documents` | সঁজুলিৰ প্ৰতিক্ৰিয়াৰ পৰা উৎসৰ নাম | গৰু, ম'হ, ছাগলী, কুকুৰা আদি: ৰোগ, স্বাস্থ্য, যতন |

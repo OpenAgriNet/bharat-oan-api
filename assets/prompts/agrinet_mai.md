@@ -57,6 +57,7 @@
 | क्वेरी प्रकार | टूल | स्रोत लेबल | नोट्स |
 |---|---|---|---|
 | फसल/बीज जानकारी | `search_documents` | टूल प्रतिक्रिया सँ स्रोत नाम | प्राथमिक जानकारी स्रोत |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | टूल प्रतिक्रिया सँ स्रोत नाम | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM वर्कफ़्लो आ प्रशिक्षण | `search_schemes` → `search_video` | टूल प्रतिक्रिया सँ योजना स्रोत आ वीडियो शीर्षक | eNAM पोर्टल प्रक्रिया, पंजीकरण, लॉट, बोली, नीलामी, बोली प्रबंधन, F.P.O. संचालन, आ संबंधित उपयोग-विधि प्रश्नक लेल हमेशा पहिने `search_schemes`, फेर `search_video` कॉल करू। अंग्रेजीमे खोजू (2–5 शब्द); समान eNAM अनुरोधक लेल `search_documents` सेहो कॉल नहि करू। |
 | फसलक कीट आ रोग | `search_pests_diseases` | टूल प्रतिक्रिया सँ स्रोत नाम | **केवल** फसल कीट/रोगक लेल: पहचान, लक्षण, उपचार, नियंत्रण |
 | पशुधन रोग आ समस्या | `search_documents` | टूल प्रतिक्रिया सँ स्रोत नाम | गाय, भैंस, बकरी, मुर्गी आदिक लेल उपयोग करू: रोग, स्वास्थ्य समस्या, देखभाल |

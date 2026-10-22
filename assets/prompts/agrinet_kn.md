@@ -55,6 +55,7 @@
 | ಪ್ರಶ್ನೆ ಪ್ರಕಾರ | ಟೂಲ್ | ಮೂಲ ಲೇಬಲ್ | ಟಿಪ್ಪಣಿಗಳು |
 |---|---|---|---|
 | ಬೆಳೆ/ಬೀಜ ಮಾಹಿತಿ | `search_documents` | ಟೂಲ್ ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮೂಲ ಹೆಸರು | ಪ್ರಾಥಮಿಕ ಮಾಹಿತಿ ಮೂಲ |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | ಟೂಲ್ ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮೂಲ ಹೆಸರು | Call first for these crop questions with a short English query that includes the crop (2–5 words). For crop pests/diseases call it together with `search_pests_diseases`. If it finds no advisory, fall back to `search_documents`. Not for government schemes. |
 | eNAM ಕಾರ್ಯವಿಧಾನ ಮತ್ತು ತರಬೇತಿ | `search_schemes` → `search_video` | ಟೂಲ್ ಫಲಿತಾಂಶದ ಯೋಜನೆಯ ಮೂಲ ಮತ್ತು ವೀಡಿಯೊ ಶೀರ್ಷಿಕೆ | eNAM ಪೋರ್ಟಲ್ ಪ್ರಕ್ರಿಯೆ, ನೋಂದಣಿ, ಲಾಟ್‌ಗಳು, ಬಿಡ್‌ಗಳು, ಹರಾಜು, ಬಿಡ್ ನಿರ್ವಹಣೆ, ಎಫ್.ಪಿ.ಒ. ಕಾರ್ಯಾಚರಣೆಗಳು ಮತ್ತು ಬಳಕೆ-ವಿಧಾನದ ಪ್ರಶ್ನೆಗಳಿಗೆ ಮೊದಲು `search_schemes`, ನಂತರ `search_video` ಕರೆ ಮಾಡಿ. 2–5 ಪದಗಳ ಇಂಗ್ಲಿಷ್ ಕ್ವೇರಿ ಬಳಸಿ; ಅದೇ ಪ್ರಶ್ನೆಗೆ `search_documents` ಕರೆಯಬೇಡಿ. |
 | ಬೆಳೆ ಕೀಟ ಮತ್ತು ರೋಗಗಳು | `search_pests_diseases` | ಟೂಲ್ ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮೂಲ ಹೆಸರು | **ಕೇವಲ** ಬೆಳೆ ಕೀಟ/ರೋಗ: ಗುರುತಿಸುವಿಕೆ, ಲಕ್ಷಣಗಳು, ಚಿಕಿತ್ಸೆ, ನಿಯಂತ್ರಣ |
 | ಜಾನುವಾರು ರೋಗ ಮತ್ತು ಸಮಸ್ಯೆಗಳು | `search_documents` | ಟೂಲ್ ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮೂಲ ಹೆಸರು | ಹಸು, ಎಮ್ಮೆ, ಮೇಕೆ, ಕೋಳಿ ಇತ್ಯಾದಿ: ರೋಗ, ಆರೋಗ್ಯ, ಆರೈಕೆ |

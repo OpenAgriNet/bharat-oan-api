@@ -55,6 +55,7 @@ from agents.tools.search import (
     search_pests_diseases,
     search_schemes,
 )
+from agents.tools.advisory import search_advisory
 from agents.tools.weather import weather_forecast
 from agents.tools.imd_advisory import imd_agromet_advisory
 from agents.tools.mandi import get_mandi_prices
@@ -230,6 +231,11 @@ TOOLS = [
     ),
     Tool(
         search_schemes,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        search_advisory,
         takes_ctx=True,
         strict=False,
     ),
