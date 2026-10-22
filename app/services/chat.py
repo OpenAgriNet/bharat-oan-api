@@ -134,6 +134,7 @@ async def _emit_final_text_chunk(
         return
     stream_state.raw_chunks.append(raw_chunk)
     visible_chunk = _strip_streaming_thinking_chunk(raw_chunk, stream_state)
+    visible_chunk = _collapse_adjacent_duplicate_text(visible_chunk)
     if visible_chunk and stream_state.visible_output:
         # Streams can occasionally resend overlapping text. Trim overlap so the
         # farmer does not see repeated prefixes/sentences.
@@ -160,6 +161,7 @@ def _sanitize_streamed_output(raw_output: str) -> str:
     cleaned_output = re.sub(r"<think>[\s\S]*?</think>", "", raw_output)
     cleaned_output = re.sub(r"<think>[\s\S]*$", "", cleaned_output)
     cleaned_output = cleaned_output.strip()
+    cleaned_output = _collapse_adjacent_duplicate_text(cleaned_output)
     # Collapse one full accidental adjacent duplication with optional spacing
     # between copies, e.g. "Question?Question?" or "Question?  Question?".
     repeated = re.fullmatch(r"(?s)(.{20,}?)\s*\1", cleaned_output)
@@ -173,6 +175,16 @@ def _sanitize_streamed_output(raw_output: str) -> str:
             continue
         break
     return cleaned_output
+
+
+def _collapse_adjacent_duplicate_text(text: str) -> str:
+    """Collapse one immediate full-text repetition, preserving original spacing around it."""
+    if not text:
+        return text
+    repeated = re.fullmatch(r"(?s)(.{20,}?)(\s*)\1", text.strip())
+    if repeated:
+        return repeated.group(1).strip()
+    return text
 
 
 def _queue_telemetry_event(background_tasks: BackgroundTasks, event: Any) -> None:
