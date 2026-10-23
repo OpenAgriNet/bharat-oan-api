@@ -1,5 +1,6 @@
 """Kisan Help Center grievance creation and status through the Beckn provider."""
 
+import difflib
 import json
 import re
 import uuid
@@ -27,6 +28,54 @@ _UNCONFIRMED = (
     "KHC grievance submission was not confirmed. Do not submit again automatically; "
     "verify with KHC first."
 )
+
+
+# Words that say nothing about the problem itself (the scheme name is removed separately).
+_NOT_A_PROBLEM = {
+    "grievance", "grivance", "complaint", "problem", "issue", "issues", "help", "register", "create", "raise",
+    "file", "lodge", "scheme", "khc", "farmer", "want", "need", "kisan", "helpline", "center", "centre",
+    "state", "district", "village", "please", "yes", "the", "and", "for", "with", "about", "regarding",
+}
+
+
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"[a-z]{3,}", text.lower()))
+
+
+def _farmer_text(messages) -> str:
+    """Everything the farmer typed in this chat (the query only, not the context lines added after it)."""
+    said = []
+    for message in messages or []:
+        for part in getattr(message, "parts", None) or []:
+            if getattr(part, "part_kind", "") != "user-prompt":
+                continue
+            content = part.content if isinstance(part.content, str) else " ".join(
+                item for item in part.content if isinstance(item, str)
+            )
+            found = re.search(r'\*\*User:\*\* "(.*?)"(?:\n\*\*|\n[A-Z]|\Z)', content, re.S)
+            said.append(found.group(1) if found else content)
+    return " ".join(said)
+
+
+def _problem_was_described(ctx, concern: str, scheme: str) -> bool:
+    """True when the concern comes from words the farmer actually wrote, not one the model made up.
+
+    A model that wants to move on can pass an invented concern and skip asking. Comparing it with the
+    farmer's own words stops that. Another language cannot be compared with an English summary, so
+    those calls are trusted, as are calls where there is no chat history to compare with.
+    """
+    messages = getattr(ctx, "messages", None)
+    if not messages:
+        return True
+    said = _farmer_text(messages)
+    if re.search(r"[^\x00-\x7f]", said):
+        return True
+    ignore = _words(scheme) | _NOT_A_PROBLEM
+    theirs = _words(said) - ignore
+    return any(
+        word in theirs or difflib.get_close_matches(word, theirs, n=1, cutoff=0.8)
+        for word in _words(concern) - ignore
+    )
 
 
 def _loose(text: str) -> str:
@@ -293,8 +342,13 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
             options = json.loads(fields.get("options", "null"))
             if not isinstance(options, list) or not all(isinstance(option, dict) for option in options):
                 raise ValueError("Invalid reference options")
+            hold_back = (
+                "Do not show these names to the farmer unless they have described their problem in their own "
+                "words and none of them fits it. If they have not described it yet, ask for it first.\n"
+                if values.get("reference_type") in ("categories", "sub-categories") else ""
+            )
             return (
-                f"KHC {values.get('reference_type')} options: {json.dumps(options, ensure_ascii=False)}\n"
+                f"KHC {values.get('reference_type')} options: {json.dumps(options, ensure_ascii=False)}\n{hold_back}"
                 f"Total matches: {fields.get('total', '')}; page: {fields.get('page', '')} (50 per page).\n"
                 "If the farmer-provided scheme/location/category value does not match a returned row, "
                 "show the relevant returned names for selection by name and offer next pages when available. "
@@ -443,6 +497,15 @@ async def get_khc_grievance_options(
     category = category.strip()
     if not state or max(len(state), len(scheme), len(category)) > 100 or len(concern) > 500:
         return "Ask the farmer which state they are from."
+    if scheme and concern and not _problem_was_described(ctx, concern, scheme):
+        return (
+            "Nothing to show yet: the farmer has not described their problem in their own words in this chat, "
+            "so that concern is not theirs. Do not show any list. Go back to the KHC step order and ask the "
+            "next step that is not done yet. If the state, district and village are done, that step is "
+            "'Please tell me about your problem in your own words. I am here to help.' If the farmer already "
+            "described the problem, do not ask again: call this tool again right away with their exact words "
+            "(translated to English if needed) as concern."
+        )
     return await _call(
         ctx, "init", request_type="grievance_tree", state_name=state, scheme_name=scheme,
         concern=concern, category_name=category,

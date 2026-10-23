@@ -290,6 +290,10 @@ def test_all_language_prompts_include_khc_rules():
         assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
         assert "Never repeat the same sentence, clause, or question in the same response" in prompt
         assert "Use simple wording" in prompt
+        assert "In that same reply never call the category tool and never show category or sub-category names" in prompt
+        assert "One question, then the list, then the source" in prompt
+        assert "Never repeat the question after the list or after the source line" in prompt
+        assert "Never make up a concern" in prompt
         assert "**Scheme comes first:**" in prompt
         assert "Never ask the state, district or village while the scheme is unknown" in prompt
         assert "KHC is the same flow for every scheme (including PM-KISAN, PMFBY and AIF)" in prompt
@@ -1039,3 +1043,69 @@ def test_picked_category_is_sent_to_the_provider(monkeypatch):
     assert _tags(calls[0])["concern"] == "installment not received"
     assert "sub-category 'Installment not received' [problemSubCategoryId=501]" in output
     assert "do not show the sub-category" in output
+
+
+def _chat(*farmer_messages):
+    """A ctx whose chat history holds these farmer messages, the way the agent builds them."""
+    parts = [SimpleNamespace(part_kind="user-prompt", content=f'**User:** "{text}"\n**Language:** English')
+             for text in farmer_messages]
+    return SimpleNamespace(
+        deps=SimpleNamespace(session_id="session-1", question_id="q1"),
+        messages=[SimpleNamespace(parts=[part]) for part in parts],
+    )
+
+
+def _tree_http(monkeypatch):
+    import json
+
+    calls = []
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
+        "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}),
+        "scheme": json.dumps({"id": 40, "name": "PM-KISAN", "division": 32}),
+        "categories": json.dumps([{"id": 50, "name": "Delay in receiving benefit",
+                                   "subCategories": [{"id": 501, "name": "Installment not received"}]}]),
+    })), calls)
+    return calls
+
+
+@pytest.mark.parametrize("invented", ["benefit not received", "PM Kisan grievance", "complaint regarding PM-KISAN"])
+def test_a_concern_the_farmer_never_said_is_refused_without_http(monkeypatch, invented):
+    calls = _tree_http(monkeypatch)
+    chat = _chat("i want to create grivance with KHC", "pm kisan", "Uttar pradesh", "Ghaziabad", "abupur")
+    output = asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh", "PM Kisan", invented))
+    assert "the farmer has not described their problem in their own words" in output
+    assert "Do not show any list" in output
+    assert "Please tell me about your problem in your own words" in output
+    assert calls == []
+
+
+@pytest.mark.parametrize("said,concern", [
+    ("installment not recieved", "installment not received"),  # typo in the farmer's words
+    ("my installment is not received since 6 months", "installment not received"),
+])
+def test_a_concern_from_the_farmers_own_words_goes_through(monkeypatch, said, concern):
+    calls = _tree_http(monkeypatch)
+    chat = _chat("i want to create grivance with KHC", "pm kisan", "abupur", said)
+    asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh", "PM Kisan", concern))
+    assert len(calls) == 1 and _tags(calls[0])["concern"] == concern
+
+
+def test_a_farmer_writing_another_language_is_trusted(monkeypatch):
+    calls = _tree_http(monkeypatch)
+    chat = _chat("मुझे KHC में शिकायत दर्ज करनी है", "मेरी किस्त नहीं आई")
+    asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh", "PM Kisan", "installment not received"))
+    assert len(calls) == 1
+
+
+def test_the_check_is_skipped_when_there_is_no_chat_history(monkeypatch):
+    calls = _tree_http(monkeypatch)
+    asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh", "PM Kisan", "installment not received"))
+    assert len(calls) == 1
+
+
+def test_category_lookups_tell_the_model_not_to_list_before_the_problem(monkeypatch):
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_reference", {
+        "options": '[{"problemcategory":50,"categoryname":"Delay in receiving benefit"}]', "total": "1", "page": "1",
+    })), [])
+    output = asyncio.run(khc.lookup_khc_reference(ctx(), "categories", 40))
+    assert "Do not show these names to the farmer unless they have described their problem" in output
