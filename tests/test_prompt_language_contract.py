@@ -58,7 +58,7 @@ class PromptLanguageContract(unittest.TestCase):
                 section = (ROOT / "assets/prompts/capabilities/agrinet/weather/agromet"
                            / f"agromet_{language}.md").read_text()
                 self.assertIn(section.strip(), render(language), "IMD agromet section is not included")
-                for name in ["forward_geocode", "search_documents", "search_pests_diseases"]:
+                for name in ["place", "forward_geocode", "search_documents", "search_pests_diseases"]:
                     self.assertIn(f"`{name}`", rows[0])
                 self.assertIn("`crop`", section)
                 if language == "en":
