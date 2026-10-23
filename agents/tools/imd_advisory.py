@@ -237,8 +237,10 @@ def _available_crops(districts: str, data: dict, rows: List[dict], missing: Opti
     return _reply(data_lines, how)
 
 
-def _format_advisory(districts: str, data: dict, rows: List[dict], lang: str, others: List[dict]) -> str:
-    data_lines = [f"IMD District Agromet Advisory for {districts}:"]
+def _format_advisory(districts: str, data: dict, rows: List[dict], lang: str, others: List[dict],
+                     missing: Optional[str] = None) -> str:
+    data_lines = [f"This bulletin has no advisory for {missing}." if missing else "",
+                  f"IMD District Agromet Advisory for {districts}:"]
     for r in rows:
         label = " — ".join(part for part in [r.get("crop") or "General", r.get("crop_stage_name")] if part)
         data_lines.append(f"[{label}] {r.get('advisory_eng') or ''}")
@@ -248,10 +250,11 @@ def _format_advisory(districts: str, data: dict, rows: List[dict], lang: str, ot
     data_lines.append(_source_line(data))
     offer = (f"Your follow-up question may offer one other item from this bulletin: {_covered(others)}."
              if _by_category(others) else "Your follow-up question offers nothing else from this advisory.")
-    how = ("Give only this advice, starting each item with the crop stage shown in its label. Translate and simplify "
-           "the wording, but keep every recommendation: every step, quantity, product, named institution or "
-           "implement, and time-critical wording such as a last date or last sowing window. " + CITE_SOURCE + " "
-           + offer)
+    how = ((f"Start by saying this bulletin has no advisory for {missing}. " if missing else "")
+           + "Give only this advice, item by item, starting each item with the crop stage shown in its label. "
+           "Translate and simplify the wording, but keep every recommendation: every step, quantity, product, named "
+           "institution or implement, and time-critical wording such as a last date or last sowing window. "
+           + CITE_SOURCE + " " + offer)
     return _reply(data_lines, how)
 
 
@@ -274,6 +277,7 @@ async def imd_agromet_advisory(
         place: The village, district or city the farmer named, in English (e.g. "Srinagar, Jammu and Kashmir").
         crop: Crop or animal name in English (e.g. "Rice", "Maize", "Cow") for that advisory, or a group in
             English ("Animals", "Fish", "Poultry", "Bees", "Silk") to list what the advisory covers in that group.
+            For several items, pass them together, e.g. "Goat, Chick", to get the advice for each.
             Leave empty to list everything the current advisory covers.
         latitude: Latitude, only when the farmer gave coordinates and no place name.
         longitude: Longitude, only when the farmer gave coordinates and no place name.
@@ -353,15 +357,39 @@ async def _answer(ctx: RunContext[FarmerContext], data: dict, crop: Optional[str
     if not crop:
         return _available_crops(districts, data, rows)
 
-    crop_rows = [r for r in rows if _is_crop(r, crop)] or _in_category_named(rows, crop)
-    if not crop_rows:
+    chosen, missing, choose = _select(rows, crop)
+    if not chosen:
         logger.warning(f"IMD advisory: crop {crop!r} not matched in the bulletin for {districts}")
         return _available_crops(districts, data, rows, missing=crop)
-    if len({r["crop"] for r in crop_rows if r.get("crop")}) > 1:  # a group such as "fish": let the farmer choose
-        return _available_crops(districts, data, crop_rows)
+    not_found = ", ".join(missing) or None
+    if choose:  # a group such as "fish": let the farmer choose
+        return _available_crops(districts, data, chosen, missing=not_found)
     await cache.set(ctx.deps.session_id, True, ttl=MENTIONED_TTL_SECONDS, namespace=MENTIONED_NAMESPACE)
-    others = [r for r in rows if r not in crop_rows]
-    return _format_advisory(districts, data, crop_rows, ctx.deps.lang_code or "en", others)
+    others = [r for r in rows if r not in chosen]
+    return _format_advisory(districts, data, chosen, ctx.deps.lang_code or "en", others, not_found)
+
+
+def _requested(rows: List[dict], crop: str) -> List[str]:
+    """The item names asked for: "Goat and Chick" -> Goat, Chick; a name that is itself an item is kept whole."""
+    if any(_is_crop(r, crop) for r in rows) or _in_category_named(rows, crop):
+        return [crop]
+    return [name.strip() for name in re.split(r",|/|&|\+|\band\b", crop, flags=re.IGNORECASE) if name.strip()]
+
+
+def _select(rows: List[dict], crop: str) -> Tuple[List[dict], List[str], bool]:
+    """Rows for the items asked for, the names not in this bulletin, and whether a group needs a choice first."""
+    chosen: List[dict] = []
+    missing: List[str] = []
+    choose = False
+    for name in _requested(rows, crop):
+        found = [r for r in rows if _is_crop(r, name)]
+        if not found:
+            found = _in_category_named(rows, name)
+            choose = choose or len({r["crop"] for r in found}) > 1
+        if not found:
+            missing.append(name)
+        chosen += [r for r in found if r not in chosen]
+    return chosen, missing, choose
 
 
 STATE_ONLY = _reply(["IMD agromet advisories are issued per district, not for a whole state."],
