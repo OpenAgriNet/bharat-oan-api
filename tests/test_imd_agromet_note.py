@@ -162,6 +162,24 @@ class AgrometNote(unittest.TestCase):
         self.assertIn("[Cow]", text)
         self.assertNotIn("[Goat]", text)
 
+    def test_several_items_give_the_advice_for_each(self):
+        for crop in ["Cow, Goat", "Cow and Goat", "cow & goat"]:
+            text = self.advisory(crop)
+            self.assertIn("[Cow]", text)
+            self.assertIn("[Goat]", text)
+            self.assertIn("item by item", text)
+            self.assertNotIn("asks which one", text)
+
+    def test_item_not_in_bulletin_is_named_with_the_others_advice(self):
+        text = self.advisory("Goat and Chick")
+        self.assertIn("[Goat]", text)
+        self.assertIn("This bulletin has no advisory for Chick.", text)
+
+    def test_a_group_in_a_list_still_asks_which_one(self):
+        text = self.advisory("Maize and animals")
+        self.assertIn("asks which one", text)
+        self.assertIn("- Live Stock: Cow, Goat", text)
+
     def test_follow_up_offers_only_items_in_the_bulletin(self):
         text = self.advisory("Cow")
         self.assertIn("may offer one other item from this bulletin: Crop (Maize, Pigeon pea, Soyabean)", text)
