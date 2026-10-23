@@ -180,14 +180,17 @@ def _collapse_adjacent_duplicate_text(text: str) -> str:
         return repeated.group(1).strip()
     # ponytail: O(n) split scan on short chat replies; upgrade to sentence-level token hashes if needed.
     minimum = 20
+    found = None
     for split in range(minimum, len(stripped) - minimum + 1):
         left = stripped[:split].strip()
         right = stripped[split:].strip()
-        if abs(len(left) - len(right)) > 8:
-            continue
-        if _canonicalize_for_duplicate_check(left) == _canonicalize_for_duplicate_check(right):
-            return left
-    return text
+        if abs(len(left) - len(right)) <= 8 and (
+            _canonicalize_for_duplicate_check(left) == _canonicalize_for_duplicate_check(right)
+        ):
+            found = left  # keep going: the last matching split also keeps the first copy's final punctuation
+        elif found is not None:
+            break
+    return found if found is not None else text
 
 
 def _queue_telemetry_event(background_tasks: BackgroundTasks, event: Any) -> None:

@@ -59,6 +59,28 @@ def _turns(messages) -> list[tuple[str, str]]:
     return turns
 
 
+_KHC_WORDS = re.compile(
+    r"\bkhc\b|k\.h\.c|kisan\s*help\s*-?\s*(?:line\s*)?cent(?:er|re)|किसान\s*हेल्प(?:लाइन)?\s*सेंटर|केएचसी",
+    re.IGNORECASE,
+)
+
+
+def khc_service_note(messages) -> str:
+    """System-prompt text for a chat where the farmer already asked for Kisan Helpline Center.
+
+    The model forgets an early "with KHC" by the time it learns the scheme and then asks the
+    PM-Kisan/PMFBY/AIF service question anyway. Stating it as a fact on every turn stops that.
+    """
+    for who, text in _turns(messages):
+        if who == "farmer" and _KHC_WORDS.search(text):
+            return (
+                "\n\n## Service already chosen\n"
+                "The farmer asked for Kisan Helpline Center (KHC) earlier in this chat. For every scheme, "
+                "including PM-Kisan, PMFBY and AIF, follow the KHC rules and do not ask which service to use."
+            )
+    return ""
+
+
 def _asked_for_problem(text: str) -> bool:
     low = text.lower()
     return "own words" in low and any(word in low for word in ("problem", "complaint", "issue"))

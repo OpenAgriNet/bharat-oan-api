@@ -274,6 +274,8 @@ def test_all_language_prompts_include_khc_rules():
         assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
         assert "Never repeat the same sentence, clause, or question in the same response" in prompt
         assert "Use simple wording" in prompt
+        assert "has already chosen it" in prompt
+        assert "the farmer already chose KHC in the first message, so there is no service question" in prompt
         assert "go straight to KHC and do not ask which service to use" in prompt
         assert "ask once 'Would you like to raise this complaint through Kisan Helpline Center, or through the <scheme> grievance service?'" in prompt
         assert "A grievance that names no scheme goes to KHC, starting with the scheme question" in prompt
@@ -1170,3 +1172,39 @@ def test_a_tool_called_with_no_state_never_asks_for_the_state_first(monkeypatch)
     assert "the scheme comes before the state" in output
     assert "Which state" not in output and "share the name of your state" not in output
     call.assert_not_called()
+
+
+@pytest.mark.parametrize("opening", [
+    "i want to create grivance with KHC",
+    "I want to raise a complaint in Kisan Helpline Center",
+    "grievance via Kisan Help Centre please",
+    "register complaint k.h.c.",
+])
+def test_the_service_note_is_added_once_the_farmer_asked_for_khc(opening):
+    chat = _chat(opening, ("bot", "Could you please tell me which scheme your complaint is about?"), "AIF")
+    note = khc.khc_service_note(chat.messages)
+    assert "## Service already chosen" in note
+    assert "do not ask which service to use" in note
+    assert "including PM-Kisan, PMFBY and AIF" in note
+
+
+@pytest.mark.parametrize("messages", [
+    ["I want to file a grievance for PM-Kisan", "AIF"],
+    ["scheme khcx information", "tell me about khcl"],
+    [],
+])
+def test_the_service_note_is_absent_when_khc_was_never_asked_for(messages):
+    assert khc.khc_service_note(_chat(*messages).messages) == ""
+
+
+def test_khc_in_the_bots_own_words_does_not_count_as_the_farmers_choice():
+    chat = _chat("grievance for PM-Kisan", ("bot", "Would you like Kisan Helpline Center or the PM-Kisan service?"), "hmm")
+    assert khc.khc_service_note(chat.messages) == ""
+
+
+def test_the_system_prompt_gets_the_note_on_every_turn():
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / "agents" / "agrinet.py").read_text()
+    assert "from agents.tools.khc import khc_service_note" in source
+    assert "+ khc_service_note(ctx.messages)" in source
