@@ -23,9 +23,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Manual runs use the selected source branch for credentials and image tags.
+    # bh-main reuses the production credentials in the main environment.
     if: github.event_name != 'workflow_dispatch' || github.ref_name == 'bh-dev' || github.ref_name == 'bh-main'
-    environment: ${{ github.base_ref || github.ref_name }}
+    environment: ${{ (github.base_ref || github.ref_name) == 'bh-main' && 'main' || (github.base_ref || github.ref_name) }}
 
     steps:
       - name: Checkout repository
@@ -47,8 +47,12 @@ jobs:
           echo "Selected Branch: $BRANCH"
           
           BUILD_TAG=$(echo "$BRANCH" | sed 's/\//-/g')
-          # Extract simple tag (e.g., bh-dev -> dev, bh-main -> main)
+          # Extract simple tag (e.g., bh-dev -> dev).
           SIMPLE_TAG=$(echo "$BRANCH" | sed 's/^.*-//')
+          # Keep bh-main builds from overwriting the existing production main tag.
+          if [[ "$BRANCH" == "bh-main" ]]; then
+            SIMPLE_TAG="$BUILD_TAG"
+          fi
 
           echo "IMAGE_NAME=${{ env.BASE_IMAGE_NAME }}" >> $GITHUB_OUTPUT
           echo "BUILD_TAG=${BUILD_TAG}" >> $GITHUB_OUTPUT
