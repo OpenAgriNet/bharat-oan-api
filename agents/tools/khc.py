@@ -132,7 +132,11 @@ def _render_location(fields: dict[str, str], place: str) -> str:
         )
     if not matches:
         ask = {
-            "state": "Ask 'Please share the name of your state', then call this tool again with that state.",
+            "state": (
+                "No state was given. Do not ask anything because of this message: go back to the KHC step order "
+                "and ask the first step that is not done yet (the scheme comes before the state), then call this "
+                "tool again once the state and district are known."
+            ),
             "district": "Ask 'Can you please share your district name', then call this tool again with that district.",
             "geocode": (
                 "Not found in this district's lists. Steps: (1) call forward_geocode and reverse_geocode on "
@@ -481,8 +485,14 @@ async def get_khc_grievance_options(
     """
     state, scheme, concern = state.strip(), scheme.strip(), " ".join(concern.split())
     category = category.strip()
-    if not state or max(len(state), len(scheme), len(category)) > 100 or len(concern) > 500:
-        return "Ask the farmer which state they are from."
+    if not state:
+        return (
+            "Nothing to look up yet: no state has been given. Do not ask anything because of this message. "
+            "Go back to the KHC step order and ask the first step that is not done yet; the scheme comes "
+            "before the state."
+        )
+    if max(len(state), len(scheme), len(category)) > 100 or len(concern) > 500:
+        return "Those details are too long. Ask the farmer to say it again in a few words."
     if scheme:
         resolved = _resolve_concern(ctx, concern, scheme)
         if resolved is None and concern:

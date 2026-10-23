@@ -260,11 +260,7 @@ def test_all_language_prompts_include_khc_rules():
         assert "If browser coordinates are unavailable, ask \"Please share the name of your state\", then \"Can you please share your district name\", then \"Can you please share the name of your village\"" in prompt
         assert "Never substitute a nearby village" in prompt
         assert "Do not proactively suggest KHC for unrelated questions" in prompt
-        assert "If the grievance is for PM-Kisan, PMFBY, or AIF" in prompt
-        assert "run the existing scheme grievance flow by default" in prompt
-        assert "Use KHC for these schemes only when the user explicitly asks to use KHC" in prompt
         assert "keep that grievance in KHC flow for subsequent turns" in prompt
-        assert "scheme without an existing grievance flow" in prompt
         assert "Kisan Helpline Center/Centre" in prompt
         assert "Do not ask for KHC opt-in again" in prompt
         assert "i want to create one kisan helpline center grivance" in prompt
@@ -278,6 +274,29 @@ def test_all_language_prompts_include_khc_rules():
         assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
         assert "Never repeat the same sentence, clause, or question in the same response" in prompt
         assert "Use simple wording" in prompt
+        assert "go straight to KHC and do not ask which service to use" in prompt
+        assert "ask once 'Would you like to raise this complaint through Kisan Helpline Center, or through the <scheme> grievance service?'" in prompt
+        assert "A grievance that names no scheme goes to KHC, starting with the scheme question" in prompt
+        assert "1a. Service choice, only for PM-Kisan, PMFBY and AIF and only if the farmer has not said which service to use" in prompt
+        assert "Skip it for every other scheme" in prompt
+        assert "AIF's own service can only track an existing grievance" in prompt
+        assert "If they chose the scheme's own service, follow that scheme's flow and do not start the KHC flow" in prompt
+        assert "Do not add the source line to the service-choice question" in prompt
+        assert "Service choice (PM-Kisan, PMFBY and AIF only):" in prompt
+        assert "**Choosing the service (PM-Kisan, PMFBY and AIF only):**" in prompt
+        assert "KCC has no grievance flow of its own, so there is no choice to ask" in prompt
+        assert "ask once: \"Would you like to raise this complaint through Kisan Helpline Center, or through the <scheme> grievance service?\"" in prompt
+        assert "If they choose the scheme's own service, use that scheme's flow below" in prompt
+        assert "route it through **KHC** straight away, without asking which service to use" in prompt
+        assert "**Scheme named in the opening message (never ask it again):**" in prompt
+        assert '"I want to create a grievance for KCC" -> the scheme is KCC, so ask only "Please share the name of your state"' in prompt
+        assert "the scheme (KCC) and the problem are both given" in prompt
+        assert "A complaint or grievance about KCC is a KHC grievance" in prompt
+        assert "Do not start the KCC application status flow for it" in prompt
+        assert "A grievance about KCC (Kisan Credit Card) has no grievance flow of its own, so it goes to KHC" in prompt
+        assert "**Opening without a scheme (the scheme is always the first question):**" in prompt
+        assert "(the first reply is never the state, district, village or problem)" in prompt
+        assert "(the farmer gave the state before the scheme: remember it, but the scheme is still missing)" in prompt
         assert "**Fallback lookups (only if `find_khc_location` or `get_khc_grievance_options` is unavailable or fails):**" in prompt
         assert "keep the same order and the same ask, match, then list rule" in prompt
         assert "AIF, A.I.F. and Agriculture Infrastructure Fund are the same scheme; do not ask the farmer to confirm it again" in prompt
@@ -675,7 +694,7 @@ def test_find_location_sends_known_details_and_reports_one_village(monkeypatch):
 
 
 @pytest.mark.parametrize("needs,expected", [
-    ("state", "Please share the name of your state"),
+    ("state", "the scheme comes before the state"),
     ("district", "Can you please share your district name"),
     ("geocode", "forward_geocode"),
 ])
@@ -729,11 +748,15 @@ def test_find_location_malformed_result_is_not_trusted(monkeypatch):
     assert "unavailable" in asyncio.run(khc.find_khc_location(ctx(), "abupur"))
 
 
-@pytest.mark.parametrize("state,scheme", [("", ""), ("s" * 101, ""), ("Bihar", "x" * 101)])
-def test_grievance_options_validates_input_without_http(monkeypatch, state, scheme):
+@pytest.mark.parametrize("state,scheme,expected", [
+    ("", "", "no state has been given"),
+    ("s" * 101, "", "too long"),
+    ("Bihar", "x" * 101, "too long"),
+])
+def test_grievance_options_validates_input_without_http(monkeypatch, state, scheme, expected):
     call = AsyncMock()
     monkeypatch.setattr(khc, "_call", call)
-    assert "state" in asyncio.run(khc.get_khc_grievance_options(ctx(), state, scheme))
+    assert expected in asyncio.run(khc.get_khc_grievance_options(ctx(), state, scheme))
     call.assert_not_called()
 
 
@@ -1136,3 +1159,14 @@ def test_a_reply_in_another_language_to_the_problem_question_is_used(monkeypatch
     chat = _chat("मुझे शिकायत करनी है", ASKED, "मेरी किस्त नहीं आई")
     asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh", "PM Kisan", ""))
     assert _tags(calls[0])["concern"] == "मेरी किस्त नहीं आई"
+
+
+def test_a_tool_called_with_no_state_never_asks_for_the_state_first(monkeypatch):
+    call = AsyncMock()
+    monkeypatch.setattr(khc, "_call", call)
+    output = asyncio.run(khc.get_khc_grievance_options(ctx(), "", "AIF"))
+    assert "Nothing to look up yet: no state has been given" in output
+    assert "Do not ask anything because of this message" in output
+    assert "the scheme comes before the state" in output
+    assert "Which state" not in output and "share the name of your state" not in output
+    call.assert_not_called()
