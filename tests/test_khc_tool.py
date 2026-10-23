@@ -308,6 +308,8 @@ def test_all_language_prompts_include_khc_rules():
         assert "Keep the earlier complaint as `concern` and pass a selected category as `category`" in prompt
         assert "go straight to the summary without showing any list or asking the farmer to select again" in prompt
         assert "Never show the category list for an already matched category" in prompt
+        assert 'Do not shorten "bank loan sanction issue" to "loan issue"' in prompt
+        assert 'use that category without asking the farmer to select it again' in prompt
         assert "One question, then the list, then the source" in prompt
         assert "Never repeat the question after the list or after the source line" in prompt
         assert "Never make up a concern" in prompt
@@ -325,15 +327,16 @@ def test_all_language_prompts_include_khc_rules():
         assert "Update both the category and sub-category IDs" in prompt
         assert "ask for confirmation again" in prompt
         assert "call `get_khc_grievance_options` again with the same concern and `category` set to their pick" in prompt
-        assert "Never choose a sub-category yourself" in prompt
+        assert "Match the concern semantically against the returned category and sub-category names" in prompt
+        assert "Never invent a category, sub-category or ID" in prompt
         assert "Reference conversation (this is exactly how the flow must go" in prompt
         assert "Farmer: I want to create a grievance with KHC for AIF, I am from Uttarpradesh." in prompt
         assert "Bot: Please share the 6-digit OTP." in prompt
         assert "Only once the scheme, state, district, village and complaint are all known" in prompt
         assert "Never call this tool to find out what to ask next" in prompt
-        assert "use that category and show just its sub-category names to choose from" in prompt
+        assert "show only that category's sub-category names if the sub-category is still ambiguous" in prompt
         assert "Ask, match, then list (every question, not only the problem)" in prompt
-        assert "Show a list of names only when the tool says nothing matched or several matched" in prompt
+        assert "For category and sub-category matching, use semantic meaning" in prompt
         assert "Match the problem first, list only if nothing fits" in prompt
         assert "Never show category or sub-category names before the farmer has described the problem" in prompt
         assert "Warm tone (all KHC questions)" in prompt
@@ -364,6 +367,10 @@ def test_all_language_prompts_include_khc_rules():
         assert "never ask for the mobile number or an OTP before the farmer has confirmed the summary" in prompt
         assert "end every reply with the line \"Source: Kisan Helpline Center\"" in prompt
         assert "Never put it between two sentences or before a question" in prompt
+        assert "i want to create grivance with kisan heliline center for pm KIsan" in prompt
+        assert 'reply only "Please share the name of your state"' in prompt
+        assert "Never ask for a PM-Kisan registration number or append a second question" in prompt
+        assert "This overrides the general answer-source-follow-up order" in prompt
         assert "call `get_khc_grievance_options(state, scheme, concern)`" in prompt
         assert "Which one feels closest to your problem?" in prompt
         assert "Phone number and OTP come last" in prompt
@@ -567,7 +574,7 @@ def test_reference_results_say_to_match_first_and_list_only_when_unmatched(monke
     assert "look at the unfiltered list and remaining pages before saying nothing matches" in output
     assert "Take the scheme and division from the same row" in output
     assert "never show IDs or ask the farmer for them" in output
-    assert "Never choose a sub-category yourself" in output
+    assert "Match the complaint semantically" in output
     assert "If the farmer explicitly asks to change the sub-category, show the requested options" in output
     assert khc.SOURCE in output
 
@@ -585,8 +592,8 @@ def test_reference_results_never_pick_a_scheme_or_sub_category_for_the_farmer(
     })), [])
     output = asyncio.run(khc.lookup_khc_reference(ctx(), kind, parent))
     assert "A failed lookup does not mean a scheme is unsupported" in output
-    assert "Never choose a sub-category yourself" in output
-    assert "it is the match from get_khc_grievance_options or the farmer's pick from the list" in output
+    assert "Never invent a category, sub-category or ID" in output
+    assert "Match the complaint semantically" in output
     assert "Pick the single best-fit" not in output
 
 
@@ -831,9 +838,11 @@ def test_grievance_options_returns_categories_and_sub_categories_for_a_complaint
         "concern": "my vehicle was stolen",
     }
     assert "schemeId=38, divisionId=31" in output
-    assert "No clear match for the complaint" in output
-    assert "- Bank Loan Sanction Issues" in output
-    assert "Bank refused loan" not in output and "problemCategoryId" not in output  # nothing to guess from
+    assert "Match the complaint semantically" in output
+    assert '"name": "Bank Loan Sanction Issues"' in output
+    assert '"id": 39' in output and '"id": 1725' in output
+    assert '"name": "Bank refused loan"' in output
+    assert "Internal KHC catalogue (not for display)" in output
 
 
 def test_grievance_options_without_a_complaint_shows_no_categories(monkeypatch):
@@ -949,14 +958,14 @@ def test_tree_shows_the_suggested_match_and_how_to_change_it(monkeypatch):
     })), calls)
     output = asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh", "AIF", "  bank   refused my loan "))
     assert _tags(calls[0])["concern"] == "bank refused my loan"
-    assert "Best match for the complaint: category 'Bank Loan Sanction Issues'" in output
-    assert "sub-category 'Bank refused loan' [problemSubCategoryId=1725]" in output
+    assert '"name": "Bank Loan Sanction Issues"' in output
+    assert '"name": "Bank refused loan"' in output and '"id": 1725' in output
     assert "Complaint: bank refused my loan" in output
     assert "Show the issue summary, scheme, location, category and mapped sub-category name" in output
     assert "confirm or change the sub-category" in output
     assert "do not show the sub-category" not in output
-    assert "Do not show a list or ask the farmer to select again" in output
-    assert "\n- " not in output and "Loan sanction delay" not in output
+    assert "If both match clearly, do not show a list or ask the farmer to select again" in output
+    assert "Loan sanction delay" in output  # The LLM sees alternatives; the farmer does not get a menu.
     assert 'lookup_khc_reference(reference_type="categories", parent_id=38, name="")' in output
     assert 'reference_type="sub-categories"' in output
     assert "each returned category ID" in output
@@ -965,21 +974,63 @@ def test_tree_shows_the_suggested_match_and_how_to_change_it(monkeypatch):
     assert "ask for confirmation again" in output
 
 
-def test_tree_with_a_complaint_but_no_match_lists_the_categories(monkeypatch):
+@pytest.mark.parametrize("concern", ["loan refused", "loan denied", "loan rejected", "rain damaged my crop"])
+def test_tree_without_a_keyword_match_gives_the_llm_the_catalogue_before_any_menu(monkeypatch, concern):
     import json
 
     fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
         "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}),
         "scheme": json.dumps({"id": 38, "name": "AIF", "division": 31}),
-        "categories": json.dumps([{"id": 39, "name": "Bank Loan Sanction Issues",
-                                   "subCategories": [{"id": 1725, "name": "Bank refused loan"}]}]),
+        "categories": json.dumps([{"id": 731, "name": "Loan assessment grievances",
+                                   "subCategories": [{"id": 9423, "name": "Finance declined by lender"}]}]),
     })), [])
-    output = asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh", "AIF", "rain damaged my crop"))
-    assert "No clear match for the complaint. Do not guess." in output
-    assert "- Bank Loan Sanction Issues" in output
-    assert "Bank refused loan" not in output and "[problemCategoryId" not in output
+    output = asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh", "AIF", concern))
+    assert f"Complaint: {concern}" in output
+    assert "Match the complaint semantically" in output
+    assert "Do not treat a missing keyword suggestion as a failed semantic match" in output
+    assert "Only if no category clearly fits semantically" in output
+    assert "Never invent a category, sub-category or ID" in output
+    catalogue = output.split("Internal KHC catalogue (not for display):\n", 1)[1].split(f"\n{khc.SOURCE}", 1)[0]
+    assert json.loads(catalogue) == [{
+        "id": 731, "name": "Loan assessment grievances",
+        "subCategories": [{"id": 9423, "name": "Finance declined by lender"}],
+    }]
+    assert "Bank Loan Sanction Issues" not in output
     assert "call this tool again with the same concern and category=<their pick>" in output
-    assert "Never choose a sub-category yourself" in output
+
+
+@pytest.mark.parametrize("categories", [
+    [], None, [{}], [{"id": 39, "name": "Issues", "subCategories": None}],
+])
+def test_empty_or_malformed_catalogue_reports_failure_instead_of_guessing(monkeypatch, categories):
+    import json
+
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
+        "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}),
+        "scheme": json.dumps({"id": 38, "name": "AIF", "division": 31}),
+        "categories": json.dumps(categories),
+    })), [])
+    output = asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh", "AIF", "loan refused"))
+    assert "unavailable" in output
+    assert "Internal KHC catalogue" not in output
+
+
+@pytest.mark.parametrize("changes", [
+    {"id": True}, {"id": 0}, {"id": 9007199254740992}, {"name": None}, {"name": " "},
+])
+@pytest.mark.parametrize("level", ["category", "sub-category"])
+def test_catalogue_rejects_invalid_ids_and_names(monkeypatch, changes, level):
+    import json
+
+    category = {"id": 39, "name": "Issues", "subCategories": [{"id": 1725, "name": "Refused loan"}]}
+    option = category if level == "category" else category["subCategories"][0]
+    option.update(changes)
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
+        "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}),
+        "scheme": json.dumps({"id": 38, "name": "AIF", "division": 31}),
+        "categories": json.dumps([category]),
+    })), [])
+    assert "unavailable" in asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh", "AIF", "loan refused"))
 
 
 def test_complaint_longer_than_500_characters_is_rejected_without_http(monkeypatch):
@@ -1082,7 +1133,7 @@ def test_sub_district_options_omit_the_district_when_they_share_one(monkeypatch)
 
 @pytest.mark.parametrize("category_picked", [False, True])
 @pytest.mark.parametrize("model_concern", ["", "bank loan sanction issue", "credit guarantee coverage"])
-def test_a_named_category_with_an_unclear_sub_category_offers_only_its_sub_categories(
+def test_category_scoped_catalogue_preserves_the_original_concern(
     monkeypatch, category_picked, model_concern,
 ):
     import json
@@ -1095,8 +1146,9 @@ def test_a_named_category_with_an_unclear_sub_category_offers_only_its_sub_categ
         "categories": json.dumps([
             {"id": 39, "name": "Bank Loan Sanction Issues", "subCategories": [
                 {"id": 1725, "name": "Bank refused loan"}, {"id": 1726, "name": "Loan sanction delay"}]},
+        ] + ([] if category_picked else [
             {"id": 41, "name": "Fund Disbursement Issues", "subCategories": [{"id": 1801, "name": "Subsidy not received"}]},
-        ]),
+        ])),
     })), calls)
     turns = [
         "i want to create grivance in khc", "AIF", "Uttar pradesh", "Ghaziabad",
@@ -1114,13 +1166,14 @@ def test_a_named_category_with_an_unclear_sub_category_offers_only_its_sub_categ
     assert len(calls) == 1
     assert _tags(calls[0])["concern"] == "bank loan sanction issue"
     assert _tags(calls[0]).get("category_name", "") == category
-    assert "The problem is under the category 'Bank Loan Sanction Issues'" in output
-    assert "- Bank refused loan [problemSubCategoryId=1725]" in output
-    assert "- Loan sanction delay [problemSubCategoryId=1726]" in output
+    assert '"name": "Bank Loan Sanction Issues"' in output
+    assert '"id": 1725, "name": "Bank refused loan"' in output
+    assert '"id": 1726, "name": "Loan sanction delay"' in output
     assert "Which one feels closest to your problem?" in output
-    assert "Do not choose one yourself" in output
+    assert "If only the category is clear, show only its sub-category names" in output
     assert "Show the issue summary, scheme, location, category and mapped sub-category name" in output
-    assert "Fund Disbursement Issues" not in output and "Subsidy not received" not in output
+    assert ("Fund Disbursement Issues" in output) is (not category_picked)
+    assert ("Subsidy not received" in output) is (not category_picked)
     assert "No clear match" not in output
     assert "Nothing to show yet" not in output
     assert "Please tell me about your problem" not in output
@@ -1142,7 +1195,7 @@ def test_picked_category_is_sent_to_the_provider(monkeypatch):
         ctx(), "Uttar Pradesh", "PM Kisan", "installment not received", " Delay in receiving benefit "))
     assert _tags(calls[0])["category_name"] == "Delay in receiving benefit"
     assert _tags(calls[0])["concern"] == "installment not received"
-    assert "sub-category 'Installment not received' [problemSubCategoryId=501]" in output
+    assert '"id": 501, "name": "Installment not received"' in output
     assert "mapped sub-category name" in output
 
 
@@ -1217,13 +1270,15 @@ def test_category_lookups_tell_the_model_not_to_list_before_the_problem(monkeypa
     assert "Do not show these names to the farmer unless they have described their problem" in output
 
 
-@pytest.mark.parametrize("model_concern", ["", "bank loan sanction"])
+@pytest.mark.parametrize("model_concern", [
+    "", "bank loan sanction", "loan sanction", "loan issue", "loan problem",
+])
 def test_the_farmers_answer_to_the_problem_question_is_used_even_if_the_model_forgets_it(monkeypatch, model_concern):
     calls = _tree_http(monkeypatch)
     chat = _chat("i want to create grivance in khc", "AIF", ASKED_VILLAGE, "abupur", ASKED, "bank loan sanction issue")
     output = asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh", "AIF", model_concern))
     assert len(calls) == 1
-    assert _tags(calls[0])["concern"] == (model_concern or "bank loan sanction issue")
+    assert _tags(calls[0])["concern"] == "bank loan sanction issue"
     assert "Nothing to show yet" not in output
 
 
@@ -1232,6 +1287,20 @@ def test_a_typo_in_the_farmers_answer_still_goes_through(monkeypatch):
     chat = _chat("khc", "AIF", ASKED, "bank laon sanction issue")
     asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh", "AIF", ""))
     assert _tags(calls[0])["concern"] == "bank laon sanction issue"
+
+
+def test_a_translated_problem_answer_is_kept_for_matching():
+    chat = _chat("khc", "PM Kisan", ASKED, "मेरी किस्त नहीं आई")
+    assert khc._resolve_concern(chat, "installment not received", "PM Kisan") == "installment not received"
+
+
+def test_a_later_clarification_is_not_replaced_with_the_original_problem():
+    chat = _chat(
+        "khc", "AIF", ASKED, "bank loan sanction issue",
+        ("bot", "Which one feels closest to your problem?"),
+        "Bank refused loan under AIF",
+    )
+    assert khc._resolve_concern(chat, "bank refused loan", "AIF") == "bank refused loan"
 
 
 def test_an_earlier_problem_answer_is_recovered_after_other_questions():
@@ -1292,6 +1361,9 @@ def test_a_tool_called_with_no_state_never_asks_for_the_state_first(monkeypatch)
     "I want to raise a complaint in Kisan Helpline Center",
     "grievance via Kisan Help Centre please",
     "register complaint k.h.c.",
+    "i want to create grivance with kisan heliline center for pm KIsan",
+    "Create a PM-Kisan grievance through Kisan HELILINE Centre",
+    "File a complaint through Kisan Help-Line Center",
 ])
 def test_the_service_note_is_added_once_the_farmer_asked_for_khc(opening):
     chat = _chat(opening, ("bot", "Could you please tell me which scheme your complaint is about?"), "AIF")
@@ -1301,9 +1373,29 @@ def test_the_service_note_is_added_once_the_farmer_asked_for_khc(opening):
     assert "including PM-Kisan, PMFBY and AIF" in note
 
 
+@pytest.mark.parametrize("later_turns", [
+    (),
+    (("bot", "Please share the name of your state"), "Uttar Pradesh"),
+])
+def test_explicit_khc_pm_kisan_request_does_not_mix_workflows(later_turns):
+    chat = _chat(
+        "i want to create grivance with kisan heliline center for pm KIsan",
+        *later_turns,
+    )
+    note = khc.khc_service_note(chat.messages)
+    assert "Never ask for a PM-Kisan registration number" in note
+    assert "Do not combine KHC and scheme-service questions" in note
+    assert "If the scheme is already named, skip the scheme question" in note
+    assert "Ask only the first missing KHC detail" in note
+    assert "These KHC rules override the general follow-up and source-order rules" in note
+    assert "put the source last with nothing after it" in note
+
+
 @pytest.mark.parametrize("messages", [
     ["I want to file a grievance for PM-Kisan", "AIF"],
     ["scheme khcx information", "tell me about khcl"],
+    ["PM Kisan grievance at a Kisan health center"],
+    ["kisan heliline centerpiece", "scheme k.h.cl information"],
     [],
 ])
 def test_the_service_note_is_absent_when_khc_was_never_asked_for(messages):

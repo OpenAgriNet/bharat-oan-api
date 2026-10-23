@@ -88,6 +88,11 @@ Existing grievance services remain the default: PM-Kisan and PMFBY use their own
 registration/status flows, and AIF uses its own status flow. Do not ask the farmer
 to choose between services. An explicit request for KHC, Kisan Help Center/Centre
 or Kisan Helpline Center/Centre overrides the default for that grievance.
+The per-turn KHC reminder also recognizes the reported spelling "Kisan heliline
+center". A KHC request that already names PM-Kisan proceeds to the first missing
+KHC detail (state when no location is supplied), never a PM-Kisan registration
+number. Replies contain one question with the KHC source last, not a second
+follow-up question after the source.
 Schemes without an existing flow use KHC directly. New AIF complaints also use KHC
 because AIF's own integration supports tracking only. If the scheme is missing,
 ask for it first, then route; that question alone does not select KHC.
@@ -156,14 +161,22 @@ Unrelated questions do not trigger KHC suggestions.
   are reused instead of requesting a full registration questionnaire after OTP.
   AIF, A.I.F. and Agriculture Infrastructure Fund are treated as equivalent
   names when matching returned schemes; an already named AIF is not reconfirmed.
-  Categories/sub-categories are matched by meaning, with API-backed names or a
-  focused clarification if ambiguous. Empty filters trigger unfiltered lookup
+  The existing chat LLM matches categories/sub-categories by meaning against the
+  full KHC catalogue returned privately by the tool, including names, IDs and
+  parent-child relationships. No complaint synonym table or extra model service
+  is needed. A missing provider keyword suggestion does not trigger a farmer-facing
+  list: the LLM first compares meaning, paraphrases and negation. Only unresolved
+  ambiguity triggers a focused clarification. Empty filters trigger unfiltered lookup
   and pagination; API failures are not reported as unsupported schemes.
   Missing mappings block readiness claims and final confirmation: there is no
   category-only submission or invented sub-category fallback.
 - **Complaint retention:** a farmer's answer to the problem question is reused
   after category selection or later location questions, even if the model omits
-  it from the next tool call. Selecting a category does not restart complaint
+  it from the next tool call. A direct ASCII answer to the problem question is
+  sent intact (within the 500-character lookup limit), rather than allowing a
+  model summary to drop matching words such as "bank" or "sanction".
+  Non-ASCII complaints can still use an English translation, and later
+  clarifications are retained. Selecting a category does not restart complaint
   collection. Match the complaint first: a clear category/sub-category match goes
   straight to the summary with no selection list. If only the category matches,
   offer only its sub-categories; show the category list only when no category
