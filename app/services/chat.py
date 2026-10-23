@@ -241,6 +241,17 @@ class _ChatTurnContext:
     deps: FarmerContext
 
 
+LANGFUSE_FLUSH_TIMEOUT_S = 3
+
+
+async def _flush_langfuse() -> None:
+    """Flush traces off the event loop; a Langfuse outage must never stall or fail a chat turn."""
+    try:
+        await asyncio.wait_for(asyncio.to_thread(get_client().flush), LANGFUSE_FLUSH_TIMEOUT_S)
+    except Exception:
+        logger.warning("Langfuse flush failed or timed out; traces may be dropped", exc_info=True)
+
+
 async def _finalize_chat_turn(
     ctx: _ChatTurnContext,
     completed_run: _AgrinetCompletedRun,
@@ -296,7 +307,7 @@ async def _finalize_chat_turn(
     )
     await update_message_history(ctx.session_id, messages)
 
-    get_client().flush()
+    await _flush_langfuse()
 
 
 async def _finalize_after_client_disconnect(
