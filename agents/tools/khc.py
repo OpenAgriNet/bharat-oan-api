@@ -322,10 +322,10 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "Never claim readiness or ask for final submission confirmation until all required IDs are resolved. "
                 "For location lists, match the supplied/geocoded place within the returned hierarchy "
                 "and ask only when missing or ambiguous. If the district is unknown, ask for it first; "
-                "never guess it from a village name. Once the district is verified, fetch sub-districts "
-                "with its districtId and name=\"\". If the sub-district is missing, show a bulleted list "
-                "of returned sub-district names (sub-districts/tehsils) for the farmer to select by name only, "
-                "rather than asking them to know the name. Offer remaining pages when available. "
+                "never guess it from a village name. Do not list sub-districts as a step: ask for the village "
+                "first. Show sub-district names only when several villages share the farmer's village name, or "
+                "when the village was not found and this list is the fallback; the farmer selects by name only. "
+                "Offer remaining pages when available. "
                 "Never invent options or present an empty list as a choice; explain lookup failures. "
                 "After selection, fetch villages under the selected subdistrictid and match the village "
                 "already supplied, asking only if ambiguous or absent. "
@@ -472,10 +472,11 @@ async def lookup_khc_reference(
     Only ask the farmer for location details not already resolved; never guess a village.
     If the district cannot be established from the village details, ask for the district;
     never infer it from the village name alone. Verify the district in the state's list.
-    When the sub-district is missing, fetch sub-districts for that district with name=""
-    and show the returned names as bulleted choices, with further pages if available.
-    Ask the farmer to select by name only, then fetch villages under the selected subdistrictid and
-    match the village already supplied. Do not ask the farmer for internal IDs.
+    This is the fallback for find_khc_location. Do not list sub-districts as a step: ask for the
+    village first. Fetch sub-districts only when the village was not found, and show the returned
+    names as choices, with further pages if available. Ask the farmer to select by name only, then
+    fetch villages under the selected subdistrictid and match the village already supplied. Do not
+    ask the farmer for internal IDs.
     Resolve the village ID before requesting final submission confirmation.
     name is a case/whitespace-insensitive literal substring filter on reference names,
     NOT a semantic problem search. uttarpradesh matches Uttar Pradesh; do not ask
@@ -579,8 +580,9 @@ async def register_khc_grievance(
             "mappings are required. Call lookup_khc_reference to resolve them from the farmer's "
             "location and problem description: state -> schemes (take scheme and division from the same row) "
             "-> categories -> sub-categories, and state -> districts -> sub-districts -> villages. "
-            "If the district is unknown, ask for it; once verified, fetch its sub-districts with name=\"\" "
-            "and show the returned names as bulleted choices for selection by name only when the sub-district is missing. "
+            "If the district is unknown, ask for it. Prefer find_khc_location, which finds the village and its "
+            "sub-district from the village name; fetch sub-districts yourself only as a fallback when the "
+            "village was not found, and then show them for selection by name. "
             "Fetch villages under the selected sub-district and match the village already supplied. "
             "Resolve all mappings before requesting final submission confirmation. "
             "Match returned names to the problem; ask a focused clarification only if ambiguous. "

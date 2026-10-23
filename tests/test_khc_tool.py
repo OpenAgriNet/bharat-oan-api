@@ -275,12 +275,10 @@ def test_all_language_prompts_include_khc_rules():
         assert "Do not ask for KHC opt-in again" in prompt
         assert "i want to create one kisan helpline center grivance" in prompt
         assert "start the KHC grievance flow" in prompt
-        assert "**Sub-district selection:**" in prompt
-        assert 'reference_type="sub-districts", parent_id=<resolved districtId>, name=""' in prompt
-        assert "show a bulleted list of the returned subdistrictname values" in prompt
-        assert "select by name only, not by number" in prompt
-        assert "If the district cannot be established from the village details, ask the farmer for the district" in prompt
-        assert "Resolve the village ID and all other required mappings before asking for final submission confirmation" in prompt
+        assert "**Sub-district (only when needed):**" in prompt
+        assert "Never ask for or list sub-districts as a step of their own" in prompt
+        assert "Ask which sub-district only when several villages in that district share the village name" in prompt
+        assert "Resolve the village ID and all other required IDs before asking the farmer to confirm" in prompt
         assert "If the farmer-provided scheme, sub-district, village, category, or sub-category does not match a returned row" in prompt
         assert "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme" in prompt
         assert "Do not ask the farmer to reconfirm AIF when already stated" in prompt
@@ -292,6 +290,9 @@ def test_all_language_prompts_include_khc_rules():
         assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
         assert "Never repeat the same sentence, clause, or question in the same response" in prompt
         assert "Use simple wording" in prompt
+        assert "Reference conversation (this is exactly how the flow must go" in prompt
+        assert "Farmer: I want to create a grievance with KHC for AIF, I am from Uttarpradesh." in prompt
+        assert "Bot: Please share the 6-digit OTP." in prompt
         assert "Only once the scheme, state, district, village and complaint are all known" in prompt
         assert "Never call this tool to find out what to ask next" in prompt
         assert "use that category and show just its sub-category names to choose from" in prompt
@@ -305,7 +306,7 @@ def test_all_language_prompts_include_khc_rules():
         assert "Village: \"Can you please share the name of your village\"" in prompt
         assert "Mobile number: \"Please share your mobile number.\"" in prompt
         assert "OTP: \"Please share the 6-digit OTP.\"" in prompt
-        assert "Start the reply with a short thank-you or acknowledgement" in prompt
+        assert "Do not start replies with \"Thank you\" or any filler" in prompt
         assert '3. District: "Can you please share your district name"' in prompt
         assert "7. Mobile number (only now, after the summary is confirmed)." in prompt
         assert "8. OTP: `initiate_khc_otp`, then `verify_khc_otp` (the last thing before submitting)." in prompt
@@ -531,7 +532,7 @@ def test_location_reference_results_guide_api_backed_subdistrict_selection(
     rendered_options = output.split(" options: ", 1)[1].split("\n", 1)[0]
     assert json.loads(rendered_options) == json.loads(options)
     assert f"Total matches: {total}; page: {page}" in output
-    assert "show a bulleted list of returned sub-district names" in output
+    assert "Do not list sub-districts as a step: ask for the village first" in output
     assert "select by name only" in output
     assert "Never invent options or present an empty list as a choice" in output
     assert "fetch villages under the selected subdistrictid" in output
