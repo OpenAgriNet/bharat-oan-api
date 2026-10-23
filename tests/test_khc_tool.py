@@ -292,6 +292,9 @@ def test_all_language_prompts_include_khc_rules():
         assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
         assert "Never repeat the same sentence, clause, or question in the same response" in prompt
         assert "Use simple wording" in prompt
+        assert "Only once the scheme, state, district, village and complaint are all known" in prompt
+        assert "Never call this tool to find out what to ask next" in prompt
+        assert "use that category and show just its sub-category names to choose from" in prompt
         assert "Ask, match, then list (every question, not only the problem)" in prompt
         assert "Show a list of names only when the tool says nothing matched or several matched" in prompt
         assert "Match the problem first, list only if nothing fits" in prompt
@@ -300,7 +303,8 @@ def test_all_language_prompts_include_khc_rules():
         assert "State: \"Please share the name of your state\"" in prompt
         assert "District: \"Can you please share your district name\"" in prompt
         assert "Village: \"Can you please share the name of your village\"" in prompt
-        assert "Mobile number: \"Could you please share your mobile number?\"" in prompt
+        assert "Mobile number: \"Please share your mobile number.\"" in prompt
+        assert "OTP: \"Please share the 6-digit OTP.\"" in prompt
         assert "Start the reply with a short thank-you or acknowledgement" in prompt
         assert '3. District: "Can you please share your district name"' in prompt
         assert "7. Mobile number (only now, after the summary is confirmed)." in prompt
@@ -762,8 +766,9 @@ def test_grievance_options_without_a_complaint_shows_no_categories(monkeypatch):
                                    "subCategories": [{"id": 1725, "name": "Bank refused loan"}]}]),
     })), [])
     output = asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh", "AIF"))
-    assert "has not described the problem yet" in output
-    assert "Do not show any list" in output
+    assert "Nothing to show yet" in output
+    assert "Do not show any list, and do not ask anything because of this message" in output
+    assert "ask the next step that is not done yet" in output
     assert "Bank Loan Sanction Issues" not in output and "Bank refused loan" not in output
     assert "problemCategoryId" not in output
 
@@ -978,3 +983,25 @@ def test_sub_district_options_omit_the_district_when_they_share_one(monkeypatch)
     assert "- Abupur: Loni sub-district\n" in output
     assert "- Abupur: Modinagar sub-district\n" in output
     assert "sub-district, Ghaziabad district" not in output
+
+
+def test_a_named_category_with_an_unclear_sub_category_offers_only_its_sub_categories(monkeypatch):
+    import json
+
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
+        "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}),
+        "scheme": json.dumps({"id": 38, "name": "AIF", "division": 31}),
+        "suggested": json.dumps({"category": {"id": 39, "name": "Bank Loan Sanction Issues"}, "subCategory": None}),
+        "categories": json.dumps([
+            {"id": 39, "name": "Bank Loan Sanction Issues", "subCategories": [
+                {"id": 1725, "name": "Bank refused loan"}, {"id": 1726, "name": "Loan sanction delay"}]},
+            {"id": 41, "name": "Fund Disbursement Issues", "subCategories": [{"id": 1801, "name": "Subsidy not received"}]},
+        ]),
+    })), [])
+    output = asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh", "AIF", "bank loan sanction issue"))
+    head = output.split("All categories and sub-categories")[0]
+    assert "matches the category 'Bank Loan Sanction Issues'" in head
+    assert "Bank refused loan; Loan sanction delay" in head
+    assert "Which one feels closest to your problem?" in head
+    assert "Fund Disbursement Issues" not in head and "Subsidy not received" not in head
+    assert "No clear match" not in output

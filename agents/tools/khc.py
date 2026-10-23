@@ -168,13 +168,24 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern_given: b
         f"Scheme: {scheme['name']} [schemeId={scheme['id']}, divisionId={scheme['division']}]",
     ]
     if isinstance(suggested, dict):
-        category, sub = suggested["category"], suggested["subCategory"]
-        lines.append(
-            f"Best match for the complaint: category '{category['name']}' [problemCategoryId={category['id']}], "
-            f"sub-category '{sub['name']}' [problemSubCategoryId={sub['id']}]. Use it and show both names in the "
-            "summary for the farmer to confirm or change. If the farmer wants to change it, show the "
-            "sub-category names of that category (no IDs) and let them pick by name."
-        )
+        category, sub = suggested["category"], suggested.get("subCategory")
+        if sub is None:
+            names = "; ".join(
+                s["name"] for c in categories if c["id"] == category["id"] for s in c["subCategories"]
+            )
+            lines.append(
+                f"The problem matches the category '{category['name']}' [problemCategoryId={category['id']}]. Use "
+                "it and do not show the other categories. Only the sub-category is unclear. Show only this "
+                f"category's sub-category names (no IDs): {names}. Ask 'Which one feels closest to your problem?'. "
+                "After the farmer picks, put the category and that sub-category in the summary."
+            )
+        else:
+            lines.append(
+                f"Best match for the complaint: category '{category['name']}' [problemCategoryId={category['id']}], "
+                f"sub-category '{sub['name']}' [problemSubCategoryId={sub['id']}]. Use it and show both names in the "
+                "summary for the farmer to confirm or change. If the farmer wants to change it, show the "
+                "sub-category names of that category (no IDs) and let them pick by name."
+            )
     elif concern_given:
         lines.append(
             "No clear match for the complaint. Do not guess. Show the category names (no IDs) and ask "
@@ -187,9 +198,10 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern_given: b
         return (
             f"State: {state['name']} [stateId={state['id']}]\n"
             f"Scheme: {scheme['name']} [schemeId={scheme['id']}, divisionId={scheme['division']}]\n"
-            "The farmer has not described the problem yet, so there are no categories to show. Do not show any "
-            "list. Ask for the problem in their own words, then call this tool again with a short English "
-            "summary of it as concern. The best match is found for them first."
+            "Nothing to show yet: this tool is only for after the farmer's district, village and problem are "
+            "known. Do not show any list, and do not ask anything because of this message. Go back to the KHC "
+            "step order and ask the next step that is not done yet. Call this tool again only once the farmer "
+            "has described the problem, with a short English summary of it as concern."
         )
     lines.append("All categories and sub-categories (IDs are for your use only):")
     for category in categories:
@@ -418,8 +430,9 @@ async def get_khc_grievance_options(
 
     Without a scheme it lists the state's schemes. With the scheme the farmer named
     (AIF, A.I.F. and the full name all work) it needs concern: a short English summary of the
-    farmer's complaint (up to 500 characters). Call it only after the farmer has described the
-    problem. Without concern it returns no categories. With concern it suggests the best-fit
+    farmer's complaint (up to 500 characters). Call it only after the scheme, state, district and
+    village are done and the farmer has described the problem. Without concern it returns no
+    categories and no next step. With concern it suggests the best-fit
     category and sub-category, and if none clearly fits it returns the categories to choose
     from, plus the IDs needed to register. Prefer this over three separate lookup_khc_reference calls.
     """
