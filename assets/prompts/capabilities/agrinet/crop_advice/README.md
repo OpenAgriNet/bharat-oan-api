@@ -3,6 +3,7 @@
 ## Tools
 
 - `analyze_crop_image`
+- `search_advisory`
 - `search_documents`
 - `search_pests_diseases`
 - `search_terms`

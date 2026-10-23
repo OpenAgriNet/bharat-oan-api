@@ -19,7 +19,9 @@ from app.config import settings
 from app.core.npss_followup import find_pending_npss_image_url
 from app.services.model_routing import ModelRouteDecision, get_model_router
 from app.services.chat_turn_map import write_chat_turn_map
+from app.services.guided_decoding import guided_decoding_settings
 from app.services.npss_response import post_process_npss_response
+from app.services.stream_dedupe import ToolBoundaryDeduper
 from app.tasks.telemetry import send_telemetry
 from app.utils import (
     filter_thinking_from_history,
@@ -64,6 +66,9 @@ class _AgrinetStreamState:
     inside_think_block: bool = False
     pending_text_start: str = ""
     raw_chunks: list[str] = field(default_factory=list)
+    visible_output: str = ""
+    deduper: ToolBoundaryDeduper = field(default_factory=ToolBoundaryDeduper)
+    tool_boundaries: int = 0
 
 
 class _StreamChunkSink:
@@ -133,14 +138,59 @@ async def _emit_final_text_chunk(
         return
     stream_state.raw_chunks.append(raw_chunk)
     visible_chunk = _strip_streaming_thinking_chunk(raw_chunk, stream_state)
+    # Model deltas append new text: overlapping digits/Markdown are not retransmits.
+    # Only deduplicate repeats across an explicit tool boundary.
+    visible_chunk = stream_state.deduper.feed(visible_chunk)
     if visible_chunk and chunk_queue is not None:
+        stream_state.visible_output += visible_chunk
         await chunk_queue.put(visible_chunk)
 
 
 def _sanitize_streamed_output(raw_output: str) -> str:
     cleaned_output = re.sub(r"<think>[\s\S]*?</think>", "", raw_output)
     cleaned_output = re.sub(r"<think>[\s\S]*$", "", cleaned_output)
-    return cleaned_output.strip()
+    cleaned_output = cleaned_output.strip()
+    cleaned_output = _collapse_adjacent_duplicate_text(cleaned_output)
+    # Collapse one full accidental adjacent duplication with optional spacing
+    # between copies, e.g. "Question?Question?" or "Question?  Question?".
+    repeated = re.fullmatch(r"(?s)(.{20,}?)\s*\1", cleaned_output)
+    if repeated:
+        cleaned_output = repeated.group(1).strip()
+    # Defensive collapse for exact accidental full duplication, e.g. "X...X...".
+    while len(cleaned_output) >= 2 and len(cleaned_output) % 2 == 0:
+        half = len(cleaned_output) // 2
+        if cleaned_output[:half] == cleaned_output[half:]:
+            cleaned_output = cleaned_output[:half].strip()
+            continue
+        break
+    return cleaned_output
+
+
+def _canonicalize_for_duplicate_check(text: str) -> str:
+    return "".join(ch.lower() for ch in text if ch.isalnum())
+
+
+def _collapse_adjacent_duplicate_text(text: str) -> str:
+    """Collapse one immediate full-text repetition, allowing minor punctuation differences."""
+    if not text:
+        return text
+    stripped = text.strip()
+    repeated = re.fullmatch(r"(?s)(.{20,}?)(\s*)\1", stripped)
+    if repeated:
+        return repeated.group(1).strip()
+    # ponytail: O(n) split scan on short chat replies; upgrade to sentence-level token hashes if needed.
+    minimum = 20
+    found = None
+    for split in range(minimum, len(stripped) - minimum + 1):
+        left = stripped[:split].strip()
+        right = stripped[split:].strip()
+        if abs(len(left) - len(right)) <= 8 and (
+            _canonicalize_for_duplicate_check(left) == _canonicalize_for_duplicate_check(right)
+        ):
+            found = left  # keep going: the last matching split also keeps the first copy's final punctuation
+        elif found is not None:
+            break
+    return found if found is not None else text
 
 
 def _queue_telemetry_event(background_tasks: BackgroundTasks, event: Any) -> None:
@@ -189,6 +239,17 @@ class _ChatTurnContext:
     history: list
     target_lang: str
     deps: FarmerContext
+
+
+LANGFUSE_FLUSH_TIMEOUT_S = 3
+
+
+async def _flush_langfuse() -> None:
+    """Flush traces off the event loop; a Langfuse outage must never stall or fail a chat turn."""
+    try:
+        await asyncio.wait_for(asyncio.to_thread(get_client().flush), LANGFUSE_FLUSH_TIMEOUT_S)
+    except Exception:
+        logger.warning("Langfuse flush failed or timed out; traces may be dropped", exc_info=True)
 
 
 async def _finalize_chat_turn(
@@ -246,7 +307,7 @@ async def _finalize_chat_turn(
     )
     await update_message_history(ctx.session_id, messages)
 
-    get_client().flush()
+    await _flush_langfuse()
 
 
 async def _finalize_after_client_disconnect(
@@ -709,6 +770,9 @@ async def _run_agrinet_once_streaming(
             message_history=trimmed_history,
             deps=deps,
             model=get_registry().get_model(decision.route),
+            model_settings=guided_decoding_settings(
+                deps.lang_code, get_registry().get_kind(decision.route)
+            ),
         ):
             # Event order from pydantic-ai for the final answer:
             #   PartStartEvent(TextPart content="Hello")  # first tokens live here
@@ -720,6 +784,8 @@ async def _run_agrinet_once_streaming(
                 if not prefix:
                     continue
                 if stream_state.final_result_found:
+                    # A new text part in the same response can repeat the previous one.
+                    stream_state.deduper.tool_boundary()
                     await _emit_final_text_chunk(prefix, stream_state, chunk_queue)
                 else:
                     stream_state.pending_text_start = prefix
@@ -744,6 +810,8 @@ async def _run_agrinet_once_streaming(
                 continue
 
             if getattr(event, "event_kind", "") == "function_tool_result":
+                stream_state.deduper.tool_boundary()
+                stream_state.tool_boundaries += 1
                 stream_state.final_result_found = False
                 stream_state.pending_text_start = ""
                 continue
@@ -767,6 +835,16 @@ async def _run_agrinet_once_streaming(
     full_output = _sanitize_streamed_output(str(getattr(result, "output", "") or ""))
     streamed_output = _sanitize_streamed_output("".join(stream_state.raw_chunks))
     output_text = full_output or streamed_output
+
+    # What the farmer saw should equal the final answer. A difference means text was streamed that
+    # the final answer does not contain (for example text written before a tool call).
+    streamed_text = " ".join(stream_state.visible_output.split())
+    if chunk_queue is not None and streamed_text and streamed_text != " ".join(output_text.split()):
+        logger.warning(
+            "Streamed text differs from final answer session=%s streamed_chars=%d final_chars=%d "
+            "tool_calls_in_run=%d",
+            session_id, len(streamed_text), len(output_text), stream_state.tool_boundaries,
+        )
 
     usage_data = result.usage()
     lf_update_current_observation(

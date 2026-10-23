@@ -19,8 +19,8 @@ copies per capability. Folder ownership does not change tool permissions.
 - [smam](smam/README.md) — 1 tool
 - [aif](aif/README.md) — 4 tools
 - [kcc](kcc/README.md) — 3 tools
-- [khc](khc/README.md) — 5 tools
-- [crop_advice](crop_advice/README.md) — 4 tools
+- [khc](khc/README.md) — 7 tools
+- [crop_advice](crop_advice/README.md) — 5 tools
 - [weather](weather/README.md) — 2 tools
 - [location](location/README.md) — 2 tools
 - [mandi](mandi/README.md) — 2 tools
@@ -37,7 +37,7 @@ Supported prompt languages: `as`, `bn`, `en`, `gu`, `hi`, `kn`, `mai`, `ml`, `mr
 
 | Section | Coverage |
 |---|---|
-| [_shared/amul_and_scheme_disambiguation](_shared/amul_and_scheme_disambiguation/) | Localized files, all 13 languages |
+| [amul/amul_and_scheme_disambiguation](amul/amul_and_scheme_disambiguation/) | Localized files, all 13 languages |
 | [_shared/grievances](_shared/grievances/) | Localized files, all 13 languages |
 | [_shared/insurance_and_loan_eligibility](_shared/insurance_and_loan_eligibility/) | Localized files, all 13 languages |
 | [agristack/rules](agristack/rules/) | Common English source, all 13 languages |

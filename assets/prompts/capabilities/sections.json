@@ -7,7 +7,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_as.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_as.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -208,6 +208,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -223,7 +225,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_bn.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_bn.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -424,6 +426,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -439,7 +443,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_en.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_en.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -650,6 +654,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -665,7 +671,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_gu.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_gu.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -866,6 +872,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -881,7 +889,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_hi.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_hi.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -1092,6 +1100,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -1107,7 +1117,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_kn.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_kn.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -1308,6 +1318,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -1323,7 +1335,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_mai.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_mai.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -1534,6 +1546,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -1549,7 +1563,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_ml.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_ml.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -1750,6 +1764,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -1765,7 +1781,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_mr.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_mr.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -1966,6 +1982,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -1981,7 +1999,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_or.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_or.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -2192,6 +2210,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -2207,7 +2227,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_pa.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_pa.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -2418,6 +2438,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -2433,7 +2455,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_ta.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_ta.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -2634,6 +2656,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",
@@ -2649,7 +2673,7 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/_shared/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_te.md",
+      "path": "capabilities/agrinet/amul/amul_and_scheme_disambiguation/amul_and_scheme_disambiguation_te.md",
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
@@ -2850,6 +2874,8 @@
       "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
       "tools": [
         "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
         "initiate_khc_otp",
         "lookup_khc_reference",
         "register_khc_grievance",

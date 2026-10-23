@@ -1,5 +1,6 @@
 """Capability loading preserves original business tools and their prepare hooks."""
 import json
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -24,8 +25,24 @@ def _prompt_assets():
 def validate_manifest(tools: list) -> None:
     names = [tool.name for tool in tools]
     grouped = [name for group in CAPABILITIES.values() for name in group]
-    if set(names) != ALL_TOOLS or len(names) != len(set(names)) or len(grouped) != len(set(grouped)):
-        raise ValueError("Capability manifest must cover every business tool exactly once")
+    missing = sorted(ALL_TOOLS - set(names))
+    extra = sorted(set(names) - ALL_TOOLS)
+    duplicate_tools = sorted(name for name in set(names) if names.count(name) > 1)
+    duplicate_manifest = sorted(name for name in set(grouped) if grouped.count(name) > 1)
+    if missing or extra or duplicate_tools or duplicate_manifest:
+        print(
+            "[capabilities.validate_manifest] failed "
+            f"missing_in_tools={missing}; extra_in_tools={extra}; "
+            f"duplicate_tools={duplicate_tools}; duplicate_manifest_entries={duplicate_manifest}; "
+            f"tools_count={len(names)}; manifest_count={len(grouped)}",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise ValueError(
+            "Capability manifest must cover every business tool exactly once. "
+            f"missing_in_tools={missing}; extra_in_tools={extra}; "
+            f"duplicate_tools={duplicate_tools}; duplicate_manifest_entries={duplicate_manifest}"
+        )
 
 
 async def load_capability(ctx: RunContext[Any], capability: str) -> dict:
