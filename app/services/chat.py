@@ -19,6 +19,7 @@ from app.config import settings
 from app.core.npss_followup import find_pending_npss_image_url
 from app.services.model_routing import ModelRouteDecision, get_model_router
 from app.services.chat_turn_map import write_chat_turn_map
+from app.services.guided_decoding import guided_decoding_settings
 from app.services.npss_response import post_process_npss_response
 from app.services.stream_dedupe import ToolBoundaryDeduper
 from app.tasks.telemetry import send_telemetry
@@ -137,24 +138,9 @@ async def _emit_final_text_chunk(
         return
     stream_state.raw_chunks.append(raw_chunk)
     visible_chunk = _strip_streaming_thinking_chunk(raw_chunk, stream_state)
+    # Model deltas append new text: overlapping digits/Markdown are not retransmits.
+    # Only deduplicate repeats across an explicit tool boundary.
     visible_chunk = stream_state.deduper.feed(visible_chunk)
-    if visible_chunk and stream_state.visible_output:
-        # Streams can occasionally resend overlapping text. Trim overlap so the
-        # farmer does not see repeated prefixes/sentences.
-        max_overlap = min(len(stream_state.visible_output), len(visible_chunk))
-        overlap = 0
-        for size in range(max_overlap, 0, -1):
-            if stream_state.visible_output.endswith(visible_chunk[:size]):
-                overlap = size
-                break
-        visible_chunk = visible_chunk[overlap:]
-    if visible_chunk and stream_state.visible_output:
-        # Also guard against a full repeated sentence re-sent as a new chunk.
-        normalized_chunk = re.sub(r"\s+", " ", visible_chunk).strip()
-        if len(normalized_chunk) >= 20:
-            normalized_seen = re.sub(r"\s+", " ", stream_state.visible_output).strip()
-            if normalized_seen.endswith(normalized_chunk):
-                return
     if visible_chunk and chunk_queue is not None:
         stream_state.visible_output += visible_chunk
         await chunk_queue.put(visible_chunk)
@@ -770,6 +756,9 @@ async def _run_agrinet_once_streaming(
             message_history=trimmed_history,
             deps=deps,
             model=get_registry().get_model(decision.route),
+            model_settings=guided_decoding_settings(
+                deps.lang_code, get_registry().get_kind(decision.route)
+            ),
         ):
             # Event order from pydantic-ai for the final answer:
             #   PartStartEvent(TextPart content="Hello")  # first tokens live here
