@@ -8,7 +8,7 @@ import re
 import threading
 import unicodedata
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import httpx
 import psycopg2
@@ -281,49 +281,69 @@ async def imd_agromet_advisory(
     Returns:
         str: The advisory texts with source, issue date and valid-until date, or a message explaining what is missing.
     """
+    try:
+        lat, lon = await _point(ctx, place, latitude, longitude)
+        data = await _bulletin(lat, lon)
+    except _Stop as stop:
+        return str(stop)
+    return await _answer(ctx, data, crop)
+
+
+class _Stop(Exception):
+    """Raised with the reply for the model when the lookup cannot go on."""
+
+
+async def _point(ctx: RunContext[FarmerContext], place: Optional[str], latitude: Optional[float],
+                 longitude: Optional[float]) -> Tuple[float, float]:
+    """The named place, else the given coordinates, the last named place or the browser location."""
     if place:
         try:
             found = await locate(place)
         except httpx.HTTPError as exc:
             logger.error(f"Geocoding {place!r} failed: {exc}")
-            return "The location service is not reachable right now. Please try again later."
+            raise _Stop("The location service is not reachable right now. Please try again later.") from exc
         if not found or found[0].latitude is None:
-            return f"No place called '{place}' was found. Ask the farmer for the district name."
+            raise _Stop(f"No place called '{place}' was found. Ask the farmer for the district name.")
         location, kind = found
         await remember_place(ctx.deps.session_id, location.latitude, location.longitude, kind)
         if kind == "state":
-            return STATE_ONLY
-        lat, lon = location.latitude, location.longitude
-    else:
-        lat, lon = await _coords(ctx, latitude, longitude)
-        if lat is None or lon is None:
-            return ("Location not available. Ask the farmer to share their location, or their village or "
+            raise _Stop(STATE_ONLY)
+        return location.latitude, location.longitude
+    lat, lon = await _coords(ctx, latitude, longitude)
+    if lat is None or lon is None:
+        raise _Stop("Location not available. Ask the farmer to share their location, or their village or "
                     "district name and call this tool with it as `place`.")
-        if await is_state_point(ctx.deps.session_id, lat, lon):
-            return STATE_ONLY
+    if await is_state_point(ctx.deps.session_id, lat, lon):
+        raise _Stop(STATE_ONLY)
+    return lat, lon
 
+
+async def _bulletin(lat: float, lon: float) -> dict:
+    """imd_lookup() result for the district at the point."""
     if not resolver_configured() or not IMD_DB_URL:
         logger.error("IMD advisory tool is not configured (RESOLVER_URL, RESOLVER_CALLBACK_URL, IMD_DB_URL)")
-        return "The IMD advisory service is not available right now. Please try again later."
-
+        raise _Stop("The IMD advisory service is not available right now. Please try again later.")
     try:
         keys = await _location_keys(lat, lon)
     except httpx.HTTPError as exc:
         logger.error(f"Resolver request failed: {exc}")
-        return "The location service is not reachable right now. Please try again later."
+        raise _Stop("The location service is not reachable right now. Please try again later.") from exc
     if not keys:
-        return "Could not identify the district for this location. Ask the farmer for their district name."
-
+        raise _Stop("Could not identify the district for this location. Ask the farmer for their district name.")
     try:
         data = await asyncio.to_thread(_lookup_sync, keys)
     except (psycopg2.Error, RuntimeError) as exc:
         logger.error(f"IMD advisory DB lookup failed: {exc}")
-        return "The IMD advisory service is not reachable right now. Please try again later."
-
-    districts = _district_names(data)
-    if not districts:
+        raise _Stop("The IMD advisory service is not reachable right now. Please try again later.") from exc
+    if not _district_names(data):
         logger.warning(f"IMD advisory: no district mapped for location {lat:.3f},{lon:.3f}")
-        return "Could not identify the district for this location. Ask the farmer for their district name."
+        raise _Stop("Could not identify the district for this location. Ask the farmer for their district name.")
+    return data
+
+
+async def _answer(ctx: RunContext[FarmerContext], data: dict, crop: Optional[str]) -> str:
+    """The list, the chosen item's advice, or why there is none."""
+    districts = _district_names(data)
     rows = data.get("advisories", [])
     if not rows:
         return _reply([f"There is no current IMD agromet advisory for {districts}.",

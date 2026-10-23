@@ -70,14 +70,20 @@ def _crop_rows() -> list[tuple]:
             variants.setdefault(_int(r["crop_id"]), []).append(name)
     rows = []
     for type_id, names in variants.items():
-        parts: list[str] = []
-        for name in [n for n in names if n == n.upper()] or names:
-            for part in re.split(r"[()/]", name):
-                part = part.strip().lower()
-                if part and part not in parts:
-                    parts.append(part)
+        parts = _name_parts([n for n in names if n == n.upper()] or names)
         rows.append((type_id, parts[0].capitalize(), parts[1:], "imd_master"))
     return rows
+
+
+def _name_parts(names: list[str]) -> list[str]:
+    """Distinct lower-case names in order: "PIGEON PEA (RED GRAM/ARHAR)" -> pigeon pea, red gram, arhar."""
+    parts: list[str] = []
+    for name in names:
+        for part in re.split(r"[()/]", name):
+            part = part.strip().lower()
+            if part and part not in parts:
+                parts.append(part)
+    return parts
 
 
 # ------------------------------------------------------------------ setup
