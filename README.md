@@ -84,28 +84,32 @@ grievance status via the `khc-agri` Beckn provider. It uses the existing
 `BAP_ENDPOINT`, `BAP_ID`, `BAP_URI`, `BPP_ID`, and `BPP_URI` configuration.
 Only the provider backend needs `KHC_BASE_URL` and `KHC_API_KEY`.
 
-KHC is intent-gated: the agent does not proactively suggest it. For an
-unspecified grievance request, it may ask whether the user wants KHC and must
-wait for explicit agreement before calling KHC. A grievance for another named
-service stays on that service; unrelated questions do not trigger KHC suggestions.
-An explicit registration/status request naming KHC, Kisan Help Center/Centre or
-Kisan Helpline Center/Centre already satisfies this opt-in; do not ask it again.
-Registration proceeds to collecting a missing mobile number or sending OTP to
-the supplied mobile, while status proceeds to collecting a missing grievance
-number or checking it. OTP verification and final submission confirmation are
-still required for registration.
+Existing grievance services remain the default: PM-Kisan and PMFBY use their own
+registration/status flows, and AIF uses its own status flow. Do not ask the farmer
+to choose between services. An explicit request for KHC, Kisan Help Center/Centre
+or Kisan Helpline Center/Centre overrides the default for that grievance.
+Schemes without an existing flow use KHC directly. New AIF complaints also use KHC
+because AIF's own integration supports tracking only. If the scheme is missing,
+ask for it first, then route; that question alone does not select KHC.
+Unrelated questions do not trigger KHC suggestions.
 
-- **Registration:** `initiate_khc_otp` sends an OTP to the supplied mobile;
-  `verify_khc_otp` verifies it and returns whether the farmer is registered.
+- **Registration order (all KHC schemes):** scheme, state/district/village,
+  concern, matching, issue summary with the mapped sub-category, confirmation,
+  mobile, OTP verification, new-farmer profile if required, submission.
+  Reuse supplied details and ask only for missing information, one question at a time.
+  `initiate_khc_otp` sends an OTP only after summary/sub-category confirmation;
+  `verify_khc_otp` verifies it and returns `isRegistered`.
   While awaiting OTP, a six-digit reply goes directly to verification using the
   same mobile; leading zeros are preserved and regional digits are normalized.
   The agent must not reject it or request it again without a verification result.
   Actual invalid/expired OTP responses and service failures are distinguished;
-  language and other remaining details are collected only after verification succeeds.
-  `lookup_khc_reference` resolves state/district/sub-district/village and
-  scheme/division/category/subcategory IDs from KHC. After summarizing the
-  grievance and obtaining explicit approval, `register_khc_grievance` submits it.
-  New farmers supply name/gender; existing farmers do not need to repeat them.
+  `find_khc_location` and `get_khc_grievance_options` resolve the required IDs
+  before confirmation; `lookup_khc_reference` supplies fallback and change-option lists.
+  Only after successful OTP verification, `isRegistered=false` triggers collection
+  of any missing name, then gender (Male/Female/Other); do not infer gender.
+  Already supplied profile details are reused. `isRegistered=true` skips both
+  questions. Then `register_khc_grievance` submits the confirmed grievance;
+  new-farmer profile collection does not restart complaint collection or confirmation.
   Registration accepts only OAN UI languages also accepted by the KHC provider:
   `hi`, `en`, `mr`, `bn`, `gu`, `kn`, `ta`, `te`, `as`, `ml`.
   UI language Maithili (`mai`) is not currently accepted by the KHC provider;
@@ -125,10 +129,10 @@ still required for registration.
   If coordinates are absent or incomplete, or the geocoder cannot identify the
   village, the agent asks only for the missing state/village/district details.
   If the district cannot be established from the village details, the agent asks
-  for it rather than guessing. After verifying the district in KHC, it fetches
-  the district's sub-district list and presents bulleted API-backed choices
-  (with further pages when available) if the sub-district is missing. Farmers
-  select by name only from the list, not by number.
+  for it rather than guessing. `find_khc_location` resolves the sub-district from
+  the village when possible. Ask for the sub-district only for an ambiguous
+  village or as a fallback when the village cannot be found. Farmers select by
+  name from API-backed choices (with further pages when available), not by number.
   The selected sub-district is used to fetch villages and match the village
   already supplied. Empty/failed lookups are explained, not replaced with guesses.
   Village and all other required IDs are resolved before final submission
@@ -143,11 +147,10 @@ still required for registration.
 - Scheme IDs and division IDs come from the same reference row. Never guess IDs
   or apply sample IDs to a different farmer. Name-filtered lookups return 50
   options per page. Ask the farmer when matching entries are ambiguous.
-- **Problem-based routing:** after resolving the state, the agent fetches its
-  schemes and matches the farmer's complaint to returned scheme names, then
-  resolves category/subcategory using their parent IDs. Farmers are not asked
-  for scheme names or internal IDs upfront. A generic complaint that fits several
-  schemes triggers a focused clarification, not an assumed scheme. The `name`
+- **Problem matching:** capture the scheme first, then location and the farmer's
+  own concern. Use only the scheme the farmer named and match the concern to
+  that scheme's categories/sub-categories. Never infer a scheme from the concern
+  or ask for internal IDs. The `name`
   filter is a literal substring, not semantic search; unfiltered options and
   further pages are checked when a keyword has no match. Already supplied details
   are reused instead of requesting a full registration questionnaire after OTP.
@@ -158,6 +161,21 @@ still required for registration.
   and pagination; API failures are not reported as unsupported schemes.
   Missing mappings block readiness claims and final confirmation: there is no
   category-only submission or invented sub-category fallback.
+- **Complaint retention:** a farmer's answer to the problem question is reused
+  after category selection or later location questions, even if the model omits
+  it from the next tool call. Selecting a category does not restart complaint
+  collection. Match the complaint first: a clear category/sub-category match goes
+  straight to the summary with no selection list. If only the category matches,
+  offer only its sub-categories; show the category list only when no category
+  clearly matches.
+- **Summary and changes:** show the issue, scheme, resolved location, category
+  and mapped sub-category name, with no internal IDs. Ask whether to confirm or
+  change the sub-category. On an explicit change request, fetch all categories
+  under the verified scheme and their sub-category lists, including remaining
+  pages, and show names grouped by category. Update both parent category and
+  sub-category IDs from the farmer's selection and obtain fresh confirmation.
+  These are KHC-backed reference lists (provider database cache with API fallback),
+  not hardcoded options.
 - Creation uses a stable external reference for the same conversation/details,
   supported by KHC's duplicate-reference semantics. Unconfirmed submissions are
   reported explicitly; do not claim success without a returned grievance number.

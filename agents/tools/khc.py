@@ -68,8 +68,8 @@ _KHC_WORDS = re.compile(
 def khc_service_note(messages) -> str:
     """System-prompt text for a chat where the farmer already asked for Kisan Helpline Center.
 
-    The model forgets an early "with KHC" by the time it learns the scheme and then asks the
-    PM-Kisan/PMFBY/AIF service question anyway. Stating it as a fact on every turn stops that.
+    Keep an explicit KHC request from being lost when a later turn names a scheme whose
+    own grievance service would otherwise be the default.
     """
     for who, text in _turns(messages):
         if who == "farmer" and _KHC_WORDS.search(text):
@@ -89,10 +89,10 @@ def _asked_for_problem(text: str) -> bool:
 def _resolve_concern(ctx, concern: str, scheme: str) -> str | None:
     """The concern to search with, or None when the farmer has not described a problem yet.
 
-    The farmer's reply to "tell me about your problem" is their problem, whatever the model passes
-    (an empty concern would otherwise send the bot back to ask again). A concern made up by the
-    model is refused unless it uses words the farmer wrote. Another language cannot be compared
-    with an English summary, so those calls are trusted, as are calls with no history to compare.
+    The farmer's reply to "tell me about your problem" remains their problem after later category
+    or location questions, even when the model omits it. A concern made up by the model is refused
+    unless it uses words the farmer wrote. Another language cannot be compared with an English
+    summary, so those calls are trusted, as are calls with no history to compare.
     """
     turns = _turns(getattr(ctx, "messages", None))
     farmer = [index for index, (who, _) in enumerate(turns) if who == "farmer"]
@@ -107,9 +107,9 @@ def _resolve_concern(ctx, concern: str, scheme: str) -> str | None:
         for word in _words(concern) - ignore
     )):
         return concern
-    before = [text for who, text in turns[: farmer[-1]] if who == "bot"]
-    if before and _asked_for_problem(before[-1]):
-        return " ".join(turns[farmer[-1]][1].split())[:500]
+    for index in reversed(farmer):
+        if index and turns[index - 1][0] == "bot" and _asked_for_problem(turns[index - 1][1]):
+            return " ".join(turns[index][1].split())[:500]
     return concern if foreign else None
 
 
@@ -216,7 +216,7 @@ def _render_location(fields: dict[str, str], place: str) -> str:
     )
 
 
-def _render_tree(fields: dict[str, str], scheme_name: str = "", concern_given: bool = False) -> str:
+def _render_tree(fields: dict[str, str], scheme_name: str = "", concern: str = "") -> str:
     needs = fields.get("needs", "").strip('"')
     if needs == "state":
         names = "\n".join(f"- {m['name']}" for m in json.loads(fields.get("matches", "[]")))
@@ -255,6 +255,8 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern_given: b
         f"State: {state['name']} [stateId={state['id']}]",
         f"Scheme: {scheme['name']} [schemeId={scheme['id']}, divisionId={scheme['division']}]",
     ]
+    if concern:
+        lines.append(f"Complaint: {concern}")
     def subs_of(category_id: int) -> str:
         return "\n".join(
             f"- {sub['name']} [problemSubCategoryId={sub['id']}]"
@@ -268,16 +270,25 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern_given: b
                 f"The problem is under the category '{category['name']}' [problemCategoryId={category['id']}], but no "
                 "single sub-category fits clearly. Do not choose one yourself. Show only these sub-category names "
                 "(no IDs) and ask 'Which one feels closest to your problem?'. Use the one the farmer picks (and its "
-                "ID). Do not show the sub-category in the summary:\n" + subs_of(category["id"])
+                "ID):\n" + subs_of(category["id"])
             )
         else:
             lines.append(
                 f"Best match for the complaint: category '{category['name']}' [problemCategoryId={category['id']}], "
-                f"sub-category '{sub['name']}' [problemSubCategoryId={sub['id']}]. Use both. In the summary show the "
-                "category only; do not show the sub-category. If the farmer asks to change it, show the sub-category "
-                "names of that category (no IDs) and let them pick by name:\n" + subs_of(category["id"])
+                f"sub-category '{sub['name']}' [problemSubCategoryId={sub['id']}]. Use both. "
+                "Do not show a list or ask the farmer to select again."
             )
-    elif concern_given:
+        lines.append(
+            "Once the sub-category is known, continue to confirmation. "
+            "Show the issue summary, scheme, location, category and mapped sub-category name (no IDs). "
+            "Ask 'Would you like to confirm or change the sub-category?'. Only if the farmer asks to change it, "
+            f'call lookup_khc_reference(reference_type="categories", parent_id={scheme["id"]}, name=""), '
+            'then lookup_khc_reference(reference_type="sub-categories", parent_id=<each returned category ID>, name=""). '
+            "Read all pages and show the scheme's available sub-category names grouped by category, not just "
+            "the matched category. Update both the category and sub-category IDs from their pick, show the "
+            "updated summary and ask for confirmation again before asking for the mobile number or submitting."
+        )
+    elif concern:
         names = "\n".join(f"- {c['name']}" for c in categories)
         lines.append(
             "No clear match for the complaint. Do not guess. Show only these category names and ask 'Which one feels "
@@ -367,23 +378,27 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 + " with KHC. This is the last step: the scheme, location, complaint and sub-category were "
                 "already confirmed, so do not ask for them again. "
                 + (
-                    ""
+                    "isRegistered=true. Use farmer_type='existing'. Do not ask for name or gender. "
+                    "Call register_khc_grievance now with the confirmed details and the IDs already found."
                     if registered else
-                    "Ask only for the farmer's name and gender (Male, Female or Other), then register. "
+                    "isRegistered=false. Use farmer_type='new'. Ask only for the missing name, then gender "
+                    "(Male, Female or Other), one question at a time; reuse either if already supplied. "
+                    "Do not submit until both are known. Then call register_khc_grievance with those profile "
+                    "details, the confirmed grievance and the IDs already found."
                 )
-                + "Call register_khc_grievance now with the confirmed details and the IDs already found."
             )
         if code == "khc_location":
             return f"{_render_location(fields, values.get('name', ''))}\n{SOURCE}"
         if code == "khc_grievance_tree":
-            return f"{_render_tree(fields, values.get('scheme_name', ''), bool(values.get('concern')))}\n{SOURCE}"
+            return f"{_render_tree(fields, values.get('scheme_name', ''), values.get('concern', ''))}\n{SOURCE}"
         if code == "khc_reference":
             options = json.loads(fields.get("options", "null"))
             if not isinstance(options, list) or not all(isinstance(option, dict) for option in options):
                 raise ValueError("Invalid reference options")
             hold_back = (
                 "Do not show these names to the farmer unless they have described their problem in their own "
-                "words and none of them fits it. If they have not described it yet, ask for it first.\n"
+                "words and none of them fits it, or they explicitly requested alternatives. "
+                "If they have not described it yet, ask for it first.\n"
                 if values.get("reference_type") in ("categories", "sub-categories") else ""
             )
             return (
@@ -394,6 +409,10 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "and do not ask again. Show names to choose from only when none or several match, only the names "
                 "that fit the question being asked, and offer the next pages if there are more. If a filter finds "
                 "nothing, look at the unfiltered list and remaining pages before saying nothing matches. "
+                "If the farmer explicitly asks to change the sub-category, show the requested options even "
+                "when one already matched; fetch all categories of the scheme and their sub-categories, "
+                "including remaining pages. Update both the category and sub-category IDs from their pick "
+                "and ask for confirmation again before submitting. "
                 "Take the scheme and division from the same row, use only returned IDs, and never show IDs or ask "
                 "the farmer for them. Do not list sub-districts as a step: ask for the village first. A failed "
                 "lookup does not mean a scheme is unsupported; say that the lookup failed. Never choose a "
@@ -442,7 +461,9 @@ async def verify_khc_otp(
     While waiting for OTP, call this tool for a six-digit reply; do not ask the farmer
     to repeat a correctly formatted OTP without attempting verification. Preserve leading
     zeros. Only the tool result can establish acceptance, rejection or service failure.
-    Collect and confirm grievance details as per flow; use this result before final submission.
+    Grievance details and the mapped sub-category must already be confirmed. Only after successful
+    verification, use isRegistered to decide: existing farmers submit directly; new farmers supply
+    any missing name and gender before submission. Do not collect those fields before verification.
     """
     mobile = _mobile(mobile_number)
     if not mobile:
@@ -499,10 +520,11 @@ async def get_khc_grievance_options(
     (AIF, A.I.F. and the full name all work) it needs concern: a short English summary of the
     farmer's complaint (up to 500 characters). Call it only after the scheme, state, district and
     village are done and the farmer has described the problem. Without concern it returns no
-    categories and no next step. With concern it picks the best-fit category and sub-category, and
-    if none clearly fits it returns only the category names. After the farmer picks a category from
-    that list, call it again with the same concern and category=<their pick> to get the best
-    sub-category inside it (or only that category's sub-categories to choose from).
+    categories and no next step. With concern it picks the best-fit category and sub-category;
+    use a clear match without showing a list. If none clearly fits it returns only the category names.
+    After the farmer picks a category from that list, call it again with the same concern and
+    category=<their pick> to get the best sub-category inside it (or only that category's
+    sub-categories to choose from). Show the issue and mapped sub-category in the confirmation summary.
     Prefer this over three separate lookup_khc_reference calls.
     """
     state, scheme, concern = state.strip(), scheme.strip(), " ".join(concern.split())
@@ -543,7 +565,7 @@ async def lookup_khc_reference(
 ) -> str:
     """Fallback lookup of KHC reference lists and IDs by name. Prefer find_khc_location (places) and
     get_khc_grievance_options (scheme, category, sub-category); use this only if they are unavailable
-    or fail.
+    or fail, or the farmer explicitly asks to see alternatives to a matched category/sub-category.
 
     Lists and parents: states (none), districts (stateId), sub-districts (districtId),
     villages (subDistrictId), schemes (stateId), categories (scheme),
@@ -612,8 +634,9 @@ async def register_khc_grievance(
     language, location and grievance details. Resolve scheme/category/subcategory from
     the problem using the reference APIs; reuse scheme already provided and ask for
     scheme name only when missing. Never ask for internal IDs/codes from the farmer.
-    New farmers also need name and
-    gender code. All six numeric IDs MUST come from verified KHC master data, not LGD
+    Only after OTP verification reports isRegistered=false, collect any missing name and
+    gender code for the new farmer. Existing farmers do not need these fields.
+    All six numeric IDs MUST come from verified KHC master data, not LGD
     assumptions, memory, example requests or guesses. Resolve IDs using lookup_khc_reference.
     Reuse permitted browser location via reverse_geocode and KHC reference lookups
     when the farmer did not state a grievance location; otherwise ask for state/village.
@@ -642,8 +665,11 @@ async def register_khc_grievance(
         )
     gender = gender.strip().upper()
     gender = {"MALE": "M", "FEMALE": "F", "OTHER": "O"}.get(gender, gender)
-    if farmer_type == "new" and (not farmer_name.strip() or gender not in ("M", "F", "O")):
-        return "Ask the new farmer for their name and gender before registering."
+    if farmer_type == "new":
+        if not farmer_name.strip():
+            return "Ask the new farmer only for their missing name before registering."
+        if gender not in ("M", "F", "O"):
+            return "Ask the new farmer only for their gender (Male, Female or Other) before registering."
     ids = (state_id, village_id, scheme_id, division_id, problem_category_id, problem_subcategory_id)
     if any(type(value) is not int or not 0 < value <= 9007199254740991 for value in ids):
         return (
