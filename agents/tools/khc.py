@@ -59,17 +59,24 @@ def _render_location(fields: dict[str, str], place: str) -> str:
         names = "\n".join(f"- {m['name']}" for m in matches)
         return (
             "Several or no states matched what the farmer said. Show these state names and ask "
-            f"'Which state are you from?' (select by name):\n{names}"
+            f"'Please share the name of your state' (select by name):\n{names}"
+        )
+    if needs == "district" and matches:
+        names = "\n".join(f"- {m['name']}" for m in matches)
+        return (
+            "That district name did not match exactly, or matched more than one. Show only these district "
+            "names (no IDs) and ask the farmer to pick by name with 'Can you please share your district name'. "
+            f"Then call this tool again with their pick as district:\n{names}"
         )
     if not matches:
         ask = {
-            "state": "Ask 'Which state are you from?', then call this tool again with that state.",
-            "district": "Ask 'Which district are you from?', then call this tool again with that district.",
+            "state": "Ask 'Please share the name of your state', then call this tool again with that state.",
+            "district": "Ask 'Can you please share your district name', then call this tool again with that district.",
             "geocode": (
                 "Not found in this district's lists. Steps: (1) call forward_geocode and reverse_geocode on "
                 "the place to fix the spelling, then call this tool again. (2) If still not found, call "
                 f"lookup_khc_reference(reference_type=\"sub-districts\", parent_id={district_id}, name=\"\"), "
-                "show the sub-district names, and ask 'Which sub-district are you from?'; then call "
+                "show the sub-district names, and ask 'Could you please tell me which sub-district you are from?'; then call "
                 "lookup_khc_reference(reference_type=\"villages\", parent_id=<that sub-district's id>, name=\"\") and show "
                 "the village names to pick from. (3) If the village is not listed, ask which listed village is "
                 "nearest; use it only if the farmer clearly says yes, and write their real village name in the "
@@ -89,7 +96,7 @@ def _render_location(fields: dict[str, str], place: str) -> str:
     if not villages:
         return (
             f"'{place}' is the name of a district or sub-district, not a village:\n{listing}\nKeep the IDs "
-            "internal. Use it as that district or sub-district and now ask 'Which village are you from?'. "
+            "internal. Use it as that district or sub-district and now ask 'Can you please share the name of your village'. "
             "Then call this tool with the village as place, the state, and this district (or sub_district). "
             "Do not list these as villages."
         )
@@ -113,7 +120,7 @@ def _render_location(fields: dict[str, str], place: str) -> str:
     )
     return (
         f"Several places named '{place}' in this state:\n{options}\n(For your use only, the rows with IDs:)\n"
-        f"{listing}\nAsk 'Which sub-district are you from?' and show the options above as a list "
+        f"{listing}\nAsk 'Could you please tell me which sub-district you are from?' and show the options above as a list "
         "(sub-district names, plus the district only when they differ; no IDs) for the farmer to pick by name. When "
         f"they pick one, the village is already known: call this tool again with place='{place}', the same state "
         "and district, and sub_district=<their pick>. "
@@ -125,7 +132,7 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern_given: b
     needs = fields.get("needs", "").strip('"')
     if needs == "state":
         names = "\n".join(f"- {m['name']}" for m in json.loads(fields.get("matches", "[]")))
-        return f"Ask 'Which state are you from?' and show these names:\n{names}"
+        return f"Ask 'Please share the name of your state' and show these names:\n{names}"
     state = json.loads(fields.get("state", "null"))
     if not isinstance(state, dict):
         raise ValueError("Missing state")
@@ -140,9 +147,18 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern_given: b
                 "If it is not, tell the farmer you cannot register this complaint here and that they can "
                 "contact that scheme's own helpline or the nearest agriculture office. Do not pick a scheme for them."
             )
+        if fields.get("match", "").strip('"') == "unnamed":
+            # No names here on purpose: a list shown before the farmer is asked becomes a menu.
+            return (
+                f"State: {state['name']} [stateId={state['id']}]. The farmer has not named a scheme yet. "
+                "Do not show a list. Ask 'Could you please tell me which scheme your complaint is about?' and "
+                "call this tool again with the scheme they say. Only if they ask which schemes are available, "
+                f"call lookup_khc_reference(reference_type=\"schemes\", parent_id={state['id']}, name=\"\") and "
+                "show the names."
+            )
         return (
-            f"State: {state['name']} [stateId={state['id']}]. No single scheme matched. "
-            f"Show only the scheme names (no IDs) and ask which one:\n{lines}"
+            f"State: {state['name']} [stateId={state['id']}]. More than one scheme matched what the farmer said. "
+            f"Show only these scheme names (no IDs) and ask which one:\n{lines}"
         )
     scheme = json.loads(fields.get("scheme", "null"))
     categories = json.loads(fields.get("categories", "[]"))
@@ -162,13 +178,18 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern_given: b
     elif concern_given:
         lines.append(
             "No clear match for the complaint. Do not guess. Show the category names (no IDs) and ask "
-            "'Which one is closest to your problem?'. After they pick, show that category's sub-category "
+            "'Which one feels closest to your problem?'. After they pick, show that category's sub-category "
             "names and ask the same. Then put both names in the summary."
         )
     else:
-        lines.append(
-            "The complaint is not known yet. Ask for it, then call this tool again with it as concern "
-            "so the best match can be found."
+        # No category names here on purpose: if the model sees a list before the farmer has described
+        # the problem, it shows the list instead of asking for the problem and matching it.
+        return (
+            f"State: {state['name']} [stateId={state['id']}]\n"
+            f"Scheme: {scheme['name']} [schemeId={scheme['id']}, divisionId={scheme['division']}]\n"
+            "The farmer has not described the problem yet, so there are no categories to show. Do not show any "
+            "list. Ask for the problem in their own words, then call this tool again with a short English "
+            "summary of it as concern. The best match is found for them first."
         )
     lines.append("All categories and sub-categories (IDs are for your use only):")
     for category in categories:
@@ -375,12 +396,12 @@ async def find_khc_location(
         return "Ask the farmer for their village or place name (up to 200 characters)."
     if state and _loose(place) == _loose(state):
         return (
-            "That is the state, not a village. Do not search with it. Ask 'Which district are you from?' "
-            "and then 'Which village are you from?', and call this tool with the village as place."
+            "That is the state, not a village. Do not search with it. Ask 'Can you please share your district name' "
+            "and then 'Can you please share the name of your village', and call this tool with the village as place."
         )
     if district and _loose(place) == _loose(district):
         return (
-            "That is the district, not a village. Do not search with it. Ask 'Which village are you from?' "
+            "That is the district, not a village. Do not search with it. Ask 'Can you please share the name of your village' "
             "and call this tool with the village as place, this state and this district."
         )
     return await _call(
@@ -396,11 +417,11 @@ async def get_khc_grievance_options(
     """Get a state's KHC grievance options in one call.
 
     Without a scheme it lists the state's schemes. With the scheme the farmer named
-    (AIF, A.I.F. and the full name all work) it returns that scheme's categories with all
-    their sub-categories and the IDs needed to register. Call it again once the complaint is
-    known and pass concern: a short English summary of the complaint (up to 500 characters).
-    The result then suggests the best-fit category and sub-category when one clearly matches.
-    Prefer this over three separate lookup_khc_reference calls.
+    (AIF, A.I.F. and the full name all work) it needs concern: a short English summary of the
+    farmer's complaint (up to 500 characters). Call it only after the farmer has described the
+    problem. Without concern it returns no categories. With concern it suggests the best-fit
+    category and sub-category, and if none clearly fits it returns the categories to choose
+    from, plus the IDs needed to register. Prefer this over three separate lookup_khc_reference calls.
     """
     state, scheme, concern = state.strip(), scheme.strip(), " ".join(concern.split())
     if not state or len(state) > 100 or len(scheme) > 100 or len(concern) > 500:
