@@ -167,30 +167,35 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern_given: b
         f"State: {state['name']} [stateId={state['id']}]",
         f"Scheme: {scheme['name']} [schemeId={scheme['id']}, divisionId={scheme['division']}]",
     ]
+    def subs_of(category_id: int) -> str:
+        return "\n".join(
+            f"- {sub['name']} [problemSubCategoryId={sub['id']}]"
+            for c in categories if c["id"] == category_id for sub in c["subCategories"]
+        )
+
     if isinstance(suggested, dict):
         category, sub = suggested["category"], suggested.get("subCategory")
         if sub is None:
-            names = "; ".join(
-                s["name"] for c in categories if c["id"] == category["id"] for s in c["subCategories"]
-            )
             lines.append(
-                f"The problem matches the category '{category['name']}' [problemCategoryId={category['id']}]. Use "
-                "it and do not show the other categories. Only the sub-category is unclear. Show only this "
-                f"category's sub-category names (no IDs): {names}. Ask 'Which one feels closest to your problem?'. "
-                "After the farmer picks, put the category and that sub-category in the summary."
+                f"The problem is under the category '{category['name']}' [problemCategoryId={category['id']}], but no "
+                "single sub-category fits clearly. Do not choose one yourself. Show only these sub-category names "
+                "(no IDs) and ask 'Which one feels closest to your problem?'. Use the one the farmer picks (and its "
+                "ID). Do not show the sub-category in the summary:\n" + subs_of(category["id"])
             )
         else:
             lines.append(
                 f"Best match for the complaint: category '{category['name']}' [problemCategoryId={category['id']}], "
-                f"sub-category '{sub['name']}' [problemSubCategoryId={sub['id']}]. Use it and show both names in the "
-                "summary for the farmer to confirm or change. If the farmer wants to change it, show the "
-                "sub-category names of that category (no IDs) and let them pick by name."
+                f"sub-category '{sub['name']}' [problemSubCategoryId={sub['id']}]. Use both. In the summary show the "
+                "category only; do not show the sub-category. If the farmer asks to change it, show the sub-category "
+                "names of that category (no IDs) and let them pick by name:\n" + subs_of(category["id"])
             )
     elif concern_given:
+        names = "\n".join(f"- {c['name']}" for c in categories)
         lines.append(
-            "No clear match for the complaint. Do not guess. Show the category names (no IDs) and ask "
-            "'Which one feels closest to your problem?'. After they pick, show that category's sub-category "
-            "names and ask the same. Then put both names in the summary."
+            "No clear match for the complaint. Do not guess. Show only these category names and ask 'Which one feels "
+            "closest to your problem?':\n" + names + "\nAfter the farmer picks one, call this tool again with the same "
+            "concern and category=<their pick> to get that category's sub-category. Never choose a sub-category "
+            "yourself."
         )
     else:
         # No category names here on purpose: if the model sees a list before the farmer has described
@@ -203,10 +208,6 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern_given: b
             "step order and ask the next step that is not done yet. Call this tool again only once the farmer "
             "has described the problem, with a short English summary of it as concern."
         )
-    lines.append("All categories and sub-categories (IDs are for your use only):")
-    for category in categories:
-        subs = "; ".join(f"{sub['name']} [{sub['id']}]" for sub in category["subCategories"])
-        lines.append(f"- {category['name']} [problemCategoryId={category['id']}]: {subs or 'none listed'}")
     return "\n".join(lines)
 
 
@@ -424,7 +425,7 @@ async def find_khc_location(
 
 @observe(name="tool:get_khc_grievance_options", as_type="tool")
 async def get_khc_grievance_options(
-    ctx: RunContext[FarmerContext], state: str, scheme: str = "", concern: str = "",
+    ctx: RunContext[FarmerContext], state: str, scheme: str = "", concern: str = "", category: str = "",
 ) -> str:
     """Get a state's KHC grievance options in one call.
 
@@ -432,16 +433,19 @@ async def get_khc_grievance_options(
     (AIF, A.I.F. and the full name all work) it needs concern: a short English summary of the
     farmer's complaint (up to 500 characters). Call it only after the scheme, state, district and
     village are done and the farmer has described the problem. Without concern it returns no
-    categories and no next step. With concern it suggests the best-fit
-    category and sub-category, and if none clearly fits it returns the categories to choose
-    from, plus the IDs needed to register. Prefer this over three separate lookup_khc_reference calls.
+    categories and no next step. With concern it picks the best-fit category and sub-category, and
+    if none clearly fits it returns only the category names. After the farmer picks a category from
+    that list, call it again with the same concern and category=<their pick> to get the best
+    sub-category inside it (or only that category's sub-categories to choose from).
+    Prefer this over three separate lookup_khc_reference calls.
     """
     state, scheme, concern = state.strip(), scheme.strip(), " ".join(concern.split())
-    if not state or len(state) > 100 or len(scheme) > 100 or len(concern) > 500:
+    category = category.strip()
+    if not state or max(len(state), len(scheme), len(category)) > 100 or len(concern) > 500:
         return "Ask the farmer which state they are from."
     return await _call(
         ctx, "init", request_type="grievance_tree", state_name=state, scheme_name=scheme,
-        concern=concern,
+        concern=concern, category_name=category,
     )
 
 
