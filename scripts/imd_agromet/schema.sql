@@ -19,10 +19,28 @@ CREATE TABLE IF NOT EXISTS imd_district_map (
   source            text      -- census2011+name | census2011_renamed | name | manual | unmatched
 );
 
+-- IMD masters (masters/imd/*.csv): crop/animal type, category, crop stage, regional language per state
 CREATE TABLE IF NOT EXISTS imd_crop_map (
   type_id integer PRIMARY KEY,
   crop    text,
   source  text
+);
+ALTER TABLE imd_crop_map ADD COLUMN IF NOT EXISTS aliases text[] NOT NULL DEFAULT '{}';
+
+CREATE TABLE IF NOT EXISTS imd_category_map (
+  cat_id   integer PRIMARY KEY,
+  category text
+);
+
+CREATE TABLE IF NOT EXISTS imd_crop_stage_map (
+  stage_id integer PRIMARY KEY,
+  stage    text
+);
+
+CREATE TABLE IF NOT EXISTS imd_state_language (
+  imd_state_id integer PRIMARY KEY,
+  language     text,
+  lang_code    text                          -- language of advisory_reg for the state's bulletins
 );
 
 -- Location Resolver keys, once per LGD district (loaded from masters/district_keys.csv.gz)
@@ -117,13 +135,17 @@ dt AS (
                               AND a.valid_until >= (now() AT TIME ZONE 'Asia/Kolkata')::date)) AS v
 ),
 adv AS (
-  SELECT a.id, a.custom_date, a.lgd_district_code, d.district_name, a.cat_id, a.type_id, c.crop,
-         a.crop_stage, imd_clean_text(a.advisory_eng) AS advisory_eng, imd_clean_text(a.advisory_reg) AS advisory_reg
+  SELECT a.id, a.custom_date, a.lgd_district_code, d.district_name, a.cat_id, cat.category, a.type_id, c.crop,
+         COALESCE(c.aliases, '{}') AS aliases, a.crop_stage, cs.stage AS crop_stage_name, sl.lang_code AS reg_lang_code,
+         imd_clean_text(a.advisory_eng) AS advisory_eng, imd_clean_text(a.advisory_reg) AS advisory_reg
   FROM advisories a
   JOIN d ON d.lgd_district_code = a.lgd_district_code
   LEFT JOIN imd_crop_map c ON c.type_id::text = a.type_id
+  LEFT JOIN imd_category_map cat ON cat.cat_id::text = a.cat_id
+  LEFT JOIN imd_crop_stage_map cs ON cs.stage_id::text = a.crop_stage
+  LEFT JOIN imd_state_language sl ON sl.imd_state_id::text = a.state_id
   WHERE a.custom_date = (SELECT v FROM dt)
-    AND (p_crop IS NULL OR lower(c.crop) = lower(p_crop))
+    AND (p_crop IS NULL OR lower(c.crop) = lower(p_crop) OR lower(p_crop) = ANY(c.aliases))
 )
 SELECT jsonb_build_object(
   'districts', COALESCE((SELECT jsonb_agg(jsonb_build_object('lgd_district_code', lgd_district_code,

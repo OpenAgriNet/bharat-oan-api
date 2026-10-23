@@ -15,6 +15,7 @@ import datetime as dt
 import gzip
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -47,7 +48,36 @@ def _int(v):
 
 
 def _csv(name: str) -> list[dict]:
-    return list(csv.DictReader((MASTERS / name).open(encoding="utf-8")))
+    return list(csv.DictReader((MASTERS / name).open(encoding="utf-8-sig")))
+
+
+# Language names used in masters/imd/language_tb.csv -> language codes used by the chat
+LANGUAGE_CODES = {"assamese": "as", "bengali": "bn", "english": "en", "gujarati": "gu", "hindi": "hi",
+                  "kannada": "kn", "malayalam": "ml", "malyalam": "ml", "marathi": "mr", "mizo": "lus",
+                  "nepali": "ne", "odia": "or", "punjabi": "pa", "tamil": "ta", "telugu": "te"}
+
+
+def _crop_rows() -> list[tuple]:
+    """One row per IMD type_id from the official crop table: display name, lower-case aliases.
+
+    "PIGEON PEA (RED GRAM/ARHAR)" -> ("Pigeon pea", ["red gram", "arhar"]). The table repeats each id once
+    per language; the upper-case English entries are used when present.
+    """
+    variants: dict[int, list[str]] = {}
+    for r in _csv("imd/crop_tb.csv"):
+        name = " ".join(r["crop_name"].split())
+        if name and _int(r["crop_id"]) is not None:
+            variants.setdefault(_int(r["crop_id"]), []).append(name)
+    rows = []
+    for type_id, names in variants.items():
+        parts: list[str] = []
+        for name in [n for n in names if n == n.upper()] or names:
+            for part in re.split(r"[()/]", name):
+                part = part.strip().lower()
+                if part and part not in parts:
+                    parts.append(part)
+        rows.append((type_id, parts[0].capitalize(), parts[1:], "imd_master"))
+    return rows
 
 
 # ------------------------------------------------------------------ setup
@@ -63,9 +93,21 @@ def setup(conn) -> dict:
         execute_values(cur, "INSERT INTO imd_district_map VALUES %s",
                        [(_int(r["imd_district_id"]), _int(r["imd_state_id"]), r["district_name"], _int(r["lgd_district_code"]),
                          _int(r["lgd_state_code"]), r["source"]) for r in _csv("district_map.csv")])
+        crops = _crop_rows()
         cur.execute("DELETE FROM imd_crop_map")
-        execute_values(cur, "INSERT INTO imd_crop_map VALUES %s",
-                       [(_int(r["type_id"]), r["crop"], r["source"]) for r in _csv("crop_map.csv")])
+        execute_values(cur, "INSERT INTO imd_crop_map (type_id, crop, aliases, source) VALUES %s", crops)
+        cur.execute("DELETE FROM imd_category_map")
+        execute_values(cur, "INSERT INTO imd_category_map VALUES %s",
+                       [(_int(r["cat_id"]), r["category_name"].strip()) for r in _csv("imd/category_tb.csv")
+                        if r["lang_id"].strip() == "2"])
+        cur.execute("DELETE FROM imd_crop_stage_map")
+        execute_values(cur, "INSERT INTO imd_crop_stage_map VALUES %s",
+                       [(_int(r["Growth_Stage_Id"]), r["name"].strip()) for r in _csv("imd/growth_stage_tb.csv")
+                        if r["name"].strip().upper() != "NULL"])
+        cur.execute("DELETE FROM imd_state_language")
+        execute_values(cur, "INSERT INTO imd_state_language VALUES %s",
+                       [(_int(r["lang_state_id"]), r["reg_lang_name"].strip(),
+                         LANGUAGE_CODES.get(r["reg_lang_name"].strip().lower())) for r in _csv("imd/language_tb.csv")])
         # rows already stored follow the (possibly corrected) district map
         cur.execute("UPDATE advisories a SET lgd_district_code = m.lgd_district_code FROM imd_district_map m "
                     "WHERE m.imd_district_id::text = a.district_id AND a.lgd_district_code IS DISTINCT FROM m.lgd_district_code")
@@ -73,7 +115,7 @@ def setup(conn) -> dict:
         cur.execute("UPDATE advisories SET valid_until = imd_valid_until(custom_date::date) WHERE valid_until IS NULL")
         cur.execute("SELECT source, count(*) FROM imd_district_map GROUP BY 1 ORDER BY 1")
         districts = dict(cur.fetchall())
-    return {"district_map": districts, "crops": len(_csv("crop_map.csv")), "advisories_remapped": remapped}
+    return {"district_map": districts, "crops": len(crops), "advisories_remapped": remapped}
 
 
 def seed_keys(conn) -> dict:
