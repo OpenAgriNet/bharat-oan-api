@@ -259,12 +259,6 @@ def test_all_language_prompts_include_khc_rules():
         assert "call `forward_geocode` first" in prompt
         assert "If browser coordinates are unavailable, ask \"Please share the name of your state\", then \"Can you please share your district name\", then \"Can you please share the name of your village\"" in prompt
         assert "Never substitute a nearby village" in prompt
-        assert "**Problem-to-scheme matching:**" in prompt
-        assert "If scheme is still missing, ask for scheme name" in prompt
-        assert "Never ask for internal IDs/codes from the farmer" in prompt
-        assert "a generic bank-loan complaint" in prompt
-        assert "name` is a literal name substring filter" in prompt
-        assert "include the matched scheme/category names in the final confirmation summary" in prompt
         assert "Do not proactively suggest KHC for unrelated questions" in prompt
         assert "If the grievance is for PM-Kisan, PMFBY, or AIF" in prompt
         assert "run the existing scheme grievance flow by default" in prompt
@@ -279,18 +273,18 @@ def test_all_language_prompts_include_khc_rules():
         assert "Never ask for or list sub-districts as a step of their own" in prompt
         assert "Ask which sub-district only when several villages in that district share the village name" in prompt
         assert "Resolve the village ID and all other required IDs before asking the farmer to confirm" in prompt
-        assert "If the farmer-provided scheme, sub-district, village, category, or sub-category does not match a returned row" in prompt
-        assert "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme" in prompt
-        assert "Do not ask the farmer to reconfirm AIF when already stated" in prompt
-        assert "Pick the single best-fit category/sub-category automatically and proceed with that mapping" in prompt
-        assert "Ask the farmer to choose from a returned list only when no supported fit can be determined automatically" in prompt
-        assert "Do not offer to proceed with only a category" in prompt
         assert "When waiting for a KHC OTP, treat a six-digit reply as the OTP" in prompt
         assert "uttarpradesh" in prompt
         assert "Do not ask the farmer to resend a proper name just because of spacing or case" in prompt
         assert "Never repeat the same sentence, clause, or question in the same response" in prompt
         assert "Use simple wording" in prompt
-        assert "In that same reply never call the category tool and never show category or sub-category names" in prompt
+        assert "**Fallback lookups (only if `find_khc_location` or `get_khc_grievance_options` is unavailable or fails):**" in prompt
+        assert "keep the same order and the same ask, match, then list rule" in prompt
+        assert "AIF, A.I.F. and Agriculture Infrastructure Fund are the same scheme; do not ask the farmer to confirm it again" in prompt
+        assert "Keep IDs internal, never invent or default an ID" in prompt
+        assert "never pass the complaint as `name`" in prompt
+        assert "While you are asking it, do not call the category tool and do not show category or sub-category names" in prompt
+        assert "never ask for the problem a second time" in prompt
         assert "One question, then the list, then the source" in prompt
         assert "Never repeat the question after the list or after the source line" in prompt
         assert "Never make up a concern" in prompt
@@ -489,19 +483,21 @@ def test_verified_farmer_goes_straight_to_registration(monkeypatch, registered, 
     assert "lookup_khc_reference" not in result and "own words" not in result
 
 
-def test_reference_results_direct_problem_matching_without_asking_for_ids(monkeypatch):
+def test_reference_results_say_to_match_first_and_list_only_when_unmatched(monkeypatch):
     fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_reference", {
         "options": '[{"scheme":38,"schemename":"Agriculture Infrastructure Fund (AIF)","division":31}]',
         "total": "1", "page": "1",
     })), [])
     output = asyncio.run(khc.lookup_khc_reference(ctx(), "schemes", 10))
-    assert "Match the farmer's problem" in output
-    assert "scheme and division from the same row" in output
-    assert "categories" in output and "sub-categories" in output
-    assert "unfiltered list and remaining pages" in output
-    assert "Treat missing spaces and case differences as name variations" in output
-    assert "show the relevant returned names for selection by name" in output
-    assert "Pick the single best-fit category/sub-category automatically and proceed with that mapping" in output
+    assert "Keep the grievance flow's order" in output
+    assert "ignoring case, spacing and small spelling differences (uttarpradesh is Uttar Pradesh)" in output
+    assert "If one matches, use it and do not ask again" in output
+    assert "Show names to choose from only when none or several match" in output
+    assert "look at the unfiltered list and remaining pages before saying nothing matches" in output
+    assert "Take the scheme and division from the same row" in output
+    assert "never show IDs or ask the farmer for them" in output
+    assert "Never choose a sub-category yourself" in output
+    assert khc.SOURCE in output
 
 
 @pytest.mark.parametrize("kind,parent,options", [
@@ -509,19 +505,17 @@ def test_reference_results_direct_problem_matching_without_asking_for_ids(monkey
     ("sub-categories", 39, '[{"problemsubcategory":1725,"subcategoryname":"Bank refused loan"}]'),
     ("sub-categories", 39, "[]"),
 ])
-def test_reference_guidance_reuses_named_scheme_and_blocks_incomplete_confirmation(
+def test_reference_results_never_pick_a_scheme_or_sub_category_for_the_farmer(
     monkeypatch, kind, parent, options,
 ):
     fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_reference", {
         "options": options, "total": "0" if options == "[]" else "1", "page": "1",
     })), [])
     output = asyncio.run(khc.lookup_khc_reference(ctx(), kind, parent))
-    assert "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme" in output
-    assert "Do not ask the farmer to reconfirm AIF when already stated" in output
-    assert "Pick the single best-fit category/sub-category automatically" in output
-    assert "choose from the returned sub-category names only when no supported fit" in output
-    assert "Do not offer to proceed with only a category" in output
-    assert "Never claim readiness or ask for final submission confirmation until all required IDs are resolved" in output
+    assert "A failed lookup does not mean a scheme is unsupported" in output
+    assert "Never choose a sub-category yourself" in output
+    assert "it is the match from get_khc_grievance_options or the farmer's pick from the list" in output
+    assert "Pick the single best-fit" not in output
 
 
 @pytest.mark.parametrize("options,total,page", [
@@ -529,7 +523,7 @@ def test_reference_guidance_reuses_named_scheme_and_blocks_incomplete_confirmati
     ('[{"subdistrictid":"1068","subdistrictname":"Another Tehsil"}]', "51", "2"),
     ("[]", "0", "1"),
 ])
-def test_location_reference_results_guide_api_backed_subdistrict_selection(
+def test_location_reference_results_do_not_make_sub_district_a_step(
     monkeypatch, options, total, page,
 ):
     import json
@@ -545,12 +539,8 @@ def test_location_reference_results_guide_api_backed_subdistrict_selection(
     assert json.loads(rendered_options) == json.loads(options)
     assert f"Total matches: {total}; page: {page}" in output
     assert "Do not list sub-districts as a step: ask for the village first" in output
-    assert "select by name only" in output
-    assert "Never invent options or present an empty list as a choice" in output
-    assert "fetch villages under the selected subdistrictid" in output
-    assert "use forward_geocode and reverse_geocode to derive missing district/state fields" in output
-    assert "If the district is unknown, ask for it first" in output
-    assert "Resolve the village ID before asking for final submission confirmation" in output
+    assert "offer the next pages if there are more" in output
+    assert "Show names to choose from only when none or several match" in output
     assert len(calls) == 1
 
 
@@ -1045,14 +1035,19 @@ def test_picked_category_is_sent_to_the_provider(monkeypatch):
     assert "do not show the sub-category" in output
 
 
-def _chat(*farmer_messages):
-    """A ctx whose chat history holds these farmer messages, the way the agent builds them."""
-    parts = [SimpleNamespace(part_kind="user-prompt", content=f'**User:** "{text}"\n**Language:** English')
-             for text in farmer_messages]
-    return SimpleNamespace(
-        deps=SimpleNamespace(session_id="session-1", question_id="q1"),
-        messages=[SimpleNamespace(parts=[part]) for part in parts],
-    )
+def _chat(*turns):
+    """A ctx whose history holds these turns: a plain string is the farmer, ("bot", text) is the bot."""
+    messages = []
+    for turn in turns:
+        who, text = ("farmer", turn) if isinstance(turn, str) else turn
+        part = (SimpleNamespace(part_kind="user-prompt", content=f'**User:** "{text}"\n**Selected Language:** English')
+                if who == "farmer" else SimpleNamespace(part_kind="text", content=text))
+        messages.append(SimpleNamespace(parts=[part]))
+    return SimpleNamespace(deps=SimpleNamespace(session_id="session-1", question_id="q1"), messages=messages)
+
+
+ASKED = ("bot", "Please tell me about your problem in your own words. I am here to help.\n\n**Source: Kisan Helpline Center**")
+ASKED_VILLAGE = ("bot", "Can you please share the name of your village\n\n**Source: Kisan Helpline Center**")
 
 
 def _tree_http(monkeypatch):
@@ -1109,3 +1104,35 @@ def test_category_lookups_tell_the_model_not_to_list_before_the_problem(monkeypa
     })), [])
     output = asyncio.run(khc.lookup_khc_reference(ctx(), "categories", 40))
     assert "Do not show these names to the farmer unless they have described their problem" in output
+
+
+@pytest.mark.parametrize("model_concern", ["", "bank loan sanction"])
+def test_the_farmers_answer_to_the_problem_question_is_used_even_if_the_model_forgets_it(monkeypatch, model_concern):
+    calls = _tree_http(monkeypatch)
+    chat = _chat("i want to create grivance in khc", "AIF", ASKED_VILLAGE, "abupur", ASKED, "bank loan sanction issue")
+    output = asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh", "AIF", model_concern))
+    assert len(calls) == 1
+    assert _tags(calls[0])["concern"] == (model_concern or "bank loan sanction issue")
+    assert "Nothing to show yet" not in output
+
+
+def test_a_typo_in_the_farmers_answer_still_goes_through(monkeypatch):
+    calls = _tree_http(monkeypatch)
+    chat = _chat("khc", "AIF", ASKED, "bank laon sanction issue")
+    asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh", "AIF", ""))
+    assert _tags(calls[0])["concern"] == "bank laon sanction issue"
+
+
+def test_the_village_answer_is_never_taken_as_the_problem(monkeypatch):
+    calls = _tree_http(monkeypatch)
+    chat = _chat("khc", "AIF", ASKED_VILLAGE, "abupur")
+    refused = asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh", "AIF", "bank loan not sanctioned"))
+    assert "Nothing to show yet" in refused and "Do not show any list" in refused
+    assert calls == []
+
+
+def test_a_reply_in_another_language_to_the_problem_question_is_used(monkeypatch):
+    calls = _tree_http(monkeypatch)
+    chat = _chat("मुझे शिकायत करनी है", ASKED, "मेरी किस्त नहीं आई")
+    asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh", "PM Kisan", ""))
+    assert _tags(calls[0])["concern"] == "मेरी किस्त नहीं आई"

@@ -42,40 +42,53 @@ def _words(text: str) -> set[str]:
     return set(re.findall(r"[a-z]{3,}", text.lower()))
 
 
-def _farmer_text(messages) -> str:
-    """Everything the farmer typed in this chat (the query only, not the context lines added after it)."""
-    said = []
+def _turns(messages) -> list[tuple[str, str]]:
+    """The chat in order as ('farmer', text) and ('bot', text); tool calls and returns are left out."""
+    turns: list[tuple[str, str]] = []
     for message in messages or []:
         for part in getattr(message, "parts", None) or []:
-            if getattr(part, "part_kind", "") != "user-prompt":
-                continue
-            content = part.content if isinstance(part.content, str) else " ".join(
-                item for item in part.content if isinstance(item, str)
-            )
-            found = re.search(r'\*\*User:\*\* "(.*?)"(?:\n\*\*|\n[A-Z]|\Z)', content, re.S)
-            said.append(found.group(1) if found else content)
-    return " ".join(said)
+            kind = getattr(part, "part_kind", "")
+            if kind == "user-prompt":
+                content = part.content if isinstance(part.content, str) else " ".join(
+                    item for item in part.content if isinstance(item, str)
+                )
+                found = re.search(r'\*\*User:\*\* "(.*?)"(?:\n\*\*|\n[A-Z]|\Z)', content, re.S)
+                turns.append(("farmer", found.group(1) if found else content))
+            elif kind == "text":
+                turns.append(("bot", str(part.content)))
+    return turns
 
 
-def _problem_was_described(ctx, concern: str, scheme: str) -> bool:
-    """True when the concern comes from words the farmer actually wrote, not one the model made up.
+def _asked_for_problem(text: str) -> bool:
+    low = text.lower()
+    return "own words" in low and any(word in low for word in ("problem", "complaint", "issue"))
 
-    A model that wants to move on can pass an invented concern and skip asking. Comparing it with the
-    farmer's own words stops that. Another language cannot be compared with an English summary, so
-    those calls are trusted, as are calls where there is no chat history to compare with.
+
+def _resolve_concern(ctx, concern: str, scheme: str) -> str | None:
+    """The concern to search with, or None when the farmer has not described a problem yet.
+
+    The farmer's reply to "tell me about your problem" is their problem, whatever the model passes
+    (an empty concern would otherwise send the bot back to ask again). A concern made up by the
+    model is refused unless it uses words the farmer wrote. Another language cannot be compared
+    with an English summary, so those calls are trusted, as are calls with no history to compare.
     """
-    messages = getattr(ctx, "messages", None)
-    if not messages:
-        return True
-    said = _farmer_text(messages)
-    if re.search(r"[^\x00-\x7f]", said):
-        return True
+    turns = _turns(getattr(ctx, "messages", None))
+    farmer = [index for index, (who, _) in enumerate(turns) if who == "farmer"]
+    if not farmer:
+        return concern
+    said = " ".join(turns[index][1] for index in farmer)
+    foreign = bool(re.search(r"[^\x00-\x7f]", said))
     ignore = _words(scheme) | _NOT_A_PROBLEM
     theirs = _words(said) - ignore
-    return any(
+    if concern and (foreign or any(
         word in theirs or difflib.get_close_matches(word, theirs, n=1, cutoff=0.8)
         for word in _words(concern) - ignore
-    )
+    )):
+        return concern
+    before = [text for who, text in turns[: farmer[-1]] if who == "bot"]
+    if before and _asked_for_problem(before[-1]):
+        return " ".join(turns[farmer[-1]][1].split())[:500]
+    return concern if foreign else None
 
 
 def _loose(text: str) -> str:
@@ -350,43 +363,16 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
             return (
                 f"KHC {values.get('reference_type')} options: {json.dumps(options, ensure_ascii=False)}\n{hold_back}"
                 f"Total matches: {fields.get('total', '')}; page: {fields.get('page', '')} (50 per page).\n"
-                "If the farmer-provided scheme/location/category value does not match a returned row, "
-                "show the relevant returned names for selection by name and offer next pages when available. "
-                "Match the farmer's problem to the returned scheme/category/subcategory names; "
-                "reuse a scheme already stated and ask for scheme only when still missing; never ask for internal IDs/codes. "
-                "Take scheme and division from the same row, "
-                "then fetch categories using scheme and sub-categories using problemcategory. "
-                "Use only returned IDs in the payload. Ask a focused clarification only when the problem "
-                "does not distinguish the matching options. If a keyword filter returns no match, "
-                "fetch the unfiltered list and remaining pages before concluding there is no match. "
-                "Treat missing spaces and case differences as name variations, not invalid input: "
-                "uttarpradesh matches Uttar Pradesh. Never ask for a proper name just to fix spacing. "
-                "If still unmatched, review unfiltered states before asking a focused clarification; "
-                "resolve the state before requesting its district. "
-                "AIF, A.I.F. and Agriculture Infrastructure Fund refer to the same scheme; "
-                "match the named scheme to the returned row in this state's list. "
-                "Do not ask the farmer to reconfirm AIF when already stated. "
-                "A failed lookup is not evidence that a scheme is unsupported; explain the lookup failure. "
-                "For sub-categories, review the unfiltered list under the verified category and its remaining "
-                "pages, matching the meaning of the complaint rather than requiring identical wording. "
-                "Pick the single best-fit category/sub-category automatically and proceed with that mapping. "
-                "Ask the farmer to choose from the returned sub-category names only when no supported fit "
-                "can be determined automatically. If none fit, explain that registration is blocked; "
-                "do not invent an ID or choose an unrelated option. "
-                "Do not offer to proceed with only a category. "
-                "Never claim readiness or ask for final submission confirmation until all required IDs are resolved. "
-                "For location lists, match the supplied/geocoded place within the returned hierarchy "
-                "and ask only when missing or ambiguous. If the district is unknown, ask for it first; "
-                "never guess it from a village name. Do not list sub-districts as a step: ask for the village "
-                "first. Show sub-district names only when several villages share the farmer's village name, or "
-                "when the village was not found and this list is the fallback; the farmer selects by name only. "
-                "Offer remaining pages when available. "
-                "Never invent options or present an empty list as a choice; explain lookup failures. "
-                "After selection, fetch villages under the selected subdistrictid and match the village "
-                "already supplied, asking only if ambiguous or absent. "
-                "If only a village/place name is provided, use forward_geocode and reverse_geocode to "
-                "derive missing district/state fields before asking the farmer again. "
-                f"Resolve the village ID before asking for final submission confirmation.\n{SOURCE}"
+                "Keep the grievance flow's order. Match what the farmer said to these names, ignoring case, "
+                "spacing and small spelling differences (uttarpradesh is Uttar Pradesh). If one matches, use it "
+                "and do not ask again. Show names to choose from only when none or several match, only the names "
+                "that fit the question being asked, and offer the next pages if there are more. If a filter finds "
+                "nothing, look at the unfiltered list and remaining pages before saying nothing matches. "
+                "Take the scheme and division from the same row, use only returned IDs, and never show IDs or ask "
+                "the farmer for them. Do not list sub-districts as a step: ask for the village first. A failed "
+                "lookup does not mean a scheme is unsupported; say that the lookup failed. Never choose a "
+                "sub-category yourself: it is the match from get_khc_grievance_options or the farmer's pick from "
+                f"the list.\n{SOURCE}"
             )
         if not fields.get("grievanceNo") or (action == "status" and (
             not fields.get("currentStatus") or fields["grievanceNo"] != values.get("grievanceNo")
@@ -497,15 +483,21 @@ async def get_khc_grievance_options(
     category = category.strip()
     if not state or max(len(state), len(scheme), len(category)) > 100 or len(concern) > 500:
         return "Ask the farmer which state they are from."
-    if scheme and concern and not _problem_was_described(ctx, concern, scheme):
-        return (
-            "Nothing to show yet: the farmer has not described their problem in their own words in this chat, "
-            "so that concern is not theirs. Do not show any list. Go back to the KHC step order and ask the "
-            "next step that is not done yet. If the state, district and village are done, that step is "
-            "'Please tell me about your problem in your own words. I am here to help.' If the farmer already "
-            "described the problem, do not ask again: call this tool again right away with their exact words "
-            "(translated to English if needed) as concern."
-        )
+    if scheme:
+        resolved = _resolve_concern(ctx, concern, scheme)
+        if resolved is None and concern:
+            logger.info("khc.concern_refused session=%s concern_len=%d", ctx.deps.session_id, len(concern))
+            return (
+                "Nothing to show yet: the farmer has not described their problem in their own words in this "
+                "chat, so that concern is not theirs. Do not show any list. Go back to the KHC step order and "
+                "ask the next step that is not done yet. If the state, district and village are done, that step "
+                "is 'Please tell me about your problem in your own words. I am here to help.' If the farmer "
+                "already described the problem, do not ask again: call this tool again right away with their "
+                "exact words (translated to English if needed) as concern."
+            )
+        if resolved is not None and resolved != concern:
+            logger.info("khc.concern_from_farmer_reply session=%s", ctx.deps.session_id)
+            concern = resolved
     return await _call(
         ctx, "init", request_type="grievance_tree", state_name=state, scheme_name=scheme,
         concern=concern, category_name=category,
@@ -517,40 +509,20 @@ async def lookup_khc_reference(
     ctx: RunContext[FarmerContext], reference_type: str,
     parent_id: Optional[int] = None, name: str = "", page: int = 1,
 ) -> str:
-    """Look up official KHC IDs by name; never guess IDs.
+    """Fallback lookup of KHC reference lists and IDs by name. Prefer find_khc_location (places) and
+    get_khc_grievance_options (scheme, category, sub-category); use this only if they are unavailable
+    or fail.
 
     Lists and parents: states (none), districts (stateId), sub-districts (districtId),
     villages (subDistrictId), schemes (stateId), categories (scheme),
-    sub-categories (problemCategory). Choose the scheme and division from the SAME
-    returned row. Follow the farmer's location through each level to the village.
-    For schemes, fetch options for the resolved state and match the farmer's problem
-    to schemename; do not require the farmer to know the scheme name or any IDs.
-    Then match categoryname under the selected scheme and subcategoryname under the
-    selected category. Use a focused clarification when several schemes fit; a generic
-    loan complaint alone does not establish AIF. Reuse a scheme already stated.
-    AIF, A.I.F. and Agriculture Infrastructure Fund are equivalent names; verify
-    against the state's returned schemes without asking the farmer to repeat AIF.
-    Match sub-categories by meaning, not exact complaint wording. If ambiguous,
-    show relevant API-returned names for selection by name or ask a focused question.
-    If no match exists after unfiltered lookup and pagination, explain the blocker.
-    Do not offer category-only submission or final confirmation with unresolved IDs.
-    Reuse an explicitly stated grievance location first. Otherwise use reverse_geocode
-    on available Browser Location Coordinates, then look up the returned place names.
-    Only ask the farmer for location details not already resolved; never guess a village.
-    If the district cannot be established from the village details, ask for the district;
-    never infer it from the village name alone. Verify the district in the state's list.
-    This is the fallback for find_khc_location. Do not list sub-districts as a step: ask for the
-    village first. Fetch sub-districts only when the village was not found, and show the returned
-    names as choices, with further pages if available. Ask the farmer to select by name only, then
-    fetch villages under the selected subdistrictid and match the village already supplied. Do not
-    ask the farmer for internal IDs.
-    Resolve the village ID before requesting final submission confirmation.
-    name is a case/whitespace-insensitive literal substring filter on reference names,
-    NOT a semantic problem search. uttarpradesh matches Uttar Pradesh; do not ask
-    the farmer to reformat a recognizable name. Resolve state before district.
-    Do not pass the entire complaint as name. Use name="" to review options when no
-    reliable name keyword is known or a filter finds nothing. Review further pages
-    before concluding no suitable option exists (50 options/page).
+    sub-categories (problemCategory). Take the scheme and division from the SAME row.
+    Keep the grievance flow's order: ask the farmer, match what they said, and show a list of
+    names only when nothing matched or several matched. Never guess an ID or a scheme.
+
+    name is a case- and whitespace-insensitive substring filter on the name (uttarpradesh matches
+    Uttar Pradesh), not a search over a complaint: never pass the complaint as name. Use name=""
+    to see the options when a filter finds nothing, and read the remaining pages (50 per page)
+    before saying nothing matches. Do not ask the farmer for IDs.
     """
     parents = {
         "states": None, "districts": "stateId", "sub-districts": "districtId",
