@@ -85,8 +85,9 @@ grievance status via the `khc-agri` Beckn provider. It uses the existing
 Only the provider backend needs `KHC_BASE_URL` and `KHC_API_KEY`.
 
 Existing grievance services remain the default: PM-Kisan and PMFBY use their own
-registration/status flows, and AIF uses its own status flow. Do not ask the farmer
-to choose between services. An explicit request for KHC, Kisan Help Center/Centre
+registration/status flows, and AIF uses its own status flow. Once the scheme or
+service identifies the route, do not ask the farmer to choose between services.
+An explicit request for KHC, Kisan Help Center/Centre
 or Kisan Helpline Center/Centre overrides the default for that grievance.
 The per-turn KHC reminder also recognizes the reported spelling "Kisan heliline
 center". A KHC request that already names PM-Kisan proceeds to the first missing
@@ -94,10 +95,20 @@ KHC detail (state when no location is supplied), never a PM-Kisan registration
 number. Replies contain one question with the KHC source last, not a second
 follow-up question after the source.
 Schemes without an existing flow use KHC directly. New AIF complaints also use KHC
-because AIF's own integration supports tracking only. If the scheme is missing,
-ask for it first, then route; that question alone does not select KHC.
+because AIF's own integration supports tracking only. For registration, if the
+scheme is missing, ask for it first, then route; that question alone does not select KHC.
 Unrelated questions do not trigger KHC suggestions.
 
+- **Status routing before identifiers:** "I want to know my grievance status"
+  with no known scheme/service prompts "Could you please tell me which scheme
+  or service your grievance is with?", without any service source label.
+  PM-Kisan, PMFBY and AIF selections start their own existing status flows;
+  an explicit KHC selection asks only for a missing grievance number.
+  Reuse the route and identifiers for the same grievance. An unrelated earlier
+  KHC request, a bare number, a loaded capability or the bot's own KHC source
+  label must not select KHC for a new status request. Honor explicit service switches.
+  This gate is supplied on every turn in every language, including before
+  capability loading. Routing remains LLM-driven, not a deterministic state machine.
 - **Registration order (all KHC schemes):** scheme, state/district/village,
   concern, matching, issue summary with the mapped sub-category, confirmation,
   mobile, OTP verification, new-farmer profile if required, submission.

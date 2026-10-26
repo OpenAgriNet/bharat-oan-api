@@ -68,25 +68,54 @@ _KHC_WORDS = re.compile(
 
 
 def khc_service_note(messages) -> str:
-    """System-prompt text for a chat where the farmer already asked for Kisan Helpline Center.
+    """Always provide status routing, plus a scoped reminder of an earlier KHC choice.
 
-    Keep an explicit KHC request from being lost when a later turn names a scheme whose
-    own grievance service would otherwise be the default.
+    Routing must be available before lazy-loaded workflow rules. Keep explicit KHC choices
+    across follow-up turns without treating them as a permanent choice for the whole chat.
     """
+    routing = (
+        "\n\n## Grievance status routing\n"
+        "Before collecting details or calling a grievance-status tool, identify the scheme or service "
+        "for the grievance being checked from the farmer's message or clear context for that same grievance. "
+        "If neither is known, ask only 'Could you please tell me which scheme or service your grievance is with?' "
+        "in the farmer's selected language, then wait. "
+        "Do not ask for a grievance number, registration number, mobile number or OTP until the route is known. "
+        "Do not show any service source label while clarifying the route. "
+        "A bare grievance number or the bot's own KHC wording does not select KHC. "
+        "Merely loading a capability does not select a service either.\n"
+        "Once known, route directly: PM-Kisan -> pmkisan_grievance_send_otp(purpose='check_status') "
+        "then pmkisan_grievance_status; PMFBY -> pmfby_grievance_status; "
+        "AIF -> initiate_aif_otp then verify_aif_otp then check_aif_grievance_status; "
+        "KHC -> check_khc_grievance_status. Collect only the chosen flow's missing details, "
+        "reusing any identifiers already supplied. "
+        "Do not ask which scheme or service again when it is already known. "
+        "An explicit KHC choice for this grievance overrides the scheme default. "
+        "A status follow-up clearly about the same KHC grievance stays with KHC. "
+        "KHC status needs only the grievance number, not the scheme, location, mobile number or OTP. "
+        "Other named schemes without an existing grievance-status flow use KHC. "
+        "An unrelated earlier KHC mention is not a choice for a new grievance or status request. "
+        "Honor an explicit switch away from KHC. "
+        "This gate overrides generic grievance tool-table entries and KHC number-collection instructions; "
+        "respect the session's permitted tools. It does not change the registration step order."
+    )
     for who, text in _turns(messages):
         if who == "farmer" and _KHC_WORDS.search(text):
-            return (
-                "\n\n## Service already chosen\n"
-                "The farmer asked for Kisan Helpline Center (KHC) earlier in this chat. For every scheme, "
-                "including PM-Kisan, PMFBY and AIF, follow the KHC rules and do not ask which service to use. "
+            return routing + (
+                "\n\n## Service already chosen (same grievance only)\n"
+                "The farmer mentioned Kisan Helpline Center (KHC) earlier in this chat. "
+                "Apply the earlier KHC choice only to that same grievance, if they requested KHC "
+                "and have not asked to switch away. A mention in an informational question is not a choice. "
+                "For that KHC grievance, for every scheme, including PM-Kisan, PMFBY and AIF, "
+                "follow the KHC rules and do not ask which service to use. "
                 "Never ask for a PM-Kisan registration number, PMFBY application number or AIF beneficiary ID "
                 "for this KHC grievance. Do not combine KHC and scheme-service questions. "
-                "If the scheme is already named, skip the scheme question. Ask only the first missing KHC "
+                "For registration: If the scheme is already named, skip the scheme question. Ask only the first missing KHC "
                 "detail, reusing everything already supplied; for registration, location comes before the "
-                "mobile number and OTP. These KHC rules override the general follow-up and source-order "
+                "mobile number and OTP. For status, follow the routing gate above, not the registration steps. "
+                "These KHC rules override the general follow-up and source-order "
                 "rules: ask one question only, and put the source last with nothing after it."
             )
-    return ""
+    return routing
 
 
 def _asked_for_problem(text: str) -> bool:
@@ -607,14 +636,22 @@ async def lookup_khc_reference(
 async def check_khc_grievance_status(
     ctx: RunContext[FarmerContext], grievance_number: str = "",
 ) -> str:
-    """Check KHC grievance status. Ask the farmer for their grievance number if missing.
+    """Check KHC grievance status.
+
+    Use only after KHC is identified as the service for this grievance. For a generic status
+    request with no known scheme or service, ask which scheme or service first, not for a number.
+    Named PM-Kisan, PMFBY and AIF grievances use their own status flows unless KHC was chosen.
+    Once KHC is known, ask the farmer for their grievance number only if missing.
 
     Keep slashes and leading zeros intact, e.g. BR/240926/2. Do not ask for an OTP,
     mobile, beneficiary ID or cookie. Never invent a grievance number.
     """
     number = to_ascii_digits(str(grievance_number or "")).strip()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9/-]{0,99}", number):
-        return "Ask the farmer for their Kisan Help Center grievance number, including any slashes."
+        return (
+            "If the service for this grievance is unknown, ask which scheme or service first, without a source label. "
+            "Only for a known KHC grievance: Ask the farmer for their Kisan Help Center grievance number, including any slashes."
+        )
     return await _call(ctx, "status", grievanceNo=number)
 
 

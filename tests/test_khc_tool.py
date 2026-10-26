@@ -59,7 +59,9 @@ def fake_http(monkeypatch, response, calls):
 def test_status_asks_for_number_without_http(monkeypatch, number):
     call = AsyncMock()
     monkeypatch.setattr(khc, "_call", call)
-    assert "Ask the farmer" in asyncio.run(khc.check_khc_grievance_status(ctx(), number))
+    output = asyncio.run(khc.check_khc_grievance_status(ctx(), number))
+    assert "ask which scheme or service first, without a source label" in output
+    assert "Ask the farmer for their Kisan Help Center grievance number" in output
     call.assert_not_called()
 
 
@@ -277,7 +279,10 @@ def test_all_language_prompts_include_khc_rules():
         assert "the farmer already chose KHC in the first message, so there is no service question" in prompt
         assert "go straight to KHC and do not ask which service to use" in prompt
         assert "Existing flows stay the default unless the farmer explicitly requests KHC" in prompt
-        assert "If the scheme is missing, ask for it first, then apply this routing rule" in prompt
+        assert "For registration, ask for the scheme first when missing, then apply this routing rule" in prompt
+        assert "Status routing before the grievance number" in prompt
+        assert "Status routing comes before identifiers" in prompt
+        assert 'A generic request such as "i want to know my grievance status" does not select KHC' in prompt
         assert "Do not ask the farmer to choose a service" in prompt
         assert "PM-Kisan and PMFBY registration/status use their existing flows by default" in prompt
         assert "AIF status uses its existing flow by default" in prompt
@@ -362,7 +367,7 @@ def test_all_language_prompts_include_khc_rules():
         assert "Never call it with the state or district name as the place, and never ask for the village before the district" in prompt
         assert "call `find_khc_location` again with the same village as `place`, the same state and district" in prompt
         assert "never ask for the village again" in prompt
-        assert "KHC step order (follow exactly; every reply asks ONE question)" in prompt
+        assert "KHC step order (registration only; follow exactly; every reply asks ONE question)" in prompt
         assert "Never ask for a later step early, never ask for two steps in one reply" in prompt
         assert "never ask for the mobile number or an OTP before the farmer has confirmed the summary" in prompt
         assert "end every reply with the line \"Source: Kisan Helpline Center\"" in prompt
@@ -1398,13 +1403,63 @@ def test_explicit_khc_pm_kisan_request_does_not_mix_workflows(later_turns):
     ["kisan heliline centerpiece", "scheme k.h.cl information"],
     [],
 ])
-def test_the_service_note_is_absent_when_khc_was_never_asked_for(messages):
-    assert khc.khc_service_note(_chat(*messages).messages) == ""
+def test_the_service_lock_is_absent_when_khc_was_never_asked_for(messages):
+    assert "## Service already chosen" not in khc.khc_service_note(_chat(*messages).messages)
 
 
 def test_khc_in_the_bots_own_words_does_not_count_as_the_farmers_choice():
     chat = _chat("grievance for PM-Kisan", ("bot", "Would you like Kisan Helpline Center or the PM-Kisan service?"), "hmm")
-    assert khc.khc_service_note(chat.messages) == ""
+    assert "## Service already chosen" not in khc.khc_service_note(chat.messages)
+
+
+@pytest.mark.parametrize("turns", [
+    (),
+    ("i want to know my grievance status",),
+    ("check my complaint status",),
+    ("i want to know my grievance status",
+     ("bot", "Could you please share your grievance number?\nSource: Kisan Helpline Center")),
+    ("check grievance 123456789012",),
+])
+def test_status_routing_gate_does_not_assume_khc(turns):
+    note = khc.khc_service_note(_chat(*turns).messages)
+    assert "## Grievance status routing" in note
+    assert "Could you please tell me which scheme or service your grievance is with?" in note
+    assert "Do not ask for a grievance number, registration number, mobile number or OTP until the route is known" in note
+    assert "Do not show any service source label while clarifying the route" in note
+    assert "A bare grievance number or the bot's own KHC wording does not select KHC" in note
+    assert "## Service already chosen" not in note
+
+
+@pytest.mark.parametrize("scheme,tool", [
+    ("PM-Kisan", "pmkisan_grievance_send_otp"),
+    ("PMFBY", "pmfby_grievance_status"),
+    ("AIF", "initiate_aif_otp"),
+    ("KHC", "check_khc_grievance_status"),
+])
+def test_status_routing_gate_preserves_direct_named_routes(scheme, tool):
+    note = khc.khc_service_note(_chat(f"Check my {scheme} grievance status").messages)
+    assert tool in note
+    assert "Do not ask which scheme or service again when it is already known" in note
+    assert "An explicit KHC choice for this grievance overrides the scheme default" in note
+    assert "KHC status needs only the grievance number, not the scheme, location, mobile number or OTP" in note
+
+
+@pytest.mark.parametrize("later_request", [
+    "i want to know my grievance status",
+    "Check a different PM-Kisan grievance",
+    "Check my PMFBY grievance status instead",
+    "Switch to the AIF grievance service",
+])
+def test_old_khc_choice_is_not_a_chat_wide_status_lock(later_request):
+    note = khc.khc_service_note(_chat("Create a grievance through KHC", later_request).messages)
+    assert "Apply the earlier KHC choice only to that same grievance" in note
+    assert "An unrelated earlier KHC mention is not a choice for a new grievance or status request" in note
+    assert "Honor an explicit switch away from KHC" in note
+
+
+def test_khc_status_tool_requires_known_route_before_asking_for_number():
+    assert "Use only after KHC is identified as the service for this grievance" in khc.check_khc_grievance_status.__doc__
+    assert "ask which scheme or service first" in khc.check_khc_grievance_status.__doc__
 
 
 def test_the_system_prompt_gets_the_note_on_every_turn():
