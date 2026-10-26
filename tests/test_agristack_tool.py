@@ -311,9 +311,6 @@ def test_every_language_prompt_includes_agristack_rules():
                 "today_date": "x",
                 "crop_season": "x",
                 "last_weekday_table": "",
-                "vector_scheme_count": 0,
-                "vector_schemes_bullets": "",
-                "vector_schemes_identifiers": "",
             },
         )
         assert "## AgriStack farmer data" in prompt, lang
