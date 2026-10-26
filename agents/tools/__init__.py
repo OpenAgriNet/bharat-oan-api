@@ -278,7 +278,7 @@ TOOLS = [
     ),
     Tool(
         forward_geocode,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
