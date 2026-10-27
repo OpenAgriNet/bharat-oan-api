@@ -69,7 +69,7 @@ async def prepare_capability_tools(ctx: RunContext[Any], tools: list) -> list:
     state = ctx.deps.capabilities
     visible = state.visible
     pending = state.policy.allowed_tools - visible
-    # Tool-specific prepare hooks have already run.
+    # Tool-specific prepare hooks (e.g. AgriStack consent) have already run.
     return [tool for tool in tools if tool.name in visible or (tool.name == "load_capability" and pending)]
 
 

@@ -98,7 +98,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_as.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_as.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -187,6 +194,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -289,7 +316,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_bn.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_bn.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -378,6 +412,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -480,7 +534,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_en.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_en.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -579,6 +640,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -681,7 +762,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_gu.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_gu.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -770,6 +858,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -872,7 +980,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_hi.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_hi.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -971,6 +1086,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -1073,7 +1208,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_kn.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_kn.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -1162,6 +1304,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -1264,7 +1426,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_mai.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_mai.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -1363,6 +1532,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -1465,7 +1654,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_ml.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_ml.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -1554,6 +1750,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -1656,7 +1872,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_mr.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_mr.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -1745,6 +1968,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -1847,7 +2090,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_or.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_or.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -1946,6 +2196,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -2048,7 +2318,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_pa.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_pa.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -2147,6 +2424,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -2249,7 +2546,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_ta.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_ta.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -2338,6 +2642,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ],
@@ -2440,7 +2764,14 @@
     {
       "path": "capabilities/agrinet/weather/forecast/weather_te.md",
       "tools": [
+        "imd_agromet_advisory",
         "weather_forecast"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/weather/agromet/agromet_te.md",
+      "tools": [
+        "imd_agromet_advisory"
       ]
     },
     {
@@ -2529,6 +2860,26 @@
         "check_kcc_application_status",
         "initiate_kcc_otp",
         "select_kcc_application"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/agristack/rules/agristack_rules_common.md",
+      "tools": [
+        "get_agristack_farmer_crops",
+        "get_agristack_farmer_location",
+        "get_agristack_farmer_profile"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/khc/rules/khc_rules_common.md",
+      "tools": [
+        "check_khc_grievance_status",
+        "find_khc_location",
+        "get_khc_grievance_options",
+        "initiate_khc_otp",
+        "lookup_khc_reference",
+        "register_khc_grievance",
+        "verify_khc_otp"
       ]
     }
   ]

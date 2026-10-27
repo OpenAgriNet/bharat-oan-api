@@ -1,0 +1,765 @@
+imd_district_id,imd_state_id,district_name,lgd_district_code,lgd_state_code,source,lgd_name
+1,1,KUPWARA,8,1,census2011+name,Kupwara
+2,1,BADGAM,2,1,census2011+name,Budgam
+3,37,LEH-LADAKH,9,37,census2011+name,Leh Ladakh
+4,37,KARGIL,6,37,census2011+name,Kargil
+5,1,POONCH,10,1,census2011+name,Poonch
+6,1,RAJAURI,12,1,census2011+name,Rajouri
+7,1,KATHUA,7,1,census2011+name,Kathua
+8,1,BARAMULLA,3,1,census2011+name,Baramulla
+9,1,BANDIPORA,623,1,census2011+name,Bandipora
+10,1,SRINAGAR,13,1,census2011+name,Srinagar
+11,1,GANDERBAL,626,1,census2011+name,Ganderbal
+12,1,PULWAMA,11,1,census2011+name,Pulwama
+13,1,SHOPIAN,625,1,census2011+name,Shopian
+14,1,ANANTNAG,1,1,census2011+name,Anantnag
+15,1,KULGAM,622,1,census2011+name,Kulgam
+16,1,DODA,4,1,census2011+name,Doda
+17,1,RAMBAN,621,1,census2011+name,Ramban
+18,1,KISHTWAR,620,1,census2011+name,Kishtwar
+19,1,UDHAMPUR,14,1,census2011+name,Udhampur
+20,1,REASI,627,1,census2011+name,Reasi
+21,1,JAMMU,5,1,census2011+name,Jammu
+22,1,SAMBA,624,1,census2011+name,Samba
+23,2,CHAMBA,16,2,census2011+name,Chamba
+24,2,KANGRA,18,2,census2011+name,Kangra
+25,2,LAHUL-SPITI,21,2,census2011+name,Lahul And Spiti
+26,2,KULLU,20,2,census2011+name,Kullu
+27,2,MANDI,22,2,census2011+name,Mandi
+28,2,HAMIRPUR,17,2,census2011+name,Hamirpur
+29,2,UNNA,26,2,census2011+name,Una
+30,2,BILASPUR,15,2,census2011+name,Bilaspur
+31,2,SOLAN,25,2,census2011+name,Solan
+32,2,SIRMOUR,24,2,census2011+name,Sirmaur
+33,2,SHIMLA,23,2,census2011+name,Shimla
+34,2,KINNAUR,19,2,census2011+name,Kinnaur
+35,3,GURDASPUR,32,3,census2011+name,Gurdaspur
+36,3,KAPURTHALA,35,3,census2011+name,Kapurthala
+37,3,JALANDHAR,34,3,census2011+name,Jalandhar
+38,3,HOSHIARPUR,33,3,census2011+name,Hoshiarpur
+39,3,SHAHIDBHAGATSINGH-NAGAR,40,3,census2011+name,Shahid Bhagat Singh Nagar
+40,3,FATEHGARH-SAHIB,30,3,census2011+name,Fatehgarh Sahib
+41,3,LUDHIANA,36,3,census2011+name,Ludhiana
+42,3,MOGA,38,3,census2011+name,Moga
+43,3,FIROZEPUR,31,3,census2011+name,Ferozepur
+44,3,SRI-MUKTSAR-SAHIB,39,3,census2011+name,Sri Muktsar Sahib
+45,3,FARIDKOT,29,3,census2011+name,Faridkot
+46,3,BHATINDA,28,3,census2011+name,Bathinda
+47,3,MANSA,37,3,census2011+name,Mansa
+48,3,PATIALA,41,3,census2011+name,Patiala
+49,3,AMRITSAR,27,3,census2011+name,Amritsar
+50,3,Tarn-Taran,609,3,census2011+name,Tarn Taran
+51,3,RUPNAGAR,42,3,census2011+name,Rupnagar
+52,3,S.A.S-NAGAR,608,3,census2011+name,S.A.S Nagar
+53,3,SANGRUR,43,3,census2011+name,Sangrur
+54,3,BARNALA,605,3,census2011+name,Barnala
+55,4,CHANDIGARH,44,4,census2011+name,Chandigarh
+56,5,UTTARKASHI,57,5,census2011+name,Uttar Kashi
+57,5,CHAMAOLI,47,5,census2011+name,Chamoli
+58,5,RUDARPRAYAG,54,5,census2011+name,Rudra Prayag
+59,5,TEHRI-GARHWAL,55,5,census2011+name,Tehri Garhwal
+60,5,DEHRADUN,49,5,census2011+name,Dehradun
+61,5,PAURI-GARHWAL,52,5,census2011+name,Pauri Garhwal
+62,5,PITHORAGARH,53,5,census2011+name,Pithoragarh
+63,5,BAGESHWAR,46,5,census2011+name,Bageshwar
+64,5,ALMORA,45,5,census2011+name,Almora
+65,5,CHAMPAWAT,48,5,census2011+name,Champawat
+66,5,NAINITAL,51,5,census2011+name,Nainital
+67,5,UDAMSINGH-NAGAR,56,5,census2011+name,Udam Singh Nagar
+68,5,HARIDWAR,50,5,census2011+name,Haridwar
+69,6,PANCHKULA,70,6,census2011+name,Panchkula
+70,6,AMBALA,58,6,census2011+name,Ambala
+71,6,YAMUNA-NAGAR,76,6,census2011+name,Yamunanagar
+72,6,KURUKSHETRA,68,6,census2011+name,Kurukshetra
+73,6,KAITHAL,66,6,census2011+name,Kaithal
+74,6,KARNAL,67,6,census2011+name,Karnal
+75,6,PANIPAT,71,6,census2011+name,Panipat
+76,6,SONIPAT,75,6,census2011+name,Sonipat
+77,6,JIND,65,6,census2011+name,Jind
+78,6,FATEHABAD,61,6,census2011+name,Fatehabad
+79,6,SIRSA,74,6,census2011+name,Sirsa
+80,6,HISAR,63,6,census2011+name,Hisar
+81,6,BHIWANI,59,6,census2011+name,Bhiwani
+82,6,ROHTAK,73,6,census2011+name,Rohtak
+83,6,JHAJJAR,64,6,census2011+name,Jhajjar
+84,6,MAHENDARGARH,69,6,census2011+name,Mahendragarh
+85,6,REWARI,72,6,census2011+name,Rewari
+86,6,GURUGRAM,62,6,census2011+name,Gurugram
+87,6,MEWAT,604,6,census2011_renamed,Nuh
+88,6,FARIDABAD,60,6,census2011+name,Faridabad
+89,6,PALWAL,619,6,census2011+name,Palwal
+90,7,NORTH-WEST-DELHI,82,7,census2011+name,North West
+91,7,NORTH-DELHI,80,7,census2011_renamed,North
+92,7,NORTH-EAST-DELHI,81,7,census2011+name,North East
+93,7,EAST-DELHI,78,7,census2011_renamed,East
+94,7,NEW-DELHI-DELHI,79,7,census2011+name,New Delhi
+95,7,CENTRAL-DELHI,77,7,census2011_renamed,Central
+96,7,WEST-DELHI,85,7,census2011_renamed,West
+97,7,SOUTH-WEST-DELHI,84,7,census2011+name,South West
+98,7,SOUTH-DELHI,83,7,census2011_renamed,South
+99,8,GANGANAGAR,100,8,census2011+name,Ganganagar
+100,8,HANUMANGARH,101,8,census2011+name,Hanumangarh
+101,8,BIKANER,93,8,census2011+name,Bikaner
+102,8,CHURU,96,8,census2011+name,Churu
+103,8,JHUNJHUNU,106,8,census2011+name,Jhunjhunu
+104,8,ALWAR,87,8,census2011+name,Alwar
+105,8,BHARATPUR,91,8,census2011+name,Bharatpur
+106,8,DHAULPUR,98,8,census2011+name,Dholpur
+107,8,KARAULI,108,8,census2011+name,Karauli
+108,8,SAWAIMADHOPUR,113,8,census2011+name,Sawai Madhopur
+109,8,DAUSA,97,8,census2011+name,Dausa
+110,8,JAIPUR,102,8,census2011+name,Jaipur
+111,8,SIKAR,114,8,census2011+name,Sikar
+112,8,NAGAUR,110,8,census2011+name,Nagaur
+113,8,JODHPUR,107,8,census2011+name,Jodhpur
+114,8,JAISALMER,103,8,census2011+name,Jaisalmer
+115,8,BARMER,90,8,census2011+name,Barmer
+116,8,JALORE,104,8,census2011+name,Jalore
+117,8,SIROHI,115,8,census2011+name,Sirohi
+118,8,PALI,111,8,census2011+name,Pali
+119,8,AJMER,86,8,census2011+name,Ajmer
+120,8,TONK,116,8,census2011+name,Tonk
+121,8,BUNDI,94,8,census2011+name,Bundi
+122,8,BHILWARA,92,8,census2011+name,Bhilwara
+123,8,RAJSAMAND,112,8,census2011+name,Rajsamand
+124,8,DUNGARPUR,99,8,census2011+name,Dungarpur
+125,8,BANSWARA,88,8,census2011+name,Banswara
+126,8,CHITORGARH,95,8,census2011+name,Chittorgarh
+127,8,KOTA,109,8,census2011+name,Kota
+128,8,BARAN,89,8,census2011+name,Baran
+129,8,JHALAWAR,105,8,census2011+name,Jhalawar
+130,8,UDAIPUR,117,8,census2011+name,Udaipur
+131,8,PRATAPGARH,629,8,census2011+name,Pratapgarh
+132,9,SAHARANPUR,177,9,census2011+name,Saharanpur
+133,9,MUZAFFARNAGAR,172,9,census2011+name,Muzaffarnagar
+134,9,BIJNOR,132,9,census2011+name,Bijnor
+135,9,MORADABAD,171,9,census2011+name,Moradabad
+136,9,RAMPUR,176,9,census2011+name,Rampur
+137,9,AMROHA,154,9,census2011+name,Amroha
+138,9,MEERUT,169,9,census2011+name,Meerut
+139,9,BAGHPAT,124,9,census2011+name,Baghpat
+140,9,GHAZIABAD,145,9,census2011+name,Ghaziabad
+141,9,GAUTAM-BUDDHA-NAGAR,144,9,census2011+name,Gautam Buddha Nagar
+142,9,BULANDSHAHR,134,9,census2011+name,Bulandshahr
+143,9,ALIGARH,119,9,census2011+name,Aligarh
+144,9,HATHRAS,163,9,census2011+name,Hathras
+145,9,MATHURA,167,9,census2011+name,Mathura
+146,9,AGRA,118,9,census2011+name,Agra
+147,9,FIROZABAD,143,9,census2011+name,Firozabad
+148,9,MAINPURI,166,9,census2011+name,Mainpuri
+149,9,BUDAUN,133,9,census2011+name,Budaun
+150,9,BAREILLY,130,9,census2011+name,Bareilly
+151,9,PILIBHIT,173,9,census2011+name,Pilibhit
+152,9,SHAHJAHANPUR,180,9,census2011+name,Shahjahanpur
+153,9,KHERI,159,9,census2011+name,Kheri
+154,9,SITAPUR,183,9,census2011+name,Sitapur
+155,9,HARDOI,150,9,census2011+name,Hardoi
+156,9,UNNAO,186,9,census2011+name,Unnao
+157,9,LUCKNOW,162,9,census2011+name,Lucknow
+158,9,RAE-BARELI,175,9,census2011+name,Rae Bareli
+159,9,FARRUKHABAD,141,9,census2011+name,Farrukhabad
+160,9,KANNAUJ,155,9,census2011+name,Kannauj
+161,9,ETAWAH,139,9,census2011+name,Etawah
+162,9,AURAIYA,122,9,census2011+name,Auraiya
+163,9,KANPUR-DEHAT,156,9,census2011+name,Kanpur Dehat
+164,9,KANPUR-NAGAR,157,9,census2011+name,Kanpur Nagar
+165,9,JALAUN,151,9,census2011+name,Jalaun
+166,9,JHANSI,153,9,census2011+name,Jhansi
+167,9,LALITPUR,161,9,census2011+name,Lalitpur
+168,9,HAMIRPUR,149,9,census2011+name,Hamirpur
+169,9,MAHOBA,165,9,census2011+name,Mahoba
+170,9,BANDA,128,9,census2011+name,Banda
+171,9,CHITRAKOOT,136,9,census2011+name,Chitrakoot
+172,9,FATEHPUR,142,9,census2011+name,Fatehpur
+173,9,PRATAPGARH,174,9,census2011+name,Pratapgarh
+174,9,KAUSHAMBI,158,9,census2011+name,Kaushambi
+175,9,PRAYAGRAJ,120,9,census2011+name,Prayagraj
+176,9,BARABANKI,129,9,census2011+name,Barabanki
+177,9,AYODHYA,140,9,census2011+name,Ayodhya
+178,9,AMBEDKAR-NAGAR,121,9,census2011+name,Ambedkar Nagar
+179,9,SULTANPUR,185,9,census2011+name,Sultanpur
+180,9,BAHRAICH,125,9,census2011+name,Bahraich
+181,9,SHRAVASTI,181,9,census2011+name,Shravasti
+182,9,BALRAMPUR,127,9,census2011+name,Balrampur
+183,9,GONDA,147,9,census2011+name,Gonda
+184,9,SIDDHARTH-NAGAR,182,9,census2011+name,Siddharth Nagar
+185,9,BASTI,131,9,census2011+name,Basti
+186,9,SANT-KABIR-NAGAR,178,9,census2011+name,Sant Kabeer Nagar
+187,9,MAHARAJGANJ,164,9,census2011+name,Maharajganj
+188,9,GORAKHPUR,148,9,census2011+name,Gorakhpur
+189,9,KUSHI-NAGAR,160,9,census2011+name,Kushi Nagar
+190,9,DEORIA,137,9,census2011+name,Deoria
+191,9,AZAMGARH,123,9,census2011+name,Azamgarh
+192,9,MAU,168,9,census2011+name,Mau
+193,9,BALLIA,126,9,census2011+name,Ballia
+194,9,JAUNPUR,152,9,census2011+name,Jaunpur
+195,9,GHAZIPUR,146,9,census2011+name,Ghazipur
+196,9,CHANDAULI,135,9,census2011+name,Chandauli
+197,9,VARANASI,187,9,census2011+name,Varanasi
+198,9,BHADOHI,179,9,census2011+name,Bhadohi
+199,9,MIRZAPUR,170,9,census2011+name,Mirzapur
+200,9,SONBHADRA,184,9,census2011+name,Sonbhadra
+201,9,ETAH,138,9,census2011+name,Etah
+202,9,KASGANJ,633,9,census2011+name,Kasganj
+203,10,PASHCHIM-CHAMPARAN,211,10,census2011+name,Pashchim Champaran
+204,10,PURBI-CHAMPARAN,213,10,census2011+name,Purbi Champaran
+205,10,SHEOHAR,220,10,census2011+name,Sheohar
+206,10,SITAMARHI,221,10,census2011+name,Sitamarhi
+207,10,MADHUBANI,206,10,census2011+name,Madhubani
+208,10,SUPAUL,223,10,census2011+name,Supaul
+209,10,ARARIA,188,10,census2011+name,Araria
+210,10,KISHANGANJ,203,10,census2011+name,Kishanganj
+211,10,PURNIA,214,10,census2011+name,Purnia
+212,10,KATIHAR,201,10,census2011+name,Katihar
+213,10,MADHEPURA,205,10,census2011+name,Madhepura
+214,10,SAHARSA,216,10,census2011+name,Saharsa
+215,10,DARBHANGA,195,10,census2011+name,Darbhanga
+216,10,MUZAFFARPUR,208,10,census2011+name,Muzaffarpur
+217,10,GOPALGANJ,197,10,census2011+name,Gopalganj
+218,10,SIWAN,222,10,census2011+name,Siwan
+219,10,SARAN,218,10,census2011+name,Saran
+220,10,VAISHALI,224,10,census2011+name,Vaishali
+221,10,SAMASTIPUR,217,10,census2011+name,Samastipur
+222,10,BEGUSARAI,191,10,census2011+name,Begusarai
+223,10,KHAGARIA,202,10,census2011+name,Khagaria
+224,10,BHAGALPUR,192,10,census2011+name,Bhagalpur
+225,10,BANKA,190,10,census2011+name,Banka
+226,10,MUNGER,207,10,census2011+name,Munger
+227,10,LAKHISARAI,204,10,census2011+name,Lakhisarai
+228,10,SHEIKHPURA,219,10,census2011+name,Sheikhpura
+229,10,NALANDA,209,10,census2011+name,Nalanda
+230,10,PATNA,212,10,census2011+name,Patna
+231,10,BHOJPUR,193,10,census2011+name,Bhojpur
+232,10,BUXAR,194,10,census2011+name,Buxar
+233,10,KAIMUR(BHABUA),200,10,census2011+name,Kaimur (Bhabua)
+234,10,ROHTAS,215,10,census2011+name,Rohtas
+235,10,AURANGABAD,189,10,census2011+name,Aurangabad
+236,10,GAYA,196,10,census2011+name,Gaya
+237,10,NAWADA,210,10,census2011+name,Nawada
+238,10,JAMUI,198,10,census2011+name,Jamui
+239,10,JAHANABAD,199,10,census2011+name,Jehanabad
+240,10,ARWAL,611,10,census2011+name,Arwal
+241,11,NORTH-DISTRICT,226,11,census2011_renamed,Mangan
+242,11,WEST-DISTRICT,228,11,census2011_renamed,Gyalshing
+243,11,SOUTH-DISTRICT,227,11,census2011_renamed,Namchi
+244,11,EAST-DISTRICT,225,11,census2011_renamed,Gangtok
+245,12,TAWANG,238,12,census2011+name,Tawang
+246,12,WEST-KAMENG,242,12,census2011+name,West Kameng
+247,12,EAST-KAMENG,231,12,census2011+name,East Kameng
+248,12,PAPUM-PARE,237,12,census2011+name,Papum Pare
+249,12,UPPER-SUBANSIRI,241,12,census2011+name,Upper Subansiri
+250,12,WEST-SIANG,243,12,census2011+name,West Siang
+251,12,EAST-SIANG,232,12,census2011+name,East Siang
+252,12,UPPER-SIANG,240,12,census2011+name,Upper Siang
+253,12,CHANGLANG,229,12,census2011+name,Changlang
+254,12,TIRAP,239,12,census2011+name,Tirap
+255,12,LOWER-SUBANSIRI,236,12,census2011+name,Lower Subansiri
+256,12,KURUNG-KUMEY,233,12,census2011+name,Kurung Kumey
+257,12,DIBANG-VALLEY,230,12,census2011+name,Dibang Valley
+258,12,LOWER-DIBANG-VALLEY,235,12,census2011+name,Lower Dibang Valley
+259,12,LOHIT,234,12,census2011+name,Lohit
+260,12,ANZAW,628,12,census2011+name,Anjaw
+261,13,MON,247,13,census2011+name,Mon
+262,13,MOKOKCHUNG,246,13,census2011+name,Mokokchung
+263,13,ZUNHEBOTO,251,13,census2011+name,Zunheboto
+264,13,WOKHO,250,13,census2011+name,Wokha
+265,13,DIMAPUR,244,13,census2011+name,Dimapur
+266,13,PHEK,248,13,census2011+name,Phek
+267,13,TUENSANG,249,13,census2011+name,Tuensang
+268,13,LONGLENG,615,13,census2011+name,Longleng
+269,13,KIPHIRE,614,13,census2011+name,Kiphire
+270,13,KOHIMA,245,13,census2011+name,Kohima
+271,13,PEREN,613,13,census2011+name,Peren
+272,14,SENAPATI,257,14,census2011+name,Senapati
+273,14,TAMENGLONG,258,14,census2011+name,Tamenglong
+274,14,CHURACHANDPUR,254,14,census2011+name,Churachandpur
+275,14,BISHNUPUR,252,14,census2011+name,Bishnupur
+276,14,THOUBAL,259,14,census2011+name,Thoubal
+277,14,IMPHAL-WEST,256,14,census2011+name,Imphal West
+278,14,IMPHAL-EAST,255,14,census2011+name,Imphal East
+279,14,UKHRUL,260,14,census2011+name,Ukhrul
+280,14,CHANDEL,253,14,census2011+name,Chandel
+281,15,MAMIT,266,15,census2011+name,Mamit
+282,15,KOLASIB,263,15,census2011+name,Kolasib
+283,15,AIZAWL,261,15,census2011+name,Aizawl
+284,15,CHAMPHAI,262,15,census2011+name,Champhai
+285,15,SERCHHIP,268,15,census2011+name,Serchhip
+286,15,LUNGLEI,265,15,census2011+name,Lunglei
+287,15,LAWNGTLAI,264,15,census2011+name,Lawngtlai
+288,15,SAIHA,267,15,census2011+name,Saiha
+289,16,WESTTRIPURA,272,16,census2011+name,West Tripura
+290,16,SOUTHTRIPURA,271,16,census2011+name,South Tripura
+291,16,DHALAI,269,16,census2011+name,Dhalai
+292,16,NORTH-TRIPURA,270,16,census2011+name,North Tripura
+293,17,WEST-GARO-HILLS,278,17,census2011+name,West Garo Hills
+294,17,EAST-GARO-HILLS,273,17,census2011+name,East Garo Hills
+295,17,SOUTH-GARO-HILLS,277,17,census2011+name,South Garo Hills
+296,17,WEST-KHASI-HILLS,279,17,census2011+name,West Khasi Hills
+297,17,RI-BHOI,276,17,census2011+name,Ri Bhoi
+298,17,EAST-KHASI-HILLS,274,17,census2011+name,East Khasi Hills
+299,17,WEST-JAINTIA-HILLS,275,17,census2011+name,West Jaintia Hills
+300,18,KOKRAJHAR,294,18,census2011+name,Kokrajhar
+301,18,DHUBRI,285,18,census2011+name,Dhubri
+302,18,GOALPARA,287,18,census2011+name,Goalpara
+303,18,BARPETA,280,18,census2011+name,Barpeta
+304,18,MARIGAON,296,18,census2011+name,Marigaon
+305,18,NAGAON,297,18,census2011+name,Nagaon
+306,18,SONITPUR,301,18,census2011+name,Sonitpur
+307,18,LAKHIMPUR,295,18,census2011+name,Lakhimpur
+308,18,DHEMAJI,284,18,census2011+name,Dhemaji
+309,18,TINSUKIA,302,18,census2011+name,Tinsukia
+310,18,DIBRUGARH,286,18,census2011+name,Dibrugarh
+311,18,SIVASAGAR,300,18,census2011+name,Sivasagar
+312,18,JORHAT,290,18,census2011+name,Jorhat
+313,18,GOLAGHAT,288,18,census2011+name,Golaghat
+314,18,KARBI-ANGLONG,292,18,census2011+name,Karbi Anglong
+315,18,DIMA-HASAO,299,18,census2011+name,Dima Hasao
+316,18,CACHAR,282,18,census2011+name,Cachar
+317,18,KARIMGANJ,293,18,census2011+name,Karimganj
+318,18,HAILAKANDI,289,18,census2011+name,Hailakandi
+319,18,BONGAIGAON,281,18,census2011+name,Bongaigaon
+320,18,CHIRANG,612,18,census2011+name,Chirang
+321,18,KAMRUP,291,18,census2011+name,Kamrup
+322,18,KAMRUP-METRO,618,18,census2011+name,Kamrup Metro
+323,18,NALBARI,298,18,census2011+name,Nalbari
+324,18,BAKSA,616,18,census2011+name,Baksa
+325,18,DARRANG,283,18,census2011+name,Darrang
+326,18,UDALGURI,617,18,census2011+name,Udalguri
+327,19,DARJEELING,309,19,census2011+name,Darjeeling
+328,19,JALPAIGURI,314,19,census2011+name,Jalpaiguri
+329,19,COOCHBEHAR,308,19,census2011+name,Coochbehar
+330,19,DINAJPUR-UTTAR,311,19,census2011+name,Dinajpur Uttar
+331,19,DINAJPUR-DAKSHIN,310,19,census2011+name,Dinajpur Dakshin
+332,19,MALDAH,316,19,census2011+name,Maldah
+333,19,MURSHIDABAD,319,19,census2011+name,Murshidabad
+334,19,BIRBHUM,307,19,census2011+name,Birbhum
+335,19,PASCHIM-BARDHAMAN,704,19,name,Paschim Bardhaman
+336,19,NADIA,320,19,census2011+name,Nadia
+337,19,24-PARAGANAS-NORTH,303,19,census2011+name,24 Paraganas North
+338,19,HOOGHLY,312,19,census2011+name,Hooghly
+339,19,BANKURA,305,19,census2011+name,Bankura
+340,19,PURULIA,321,19,census2011+name,Purulia
+341,19,HOWRAH,313,19,census2011+name,Howrah
+342,19,KOLKATA,315,19,census2011+name,Kolkata
+343,19,24-PARAGANAS-SOUTH,304,19,census2011+name,24 Paraganas South
+344,19,PASCHIM MEDINIPUR,318,19,census2011_renamed,Medinipur West
+345,19,MEDINIPUR-EAST,317,19,census2011+name,Medinipur East
+346,20,GARHWA,328,20,census2011+name,Garhwa
+347,20,CHATRA,323,20,census2011+name,Chatra
+348,20,KODERMA,334,20,census2011+name,Koderma
+349,20,GIRIDIH,329,20,census2011+name,Giridih
+350,20,DEOGHAR,324,20,census2011+name,Deoghar
+351,20,GODDA,330,20,census2011+name,Godda
+352,20,SAHEBGANJ,340,20,census2011+name,Sahebganj
+353,20,PAKUR,337,20,census2011+name,Pakur
+354,20,DHANBAD,325,20,census2011+name,Dhanbad
+355,20,BOKARO,322,20,census2011+name,Bokaro
+356,20,LOHARDAGA,336,20,census2011+name,Lohardaga
+357,20,EAST-SINGHBHUM,327,20,census2011+name,East Singhbum
+358,20,PALAMU,338,20,census2011+name,Palamu
+359,20,LATEHAR,335,20,census2011+name,Latehar
+360,20,HAZARIBAGH,332,20,census2011+name,Hazaribagh
+361,20,RAMGARH,607,20,census2011+name,Ramgarh
+362,20,DUMKA,326,20,census2011+name,Dumka
+363,20,JAMTARA,333,20,census2011+name,Jamtara
+364,20,RANCHI,339,20,census2011+name,Ranchi
+365,20,KHUNTI,606,20,census2011+name,Khunti
+366,20,GUMLA,331,20,census2011+name,Gumla
+367,20,SIMDEGA,342,20,census2011+name,Simdega
+368,20,WEST-SINGHBHUM,343,20,census2011+name,West Singhbhum
+369,20,SARAIKELA-KHARSAWAN,341,20,census2011+name,Saraikela Kharsawan
+370,21,BARGARH,347,21,census2011+name,Bargarh
+371,21,JHARSUGUDA,357,21,census2011+name,Jharsuguda
+372,21,SAMBALPUR,371,21,census2011+name,Sambalpur
+373,21,DEOGARH,351,21,census2011+name,Deogarh
+374,21,SUNADAGARH,373,21,census2011+name,Sundargarh
+375,21,KEONJHAR,361,21,census2011+name,Kendujhar
+376,21,MAYURBHANJ,365,21,census2011+name,Mayurbhanj
+377,21,BALESHWAR,346,21,census2011+name,Baleshwar
+378,21,BHADRAK,348,21,census2011+name,Bhadrak
+379,21,KENDRAPARA,360,21,census2011+name,Kendrapara
+380,21,JAGATSINGHAPUR,355,21,census2011+name,Jagatsinghapur
+381,21,CUTTACK,350,21,census2011+name,Cuttack
+382,21,JAJAPUR,356,21,census2011+name,Jajapur
+383,21,DHENKANAL,352,21,census2011+name,Dhenkanal
+384,21,ANUGUL,344,21,census2011+name,Anugul
+385,21,NAYAGARH,367,21,census2011+name,Nayagarh
+386,21,KHORDHA,362,21,census2011+name,Khordha
+387,21,PURI,369,21,census2011+name,Puri
+388,21,GANJAM,354,21,census2011+name,Ganjam
+389,21,GAJAPATI,353,21,census2011+name,Gajapati
+390,21,KANDHAMAL,359,21,census2011+name,Kandhamal
+391,21,BOUDH,349,21,census2011+name,Boudh
+392,21,SONEPUR,372,21,census2011+name,Sonepur
+393,21,BALANGIR,345,21,census2011+name,Balangir
+394,21,NUAPADA,368,21,census2011+name,Nuapada
+395,21,KALAHANDI,358,21,census2011+name,Kalahandi
+396,21,RAYAGADA,370,21,census2011+name,Rayagada
+397,21,NABARANGPUR,366,21,census2011+name,Nabarangpur
+398,21,KORAPUT,363,21,census2011+name,Koraput
+399,21,MALKANGIRI,364,21,census2011+name,Malkangiri
+400,22,KOREA,384,22,census2011+name,Korea
+401,22,SURGUJA,389,22,census2011+name,Surguja
+402,22,JASHPUR,380,22,census2011+name,Jashpur
+403,22,RAIGAD,386,22,census2011+name,Raigarh
+404,22,KORBA,383,22,census2011+name,Korba
+405,22,JANJGIR-CHAMPA,379,22,census2011+name,Janjgir-Champa
+406,22,BILASPUR,375,22,census2011+name,Bilaspur
+407,22,KABIRDHAM,382,22,census2011+name,Kabirdham
+408,22,RAJNANDGAON,388,22,census2011+name,Rajnandgaon
+409,22,DURG,378,22,census2011+name,Durg
+410,22,RAIPUR,387,22,census2011+name,Raipur
+411,22,MAHASAMUND,385,22,census2011+name,Mahasamund
+412,22,DHAMTARI,377,22,census2011+name,Dhamtari
+413,22,KANKER,381,22,census2011+name,Kanker
+414,22,BASTAR,374,22,census2011+name,Bastar
+415,22,NARAYANPUR,637,22,census2011+name,Narayanpur
+416,22,DANTEWARA,376,22,census2011+name,Dantewada
+417,22,BIJAPUR,636,22,census2011+name,Bijapur
+418,23,SHEOPUR,431,23,census2011+name,Sheopur
+419,23,MORENA,417,23,census2011+name,Morena
+420,23,BHIND,395,23,census2011+name,Bhind
+421,23,GWALIOR,407,23,census2011+name,Gwalior
+422,23,DATIA,401,23,census2011+name,Datia
+423,23,SHIVPURI,432,23,census2011+name,Shivpuri
+424,23,TIKAMGARH,434,23,census2011+name,Tikamgarh
+425,23,CHHATARPUR,398,23,census2011+name,Chhatarpur
+426,23,PANNA,420,23,census2011+name,Panna
+427,23,SAGAR,425,23,census2011+name,Sagar
+428,23,DAMOH,400,23,census2011+name,Damoh
+429,23,SATNA,426,23,census2011+name,Satna
+430,23,REWA,424,23,census2011+name,Rewa
+431,23,UMARIA,436,23,census2011+name,Umaria
+432,23,NEEMUCH,419,23,census2011+name,Neemuch
+433,23,MANDSAUR,416,23,census2011+name,Mandsaur
+434,23,RATLAM,423,23,census2011+name,Ratlam
+435,23,UJJAIN,435,23,census2011+name,Ujjain
+436,23,SHAJAPUR,430,23,census2011+name,Shajapur
+437,23,DEWAS,402,23,census2011+name,Dewas
+438,23,DHAR,403,23,census2011+name,Dhar
+439,23,INDORE,410,23,census2011+name,Indore
+440,23,KHARGONE,414,23,census2011+name,Khargone
+441,23,BARWANI,393,23,census2011+name,Barwani
+442,23,RAJGARH,422,23,census2011+name,Rajgarh
+443,23,VIDISHA,437,23,census2011+name,Vidisha
+444,23,BHOPAL,396,23,census2011+name,Bhopal
+445,23,SEHORE,427,23,census2011+name,Sehore
+446,23,RAISEN,421,23,census2011+name,Raisen
+447,23,BETUL,394,23,census2011+name,Betul
+448,23,HARDA,408,23,census2011+name,Harda
+449,23,HOSHANGABAD,409,23,census2011_renamed,Narmadapuram
+450,23,KATNI,413,23,census2011+name,Katni
+451,23,JABALPUR,411,23,census2011+name,Jabalpur
+452,23,NARSINGHPUR,418,23,census2011+name,Narsinghpur
+453,23,DINDORI,404,23,census2011+name,Dindori
+454,23,MANDLA,415,23,census2011+name,Mandla
+455,23,CHHINDWARA,399,23,census2011+name,Chhindwara
+456,23,SEONI,428,23,census2011+name,Seoni
+457,23,BALAGHAT,392,23,census2011+name,Balaghat
+458,23,GUNA,406,23,census2011+name,Guna
+459,23,ASHOKNAGAR,391,23,census2011+name,Ashoknagar
+460,23,SHAHDOL,429,23,census2011+name,Shahdol
+461,23,ANUPPUR,390,23,census2011+name,Anuppur
+462,23,SIDHI,433,23,census2011+name,Sidhi
+463,23,SINGRAULI,638,23,census2011+name,Singrauli
+464,23,JHABUA,412,23,census2011+name,Jhabua
+465,23,ALIRAJPUR,639,23,census2011+name,Alirajpur
+466,23,EAST NIMAR,405,23,census2011+name,East Nimar
+467,23,BUHRHANPUR,397,23,census2011+name,Burhanpur
+468,24,KACHCHH,449,24,census2011+name,Kachchh
+469,24,BANASKANTHA,441,24,census2011+name,Banas Kantha
+470,24,PATAN,455,24,census2011+name,Patan
+471,24,MAHESANA,451,24,census2011+name,Mahesana
+472,24,SABAR-KANTHA,458,24,census2011+name,Sabar Kantha
+473,24,GANDHINAGAR,446,24,census2011+name,Gandhinagar
+474,24,AHMADABAD,438,24,census2011+name,Ahmadabad
+475,24,SURENDRANAGAR,460,24,census2011+name,Surendranagar
+476,24,RAJKOT,457,24,census2011+name,Rajkot
+477,24,JAMNAGAR,447,24,census2011+name,Jamnagar
+478,24,PORBANDAR,456,24,census2011+name,Porbandar
+479,24,JUNAGADH,448,24,census2011+name,Junagadh
+480,24,AMRELI,439,24,census2011+name,Amreli
+481,24,BHAVNAGAR,443,24,census2011+name,Bhavnagar
+482,24,ANAND,440,24,census2011+name,Anand
+483,24,KHEDA,450,24,census2011+name,Kheda
+484,24,PANCH-MAHALS,454,24,census2011+name,Panch Mahals
+485,24,DOHAD,445,24,census2011+name,Dohad
+486,24,VADODARA,461,24,census2011+name,Vadodara
+487,24,NARMADA,452,24,census2011+name,Narmada
+488,24,BHARUCH,442,24,census2011+name,Bharuch
+489,24,DANG,444,24,census2011+name,Dang
+490,24,NAVSARI,453,24,census2011+name,Navsari
+491,24,VALSAD,462,24,census2011+name,Valsad
+492,24,SURAT,459,24,census2011+name,Surat
+493,24,TAPI,641,24,census2011+name,Tapi
+494,25,DIU,464,38,census2011+name,Diu
+495,25,DAMAN,463,38,census2011+name,Daman
+496,26,DADRA-AND-NAGAR-HAVELI,465,38,census2011+name,Dadra And Nagar Haveli
+497,27,NANDURBAR,486,27,census2011+name,Nandurbar
+498,27,DHULE,474,27,census2011+name,Dhule
+499,27,JALGAON,478,27,census2011+name,Jalgaon
+500,27,BULDHANA,472,27,census2011+name,Buldhana
+501,27,AKOLA,467,27,census2011+name,Akola
+502,27,WASHIM,499,27,census2011+name,Washim
+503,27,AMRAVATI,468,27,census2011+name,Amravati
+504,27,WARDHA,498,27,census2011+name,Wardha
+505,27,NAGPUR,484,27,census2011+name,Nagpur
+506,27,BHANDARA,471,27,census2011+name,Bhandara
+507,27,GONDIA,476,27,census2011+name,Gondia
+508,27,GADCHIROLI,475,27,census2011+name,Gadchiroli
+509,27,CHANDRAPUR,473,27,census2011+name,Chandrapur
+510,27,YAVATMAL,500,27,census2011+name,Yavatmal
+511,27,NANDED,485,27,census2011+name,Nanded
+512,27,HINGOLI,477,27,census2011+name,Hingoli
+513,27,PARBHANI,489,27,census2011+name,Parbhani
+514,27,JALNA,479,27,census2011+name,Jalna
+515,27,AURANGABAD,469,27,census2011+name,Aurangabad
+516,27,NASHIK,487,27,census2011+name,Nashik
+517,27,THANE,497,27,census2011+name,Thane
+518,27,PALHGAR,665,27,name,Palghar
+519,27,MUMBAI,482,27,census2011+name,Mumbai
+520,27,RAIGAD,491,27,census2011+name,Raigad
+521,27,PUNE,490,27,census2011+name,Pune
+522,27,AHMEDNAGAR,466,27,census2011+name,Ahmednagar
+523,27,BEED,470,27,census2011+name,Beed
+524,27,LATUR,481,27,census2011+name,Latur
+525,27,OSMANABAD,488,27,census2011+name,Osmanabad
+526,27,SOLAPUR,496,27,census2011+name,Solapur
+527,27,SATARA,494,27,census2011+name,Satara
+528,27,RATNAGIRI,492,27,census2011+name,Ratnagiri
+529,27,SINDHUDURG,495,27,census2011+name,Sindhudurg
+530,27,KOLHAPUR,480,27,census2011+name,Kolhapur
+531,27,SANGLI,493,27,census2011+name,Sangli
+532,36,ADILABAD,501,36,census2011+name,Adilabad
+533,36,NIZAMABAD,516,36,census2011+name,Nizamabad
+534,36,KARIMNAGAR,508,36,census2011+name,Karimnagar
+535,36,MEDAK,513,36,census2011+name,Medak
+536,36,HYDERABAD,507,36,census2011+name,Hyderabad
+537,36,RANGAREDDY,518,36,census2011+name,Ranga Reddy
+538,36,MAHABUBNAGAR,512,36,census2011+name,Mahabubnagar
+539,36,NALGONDA,514,36,census2011+name,Nalgonda
+540,36,WARANGAL-RURAL,522,36,census2011+name,Warangal
+541,36,KHAMMAM,509,36,census2011+name,Khammam
+542,28,VIZIANAGARAM,521,28,name,Vizianagaram
+544,28,VISAKHAPATANAM,520,28,census2011+name,Visakhapatanam
+545,28,EAST-GODAVARI,505,28,census2011+name,East Godavari
+546,28,WEST-GODAVARI,523,28,census2011+name,West Godavari
+547,28,KRISHNA,510,28,census2011+name,Krishna
+548,28,GUNTUR,506,28,census2011+name,Guntur
+549,28,PRAKASAM,517,28,census2011+name,Prakasam
+550,28,SPSR-NELLORE,515,28,census2011+name,Spsr Nellore
+551,28,Y.S.R.(Kadapa),504,28,census2011_renamed,Y.S.R.
+552,28,KURNOOL,511,28,census2011+name,Kurnool
+553,28,ANANTPUR,502,28,census2011+name,Anantapur
+554,28,CHITTOOR,503,28,census2011+name,Chittoor
+555,29,BELAGAVI,527,29,census2011+name,Belagavi
+556,29,BAGALKOT,524,29,census2011+name,Bagalkote
+557,29,BIJAPUR,530,29,census2011_renamed,Vijayapura
+558,29,BIDAR,529,29,census2011+name,Bidar
+559,29,RAICHUR,546,29,census2011+name,Raichur
+560,29,KOPPAL,543,29,census2011+name,Koppal
+561,29,GADAG,537,29,census2011+name,Gadag
+562,29,DHARWAD,536,29,census2011+name,Dharwad
+563,29,UTTAR-KANNAD,550,29,census2011+name,Uttara Kannada
+564,29,HAVERI,540,29,census2011+name,Haveri
+565,29,BALLARY,528,29,census2011+name,Ballari
+566,29,CHITRADURGA,533,29,census2011+name,Chitradurga
+567,29,DAVANGERE,535,29,census2011+name,Davangere
+568,29,SHIVAMOGGA,547,29,census2011+name,Shivamogga
+569,29,UDUPI,549,29,census2011+name,Udupi
+570,29,CHIKMAGALURU,532,29,census2011+name,Chikkamagaluru
+571,29,TUMKURU,548,29,census2011+name,Tumakuru
+572,29,BANGALURU-URBAN,525,29,census2011+name,Bengaluru Urban
+573,29,MANDYA,544,29,census2011+name,Mandya
+574,29,HASSAN,539,29,census2011+name,Hassan
+575,29,DAKSHIN-KANNAD,534,29,census2011+name,Dakshina Kannada
+576,29,KODAGU,541,29,census2011+name,Kodagu
+577,29,MYSURU,545,29,census2011+name,Mysuru
+578,29,CHAMARAJANAGAR,531,29,census2011+name,Chamarajanagara
+579,29,Gulbarga,538,29,census2011_renamed,Kalaburagi
+580,29,YADGIR,635,29,census2011+name,Yadgir
+581,29,KOLAR,542,29,census2011+name,Kolar
+582,29,CHIKBALLAPUR,630,29,census2011+name,Chikkaballapura
+583,29,BANGALURU-RURAL,526,29,census2011+name,Bengaluru Rural
+584,29,RAMANAGARA,631,29,census2011+name,Ramanagara
+585,30,NORTH-GOA,551,30,census2011+name,North Goa
+586,30,SOUTH-GOA,552,30,census2011+name,South Goa
+587,31,LAKSHADWEEP,553,31,census2011_renamed,Lakshadweep District
+588,32,KASARAGOD,558,32,census2011+name,Kasaragod
+589,32,KANNUR,557,32,census2011+name,Kannur
+590,32,WAYANAD,567,32,census2011+name,Wayanad
+591,32,KOZHIKODE,561,32,census2011+name,Kozhikode
+592,32,MALAPPURAM,562,32,census2011+name,Malappuram
+593,32,PALAKKAD,563,32,census2011+name,Palakkad
+594,32,THRISSUR,566,32,census2011+name,Thrissur
+595,32,ERNAKULAM,555,32,census2011+name,Ernakulam
+596,32,IDUKKI,556,32,census2011+name,Idukki
+597,32,KOTTAYAM,560,32,census2011+name,Kottayam
+598,32,ALAPPUZHA,554,32,census2011+name,Alappuzha
+599,32,PATHANAMTHITTA,564,32,census2011+name,Pathanamthitta
+600,32,KOLLAM,559,32,census2011+name,Kollam
+601,32,THIRUVANANTHAPUR,565,32,census2011+name,Thiruvananthapuram
+602,33,THIRUVALLUR,589,33,census2011+name,Thiruvallur
+603,33,CHENNAI,568,33,census2011+name,Chennai
+604,33,KANCHIPURAM,574,33,census2011+name,Kanchipuram
+605,33,VELLORE,595,33,census2011+name,Vellore
+606,33,TIRUVANNAMALAI,593,33,census2011+name,Tiruvannamalai
+607,33,VILLUPURAM,596,33,census2011+name,Villupuram
+608,33,SALEM,584,33,census2011+name,Salem
+609,33,NAMAKKAL,580,33,census2011+name,Namakkal
+610,33,ERODE,573,33,census2011+name,Erode
+611,33,THE-NILGIRIS,587,33,census2011+name,The Nilgiris
+612,33,DINDIGUL,572,33,census2011+name,Dindigul
+613,33,KARUR,576,33,census2011+name,Karur
+614,33,TIRUCHIRAPPALLI,591,33,census2011+name,Tiruchirappalli
+615,33,PERAMBALUR,581,33,census2011+name,Perambalur
+616,33,ARIYALUR,610,33,census2011+name,Ariyalur
+617,33,CUDDALORE,570,33,census2011+name,Cuddalore
+618,33,NAGAPATTINAM,579,33,census2011+name,Nagapattinam
+619,33,THIRUVARUR,590,33,census2011+name,Thiruvarur
+620,33,THANJAVUR,586,33,census2011+name,Thanjavur
+621,33,PUDUKKOTTAI,582,33,census2011+name,Pudukkottai
+622,33,SIVAGANGA,585,33,census2011+name,Sivaganga
+623,33,MADURAI,578,33,census2011+name,Madurai
+624,33,THENI,588,33,census2011+name,Theni
+625,33,VIRUDHUNAGAR,597,33,census2011+name,Virudhunagar
+626,33,RAMANATHAPURAM,583,33,census2011+name,Ramanathapuram
+627,33,Thoothukkudi,594,33,census2011_renamed,Tuticorin
+628,33,TIRUNELVELI,592,33,census2011+name,Tirunelveli
+629,33,KANNIYAKUMARI,575,33,census2011+name,Kanniyakumari
+630,33,DHARMAPURI,571,33,census2011+name,Dharmapuri
+631,33,KRISHNAGIRI,577,33,census2011+name,Krishnagiri
+632,33,COIMBATORE,569,33,census2011+name,Coimbatore
+633,33,TIRUPPUR,634,33,census2011+name,Tiruppur
+634,33,YANAM,601,34,census2011+name,Yanam
+635,33,PUDUCHERRY,600,34,census2011+name,Pondicherry
+636,33,MAHE,599,34,census2011+name,Mahe
+637,33,KARAIKAL,598,34,census2011+name,Karaikal
+638,19,NICOBAR,603,35,census2011+name,Nicobars
+639,19,N-AND-M-ANDAMAN,632,35,census2011_renamed,North And Middle Andaman
+640,19,SOUTH-ANDAMANS,602,35,census2011+name,South Andamans
+642,36,BHADRADRI-KOTHAGUDEM,690,36,name,Bhadradri Kothagudem
+643,36,JAGITIAL,681,36,name,Jagitial
+644,36,JANGOAN,689,36,name,Jangoan
+645,36,JAYASHANKAR-BHUPALAPALLY,687,36,name,Jayashankar Bhupalapally
+646,36,JOGULAMBA-GADWAL,695,36,name,Jogulamba Gadwal
+647,36,KAMAREDDY,685,36,name,Kamareddy
+648,36,KUMURAM-BHEEM-ASIFABAD,699,36,name,Kumuram Bheem Asifabad
+649,36,MAHABUBABAD,688,36,name,Mahabubabad
+650,36,MANCHERIAL,684,36,name,Mancherial
+651,36,MEDCHAL-MALKAJGIRI,700,36,name,Medchal Malkajgiri
+652,36,NAGARKURNOOL,694,36,name,Nagarkurnool
+653,36,NIRMAL,680,36,name,Nirmal
+654,36,PEDDAPALLI,682,36,name,Peddapalli
+655,36,RAJANNA-SIRCILLA,683,36,name,Rajanna Sircilla
+656,36,SANGAREDDY,691,36,name,Sangareddy
+657,36,SIDDIPET,692,36,name,Siddipet
+658,36,SURYAPET,696,36,name,Suryapet
+659,36,VIKARABAD,698,36,name,Vikarabad
+660,36,WANAPARTHY,693,36,name,Wanaparthy
+661,36,WARANGAL-URBAN,686,36,manual,Hanumakonda
+662,36,YADADRI-BHUVANAGIRI,697,36,name,Yadadri Bhuvanagiri
+663,28,SRIKAKULAM,519,28,name,Srikakulam
+665,22,BEMETARA,650,22,name,Bemetara
+666,22,KONDAGAON,643,22,name,Kondagaon
+667,22,BALRAMPUR,649,22,name,Balrampur
+668,22,BALODABAZAR,644,22,name,Baloda Bazar
+669,22,BALOD,646,22,name,Balod
+670,22,SURAJPUR,648,22,name,Surajpur
+671,22,SUKMA,642,22,name,Sukma
+672,22,GARIABANDH,645,22,name,Gariyaband
+673,22,MUNGELI,647,22,name,Mungeli
+674,35,N-AND-M-ANDAMAN,632,35,name,North And Middle Andaman
+675,35,SOUTH-ANDAMANS,602,35,name,South Andamans
+676,35,NICOBAR,603,35,name,Nicobars
+677,19,PURBA-BARDHAMAN,306,19,name,Purba Bardhaman
+681,3,FAZILKA,651,3,name,Fazilka
+682,3,PATHANKOT,662,3,name,Pathankot
+683,6,CHARKHI-DADRI,701,6,name,Charki Dadri
+684,7,SHAHDARA,671,7,name,Shahdara
+685,7,SOUTH-EAST-DELHI,670,7,name,South East
+686,9,AMETHI,640,9,name,Amethi
+687,9,HAPUR,661,9,name,Hapur
+688,9,SAMBHAL,659,9,name,Sambhal
+689,9,SHAMLI,660,9,name,Shamli
+690,12,KRA-DAADI,677,12,name,Kra Daadi
+691,12,LONGDING,666,12,name,Longding
+692,12,NAMSAI,678,12,name,Namsai
+693,12,SIANG,679,12,name,Siang
+694,14,JIRIBAM,713,14,name,Jiribam
+695,14,KAKCHING,711,14,name,Kakching
+696,14,KAMJONG,717,14,name,Kamjong
+697,14,KANGPOKPI,712,14,name,Kangpokpi
+698,14,NONEY,714,14,name,Noney
+699,14,PHERZAWL,715,14,name,Pherzawl
+700,14,TENGNOUPAL,716,14,name,Tengnoupal
+701,16,GOMATI,654,16,name,Gomati
+702,16,KHOWAI,652,16,name,Khowai
+703,16,SEPAHIJALA,653,16,name,Sepahijala
+704,16,UNAKOTI,655,16,name,Unakoti
+705,17,EAST-JAINTIA-HILLS,657,17,name,East Jaintia Hills
+706,17,NORTH-GARO-HILLS,656,17,name,North Garo Hills
+707,17,SOUTH-WEST-GARO-HILLS,663,17,name,South West Garo Hills
+708,17,SOUTH-WEST-KHASI-HILLS,658,17,name,South West Khasi Hills
+709,18,BISWANATH,705,18,name,Biswanath
+710,18,CHARAIDEO,708,18,name,Charaideo
+711,18,HOJAI,709,18,name,Hojai
+712,18,MAJULI,706,18,name,Majuli
+713,18,SOUTH-SALMARA-MANCACHAR,707,18,name,South Salmara Mancachar
+714,18,WEST-KARBI-ANGLONG,710,18,name,West Karbi Anglong
+715,19,ALIPURDUAR,664,19,name,Alipurduar
+716,19,JHARGRAM,703,19,name,Jhargram
+717,19,KALIMPONG,702,19,name,Kalimpong
+719,23,AGAR-MALWA,667,23,name,Agar Malwa
+720,24,ARVALLI,672,24,name,Arvalli
+721,24,BOTAD,676,24,name,Botad
+722,24,CHHOTAUDEPUR,668,24,name,Chhotaudepur
+723,24,DEVBHUMI-DWARKA,674,24,name,Devbhumi Dwarka
+724,24,GIR-SOMNATH,675,24,name,Gir Somnath
+725,24,MAHISAGAR,669,24,name,Mahisagar
+726,24,MORBI,673,24,name,Morbi
+727,27,MUMBAI-SUBURBAN,483,27,name,Mumbai Suburban
+728,36,MULUGU,720,36,name,Mulugu
+729,36,NARAYANPET,721,36,name,Narayanpet
+734,11,SORENG,742,11,name,Soreng
+735,11,PAKYONG,741,11,name,Pakyong
+736,12,LOWER SIANG,719,12,name,Lower Siang
+737,12,SHI YOMI,725,12,name,Shi Yomi
+738,12,LEPA RADA,724,12,name,Leparada
+739,12,PAKKE KESSANG,723,12,name,Pakke Kessang
+740,12,KAMLE,718,12,name,Kamle
+741,1,MIRPUR,,,unmatched,
+742,1,MUZAFFARABAD,,,unmatched,
+743,23,NIWARI,722,23,name,Niwari
+744,33,CHENGALPATTU,730,33,name,Chengalpattu
+745,33,KALLAKKURICHI,729,33,name,Kallakurichi
+746,33,RANIPPETTAI,731,33,name,Ranipet
+747,33,TENKASI,733,33,name,Tenkasi
+748,33,TIRUPPATTUR,732,33,name,Tirupathur
+749,33,MAYILADUTHURAI,735,33,name,Mayiladuthurai
+750,28,ALLURI SITHARAMA RAJU,745,28,name,Alluri Sitharama Raju
+751,28,ANAKAPALLI,744,28,name,Anakapalli
+752,28,ANNAMAYYA,753,28,name,Annamayya
+753,28,BAPATLA,750,28,name,Bapatla
+754,28,ELURU,748,28,name,Eluru
+755,28,KAKINADA,746,28,name,Kakinada
+756,28,KONASEEMA,747,28,name,Konaseema
+757,28,PARVATHIPURAM MANYAM,743,28,name,Parvathipuram Manyam
+758,28,NANDYAL,755,28,name,Nandyal
+759,28,NTR,749,28,name,Ntr
+760,28,PALNADU,751,28,name,Palnadu
+761,28,SRISATHYASAI,754,28,name,Sri Sathya Sai
+762,28,TIRUPATHI,752,28,name,Tirupati
+763,18,BAJALI,739,18,name,Bajali
+764,18,TAMULPUR,756,18,name,Tamulpur
+765,22,GAURELA-PENDRA-MARWAHI,734,22,name,Gaurella Pendra Marwahi
+766,22,KHAIRAGARH-CHHUIKHADAN-GANDAI,759,22,name,Khairgarh Chhuikhadan Gandai
+767,22,MANENDRAGARH-CHIRMIRI-BHARATPUR,760,22,name,Manendragarh Chirimiri Bharatpur
+768,22,MOHLA-MANPUR-AMBAGARH CHOWKI,761,22,name,Mohla Manpur Ambagarh Chouki
+769,22,SAKTI,762,22,name,Sakti
+770,22,SARANGARH-BILAIGARH,763,22,name,Sarangarh Bilaigarh
+771,29,VIJAYANAGARA,738,29,name,Vijayanagar
+772,17,EASTERN WEST KHASI HILLS,740,17,name,Eastern West Khasi Hills
+773,23,MAIHAR,,,unmatched,
+774,23,MAUGANJ,,,unmatched,
+775,23,PANDHURNA,,,unmatched,

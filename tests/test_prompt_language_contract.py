@@ -1,4 +1,4 @@
-"""Guard for localized PMFBY instructions in rendered language prompts.
+"""Guard for localized PMFBY and IMD agromet instructions in rendered language prompts.
 
 This checks script and identifiers, not translation quality or model behavior.
 """
@@ -46,6 +46,31 @@ class PromptLanguageContract(unittest.TestCase):
                 self.assertIsNone(re.search(r"[A-Za-z]{2,}", prose), "English prose in localized safeguards")
                 lo, hi = SCRIPT_RANGES[language]
                 for line in block.splitlines():
+                    if line.startswith("- "):
+                        self.assertTrue(any(lo <= ord(char) <= hi for char in line), "Instruction is missing the language's script")
+
+    def test_imd_agromet_instructions_keep_language_and_tool_names(self):
+        for language in ["en", *SCRIPT_RANGES]:
+            with self.subTest(language=language):
+                rows = [line for line in render(language).splitlines()
+                        if line.startswith("|") and "`imd_agromet_advisory`" in line]
+                self.assertEqual(len(rows), 1, "Expected exactly one IMD agromet tool row")
+                section = (ROOT / "assets/prompts/capabilities/agrinet/weather/agromet"
+                           / f"agromet_{language}.md").read_text()
+                self.assertIn(section.strip(), render(language), "IMD agromet section is not included")
+                for name in ["place", "forward_geocode", "search_documents", "search_pests_diseases"]:
+                    self.assertIn(f"`{name}`", rows[0])
+                self.assertIn("`crop`", section)
+                if language == "en":
+                    continue
+                lo, hi = SCRIPT_RANGES[language]
+                for text in [rows[0], section]:
+                    prose = re.sub(r"`[^`]+`", "", text)
+                    prose = re.sub(r"(?<![A-Za-z])IMD(?![A-Za-z])", "", prose)
+                    self.assertIsNone(re.search(r"[A-Za-z]{2,}", prose), "English prose in localized IMD instructions")
+                for cell in rows[0].strip("|").split("|"):
+                    self.assertTrue(any(lo <= ord(char) <= hi for char in cell), "Cell is missing the language's script")
+                for line in section.splitlines():
                     if line.startswith("- "):
                         self.assertTrue(any(lo <= ord(char) <= hi for char in line), "Instruction is missing the language's script")
 

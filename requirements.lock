@@ -2562,6 +2562,9 @@ protobuf==6.33.6 \
     #   proto-plus
     #   qdrant-client
     #   temporalio
+psycopg2-binary==2.9.13 \
+    --hash=sha256:541a487a9ccd72b5e38f37f27b0ce78cb7eb3e336e7b5277d45463010c03a7a8
+    # via -r requirements.txt
 py-key-value-aio==0.2.8 \
     --hash=sha256:561565547ce8162128fd2bd0b9d70ce04a5f4586da8500cce79a54dfac78c46a \
     --hash=sha256:c0cfbb0bd4e962a3fa1a9fa6db9ba9df812899bd9312fa6368aaea7b26008b36

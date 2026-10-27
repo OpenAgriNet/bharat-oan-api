@@ -2,8 +2,8 @@
 
 Default behavior is unchanged: every permitted business tool is loaded initially,
 no loader is exposed, and every existing language prompt renders exactly as before.
-Existing tool-specific restrictions still apply.
-All 40 tools and 13 language prompts in this release are covered.
+Existing tool-specific restrictions (including AgriStack consent) still apply.
+All 48 tools and 13 language prompts in the current chat `bh-dev` are covered.
 
 ## Configuration
 
@@ -55,8 +55,8 @@ Tool descriptions, schemas, model settings, and business implementations are unc
 original block is included. A loader also returns the matching blocks, which is
 necessary for agents whose system prompt is not reevaluated during a tool loop.
 Browse [capability → section → language](../assets/prompts/capabilities/agrinet/README.md).
-Shared cross-capability blocks live under `_shared`.
-Git preserves prior wording; no frozen hash files are used.
+Common KHC/AgriStack sources are included directly; shared cross-capability blocks
+live under `_shared`. Git preserves prior wording; no frozen hash files are used.
 For a structural change, set `PROMPT_COMPARE_REF` to the preceding Git revision to
 compare every rendered language prompt and lazy-loaded instructions byte-for-byte.
 

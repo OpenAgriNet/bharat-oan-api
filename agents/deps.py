@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 from langcodes import Language
 from agents.capability_policy import CapabilityState
@@ -32,6 +32,10 @@ class FarmerContext(BaseModel):
     moderation_str: Optional[str] = Field(default=None, description="The moderation result of the user's question.")
     latitude: Optional[float] = Field(default=None, description="User's latitude for geocoding.")
     longitude: Optional[float] = Field(default=None, description="User's longitude for geocoding.")
+    agristack_status: Literal["not_logged_in", "no_consent", "consent"] = Field(
+        default="not_logged_in",
+        description="AgriStack login state for this session (see assets/prompts/capabilities/agrinet/agristack/rules/agristack_rules_common.md).",
+    )
     npss_used: bool = Field(default=False, description="Whether NPSS image analysis was used in this turn.")
     npss_source_name: Optional[str] = Field(default=None, description="Official NPSS source name.")
     npss_source_owner: Optional[str] = Field(default=None, description="Official NPSS source owner.")
@@ -83,6 +87,25 @@ class FarmerContext(BaseModel):
             )
         return None
     
+    def _agristack_context_string(self):
+        """AgriStack status line read by the prompt's AgriStack rules; absent when not logged in."""
+        if self.agristack_status == "consent":
+            return (
+                "**AgriStack status:** logged in with consent. If this question needs the farmer's place, crop, or "
+                "profile details and the farmer did not name/give them, call the AgriStack tool first instead of "
+                "asking or following the normal ask-first flow: `get_agristack_farmer_location` for weather "
+                "forecast/advisory/alerts; `get_agristack_farmer_crops` for crop advisory, pests/diseases and mandi "
+                "prices; `get_agristack_farmer_profile` for scheme eligibility/application/renewal, grievance "
+                "submission, and fertilizer recommendation/quota."
+            )
+        if self.agristack_status == "no_consent":
+            return (
+                "**AgriStack status:** logged in without consent. Do not call AgriStack tools. If this question needs "
+                "a place or crop the farmer did not name, first say that AgriStack data could not be accessed because "
+                "consent is not enabled from their end, then ask for it."
+            )
+        return None
+
     def get_user_message(self):
         """Get the user message for the agrinet agent."""
         strings = [
@@ -90,5 +113,6 @@ class FarmerContext(BaseModel):
             self._language_string(),
             self._moderation_string(),
             self._location_context_string(),
+            self._agristack_context_string(),
         ]
         return "\n".join([x for x in strings if x])

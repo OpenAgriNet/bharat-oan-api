@@ -1,6 +1,6 @@
 """Drop text the model repeats after a tool call.
 
-Some turns stream a sentence before a tool call and then write the
+Some turns (KHC especially) stream a sentence before a tool call and then write the
 same sentence again once the tool returns. The first copy is already on the wire,
 so the second copy is held back until it either diverges (flush it) or finishes
 matching the earlier text (drop it).
