@@ -19,3 +19,26 @@ jobs:
           python-version: '3.11'
       - name: Check localized PMFBY instructions
         run: python -m unittest discover -s tests -p test_prompt_language_contract.py
+
+  kcc-mandi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install isolated feature-test dependencies
+        run: >-
+          python -m pip install pytest pytest-cov pydantic-ai-slim==1.32.0
+          httpx==0.28.1 python-dateutil==2.9.0.post0 pytz python-dotenv
+          Jinja2==3.1.6 rapidfuzz
+      - name: Check KCC and mandi behavior
+        run: >-
+          python -m pytest -q tests/test_kcc.py tests/test_mandi.py
+          tests/test_mandi_pagination.py tests/test_commodity.py
+          --cov=agents/tools --cov=scripts --cov-report=
+      - name: Enforce feature coverage
+        run: |
+          for file in agents/tools/kcc.py agents/tools/mandi.py agents/tools/commodity.py scripts/sync_commodity_codes.py; do
+            python -m coverage report --include="$file" --fail-under=80 || exit 1
+          done
