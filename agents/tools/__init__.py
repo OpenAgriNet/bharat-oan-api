@@ -5,6 +5,7 @@ Tools for the BharatVistaar AI Agent.
 # from agents.tools.search_beckn import search_documents
 
 from pydantic_ai import Tool
+from agents.tools.agriwelfare import research_agriwelfare
 
 from agents.tools.scheme_info import get_scheme_info
 from agents.tools.amul_vistaar import call_amul_vistaar_network
@@ -81,6 +82,7 @@ from agents.tools.agristack import (
 )
 
 TOOLS = [
+    Tool(research_agriwelfare, takes_ctx=True, strict=False),
     Tool(
         get_scheme_info,
         takes_ctx=True,

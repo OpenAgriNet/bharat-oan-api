@@ -1,5 +1,6 @@
 """Related tools load together, intersected with the session's tool allowlist."""
 CAPABILITIES = {
+    "website": {"research_agriwelfare"},
     "schemes": {"get_scheme_info", "search_schemes", "search_video"},
     "amul": {"call_amul_vistaar_network"},
     "maha": {"call_maha_vistaar_network"},

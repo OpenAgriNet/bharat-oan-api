@@ -1,0 +1,2770 @@
+{
+  "updated_at": "2026-10-26T11:25:37.415667+00:00",
+  "links": [
+    {
+      "url": "https://agriwelfare.gov.in/about",
+      "title": "About Us",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/about/whos-who",
+      "title": "Our Team",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/about/organisation",
+      "title": "For Researcher",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/agriculture-in-india",
+      "title": "Our Performance",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/directory",
+      "title": "Directory",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes",
+      "title": "For Farmer",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge?type=Recruitment",
+      "title": "Vacancies",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge?type=Tenders",
+      "title": "For Trader",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/documents/reports",
+      "title": "Reports",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/act",
+      "title": "Acts & Policies",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/documents/publications",
+      "title": "Publications",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/documents/press-releases",
+      "title": "Press Releases",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/notifications",
+      "title": "Circulars / Notifications",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/cwwg",
+      "title": "Crop Weather Watch Group",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/pages/media",
+      "title": "Photos",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/pages/media?tab=videos",
+      "title": "Videos",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/contact",
+      "title": "Contact Us",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/connect/directory",
+      "title": "Directory",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/rti",
+      "title": "RTI",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/visitors-pass",
+      "title": "Visitor's Pass",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/citizen-engagement",
+      "title": "Citizen Engagement",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/parliament-questions",
+      "title": "Parliament Questions",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/pm-kisan",
+      "title": "Check PM-KISAN: Beneficiary status and payment details",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/pmfby",
+      "title": "Pradhan Mantri Fasal Bima Yojana (PMFBY) Pradhan Mantri Fasal Bima Yojana (PMFBY)",
+      "description": "Crop insurance against yield loss."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/pm-kmy",
+      "title": "Pradhan Mantri Kisan Maan Dhan Yojana Pradhan Mantri Kisan Maan Dhan Yojana (PM-KMY)",
+      "description": "Pension for small and marginal farmers."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/kcc",
+      "title": "Modified Interest Subvention Scheme (MISS) / KCC Kisan Credit Card & Modified Interest Subvention Scheme (KCC & MISS)",
+      "description": "Low-interest crop loans."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/aif",
+      "title": "Agriculture Infrastructure Fund Agriculture Infrastructure Fund (AIF)",
+      "description": "Finance for post-harvest infrastructure and viable farming assets."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/fpo",
+      "title": "Formation & Promotion of 10,000 FPOs Formation & Promotion of 10,000 Farmer Producer Organisations (FPOs)",
+      "description": "Help to form and grow FPOs."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/enam",
+      "title": "National Agriculture Market National Agriculture Market (e-NAM)",
+      "description": "A pan-India electronic trading platform for transparent and competitive agricultural marketing."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/rkvy",
+      "title": "Rashtriya Krishi Vikas Yojana Rashtriya Krishi Vikas Yojana (RKVY)",
+      "description": "State-led agriculture development."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/krishonnati",
+      "title": "Krishonnati Yojana (MIDH, NFSNM, SMAE, seeds) Krishonnati Yojana",
+      "description": "Horticulture, food crops, seeds and extension."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/nmeo",
+      "title": "National Mission on Edible Oils – Oilseeds & Oil Palm National Mission on Edible Oils (NMEO)",
+      "description": "Grow more oilseeds and oil palm."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/nmnf",
+      "title": "National Mission on Natural Farming National Mission on Natural Farming (NMNF)",
+      "description": "Move to natural farming."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/nbhm",
+      "title": "National Beekeeping & Honey Mission National Beekeeping & Honey Mission (NBHM)",
+      "description": "Earn from beekeeping."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/drone-didi",
+      "title": "Namo Drone Didi Namo Drone Didi",
+      "description": "Drones for women SHGs."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/dam",
+      "title": "Digital Agriculture Mission (AgriStack) Digital Agriculture Mission (DAM)",
+      "description": "Farmer ID and digital crop records."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/pm-aasha",
+      "title": "Pradhan Mantri Annadata Aay Sanrakshan Abhiyan Pradhan Mantri Annadata Aay Sanrakshan Abhiyan (PM-AASHA)",
+      "description": "Price support for notified pulses, oilseeds and Copra under Price Support Scheme(PSS)"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/pmddky",
+      "title": "Pradhan Mantri Dhan-Dhaanya Krishi Yojana Pradhan Mantri Dhan-Dhaanya Krishi Yojana (PMDDKY)",
+      "description": "Focus support for 100 districts."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/pulses",
+      "title": "Mission for Aatmanirbharta in Pulses Mission for Aatmanirbharta in Pulses",
+      "description": "Grow more pulses."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/schemes/pdmc",
+      "title": "Per Drop More Crop Per Drop More Crop (PDMC)",
+      "description": "Micro irrigation for better water use efficiency."
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/765",
+      "title": "RecruitmentRecruitment of Two Posts of Stenographer Gr-I (Sub-Office Cadre) group ‘B’ Non-Gazetted to be filled on deputation (including short term contract) in pay Band-2 (Rs. 9300-34,800/-) with Grade Pay of Rs.4200/- in the Directorate of Marketing & Inspection",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/766",
+      "title": "Filling up of one post of Scheme Officer (General Central Service, Group-'B' Gazetted, Non-ministerial) in the Department of Agriculture and Farmers Welfare in Level-7 in the Pay Matrix (Rs.44,900-1,42,400) on Composite method [Promotion or Deputation (including short term contract)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/763",
+      "title": "Filling up the post of Plant Protection Adviser, Level-13A in the Directorate of Plant Protection, Quarantine and Storage, Faridabad, on Deputation basis.",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/764",
+      "title": "Filling up one post of Office Superintendent, Level-6 (₹35,400–1,12,400), on deputation basis in the Farm Machinery Training & Testing Institutes",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/723",
+      "title": "Selection for the post of Chairman cum Managing Director, National Seeds Corporation Limited (NSC)",
+      "description": "Recruitment 2026-09-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/842",
+      "title": "Tenders4th Date Extension-Expression of Interest (EoI) for Selection of a Managed Service Provider (MSP) for providing Cloud Services to DAFW for hosting its applications/ websites",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/760",
+      "title": "Engagement of 05 Young Professionals (YPs) at CFQC&TI Lab Faridabad & its 03 Regional Labs Chennai, Navi Mumbai and Kalyani (WB) to assist the officers for analysis of Bio-stimulants & Nano fertilizers - reg.",
+      "description": "Recruitment 2026-09-04"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/762",
+      "title": "Filling up of the Post of Deputy Director, DCCD, Kochi, Kerala, on Deputation (ISTC) Basis",
+      "description": "Recruitment 2026-09-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/761",
+      "title": "Invitation of comments on draft RRs for the posts of Joint Director (Farm Information), Joint Director (Extension) and Joint Director (Women’s Programme) in the Directorate of Extension, DA&FW",
+      "description": "Recruitment 2026-09-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/759",
+      "title": "फार्म मशीनरी ट्रेनिंग एंड टेस्टिंग इंस्टीट्यूट में कृषि अभियंता [सामान्य केंद्रीय सेवा, समूह ‘ख’ राजपत्रित, गैर-मंत्रालयी), वेतन मैट्रिक्स के लेवल-7 (₹44,900-1,42,400) में एक पद को सीधी भर्ती द्वारा भरे जाने के संबंध में।",
+      "description": "Recruitment 2026-08-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/841",
+      "title": "3rd Date Extension-Expression of Interest (EoI) for Selection of a Managed Service Provider (MSP) for providing Cloud Services to DAFW for hosting its applications/ websites",
+      "description": "Tenders 2026-08-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/758",
+      "title": "Invitation of comments on draft RRs for the posts of Joint Director (Farm Information), Joint Director (Extension) and Joint Director (Women’s Programme) in the Directorate of Extension, DAFW – regarding",
+      "description": "Recruitment 2026-08-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/750",
+      "title": "various Vacancy Circulars on Directorate of Extension",
+      "description": "Recruitment 2026-08-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/736",
+      "title": "Inviting comments of all stakeholders on draft amended Recruitment rules for the post of Stenographer Gr.I (Sub-Office Cadre) in the Directorate of Marketing & Inspection under Department of Agriculture and Farmers Welfare.",
+      "description": "Recruitment 2026-08-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/757",
+      "title": "Filling of five posts of STA in level 6 on deputation(ISTC)",
+      "description": "Recruitment 2026-08-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/756",
+      "title": "Filling of three posts of Director (Technical) in level 13A on deputation(ISTC)",
+      "description": "Recruitment 2026-08-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/840",
+      "title": "2nd Date Extension-Expression of Interest (EoI) for Selection of a Managed Service Provider (MSP) for providing Cloud Services to DAFW for hosting its applications/ websites",
+      "description": "Tenders 2026-08-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/755",
+      "title": "Vacancy Notice for filling up two (02) posts of Private Secretary in Pay Level - 7 in Commission for Agricultural Costs and Prices (CACP) - reg.",
+      "description": "Recruitment 2026-07-31"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/866",
+      "title": "Date Extension-Expression of Interest (EoI) for Selection of a Managed Service Provider (MSP) for providing Cloud Services to DAFW for hosting its applications/ websites",
+      "description": "Tenders 2026-07-21"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/754",
+      "title": "Filling up one (01) vacancy of Despatch Rider in Level-2 (19900-63200) of the pay matrix in Department of Agriculture and Farmers Welfare on Deputation/ Absorption basis-reg.",
+      "description": "Recruitment 2026-07-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/908",
+      "title": "GuidelinesGuidelines for Online Pesticide Registration",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/660",
+      "title": "UPSC Advertisement No. 08/2026",
+      "description": "Recruitment 2026-07-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/909",
+      "title": "Plant Quarantine Clearance (PQMS): User Manual",
+      "description": "Guidelines 2026-07-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/907",
+      "title": "Operational Guidelines: Pradhan Mantri Fasal Bima Yojana (PMFBY)",
+      "description": "Guidelines 2026-07-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/752",
+      "title": "Advertisement for engagement of 01 Young Professional (YP) in Oilseeds Division (DA&FW)",
+      "description": "Recruitment 2026-07-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/875",
+      "title": "Expression of Interest (EoI) for Selection of a Managed Service Provider (MSP) for providing Cloud Services to DAFW for hosting its applications/ websites",
+      "description": "Tenders 2026-06-29"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/753",
+      "title": "(Vacancy No. 26060701227) Six vacancies for the post of Joint Director (Crops Development Directorate), Department of Agriculture and Farmers Welfare, Ministry of Agriculture and Farmers Welfare.",
+      "description": "Recruitment 2026-06-27"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/751",
+      "title": "Filling up one post of Regional Director in Nationai Centre of Organic and Natural Farming, on Deputation-ISTC basis.",
+      "description": "Recruitment 2026-06-27"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/897",
+      "title": "Result-Expression of Interest (EoI) for Selection of Agency for Providing Cloud Telephony Services with Native WebSocket API Support for Real-Time Voice AI Integration with BharatVISTAAR",
+      "description": "Tenders 2026-06-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/747",
+      "title": "Filling up one post of Office Superintendent (General Central Service, Group – ‘B’ Non – Gazetted, Non – Ministerial) in Central Fertilizer Quality Control & Training Institute, Faridabad (A subordinate office under the administrative control of Department of Agriculture & Farmers Welfare) in the Le",
+      "description": "Recruitment 2026-06-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/919",
+      "title": "Guidelines: Mission for Aatmanirbharta in Pulses",
+      "description": "Guidelines 2026-06-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/749",
+      "title": "For filling up 09 vacancies (Vacancy No. 26060601213) for the post of Junior Scientific Officer and 02 vacancies (Vacancy No. 26060602213) for the post of Regional Director on a direct recruitment basis in National Centre of Organic and Natural Farming under the Department of Agriculture and Farmers",
+      "description": "Recruitment 2026-06-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/748",
+      "title": "Filling up of various General Central Services Group ’A’ Gazetted (Non-Ministerial) posts in the Directorate of Plant Protection, Quarantine & Storage, Faridabad, an attached office of the Ministry of Agriculture and Farmers Welfare, Department of Agriculture and Farmers.",
+      "description": "Recruitment 2026-06-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/746",
+      "title": "Filling up one post of Junior Translator (General Central Service, Group – ‘B’ Non – Gazetted, Ministerial) in Central Fertiliser Quality Control & Training Institute, Faridabad (A subordinate office under the administrative control of Department of Agriculture & Farmers Welfare) in the Level-6 of P",
+      "description": "Recruitment 2026-06-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/745",
+      "title": "Vacancy Circular for engagement of Technical Expert on contract basis in National Makhana Board",
+      "description": "Recruitment 2026-06-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/865",
+      "title": "Date Extension-Expression of Interest (EoI) for Selection of Agency for Providing Cloud Telephony Services with Native WebSocket API Support for Real-Time Voice AI Integration with BharatVISTAAR",
+      "description": "Tenders 2026-06-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/744",
+      "title": "Filling of five posts of STA in level 6 on deputation(ISTC)",
+      "description": "Recruitment 2026-05-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/743",
+      "title": "Filling of three posts of Director (Technical) in level 13A on deputation(ISTC)",
+      "description": "Recruitment 2026-05-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/896",
+      "title": "Response of Pre-EOI Queries- Expression of Interest (EoI) for Selection of Agency for Providing Cloud Telephony Services with Native WebSocket API Support for Real-Time Voice AI Integration with BharatVISTAAR",
+      "description": "Tenders 2026-05-29"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/742",
+      "title": "Filling up of (01) one post of Assistant Soil Conservation Officer (NRM/RFS) (General Central Service) in the Department of Agriculture and Farmers Welfare in Level 10 (56100-177500/-) in the Pay Matrix (Pre revised pay scale of PB:3 Rs. 15600-39100 with Grade Pay Rs. 5400/-) on deputation (includin",
+      "description": "Recruitment 2026-05-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/874",
+      "title": "Expression of Interest (EoI) for Selection of Agency for Providing Cloud Telephony Services with Native WebSocket API Support for Real-Time Voice AI Integration with BharatVISTAAR",
+      "description": "Tenders 2026-05-21"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/741",
+      "title": "Filling up of one post of Administrative Officer in Centra Institute of Horticulture, Nagaland on deputation (ISTC) basis under DA&FW",
+      "description": "Recruitment 2026-05-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/7",
+      "title": "PublicationsAnnual Report 2025-26",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/739",
+      "title": "Engagement of Consultants and Technical Assistant in National Bee Board (NBB)",
+      "description": "Recruitment 2026-05-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/910",
+      "title": "Guidelines: Mission for Integrated Development of Horticulture (MIDH)",
+      "description": "Guidelines 2026-05-12"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/738",
+      "title": "Filling up of one post of Scheme Officer (General Central Service, Group- 'B' Gazetted, Non-ministerial) in the Department of Agriculture and Farmers Welfare in Level-7 in the Pay Matrix (Rs.44,900-1,42,400) on Composite method [Promotion or Deputation (including short term contract)basis",
+      "description": "Recruitment 2026-05-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/740",
+      "title": "Vacancy Notice for filling up two (02) posts of Private Secretary in Pay Level - 7 in Commission for Agricultural Costs and Prices (CACP)",
+      "description": "Recruitment 2026-04-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/873",
+      "title": "EXPRESSTON OF TNTEREST (EOI) FOR PREMIER GOVERNMENT INSTITUTES TO ESTABLISH CENTERS OF EXCELLENCE (COEs) lN DIGITAL PUBLIC INFRASTRUCTURE",
+      "description": "Tenders 2026-04-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/733",
+      "title": "Notice regarding extension of vacancy circular in NFWPIS",
+      "description": "Recruitment 2026-04-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/734",
+      "title": "Vacancy circular for the post of Administrative Officer to be filled up on a deputation basis. This vacancy belongs to the Soil and Land Use Survey of (SLUSI), an organization under the INM division.",
+      "description": "Recruitment 2026-04-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/732",
+      "title": "Filling up one post of Stenographer (Grade-I) in Level-06 at Directorate of Cashewnut and Cocoa Development, Kochi, on deputation/absorption basis.",
+      "description": "Recruitment 2026-03-28"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/857",
+      "title": "Corrigendum II to request for Proposal for selection of consultant for setting up of Project Management Unit (PMU) under the “Mission for Aatmanirbharta in Pulses” in Department of Agriculture and Farmers’ Welfare.",
+      "description": "Tenders 2026-03-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/854",
+      "title": "Corrigendum I to request for Proposal for selection of consultant for setting up of Project Management Unit (PMU) under the “Mission for Aatmanirbharta in Pulses” in Department of Agriculture and Farmers’ Welfare.",
+      "description": "Tenders 2026-03-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/731",
+      "title": "Recruitment of Three Posts of Stenographer Grade-I Group 'B' Non-Gazetted Sub Office Cadre to be filled on deputation (Including short-term contract) in the Level-6 in pay matrix (as per 7th CPC) {Pre-revised Pay Band-2 (Rs. 9300-34800/-)",
+      "description": "Recruitment 2026-03-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/894",
+      "title": "Request for Proposal for selection of consultant for setting up of Project Management Unit (PMU) under the “Mission for Aatmanirbharta in Pulses” in Department of Agriculture and Farmers’ Welfare",
+      "description": "Tenders 2026-03-12"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/729",
+      "title": "Filling up one (01) vacancy of Despatch Rider in level 2 (Rs.19900-63200/-) in the pay matrix in Department of Agriculture and Farmers Welfare on Deputation/Absorption basis-reg.",
+      "description": "Recruitment 2026-03-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/730",
+      "title": "Filling up of two (02) posts of Upper Division Clerk in Commission for Agricultural Costs and Prices (An attached office under the Department of Agriculture and Farmers Welfare, Ministry of Agriculture and Farmers Welfare) in Pay Level 4 of Pay Matrix (Rs. 25500-81100) on deputation basis",
+      "description": "Recruitment 2026-02-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/728",
+      "title": "Request from kins of deceased employees of the Economics, Statistics and Evaluation Division, DA&FW (erstwhile DES) for appointment on any suitable Group C’ or D’ post on compassionate ground, in any Central Government Office located in Delhi.",
+      "description": "Recruitment 2026-02-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/726",
+      "title": "Filling up one post of Office Superintendent (General Central Service, Group – ‘B’ Non – Gazetted, Non – Ministerial) in Central Fertilizer Quality Control & Training Institute, Faridabad (A subordinate office under the administrative control of Department of Agriculture & Farmers Welfare) in the Le",
+      "description": "Recruitment 2026-02-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/737",
+      "title": "तिथि विस्तार सूचना - फार्म मशीनरी प्रशिक्षण एवं परीक्षण संस्थान में निदेशक के दो पदों को प्रतिनियुक्ति (अल्पकालिक अनुबंध सहित) के आधार पर भरे जाने के संबंध में।",
+      "description": "Recruitment 2026-02-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/735",
+      "title": "Date extension notice - Filling up of two (02) posts of Upper Division Clerk in Commission for Agricultural Costs and Prices (An attached office under the Department of Agriculture and Farmers Welfare, Ministry of Agriculture and Farmers Welfare) in Pay Level 4 of Pay Matrix (Rs. 25500-81100) on dep",
+      "description": "Recruitment 2026-02-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/727",
+      "title": "Filling up of two posts of Director at Farm machinery Training and Testing Institute on deputation (including short term contract) basis - reg.",
+      "description": "Recruitment 2026-02-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/725",
+      "title": "Uploading of Bilingual Circular on DoPT Website – Invitation of Applications for Engagement of Retired Central Government Officers as Consultants",
+      "description": "Recruitment 2026-02-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/724",
+      "title": "Filling up of one (01) post of Liaison & Protocol Officer (General Central Service, Group B , Gazetted, Non-Ministerial) in Level 07 of the Pay Matrix (Rs.44,900-1,42,400/-) in Department of Agriculture & Farmers Welfare on Deputation(ISTC)/Absorption (For Armed Forces Personnel: Deputation (ISTC)/A",
+      "description": "Recruitment 2026-02-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/722",
+      "title": "Filling up the post of Director General, Group-A, Level-14 post in the National Institute of Plant Health Management (NIPHM), Rajendranagar, Hyderabad-reg.",
+      "description": "Recruitment 2026-02-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/720",
+      "title": "Filling up of thirteen (13) posts on Deputation (ISTC) basis in National Farmers Welfare Program Implementation Society (NFWPIS)- reg.",
+      "description": "Recruitment 2026-02-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/719",
+      "title": "Recruitment of Three Posts of Stenographer Grade-I Group B Non-Gazetted Sub Office Cadre to be filled on deputation (Including short-term contract) in the Level-6 in pay matrix (as per 7th CPC) {Pre-revised Pay Band-2 (Rs. 9300-34800/-) with Grade Pay of Rs. 4200/-} in the Directorate of Marketing &",
+      "description": "Recruitment 2026-01-27"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/721",
+      "title": "Vacancy Notice for Filling up of two (02) posts of Private Secretary in Commission for Agricultural Costs and Prices (An attached office under the Department of Agriculture and Farmers Welfare, Ministry of Agriculture and Farmers Welfare) in Pay Level 7 of Pay Matrix (Rs. 44900-142400) on deputation",
+      "description": "Recruitment 2026-01-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/718",
+      "title": "Filling up of thirteen (13) posts on Deputation (ISTC) basis in National Farmers Welfare Program Implementation Society (NFWPIS)- reg.",
+      "description": "Recruitment 2026-01-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/859",
+      "title": "Corrigendum III to Submission of EoI for providing consultancy services under the Centrally Sponsored Scheme –“Mission for Aatmanirbharta in Pulses” of Govt. of India published on 20.11.2025.",
+      "description": "Tenders 2026-01-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/717",
+      "title": "Vacancy Circular for the Post of Senior System Analyst (Level-11) on Deputation Basis – SLUSI, INM Division",
+      "description": "Recruitment 2026-01-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/716",
+      "title": "Inviting comment/suggestions of all stakeholders on draft Recruitment Rules of Gestetner-cum-photocopier Operator in Department of Agriculture and Farmers Welfare.",
+      "description": "Recruitment 2026-01-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/715",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Multi Tasking Staff in Department of Agriculture and Farmers Welfare",
+      "description": "Recruitment 2026-01-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/714",
+      "title": "Filling up of One Post of Seed Technologist in the National Seeds Research and Training Centre, Varanasi (Uttar Pradesh)-A Subordinate Office under Department of Agriculture & Farmers Welfare on deputation (Including Short Term Contract)",
+      "description": "Recruitment 2025-12-29"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/856",
+      "title": "Corrigendum II for Submission of EoI for providing consultancy services under the Centrally Sponsored Scheme –“Mission for Aatmanirbharta in Pulses” of Govt. of India published on 20.11.2025.",
+      "description": "Tenders 2025-12-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/853",
+      "title": "Corrigendum I to Submission of EoI for providing consultancy services under the Centrally Sponsored Scheme –“Mission for Aatmanirbharta in Pulses” of Govt. of India published on 20.11.2025.",
+      "description": "Tenders 2025-12-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/713",
+      "title": "Extension of last date for submission of application for the post of Private Secretary at NSRTC, Varanasi",
+      "description": "Recruitment 2025-12-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/712",
+      "title": "Recruitment regarding engagement of two young professionals on contract basis for a period of one year in Non Chemical Fertilizer Section, INM Division.",
+      "description": "Recruitment 2025-12-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/711",
+      "title": "Recruitment of Three Posts of Stenographer Grade-I Group 'B' Non-Gazetted Sub Office Cadre to be filled on deputation (Including short-term contract) in the Level-6 in pay matrix (as per 7th CPC) {Pre-revised Pay Band-2 (Rs. 9300-34800/-)",
+      "description": "Recruitment 2025-12-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/860",
+      "title": "Corrigendum IV to RFQ for ‘Selection of Agency as Accessibility Auditors of Digital and Web Accessibility’",
+      "description": "Tenders 2025-12-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/710",
+      "title": "Corrigendum regarding extension of last date for filling up two posts of Joint Director(Extension) and Joint Director (Farm Information) in Directorate of Extension under DA&FW in Department's website -reg",
+      "description": "Recruitment 2025-12-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/858",
+      "title": "Corrigendum III to RFQ for ‘Selection of Agency as Accessibility Auditors of Digital and Web Accessibility’",
+      "description": "Tenders 2025-11-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/855",
+      "title": "Corrigendum II (Notice of Extension) to RFQ for ‘Selection of Agency as Accessibility Auditors of Digital and Web Accessibility",
+      "description": "Tenders 2025-11-21"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/709",
+      "title": "The vacancy circular for the post of Administrative Officer in Level-7 of pay matrix in SLUSI, Pusa, New Delhi on deputation basis -reg",
+      "description": "Recruitment 2025-11-21"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/898",
+      "title": "Submission of Expression of Interest (EoI) for providing consultancy services under the Centrally Sponsored Scheme –“Mission for Aatmanirbharta in Pulses” of Govt. of India.",
+      "description": "Tenders 2025-11-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/852",
+      "title": "Corrigendum I to RFQ for Selection of Agency as Accessibility Auditors of Digital and Web Accessibility published on 31.10.2025",
+      "description": "Tenders 2025-11-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/708",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules for the post of Data Processing Manager and System Analyst in DA&FW.",
+      "description": "Recruitment 2025-11-12"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/707",
+      "title": "filling up one post of Member (Non-Official) in Commission for Agricultural Costs and Prices (CACP) (from South Zone only) in level-14 (Rs.144200-218200) of Pay Matrix, on contract basis for a period of three years.",
+      "description": "Recruitment 2025-11-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/706",
+      "title": "Extension of the last date for receipt of applications for the post of Senior System Analyst (SSA), Group 'A' Gazetted, Level-11 of the Pay Matrix in Soil and Land Use Survey of India (SLUSI), under the Department of Agriculture and Farmers Welfare, on deputation (including short-term contract) basi",
+      "description": "Recruitment 2025-11-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/895",
+      "title": "Request for Quotation (RFQ) for Selection of Agency as Accessibility Auditors of Digital and Web Accessibility",
+      "description": "Tenders 2025-10-31"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/705",
+      "title": "Filling up of the post of Administrative Officer in Central Institute of Horticulture, Medziphema, Dimapur Distt., Nagaland on deputation (ISTC) basis, a subordinate office under Ministry of Agriculture & Farmers Welfare, Department of Agriculture & Farmers Welfare.",
+      "description": "Recruitment 2025-10-31"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/704",
+      "title": "Filling up of Vacancies in the Directorate of Extension on deputation basis (Including Short-Term Contract) - regarding",
+      "description": "Recruitment 2025-10-23"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/703",
+      "title": "Vacancy circular for the post of Seed Technologist in NSRTC",
+      "description": "Recruitment 2025-10-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/702",
+      "title": "Vacancy circular for the post of Director NSRTC",
+      "description": "Recruitment 2025-10-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/701",
+      "title": "Vacancy circular (anticipatory vacancy) for the post of CSSO, in Level-13 at SLUSI under DA\"&FW- reg",
+      "description": "Recruitment 2025-10-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/700",
+      "title": "Vacancy Circular for filling up two posts of Joint Director(Extension) and Joint Director (Farm Information) in Directorate of Extension under DA&FW -reg",
+      "description": "Recruitment 2025-09-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/699",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Market Intelligence Inspector (Economics) in Department of Agriculture and Farmers Welfare",
+      "description": "Recruitment 2025-09-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/698",
+      "title": "The vacancy circular for the post of Office Superintendent in Level-6 of pay matrix in CFQC&TI, Faridabad on deputation(ISTC) basis -reg",
+      "description": "Recruitment 2025-08-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/697",
+      "title": "Vacancy circular for the post of Senior System Analyst (in Level-11) in SLUSI on deputation(ISTC) basis - reg",
+      "description": "Recruitment 2025-08-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/696",
+      "title": "Engagement of consultant on contractual basis",
+      "description": "Recruitment 2025-08-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/695",
+      "title": "Filling up of Thirteen (13) posts on Deputation (ISTC) basis on National Farmers Welfare Program Implementation Society (NFWPIS)-Date Extension Notice",
+      "description": "Recruitment 2025-08-05"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/693",
+      "title": "Revision of Recruitment Rules for Post of Stenographer Grade-I (Non Technical ) at Farm Machinery Training and Testing Institute (FMTTIs)/DA&FW, Hqrs -reg.",
+      "description": "Recruitment 2025-08-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/694",
+      "title": "Vacancy circular for the post of Administrative Officer in Level-7 of SLUSI",
+      "description": "Recruitment 2025-07-28"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/692",
+      "title": "The vacancy circular for the post of Library and Information Assistant in Level-6 of pay matrix to be filled up on deputation (Including short-term contract)/absorption basis, Central Fertilizer Quality Control and Training Institute, Faridabad, an organization under INM division.",
+      "description": "Recruitment 2025-07-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/881",
+      "title": "Invitation for Expression of Interest for \"Gram Panchayat (GP) level Crop Yield Estimation Using Technology for selected crops in 2025-26",
+      "description": "Tenders 2025-07-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/691",
+      "title": "Vacancy Circular for Halwai-cum-Cook",
+      "description": "Recruitment 2025-07-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/690",
+      "title": "FUPSC's Advertisement No. 08/2025 for filling up of various post in various Ministries.",
+      "description": "Recruitment 2025-06-28"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/689",
+      "title": "Hiring of theme experts on contractual basis",
+      "description": "Recruitment 2025-06-21"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/688",
+      "title": "Filling up of Thirteen (13) posts on Deputation (ISTC) basis on National Farmers Welfare Program Implementation Society (NFWPIS)",
+      "description": "Recruitment 2025-06-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/846",
+      "title": "Bid document for hiring of agency for conducting Third Party Assessment of NBHM Scheme",
+      "description": "Tenders 2025-06-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/687",
+      "title": "Filling up of Four posts of Directors (Technical)",
+      "description": "Recruitment 2025-06-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/686",
+      "title": "Filling up of one post of Technical Expert (Forestry)",
+      "description": "Recruitment 2025-06-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/685",
+      "title": "Filling up of Five posts of Senior Technical Assistant",
+      "description": "Recruitment 2025-06-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/882",
+      "title": "Invitation for Expression of Interest for Collection of Real Time Observations and Photo of Crops (CROPIC)",
+      "description": "Tenders 2025-06-05"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/684",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of (i) Assistant Library and Information Officer and (ii) Library and Information Assistant in the Department of Agriculture and Farmers Welfare",
+      "description": "Recruitment 2025-05-27"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/683",
+      "title": "Filling up one post of Member(Non-Official) in Commission for Agricultural Costs and Prices(CACP) (from North Zone only) in level-14 of Pay Matrix, on contract basis for a period of three years.",
+      "description": "Recruitment 2025-05-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/682",
+      "title": "Filling up one post of Stenographer (Grade-I) in Level-06 at Directorate of Cashewnut and Cocoa Development, Kochi, on deputation/absorption basis.",
+      "description": "Recruitment 2025-05-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/679",
+      "title": "Engagement of Consultants in National Bee Board (NBB)",
+      "description": "Recruitment 2025-05-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/678",
+      "title": "Vacancy Circular for filling up the post of Administrative Officer in Level-10 of pay matrix in the Commission for Agricultural Costs and Prices (CACP) on Composite method [deputation (including short-term contract/promotion) basis for a period of three years",
+      "description": "Recruitment 2025-04-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/677",
+      "title": "vacancy circular for filling up one post of Joint Director (Extn.) in Directorate of Extension under DA&FW-reg.",
+      "description": "Recruitment 2025-04-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/676",
+      "title": "Engagement of one(1) Young Professional on contractual basis as part of Project Monitoring Unit (PMU) of the 11th Agriculture Census 2021-22 project in Agriculture Census Division",
+      "description": "Recruitment 2025-04-29"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/681",
+      "title": "Corrigendum-Filling up one post of Senior Administrative Officer, General Central Services Grou 'A' Gazetted (Non-Ministerial) posts in the Directorate of Plant Protectior f,uarantine and Storage, Faridabad, on deputation basis",
+      "description": "Recruitment 2025-04-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/680",
+      "title": "Filling up one post of Senior Administrative Officer, General Central Services Grou 'A' Gazetted (Non-Ministerial) posts in the Directorate of Plant Protectior f,uarantine and Storage, Faridabad, on deputation basis",
+      "description": "Recruitment 2025-04-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/675",
+      "title": "Engagement of one Consultant and 04 Young Professionals in the International Cooperation Division of Department of Agriculture and Farmers Welfare (DA&FW) - Publication of results- reg.",
+      "description": "Recruitment 2025-04-22"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/674",
+      "title": "Engagement of one Consultant and 04 Young Professionals in the International Cooperation Division of Department of Agriculture and Farmers Welfare (DA&FW) - Publication of results- reg.",
+      "description": "Recruitment 2025-04-22"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/672",
+      "title": "Vacancy Circular / Advertisement for filling up of two post of Stenographer Grade-l at FMTTIs by deputation",
+      "description": "Recruitment 2025-04-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/671",
+      "title": "Filling up two (02) vacancies of Staff Car Driver (Ordinary Grade) in Level-2 of the pay matrix in Department of Agriculture and Farmers Welfare on Deputation/ Absorption basis-reg.",
+      "description": "Recruitment 2025-04-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/845",
+      "title": "Bid Document",
+      "description": "Tenders 2025-04-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/911",
+      "title": "Revised Guidelines: ATMA (Agricultural Technology Management Agency)",
+      "description": "Guidelines 2025-04-04"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/673",
+      "title": "Advertisement for the post of Director (Finance), NSC - reg.",
+      "description": "Recruitment 2025-04-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/670",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Despatch Rider in Department of Agriculture and Farmers Welfare.",
+      "description": "Recruitment 2025-03-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/669",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Despatch Rider in Department of Agriculture and Farmers Welfare.",
+      "description": "Recruitment 2025-03-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/668",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Staff Car Driver (Ordinary Grade) in Department of Agriculture and Farmers Welfare.",
+      "description": "Recruitment 2025-03-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/667",
+      "title": "Filling up the post of Director General, CCS NIAM, Jaipur (Pay Level-14) on deputation basis through Search-cum-Selection process.",
+      "description": "Recruitment 2025-03-05"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/666",
+      "title": "Engagement of Technical Consultants and Young Professionals in NRAA",
+      "description": "Recruitment 2025-03-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/665",
+      "title": "Engagement of National Level Network Manager in REWARD Programme of NRAA",
+      "description": "Recruitment 2025-03-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/664",
+      "title": "Vacancy Circular for filling up the post of Chairman in Commission for Agricultural Costs and Prices (CACP), D/o Agriculture and Farmers Welfare in Level-17 (Rs.225000) of Pay Matrix on deputation (including short-term contract) basis for a period of five (05) years.",
+      "description": "Recruitment 2025-02-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/663",
+      "title": "Filling up one post of Regional Home Economist in Directorate of Extension, Department of Agriculture and Farmers Welfare on deputation basis.",
+      "description": "Recruitment 2025-02-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/544",
+      "title": "Advertisement for the post of Secretary, Coconut Development Board on deputation basis",
+      "description": "Recruitment 2025-02-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/843",
+      "title": "AMC of Integrated Security and Surveillance System - Monitor Operations, Employee Safety, Health Monitoring Solution for CCTV System, Building Management System; Comprehensive; Hardware, Software, Wireless System, Networking System, License; Consumables",
+      "description": "Tenders 2025-01-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/662",
+      "title": "Filling up of One Post of Director in the National Seeds Research and Training Centre, Varanasi (Uttar Pradesh) - a Subordinate Office under Department of Agriculture & Farmers Welfare on deputation basis- regarding",
+      "description": "Recruitment 2025-01-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/850",
+      "title": "Cancellation of REQUEST FOR Quotation (RFQ) for Integration of ‘Aadhaar-based e-Signature’ Services",
+      "description": "Tenders 2025-01-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/661",
+      "title": "lnviting application from Central Government Officers retired at the level of Deputy Secretary/Director or equivalent post for engagement as consultant on contract basis in Department of Agriculture & Farmers Welfare - regarding",
+      "description": "Recruitment 2025-01-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/659",
+      "title": "Filling up one (01) vacancy of Transport Officer in Level-5 of the pay matrix in Department of Agriculture and Farmers Welfare on Deputation/ Absorption basis-reg.",
+      "description": "Recruitment 2025-01-04"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/864",
+      "title": "Corrigendum-II on E-sign",
+      "description": "Tenders 2025-01-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/863",
+      "title": "Corrigendum on E-sign",
+      "description": "Tenders 2025-01-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/838",
+      "title": "(Corrigendum-2) The National Farmers Welfare Program Implementation Society (NFWPIS) registered under Society registration Act,1860, which is under administration control of Ministry of Agriculture & Farmers Welfare. NFWPIS is operational at 4th & 6th Floor, Plant Authority Bhawan (PAB), PUSA, New …",
+      "description": "Tenders 2025-01-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/653",
+      "title": "Filling up one (01) vacancy of Staff Car Driver (Ordinary Grade) in Level 2 of Pay Matrix (Rs. 19900-63200) in Department of Agriculture and Farmers Welfare on Deputation/Absorption basis-reg.",
+      "description": "Recruitment 2024-12-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/656",
+      "title": "Filling up one (01) vacancy of Assistant Library and Information Officer in Level-7 of the pay matrix in Department of Agriculture and Farmers Welfare on Deputation or Absorption basis-reg.",
+      "description": "Recruitment 2024-12-28"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/890",
+      "title": "REQUEST FOR Quotation (RFQ) for Integration of ‘Aadhaar-based e-Signature’ Services with DA&FW Consent collector app",
+      "description": "Tenders 2024-12-27"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/652",
+      "title": "Filling up the post of Administrative Officer, CIH, Nagaland",
+      "description": "Recruitment 2024-12-27"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/651",
+      "title": "Engagement of four (04) young professionals in the International Cooperation Division of the Department of Agriculture and Farmers Welfare",
+      "description": "Recruitment 2024-12-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/650",
+      "title": "Engagement of one consultant in the International Cooperation Division of the Department of Agriculture and Farmers Welfare",
+      "description": "Recruitment 2024-12-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/837",
+      "title": "(Corrigendum) The National Farmers Welfare Program Implementation Society (NFWPIS) registered under Society registration Act,1860, which is under administration control of Ministry of Agriculture & Farmers Welfare. NFWPIS is operational at 4th & 6th Floor, Plant Authority Bhawan (PAB), PUSA, New De…",
+      "description": "Tenders 2024-12-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/658",
+      "title": "Final List of Selected Candidates for engagement of 09 YPs in the post of Young Professionals in Oilseeds Division. DA&FW",
+      "description": "Recruitment 2024-12-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/657",
+      "title": "filling up of two (02) posts of Deputy Agricultural Marketing Adviser (Group-III) in Level-12 of Pay Matrix for HQ, Faridabad, in the Directorate of Marketing & Inspection, an attached office under the Department of Agriculture & Farmers Welfare on deputation (including Short term contract) basis",
+      "description": "Recruitment 2024-12-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/647",
+      "title": "Filling up of the post of Director in Central Institute of Horticulture, Medziphema, Dimapur Distt., Nagaland on deputation (ISTC) basis, a subordinate office under Ministry of Agriculture & Farmers Welfare, department of Agriculture & Farmers Welfare",
+      "description": "Recruitment 2024-12-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/839",
+      "title": "(EOI) The National Farmers Welfare Program Implementation Society (NFWPIS) registered under Society registration Act,1860, which is under administration control of Ministry of Agriculture & Farmers Welfare. NFWPIS is operational at 4th & 6th Floor, Plant Authority Bhawan (PAB), PUSA, New Delhi-12 ,…",
+      "description": "Tenders 2024-12-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/654",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Economic Officer in Department of Agriculture and Farmers Welfare",
+      "description": "Recruitment 2024-12-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/655",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Technical Clerk (Economics) in the Department of Agriculture and Farmers Welfare",
+      "description": "Recruitment 2024-12-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/649",
+      "title": "Filling up ofthe post of Private Secretary in the National Seeds Research and Training Centre, Varanasi (Uttar Pradesh) - a Subordinate Office under the Department of Agriculture & Farmers Welfare - regarding",
+      "description": "Recruitment 2024-11-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/648",
+      "title": "Filling up of One Post of Chief Seed Analyst in the National Seeds Research and Training Centre, Varanasi (Uttar Pradesh) - a Subordinate Office under Department of Agriculture & Farmers Welfare - regarding",
+      "description": "Recruitment 2024-11-23"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/848",
+      "title": "CORRIGENDUM1 for the Request for Expressions of Interest (EoI) for a cloud-based APM tool",
+      "description": "Tenders 2024-11-21"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/877",
+      "title": "Farmer Grievance Redressal System (FGRS) RFP- 2024",
+      "description": "Tenders 2024-11-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/644",
+      "title": "Filling up of post of Senior Technical Assistant on deputation (including short term contract) basis in National Rainfed Area Authority.",
+      "description": "Recruitment 2024-11-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/643",
+      "title": "Filling up of one post of Technical Expert (Forestry) on deputation (including short term contract) basis in National Rainfed Area Authority.",
+      "description": "Recruitment 2024-11-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/642",
+      "title": "Filling up of one post of Director (Water Management) on deputation (including short term contract) basis in National Rainfed Area Authority.",
+      "description": "Recruitment 2024-11-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/641",
+      "title": "Filling up of one post of Director (Forestry) deputation (including short term contract) basis in National Rainfed Area Authority.",
+      "description": "Recruitment 2024-11-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/893",
+      "title": "Request for Expression of interest EOI",
+      "description": "Tenders 2024-10-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/640",
+      "title": "Filling up one (01) post of Law Officer (Fertiliser) in Level-10 of the Pay Matrix on deputation (ISTC) or absorption basis in the Department of Agriculture and Farmers Welfare - reg.",
+      "description": "Recruitment 2024-10-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/639",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Technical Assistant (Economics) in Department of Agriculture and Farmers Welfare",
+      "description": "Recruitment 2024-10-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/637",
+      "title": "Filling up of one (01) post of Member (Official) in the Commission for Agricultural Costs & Prices (CACP) under DA&FW",
+      "description": "Recruitment 2024-10-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/636",
+      "title": "Vacancy circular regarding filling up the post of Director General (DG), CCS National Institute of Agricultural Marketing, Jaipur, an autonomous organization under the Department of Agriculture & Farmers Welfare, Ministry of Agriculture & Farmers Welfare",
+      "description": "Recruitment 2024-10-04"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/635",
+      "title": "Corrigendum for filling up two posts of Extension Officer in Directorate of Extension, DA&FW-reg",
+      "description": "Recruitment 2024-10-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/634",
+      "title": "Vacancy circular for filling up the post of Deputy Director(Administration) in Directorate of Extension, DA&FW",
+      "description": "Recruitment 2024-10-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/633",
+      "title": "vacancy circular for filling up the post of Director(Administration) in Directorate of Extension, DA&FW",
+      "description": "Recruitment 2024-10-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/632",
+      "title": "Inviting comment/suggestions of all stakeholders on draft Recruitment Rules of Scheme Officer in Department of Agriculture and Farmers Welfare.",
+      "description": "Recruitment 2024-10-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/631",
+      "title": "Advertisement for engagement of 09 Young Professionals (YPs) in Oilseeds Division (DA&FW)",
+      "description": "Recruitment 2024-09-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/630",
+      "title": "Advertisement for the post of Three (3) Consultants from various fields i.e. Consultant for Beekeeping, Marketing & Post-Harvest Technology in NBB.",
+      "description": "Recruitment 2024-09-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/629",
+      "title": "vacancy circular for filling up the post of Director General in National Institute of Agricultural Extension Management (MANAGE)",
+      "description": "Recruitment 2024-09-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/628",
+      "title": "Filling up of the post of Director in Central Institute of Horticulture, Medziphema,Dimapur Distt.,Nagaland on deputation (ISTC) basics, a subordinate office under Ministry of Agriculture & farmer Welfare, Department of Agriculture & Farmer Welfare.",
+      "description": "Recruitment 2024-09-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/646",
+      "title": "Filling up the post of Regional Home Economist in Directorate of Extension",
+      "description": "Recruitment 2024-09-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/645",
+      "title": "Filling up the post of Joint Director (Farm Information) in Directorate of Extension",
+      "description": "Recruitment 2024-09-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/625",
+      "title": "Extension of date of filling up 01 post of Member Secretary in CACP",
+      "description": "Recruitment 2024-09-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/626",
+      "title": "Vacancy Circular - Filling up of the post of Chief Seed Analyst in National Seeds Research and Training Centre, Varanasi",
+      "description": "Recruitment 2024-09-05"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/623",
+      "title": "Vacancy Circular for filling up one post of Joint Director (FI) in Directorate of Extension on DA&FW website reg",
+      "description": "Recruitment 2024-09-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/880",
+      "title": "Invitation for Expression of Interest For Gram Panchayat (GP) level Crop Yield Estimation Using Technology for Cotton crop",
+      "description": "Tenders 2024-09-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/622",
+      "title": "Request for uploading the vacancy circular for filling up one post of Regional Home Economist in Directorate of Extension under DA&FW-reg",
+      "description": "Recruitment 2024-09-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/638",
+      "title": "Vacancy Circular - Advertisement for the post of Director, NSRTC",
+      "description": "Recruitment 2024-08-31"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/886",
+      "title": "Opening of technical bid on 14 Aug 24 at 3 PM- RKVY Integrated PMU",
+      "description": "Tenders 2024-08-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/621",
+      "title": "Filling up of two (02) posts of Deputy Agricultural Marketing Adviser (Group-III) in Level-12 of Pay Matrix for HQ, Faridabad in Directorate of Marketing & Inspection, an attached office under Department of Agriculture & Farmers Welfare on deputation (including Short term contract) basis",
+      "description": "Recruitment 2024-08-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/624",
+      "title": "Vacancy Circular for filling up one post of Law Officer in Central Fertilizer Quality Control and Training Institute, Faridabad ( A subordinate office under D/o Agri. Farmers Welfare) in Level-10 of the Pay Matrix on deputation(Including short-term contract) basis",
+      "description": "Recruitment 2024-08-10"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/627",
+      "title": "Vacancy Circular for filling up one post of Office Superintendent in Central Fertilizer Quality Control and Training Institute, Faridabad ( A subordinate office under D/o Agri. Farmers Welfare) in Level- 6of the Pay Matrix on deputation(Including short-term contract) basis",
+      "description": "Recruitment 2024-08-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/620",
+      "title": "Extension of last date of receipt of applications (by 07.9.2024) for filling up of one post of Member Secretary, Commission for Agricultural Costs and Prices (CACP) in Level-14 (Rs.144200-218200) of pay matrix on deputation (including short-term contract) basis for a period of five years.",
+      "description": "Recruitment 2024-07-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/619",
+      "title": "Vacancy circular for filling up two posts of Extension Officer in Directorate of Extension under DA&FW",
+      "description": "Recruitment 2024-07-22"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/872",
+      "title": "EXPRESSION OF INTEREST (EOI) FOR DEVELOPING SOFTWARE FOR INTEGRATED COMMAND AND CONTROL CENTRE (ICCC) (LAST DATE OF APPLICATION IS 09/08/24)",
+      "description": "Tenders 2024-07-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/618",
+      "title": "Vacancy Circular for filling up the post of Member (Official), Commission for Agricultural Costs and Prices (CACP) in Level-14 (Rs.144200-218200) of Pay Matrix on deputation (including short-term contract) basis for a period of three years",
+      "description": "Recruitment 2024-07-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/617",
+      "title": "Filling of DDG FAO and the upcoming vacancies",
+      "description": "Recruitment 2024-07-05"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/616",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Data Entry Operator Grade (A&B) in Department of Agriculture and Farmers Welfare.",
+      "description": "Recruitment 2024-07-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/615",
+      "title": "Advertisement for the posts of 1 Consultant and 1 Technical Assistant in National Bee Board (NBB)",
+      "description": "Recruitment 2024-07-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/553",
+      "title": "Advertisement for the posts of 4 Consultants in National Bee Board (NBB)",
+      "description": "Recruitment 2024-07-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/610",
+      "title": "Vacancy Circular for filling up one post of Administrative Officer in Central Fertilizer Quality Control and Training Institute, Faridabad ( A subordinate office under D/o Agri. Farmers Welfare) in Level-10 of the Pay Matrix on deputation(Including short-term contract) basis",
+      "description": "Recruitment 2024-06-29"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/903",
+      "title": "Tender reg invitation of bids/ proposals for setting up an integrated PMU under RKVY Cafeteria scheme in DA&FW (RKVY PMU Corrigendum I & II)",
+      "description": "Tenders 2024-06-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/614",
+      "title": "Advertisement for the post of Stenographer (Grade-I)",
+      "description": "Recruitment 2024-06-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/606",
+      "title": "Advertisement for the post of Photographer",
+      "description": "Recruitment 2024-06-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/612",
+      "title": "Filling up one post of Senior Administrative Officer in ( A subordinate office under D/o Agri. Farmers Welfare) in Level-11 of the Pay Matrix on deputation(Including short-term contract) basis",
+      "description": "Recruitment 2024-06-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/613",
+      "title": "Filling up of Two posts of Staff Car Drivers (Ordinary Grade) on deputation/ absorption basis in the Level-2 of Pay Matrix, Rs. 19900-63200/- (as per TthCPC)",
+      "description": "Recruitment 2024-06-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/902",
+      "title": "Tender reg invitation of bids/ proposals for setting up an integrated PMU under RKVY Cafeteria scheme in DA&FW",
+      "description": "Tenders 2024-06-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/611",
+      "title": "Filling up of the post of Private Secretary in the National Seeds Research and Training Centre, Varanasi (Uttar Pradesh) - a Subordinate Office under the Department of Agriculture & Farmers Welfare",
+      "description": "Recruitment 2024-06-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/912",
+      "title": "Guidelines: Agriculture Infrastructure Fund (Hindi)",
+      "description": "Guidelines 2024-06-12"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/608",
+      "title": "Filling up one (01) vacancy of Despatch Rider in Department of Agriculture and Farmers Welfare in Level-2 (19900-63200) of the pay matrix on Deputation/ Absorption basis-reg.",
+      "description": "Recruitment 2024-06-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/609",
+      "title": "Filling up one (01) post of Law Officer (Fertiliser) in the Department of Agriculture and Farmers Welfare in Level 10 in the pay matrix (56100-177500) on Deputation(ISTC) or Absorption basis-reg.",
+      "description": "Recruitment 2024-05-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/607",
+      "title": "Filling up One (01) vacant post of Additional Commissioner (Crops) on Deputation (ISTC) basis.",
+      "description": "Recruitment 2024-05-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/605",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Assistant Library and Information Officer in Department of Agriculture and Farmers Welfare.",
+      "description": "Recruitment 2024-05-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/603",
+      "title": "Engagement of 03 Young Professionals in the International Cooperation Division of Department of Agriculture and Farmers Welfare (DA&FW) Publication of result on DA&FW website reg.",
+      "description": "Recruitment 2024-04-29"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/602",
+      "title": "Filling up of one post of Joint Director (Extension) in Directorate of Extension, Department of Agriculture and Farmers Welfare on deputation (ISTC).",
+      "description": "Recruitment 2024-04-29"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/604",
+      "title": "Filling up of one (01) post of Additional Commissioner (NRM/RFS) in this Department in Level 13 of the Pay Matrix on Deputation (ISTC) basis .",
+      "description": "Recruitment 2024-04-27"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/601",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules in respect of technical posts of Credit Division, Department of Agriculture and Farmers Welfare (Proper)",
+      "description": "Recruitment 2024-04-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/600",
+      "title": "Filling up one (01) post of Accounts Officer in the Department of Agriculture and Farmers Welfare in Level 7 in the pay matrix (44900-142400) on Deputation basis-reg.",
+      "description": "Recruitment 2024-04-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/598",
+      "title": "Filling up of one post of Agricultural Engineer [General Central Service, Group B Gazetted in Level 7 (Rs. 44900-142400) in pay matrix), at Farm Machinery Training and Testing Institute on deputation (including short term contract) basis. - regarding",
+      "description": "Recruitment 2024-04-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/599",
+      "title": "Filling up Three (03) vacant posts of Deputy Commissioner (Crops) on Deputation (ISTC) basis.",
+      "description": "Recruitment 2024-03-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/586",
+      "title": "Filling up of One Post of Director in the National Seeds Research and Training Centre, Varanasi (Uttar Pradesh) a Subordinate Office under Department of Agriculture & Farmers Welfare on Deputation/ Deputation (including short term contract) basis- regarding",
+      "description": "Recruitment 2024-03-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/596",
+      "title": "Filling up one (01) anticipated vacancy of Assistant Library and Information Officer in the scale of PB-2 Rs. 9300-34800 with Grade Pay of Rs. 4600 (Level-7 as per 7th CPC) in Department of Agriculture and Farmers Welfare on Deputation or Absorption basis-reg.",
+      "description": "Recruitment 2024-03-23"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/595",
+      "title": "Filling up of the post of Administrative Officer in Central Institute of Horticulture, Medziphema, Dimapur Distt., Nagaland on deputation (ISTC) basis, a subordinate office under Ministry of Agriculture & Farmers Welfare, Department of Agriculture & Farmers Welfare",
+      "description": "Recruitment 2024-03-23"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/594",
+      "title": "Engagement of retired Government Officers as Senior Consultant (1) on contract basis under Agriculture Census Division of the Department of Agriculture & Farmers Welfare, Government of India.",
+      "description": "Recruitment 2024-03-21"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/871",
+      "title": "EOI for empanelment of agencies under YESTECH",
+      "description": "Tenders 2024-03-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/593",
+      "title": "Filling up of One post of Staff Car Driver (Ordinary Grade) on deputation/absorption basis in the Level-2 of Pay Matrix, Rs.19900-63200/- (as per 7th CPC) - regarding",
+      "description": "Recruitment 2024-03-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/876",
+      "title": "Expression of Interest for empanelment of WINDS implementing Partner",
+      "description": "Tenders 2024-03-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/592",
+      "title": "Filling up of two posts of Farm Superintendent [General Central Service, Group B Gazetted in Level 7 (Rs. 44900-142400) in pay matrix), at Farm Machinery Training and Testing Institute on deputation (including short term contract) basis. - regarding",
+      "description": "Recruitment 2024-03-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/591",
+      "title": "Engagement of 03 (three) Young Professionals in the International Cooperation Division of Department of Agriculture and Farmers Welfare (DA&FW)- regarding",
+      "description": "Recruitment 2024-03-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/590",
+      "title": "Filling up of One (01) vacancy of Staff Car Driver (Ordinary Grade) in the Pay Matrix Level-2 (Rs. 19900-63200) (Group-C) in the Directorate of Extension by deputation basis - regarding.",
+      "description": "Recruitment 2024-03-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/589",
+      "title": "Filling up one (01) vacant post of Assistant Director (Cooperation/Credit) in the Department of Agriculture and Farmers Welfare in Level-10 of the Pay Matrix on Deputation (ISTC) basis.",
+      "description": "Recruitment 2024-03-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/587",
+      "title": "Filling up one (01) vacancy of Despatch Rider in the scale of PB-1 Rs.5200-20200 with Grade Pay of Rs.1900 in Department of Agriculture and Farmers Welfare on Deputation/Absorption basis-reg.",
+      "description": "Recruitment 2024-02-27"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/588",
+      "title": "Filling up one (01) vacant post of Assistant Director (Cooperation/Credit) in the Department of Agriculture and Farmers Welfare in Level-10 of the Pay Matrix on Deputation (ISTC) basis.",
+      "description": "Recruitment 2024-02-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/847",
+      "title": "CORRIGENDUM ( Bid No.GEM/2024/B/4494261 )- RFP for selecting a consulting agency to establish a Project Development and Management Consultancy (PDMC) for the project “Development of Bamboo Value Chain in North Eastern Region (NER).",
+      "description": "Tenders 2024-02-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/585",
+      "title": "Filling up of one post of Technical Expert (Forestry) (Level-15/14) on deputation (including short term contract) basis in NRAA-regarding",
+      "description": "Recruitment 2024-02-12"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/584",
+      "title": "Filling up of two posts of Director (Technical Discipline) General Central Service, Group A , Gazetted, Non- Ministerial in the pay scale of Rs. 131100-216600 (Level-13A) in the pay matrix on deputation (including short term contract) basis in NRAA-regarding",
+      "description": "Recruitment 2024-02-12"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/597",
+      "title": "Engagement of one(1) Young Professional (IT) as System Analyst (IT) on temporary basis for two years in Agriculture Census Division of DA&FW, Government of India.",
+      "description": "Recruitment 2024-02-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/583",
+      "title": "Filling up of the post of Private Secretary in the National Seeds Research and Training Centre, Varanasi (Uttar Pradesh) - a Subordinate Office under the Department of Agriculture & Farmers Welfare - regarding.",
+      "description": "Recruitment 2024-02-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/582",
+      "title": "Filling up of the post of Joint Director (Farm Information) in Directorate of Extension, Department of Agriculture & Farmers Welfare on deputation (ISTC).",
+      "description": "Recruitment 2024-02-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/581",
+      "title": "Filling up of Two (02) vacancies of Photographers in the Pay Matrix Level-6 Rs. 35400-112400 in the Directorate of Extension by deputation basis (including short- term contract) regarding.",
+      "description": "Recruitment 2024-02-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/580",
+      "title": "Filling up of Two (02) vacancies of Stenographer Grade-l in the Level-6 (Rs.35400-112400) in the Directorate of Extension by deputation basis (including short-term contract) regarding.",
+      "description": "Recruitment 2024-02-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/579",
+      "title": "Advertisement and Term of Reference for engagement of Consultant and Technical Assistant on contractual basis in the Directorate of Wheat Development, Gurugram (Haryana) under National Food Security Mission (NFSM) on websites of DA&FW and Portal -regarding.",
+      "description": "Recruitment 2024-02-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/578",
+      "title": "Filling up the post of Extension Officer in Directorate of Extension, Department of Agriculture and Farmers Welfare on deputation (including short term contract) basis.",
+      "description": "Recruitment 2024-01-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/577",
+      "title": "Filling up of two (02) posts of Deputy Agricultural Marketing Adviser (Group-III) at Faridabad (Haryana) in Directorate of Marketing & Inspection an attached office under Department of Agriculture & Farmers Welfare on deputation (including short term contract) basis - regarding.",
+      "description": "Recruitment 2024-01-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/576",
+      "title": "Filling up one (01) post of Law Officer (Fertilizer) in Level-10 of the Pay Matrix on deputation (ISTC) or absorption basis in the Department of Agriculture and Farmers Welfare.",
+      "description": "Recruitment 2024-01-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/891",
+      "title": "RFP on to establish a Project Development and Management Consultancy (PDMC) for the project ‘Development of Bamboo Value Chain in North Eastern Region (NER)’.",
+      "description": "Tenders 2024-01-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/575",
+      "title": "Vacancy circular for filling up of the posts of Senior Technical Assistant in National Rainfed Area Authority on deputation (including short term contract)-regarding.",
+      "description": "Recruitment 2024-01-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/562",
+      "title": "Corrigendum for Filling up of two posts of Joint Director (Extension) in Directorate of Extension, Department of Agriculture & Farmers Welfare by deputation (ISTC).",
+      "description": "Recruitment 2024-01-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/574",
+      "title": "Filling up of one anticipated post of Director (Finance & Administration) General Central Service, Group A , Gazetted, Non- Ministerial in the pay scale of Rs. 123100-215900 (Level-13) in the pay matrix on deputation (including short term contract) basis in NRAA-regarding.",
+      "description": "Recruitment 2024-01-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/573",
+      "title": "Filling up of the post of Administrative Accounts Officer in the National Seeds Research and Training Centre, Varanasi (Uttar Pradesh) - a Subordinate Office under the Department of Agriculture & Farmers Welfare - regarding",
+      "description": "Recruitment 2024-01-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/572",
+      "title": "Filling up of the post of Joint Director (Farm Information) in Directorate of Extension, Department of Agriculture & Farmers Welfare on deputation(ISTC).",
+      "description": "Recruitment 2023-12-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/571",
+      "title": "Filling up of the post of Director in Central lnstitute of Horticulture, Medziphema, Dimapur Distt., Nagaland on deputation (ISTC) basis, a subordinate office under Ministry of Agriculture & Farmers Welfare, Department of Agriculture & Farmers Welfare.",
+      "description": "Recruitment 2023-11-28"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/570",
+      "title": "Filling up of five posts of Technical Experts (Level-15/14) on deputation (including short term contract) basis in NRAA-Reg",
+      "description": "Recruitment 2023-11-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/569",
+      "title": "Filling up one post of Assistant Director in National Centre of Organic and Natural Farming, Ghaziabad (A subordinate office under the Department of Agriculture & Farmers Welfare) in the Level-10 of the Pay Matrix on deputation(ISTC) basis.",
+      "description": "Recruitment 2023-11-22"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/568",
+      "title": "Filling up the post of Assistant Director (Cooperation/Credit) on \"Deputation (Including Short Term Contract)\" basis.",
+      "description": "Recruitment 2023-11-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/567",
+      "title": "Filling up the post of Draughtsman Grade-I on \"Deputation\" basis.",
+      "description": "Recruitment 2023-11-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/566",
+      "title": "Filling up the post of Staff Car Driver (Ordinary Grade) on \"Deputation/Absorption basis\" (For Armed Forces Personnel: Deputation/Re-employment basis).",
+      "description": "Recruitment 2023-11-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/548",
+      "title": "Filling up the post of Assistant Soil Conservation Officer (NRM/RFS) on \"Deputation (Including Short Term Contract)\" basis",
+      "description": "Recruitment 2023-11-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/565",
+      "title": "Filling up of the post of Assistant Director (OL) in Directorate of Extension, Department of Agriculture & Farmers Welfare by Composite Method.",
+      "description": "Recruitment 2023-11-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/564",
+      "title": "The corrigendum vacancy circular for filling up the post of Joint Director (Farm Information) in Directorate of Extension under DA & FW.",
+      "description": "Recruitment 2023-11-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/563",
+      "title": "Filling up of One Post of Chief Seed Analyst in the National Seeds Research and Training Centre, Varanasi (Uttar Pradesh) - a Subordinate Office under Department of Agriculture & Farmers Welfare - regarding",
+      "description": "Recruitment 2023-11-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/561",
+      "title": "National Rural Infrastructure Development Agency (Ministry of Rural Development) regarding making available the advertisement of recruitment on deputation basis for publicity on its website and office.",
+      "description": "Recruitment 2023-11-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/560",
+      "title": "Filling up of Two (02) vacancies of Stenographer Grade-1 in the Level-6 (Rs.35400-112400) in the Directorate of Extension by deputation basis (including short-term contract) regarding.",
+      "description": "Recruitment 2023-11-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/558",
+      "title": "Filling up the three (3) posts of Registrar, Protection of Plant Varieties and Farmers Rights Authority on deputation basis.",
+      "description": "Recruitment 2023-10-31"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/884",
+      "title": "Notice for cancellation of e-tender bid vide tender ID 2023_DACO_770516_1 for empanelment of agencies for the production of short audio & video films/jingles.",
+      "description": "Tenders 2023-10-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/559",
+      "title": "Filling up of Two (02) vacancies of Photographers in the Pay Matrix Level-6 Rs. 35400-112400 in the Directorate of Extension by deputation basis (including short- term contract) regarding.",
+      "description": "Recruitment 2023-10-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/557",
+      "title": "Filling up of two posts of Joint Director (Extension) in Directorate of Extension, Department of Agriculture & Farmers Welfare on deputation (ISTC).",
+      "description": "Recruitment 2023-10-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/556",
+      "title": "Filling up of two posts of Director (Technical Discipline) General Central Service, Group A , Gazetted, Non- Ministerial in the pay scale of Rs. 131100-216600 (Level-13A) in the pay matrix on deputation (including short term contract) basis in NRAA-reg.",
+      "description": "Recruitment 2023-10-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/906",
+      "title": "“Empanelment of Companies/Agencies for setting-up of AWS/ARGs and providing weather datasets under Weather Information Network Data System (WINDS)”.",
+      "description": "Tenders 2023-10-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/554",
+      "title": "Filling up the one (01) post of Assistant Director at Central Agmark Laboratory, Nagpur in Directorate of Marketing & Inspection an attached oflice under Department of Agriculture & Farmers Welfare on deputation (including short term contract) basis - regarding,",
+      "description": "Recruitment 2023-10-10"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/552",
+      "title": "Hiring of National Level Network Manager for World Bank aided REWARD programme by NRAA.",
+      "description": "Recruitment 2023-10-10"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/551",
+      "title": "Filling up of one (01) post of Assistant Director (Seeds) in this Department in Level 10 of the Pay Matrix on Composite Method [Deputation (including short term contract basis) plus Promotion.",
+      "description": "Recruitment 2023-10-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/861",
+      "title": "Corrigendum dated 19.09.2023 regarding Extension of date for uploading the tender bid published on 06.09.2023 through eProcurement System (CPP Portal) vide tender ID 2023_DACO_770516_1 for empanelment of agencies for the production of short audio & video films/jingles.",
+      "description": "Tenders 2023-09-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/879",
+      "title": "Invitation for Expression of Interest (EoI) for Empanelment of agencies for carrying yield estimation at Insurance Unit level under “Yield Estimation System based on Technology (YES-TECH)” of Pradhan Mantri Fasal Bima Yojana” .",
+      "description": "Tenders 2023-09-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/549",
+      "title": "The corrigendum for Filling up of one post of Chief Executive Officer (Level- I7) on deputation (including short term contract) basis in NRAA.",
+      "description": "Recruitment 2023-09-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/862",
+      "title": "Corrigendum for The tender bid published on 06.09.2023 through eProcurement System (CPP Portal) vide tender ID 2023_DACO_770516_1 for empanelment of agencies for the production of short audio & video films/jingles.",
+      "description": "Tenders 2023-09-12"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/904",
+      "title": "The EMPANELMENT (RFE) OF AGENCIES FOR THE PRODUCTION OF SHORT AUDIO & VIDEO FILMS/ JINGLES.",
+      "description": "Tenders 2023-09-07"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/550",
+      "title": "Filling up of One Post of Director in the National Seeds Research and Training Centre, Varanasi (Uttar Pradesh) - a Subordinate Office under Department of Agriculture & Farmers Welfare -Regards",
+      "description": "Recruitment 2023-08-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/547",
+      "title": "Filling up one (o1) vacant post of Assistant Director (Cooperation/Credit(General central Service, Group- A Gazetted, Non ministerial) in the Department of Agriculture and Farmer s Welfare in Level-10 of the pay Matrix (Rs. 56100-177500/ on Deputation (ISTC) basis - reg.",
+      "description": "Recruitment 2023-08-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/546",
+      "title": "Filling up of one post of Joint Director (Extension) in Directorate of Extension, Department of Agriculture & Farmers Welfare by deputation (ISTC).",
+      "description": "Recruitment 2023-08-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/545",
+      "title": "Applications are invited for engagement of One (01) Consultant and Two (02) Young Professionals (YPs) purely on contractual basis under Project Monitoring Unit (PMU) of Seed Authentication, Traceability and Holistic Inventory (SATHI) portal:",
+      "description": "Recruitment 2023-08-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/543",
+      "title": "Filling up of one post of Chief Executive Officer (Level- I7) on deputation (including short term contract) basis in NRAA-reg.",
+      "description": "Recruitment 2023-08-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/542",
+      "title": "Terms of Recruitment for engagement of Consultants in National Bee Board (NBB)",
+      "description": "Recruitment 2023-07-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/885",
+      "title": "Notice for cancellation of e-tender bid.",
+      "description": "Tenders 2023-07-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/540",
+      "title": "Filling up Two (02) vacant posts of Assistant Director (Crops) on Deputation (ISTC) basis.",
+      "description": "Recruitment 2023-07-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/541",
+      "title": "Filling up One (01) vacant post of Deputy Commissioner (Crops) on Deputation or Absorption basis.",
+      "description": "Recruitment 2023-07-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/538",
+      "title": "Filling up of two posts of Farm Superintendent [General central service, Group B Gazetted in Level 7 (Rs. 44900-142400) at Farm Machinery Training and Testing lnstitute on deputation (including short term contract) basis. - regarding.",
+      "description": "Recruitment 2023-07-12"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/537",
+      "title": "The corrigendum vacancy circular for filling up the post of Joint Director (Farm Information) in Directorate of Extension under DA & FW.",
+      "description": "Recruitment 2023-07-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/539",
+      "title": "The circular for Two (02) vacant posts of Assistant Director (Crops) on Deputation (ISTC) basis in DA & FW.",
+      "description": "Recruitment 2023-07-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/536",
+      "title": "Vacancy Circular for filling up various posts in Coconut Development Board on deputation basis.",
+      "description": "Recruitment 2023-06-28"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/535",
+      "title": "Filling up of one (01) post of Draughtsman Grade-I (NRM/RFS) in this Department in Level 06 of the Pay Matrix on Deputation basis.",
+      "description": "Recruitment 2023-06-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/530",
+      "title": "Filling up of 2 postsof Office Superintendent at FMTTIs - reg.",
+      "description": "Recruitment 2023-06-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/534",
+      "title": "Filling up of one (01) post of Assistant Soil Conservation Officer (NRM/RFS) in this Department in Level 10 of the Pay Matrix on Deputation (including short term contract) basis.",
+      "description": "Recruitment 2023-06-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/533",
+      "title": "Filling up of one (01) post of Assistant Soil Conservation Officer (NRM/RFS) in this Department in Level 10 of the Pay Matrix on Deputation (including short term contract) basis.",
+      "description": "Recruitment 2023-06-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/529",
+      "title": "Applications are invited for engagement of One (01) Technical Assistant (TA) purely on contractual basis under NATIONAL MISSION ON EDIBLE OILS – OIL PALM (NMEO-OP).",
+      "description": "Recruitment 2023-06-12"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/849",
+      "title": "Call Centre Service - Per Seat Basis - Cloud Based Call Center Solution Onsite.",
+      "description": "Tenders 2023-06-10"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/528",
+      "title": "Filling up of one Post of Chief Seed Analyst in the National Seeds Research and Training centre, Varanasi (uttar pradesh) - a Subordinate Office under Department of Agriculture & Farmers Welfare.",
+      "description": "Recruitment 2023-06-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/532",
+      "title": "Filling up of five(5) vacancies of UDC in the Level-04(Rs.25500-81100) in the Directorate of Extension By deputation basis-reg.",
+      "description": "Recruitment 2023-06-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/531",
+      "title": "Filling up of the post of Director in Central lnstitute of Horticulture, Medziphema, Dimapur Distt., Nagaland on deputation (ISTC) basis, a subordinate office under Ministry of Agriculture & Farmers Welfare, Department of Agriculture & Farmers Welfare.",
+      "description": "Recruitment 2023-06-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/527",
+      "title": "Vacancy circular for the post of Member (Non-Official), Commission for Agricultural Costs and Prices (CACP).",
+      "description": "Recruitment 2023-06-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/526",
+      "title": "Advertisement for filling up one post of Dy. Managing Director (on deputation) in National Horticulture Board-reg.",
+      "description": "Recruitment 2023-06-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/525",
+      "title": "Lateral Recruitment of Joint Secretary and Director/Deputy Secretary Level Posts On Contract Basis.",
+      "description": "Recruitment 2023-05-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/524",
+      "title": "Filling up the post of Joint Director (Farm Information) in Directorate of Extension, Department of Agriculture & Farmers Welfare on deputation",
+      "description": "Recruitment 2023-05-29"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/523",
+      "title": "Filling up of the post (one post likely to be increased to two) of Joint Director (Farm information) in Directorate of Extension, Department of Agriculture & Farmers Welfare by Deputation Method (ISTC).",
+      "description": "Recruitment 2023-05-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/522",
+      "title": "Filling up three (03) vacancies of Office Superintendent, Group-B, Non-Gazetted, Ministerial, Level-6 of Pay Matrix [pre-revised scale Rs. 9300-34800, Pay Band-2, Grade Pay 4200/-] on deputation (including short-term contract) basis in SLUSI\".",
+      "description": "Recruitment 2023-05-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/520",
+      "title": "Appointment to the post of chairman cum Managing Director (CMD), National Seeds Corporation (NSC) Ltd., a schedule B CPSE, through Search-cum-selection Committee.",
+      "description": "Recruitment 2023-05-22"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/521",
+      "title": "Filling up of one (01) post of Assistant Director (Cooperation/Credit) in this Department in Level 10 of the Pay Matrix on Deputation (including short term contract) basis.",
+      "description": "Recruitment 2023-05-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/519",
+      "title": "The National Horticulture Board (NHB) invites applications for filling up the post of Dy. Managing Director on deputation basis.",
+      "description": "Recruitment 2023-05-19"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/518",
+      "title": "Advertisement for the post of Assistant Extension Officer.",
+      "description": "Recruitment 2023-05-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/515",
+      "title": "The Vacancy Circular for filling up one post of Joint Director (Extension) in Directorate of Extension under DA&FW.",
+      "description": "Recruitment 2023-05-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/517",
+      "title": "Filling up of one (01) post of Assistant Soil Chemist (ASC), in Soil & Land Use Survey of India (SLUSI), level-10 of the Pay Matrix (Pre-revised Rs. 15,600-39,100, Grade Pay Rs. 5400/-in Pay Band-3) by deputation (including short term contract) basis.",
+      "description": "Recruitment 2023-05-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/516",
+      "title": "Advertisement for filling up of one post of Advisor (Bamboo Sector) on contractual basis under National Bamboo Mission Sub-Scheme of Mission for Integrated Development of Horticulture (MIDH)",
+      "description": "Recruitment 2023-05-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/514",
+      "title": "Filling up the one (01) post of Assistant Director at Central Agmark Laboratory, Nagpur in Directorate of Marketing & Inspection an attached office under Department of Agriculture & Farmers Welfare on deputation (including short term contract) basis - regarding",
+      "description": "Recruitment 2023-04-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/513",
+      "title": "Corrigendum for filling up of the post of Joint Director(FI) in Directorate of Extension, DA&FW on deputation (ISTC) basis.",
+      "description": "Recruitment 2023-04-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/512",
+      "title": "Application are invited for the engagement of One Consultant to be filled on a purely contractual basis for working in the Directorate of Wheat Development (DWD), Gurugram under National Food Security Mission(NFSM) scheme during 2023-24.",
+      "description": "Recruitment 2023-04-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/511",
+      "title": "The vacancy circular for filling up Two (02) vacant posts of Assistant Director (Crops) on Deputation (ISTC) basis .",
+      "description": "Recruitment 2023-03-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/510",
+      "title": "Filling up of one (01) vacant post of Assistant Director (Manures) in this Department in Level 10 of the Pay Matrix by Composite Method [Deputation (including short term contract) plus Promotion].",
+      "description": "Recruitment 2023-03-25"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/509",
+      "title": "Online reporting of vacancies of Stenographer Grade C & D Examination, 2022",
+      "description": "Recruitment 2023-03-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/508",
+      "title": "Circular: Inviting applications from retired IAS officers for appointment as Inquiry Officers.",
+      "description": "Recruitment 2023-03-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/503",
+      "title": "Vacancy circular for filling up One (01) vacant post of Deputy Commissioner (Crops) on Deputation or Absorption basis.",
+      "description": "Recruitment 2023-03-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/507",
+      "title": "Advertisement for the post of Staff Car Driver (Gr-II) (English & Hindi).",
+      "description": "Recruitment 2023-03-23"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/506",
+      "title": "Advertisement for the post of Stenographer (Grade-I) (English & Hindi).",
+      "description": "Recruitment 2023-03-23"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/505",
+      "title": "Corrigendum of Vacancy Circular (Hindi).",
+      "description": "Recruitment 2023-03-21"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/504",
+      "title": "Filling up of the post (one post likely to be increased to two) of Joint Director (Farm Information) in Directorate of Extension, Department of Agriculture & Farmers Welfare by Deputation Method (ISTC) (English & Hindi).",
+      "description": "Recruitment 2023-03-20"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/502",
+      "title": "Vacancy circular for two posts of Assistant Soil Conservation Officer (NRM/RFS)",
+      "description": "Recruitment 2023-03-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/500",
+      "title": "Filling up one post of Senior Administrative Officer in the National Centre of Organic and Natural Farming, Ghaziabad (A subordinate office under the Department of Agriculture & Farmers Welfare) in the Level-11 of Pay Matrix (pre-revised pay scale of Rs. 15600-39100/- with a Grade Pay of Rs. 6600/-,",
+      "description": "Recruitment 2023-02-22"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/851",
+      "title": "Contract for mechanized housekeeping etc. services for Krishi Bhawan Complex and Shastri Bhawan/Janpath Bhawan (Partial) for the year 22-23- regarding (Eng & Hin).",
+      "description": "Tenders 2023-02-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/499",
+      "title": "Corrigendum, Filling up of three posts of Joint Director (Extension) in Directorate of Extension, Department of Agriculture & Farmers welfare by deputation (ISCT).",
+      "description": "Recruitment 2023-01-31"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/498",
+      "title": "Corrigendum for filling up the post of Joint Director (Farm Information) in the Directorate of Extension under DA & FW-reg.",
+      "description": "Recruitment 2023-01-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/497",
+      "title": "Filling up one (01) post of Assistant Director (Cooperation/Credit) in Level-10 of the Pay Matrix on Deputation (ISTC) basis.",
+      "description": "Recruitment 2023-01-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/495",
+      "title": "Two (02) vacant posts of Additional Commissioner (Crops) on a Deputation (ISTC) basis.",
+      "description": "Recruitment 2023-01-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/494",
+      "title": "Filling up Two (02) vacant post of Assistant Director (Crops) on Deputation (ISTC) basis.",
+      "description": "Recruitment 2023-01-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/493",
+      "title": "Interviews held on 20 and 21st December, 2022 for recruitment of Young Professionals (YP) in G20/IC division DA&FW, Krishi Bhawan, New Delhi",
+      "description": "Recruitment 2023-01-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/474",
+      "title": "Vacancy circular for the two posts of Deputy Commissioner (NRM/RFS)",
+      "description": "Recruitment 2022-12-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/475",
+      "title": "Engagement of retired Govt Officers as Consultant on contract basis under Agriculture Census Division of the Department of Agriculture & Farmers Welfare",
+      "description": "Recruitment 2022-12-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/501",
+      "title": "Filling up of the post of Director in the central institute of Horticulture, Medziphema, Dimapur Distt., Nagaland on a deputation (ISTC) basis, a subordinate office under the Ministry of Agriculture & Farmers Welfare, Department of Agriculture & Farmers Welfare.",
+      "description": "Recruitment 2022-11-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/480",
+      "title": "Advertisement of Engagement of Young Professionals in IC/G20 Division of DA&FW",
+      "description": "Recruitment 2022-11-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/484",
+      "title": "Vacancy Circular for filling up the post of Joint Director (Farm Information) in Directorate of Extension under DA&FW-reg (English & Hindi)",
+      "description": "Recruitment 2022-11-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/482",
+      "title": "The Corrigendum Vacancy Circular for filling up the post of Joint Director (Extension) in Directorate of Extension under DA&FW-reg (English & Hindi).",
+      "description": "Recruitment 2022-11-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/478",
+      "title": "Filling up one post of System Manager in the pay scale of Rs l5500-39100/-with a Grade Pay of Rs.6500/. (PB-3) (Level 11 as per 7th CPC) on deputation(ISTC)basis.",
+      "description": "Recruitment 2022-11-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/476",
+      "title": "Filling up of two posts of Joint Director (Extension) in directorate of Extension, Department of Agriculture & Farmers welfare by deputation (ISTC).",
+      "description": "Recruitment 2022-11-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/479",
+      "title": "The vacancy circular for the post of Technical Assistants on contractual basis for working in the Directorate of Wheat Development, Gurugram under Crops division.",
+      "description": "Recruitment 2022-11-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/485",
+      "title": "Filling up of the post of Assistant Director (OL) in Directorate of Extension, Department of Agriculture & Farmers Welfare by Composite Method (English & Hindi).",
+      "description": "Recruitment 2022-11-10"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/483",
+      "title": "Filling up two (02) posts of Assistant Soil Conservation Officer (NRM/RFS) in Level-10 of the Pay Matrix on Deputation (ISTC) basis",
+      "description": "Recruitment 2022-10-27"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/397",
+      "title": "The vacancy of the post of Research Officer, DASD, Calicut, Kerala.",
+      "description": "Recruitment 2022-10-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/392",
+      "title": "The Post regarding engagement of retired Government officer as Senior Consultant/Consultant.",
+      "description": "Recruitment 2022-10-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/486",
+      "title": "RR to the Various methods of recruitment whether by direct recruitment or by promotion or by deputation/ absorption and the percentage of the vacancies to be filled.",
+      "description": "Recruitment 2022-10-09"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/391",
+      "title": "Filling up the post of Assistant Commissioner (Seeds) on Deputation (Including short term contract) or absorption basis.",
+      "description": "Recruitment 2022-10-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/390",
+      "title": "Filling up the post of Deputy Commissioner (Seeds) on Deputation (Including short-term contract) or absorption basis.",
+      "description": "Recruitment 2022-10-04"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/395",
+      "title": "Filling up one (01) post of Deputy Commissioner (Cooperation/Credit) in Level-12 of the Pay Matrix on Deputation (ISTC) basis - reg.",
+      "description": "Recruitment 2022-09-27"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/892",
+      "title": "Reference e - tender ID No. 2022 DACO 705641_1 for Empanelment ( RFE ) of Audio - Video Production Agencies for production of short audio & video films / jingles / documentary films",
+      "description": "Tenders 2022-09-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/889",
+      "title": "Productions of short video/films/jingles/documentary Tender",
+      "description": "Tenders 2022-09-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/412",
+      "title": "Filling up of the post of Assistant Director (OL) in Directorate of Extension, Department of Agriculture & Farmers Welfare (English & Hindi).",
+      "description": "Recruitment 2022-08-23"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/408",
+      "title": "The post of Deputy Commissioner (Crops) on Deputation or Absorption basis",
+      "description": "Recruitment 2022-08-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/905",
+      "title": "The tender document for Empanelment of Audio-Video Production Agencies for production of short audio & video films/ jingles/ documentary films on 08.08.2022 at CPP portal",
+      "description": "Tenders 2022-08-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/418",
+      "title": "Uploading of vacancy circular for the post of Additional Commissioner(NRM/RFS)-reg.",
+      "description": "Recruitment 2022-08-03"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/405",
+      "title": "vacancy circular for the post of Deputy Commissioner(NRM/RFS)-reg.",
+      "description": "Recruitment 2022-07-29"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/421",
+      "title": "Uploading of vacancy circular for the post of Assistant Soil Conservation Officer(NRM/RFS)-reg.",
+      "description": "Recruitment 2022-07-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/419",
+      "title": "Filling up the post of Assistant Director (Crops) on deputation (Including short term contract) basis.",
+      "description": "Recruitment 2022-07-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/477",
+      "title": "Filling up three (03) posts of Additional Commissioner (NRM/RFS) in Level-13 of the Pay Matrix on Deputation (ISTC) basis",
+      "description": "Recruitment 2022-07-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/844",
+      "title": "Award for contract of repair of electric appliances in the Commission",
+      "description": "Tenders 2022-04-21"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/439",
+      "title": "one vacant post of Library & Information Assistant (earmarked for UR- Deaf and Hard of Hearing Disability) in Level-6",
+      "description": "Recruitment 2022-03-23"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/440",
+      "title": "Two (02) posts of Deputy Agricultural Marketing Adviser (Group - III) in Directorate of Marketing & Inspection, an Attached Office under Department of Agriculture & Farmers Welfare, on deputation (including short term contract) -reg.",
+      "description": "Recruitment 2022-03-21"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/899",
+      "title": "TENDER FOR HIRING OF AN AGENCY FOR PROVIDING MONKEY HANDLERS TO DRIVE AWAY MONKEYS MENACE IN AND AROUND KRISHI BHAWAN NEW DELHI",
+      "description": "Tenders 2022-03-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/441",
+      "title": "Vacancy circular for the post of Director (Farm Information) on deputation basis-reg (English & Hindi).",
+      "description": "Recruitment 2022-03-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/442",
+      "title": "Advertisement for recruitment of Young professionals in Agri Trade Division",
+      "description": "Recruitment 2022-03-15"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/438",
+      "title": "Advertisement for the One (01) posts of Staff Car Driver (Gr.-II) (English & Hindi).",
+      "description": "Recruitment 2022-03-02"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/437",
+      "title": "Advertisement for the One (01) posts of Stenographer (Gr.-I) (English & Hindi).",
+      "description": "Recruitment 2022-02-28"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/450",
+      "title": "Filling up of two posts of Member (Non-Official) in Commission for Agricultural Costs & Prices (CACP) on contract basis -reg.",
+      "description": "Recruitment 2022-02-24"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/446",
+      "title": "Fill up the post of Director in Central Institute of Horticulture, Medziphema, Dimapur Distt., Nagaland on deputation (ISTC) basis, a subordinate office under Ministry of Agriculture & Farmers Welfare",
+      "description": "Recruitment 2022-02-22"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/443",
+      "title": "vacancy circulars for the post of Private Secretary & Economic Officer on deputation basis in CACP",
+      "description": "Recruitment 2022-02-17"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/447",
+      "title": "Vacancy circular for post of Asstt. Accounts Officer in DoE & DA&FW website - reg (English & Hindi).",
+      "description": "Recruitment 2022-02-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/452",
+      "title": "Filling up one post of Chief Seed Analyst, National Seeds Research and Training Centre (NSRTC), Varanasi, (Uttar Pradesh) a subordinate office under the Department of Agriculture and Farmers Welfare",
+      "description": "Recruitment 2022-02-10"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/448",
+      "title": "vacancy circular for the post of Extension officer under Department of Agriculture and Farmers Welfare-reg (English & Hindi).",
+      "description": "Recruitment 2022-02-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/453",
+      "title": "Filling up of the post of Registrar -General (Level-15), Protection of Plant Varieties and Farmers Rights Authority, New Delhi",
+      "description": "Recruitment 2022-01-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/454",
+      "title": "Vacancy circular for filling up of one post of Chief Soil Survey Officer CSSO, Group-A, Gazetted, Level-13 of Pa Matrix in Soil and Land Use Survey of India, HQ Office",
+      "description": "Recruitment 2022-01-10"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/449",
+      "title": "Vacancy Circular for Filling up the post of Law Officer in the Dte. of PPQ&S, Faridabad on Deputation basis.",
+      "description": "Recruitment 2022-01-10"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/456",
+      "title": "Engagement of retired Central Government employees as Consultants - Reg",
+      "description": "Recruitment 2021-12-13"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/870",
+      "title": "ENGAGEMENT OF REGISTRAR - FOR DISINVESTMENT OF PAID UP EQUITY OF UP TO 25% OF NATIONAL SEEDS CORPORATION LIMITED (NSC)",
+      "description": "Tenders 2021-11-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/867",
+      "title": "ENGAGEMENT OF ADVERTISING AGENCY - FOR DISINVESTMENT OF UP TO 25% PAID UP EQUITY OF NATIONAL SEEDS CORPORATION LIMITED (NSC)",
+      "description": "Tenders 2021-11-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/455",
+      "title": "Filling up one post of Library and Information Assistant in Central Fertilizer Quality Control & Training Institute Faridabad",
+      "description": "Recruitment 2021-11-22"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/458",
+      "title": "Vacancy Circular for the post of Economic Officer in the Commission for Agricultural Costs and Prices, Department of Agriculture & Farmers Welfare, on deputation basis",
+      "description": "Recruitment 2021-10-08"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/459",
+      "title": "Advertisement for the post of Assistant Library and Information Officer (English & Hindi).",
+      "description": "Recruitment 2021-09-28"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/901",
+      "title": "Tender notice LA - NSC",
+      "description": "Tenders 2021-08-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/869",
+      "title": "ENGAGEMENT OF LEGAL ADVISOR FOR DISINVESTMENT OF NSC",
+      "description": "Tenders 2021-08-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/868",
+      "title": "ENGAGEMENT OF BOOK RUNNING LEAD MANAGERS FOR DISINVESTMENT OF NSC",
+      "description": "Tenders 2021-08-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/457",
+      "title": "Vacancy for the post of Chief Knowledge Officer at National Farmers Welfare Program Implementation Society",
+      "description": "Recruitment 2021-03-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/460",
+      "title": "Recruitment for one (01) post of Agricultural Engineer (Instrumentation)in Farm Machinery Training & Testing Institute",
+      "description": "Recruitment 2020-05-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/492",
+      "title": "The 10 Nos vacancy of Young Professionals in the National Horticulture Board (NHB) purely on a Contract basis for a period of one year.",
+      "description": "Recruitment 2020-05-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/487",
+      "title": "Filling up of the post of Director to be filled up by composite method: Deputation (including short-term contract)/ promotion in the Directorate of Cashewnut & Cocoa Development, Kochi, Kerala, a subordinate office under Ministry of Agriculture & Farmers Welfare, Department of Agriculture & Farmers ",
+      "description": "Recruitment 2020-05-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/463",
+      "title": "Rolling advertisement for recruitment of YPs",
+      "description": "Recruitment 2020-03-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/462",
+      "title": "Vacancy Circular for filling up three (03) vacancies of Office Superintendent Group B, on deputation (including sought term contract) basis in Soil & Land Use Survey of India, a Subordinate office under INM Division DAC & FW- reg.",
+      "description": "Recruitment 2020-03-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/461",
+      "title": "Filling up the post of Director (VAMNICOM), Pune-reg.",
+      "description": "Recruitment 2020-03-05"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/878",
+      "title": "For supplying services of Hindi typists in Ministry of Agriculture & Farmers Welfare, DAC & FW.",
+      "description": "Tenders 2019-09-11"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/465",
+      "title": "Corrigendum for one post of Joint Director (Extension) in Directorate of Extension, Department of Agriculture, Cooperation & Famers Welfare (English & Hindi).",
+      "description": "Recruitment 2019-01-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/464",
+      "title": "Corrigendum for Director (Farm information) in Directorate of Extension, Department of Agriculture, cooperation & Farmers Welfare by composite Method (English & Hindi).",
+      "description": "Recruitment 2019-01-30"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/466",
+      "title": "Withdrawal of Post of Assistant Soil Conservation Officer(NRM / RFS).",
+      "description": "Recruitment 2018-11-26"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/888",
+      "title": "Printing of State of Indian Agriculture 2016-17 of Ministry of Agriculture & Farmers Welfare.",
+      "description": "Tenders 2018-11-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/883",
+      "title": "Notice Inviting Quotations for Security Audit of Websites and Web Applications.",
+      "description": "Tenders 2018-11-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/900",
+      "title": "Tender for Procurement of GC-MS/MS with Triple Quadrupole System and HPCL - MS/MS Triple Quadrupole System.",
+      "description": "Tenders 2018-08-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/887",
+      "title": "Printing of Agricultural Statistics at a Glance and Pocket Book of Agricultural Statistics 2017 of Ministry of Agriculture & Farmers Welfare.",
+      "description": "Tenders 2018-08-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/467",
+      "title": "Cancellation of Filling up one post of Additional Commissioner(Crops) in DAC&FW in Level-13 of the Pay Matrix (Rs.118500-214100/-) on deputation (ISTC) basis.(Last Date -15Nov17).",
+      "description": "Recruitment 2017-09-16"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/913",
+      "title": "Guidelines: National Agriculture Market (e-NAM)",
+      "description": "Guidelines 2016-10-04"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/914",
+      "title": "Guidelines: Soil Health Card and Soil Fertility Scheme",
+      "description": "Guidelines 2016-09-01"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/915",
+      "title": "Guidelines: Pradhan Mantri Krishi Sinchayee Yojana (PMKSY)",
+      "description": "Guidelines 2016-05-06"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/916",
+      "title": "Guidelines: Organic Farming (Jaivik Kheti)",
+      "description": "Guidelines 2015-05-18"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/917",
+      "title": "Guidelines: Direct Benefit Transfer (DBT) in Agriculture",
+      "description": "Guidelines 2014-05-12"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/918",
+      "title": "Guidelines: AGMARKNET",
+      "description": "Guidelines 2014-03-14"
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/PUBLICNOTICE_18032026.pdf",
+      "title": "Alert: CAUTION AGAINST FRAUDULENT RECRUITMENT – Click here to read more (opens external website)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Fake_Letter_02032026.pdf",
+      "title": "Alert : Official Website Disclaimer & Public Advisory (PDF, 391 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/3",
+      "title": "Advisory on fall armyworm management in maize",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/about/whos-who?q=Shivraj",
+      "title": "Shri Shivraj Singh ChouhanHon'ble Union Minister",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/about/whos-who?q=Ramnath",
+      "title": "Shri Ramnath ThakurHon'ble Minister of State",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/about/whos-who?q=Bhagirath",
+      "title": "Shri Bhagirath ChoudharyHon'ble Minister of State",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/data-dashboards",
+      "title": "Agriculture Statistics: Data, reports and publications",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge?type=Guidelines",
+      "title": "Guidelines & Circulars: Official orders and documents",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/pages/grievance",
+      "title": "Contact / Grievance: Get in touch and lodge a grievance",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/MSP_RabiCrops_RMS_2027_28.pdf",
+      "title": "Minimum Support Prices (MSPs) of Rabi Crops for Rabi Marketing Season (RMS) 2027-28\n (PDF, 280 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/RR_JD_extension_19082026.pdf",
+      "title": "Invitation of comments on draft RRs for the posts of Joint Director (Farm Information), Joint Director (Extension) and Joint Director (Women’s Programme) in the Directorate of Extension, DAFW – regarding (PDF, 167.00 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/Amended_RR_StenoGr_17082026.pdf",
+      "title": "Inviting comments of all stakeholders on draft amended Recruitment rules for the post of Stenographer Gr.I (Sub-Office Cadre) in the Directorate of Marketing & Inspection under Department of Agriculture and Farmers Welfare. (PDF, 1.49 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/DAFW_EOI_MSP_29062026.pdf",
+      "title": "Expression of Interest (EoI) for Selection of a Managed Service Provider (MSP) for providing Cloud Services to DAFW for hosting its applications/ websites (PDF, 2.51 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/NC_KharifCampaign_2026.pdf",
+      "title": "National Conference on Agriculture for Kharif Campaign 2026 (PDF, 2.29 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Kharif_2026_27_En.pdf",
+      "title": "Minimum Support Prices (MSPs) of Kharif Crops for Kharif Marketing Season (KMS) 2026-27. (PDF, 438 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/DAFW_AnnualReport_2025_26_En.pdf",
+      "title": "Annual Report 2025-2026 (PDF, 113.00 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/English_Notification_0.pdf",
+      "title": "Minimum Support Price of Raw Jute for 2026-27 Season (PDF, 713.58 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Stenographer_Gr_I_recruitment_extension_of_last_date_0.pdf",
+      "title": "Recruitment of Three Posts of Stenographer Grade-I Group  B  Non-Gazetted Sub Office Cadre to be filled on deputation (Including short-term contract) in the Level-6 in pay matrix (as per 7th CPC) {Pre-revised Pay Band-2 (Rs. 9300-34800/-) with Grade Pay of Rs. 4200/-} in the Directorate of Marketing",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Inviting_Comments_on_the_draft_Pesticides_Management_Bill_2025_0.pdf",
+      "title": "Inviting Comments on the draft Pesticides Management Bill, 2025 (PDF, 1.62 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/English_Notification_Copra_2026_Season_0.pdf",
+      "title": "Minimum Support Prices (MSP) of Copra for 2026 Season (PDF, 348.72 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/circular_0.pdf",
+      "title": "Recruitment  regarding engagement of two young professionals on contract basis for a period of one year in Non Chemical Fertilizer Section, INM Division. (PDF, 1.71 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/recruitment_admin_031225.pdf",
+      "title": "Recruitment of Three Posts of Stenographer Grade-I Group 'B' Non-Gazetted Sub Office Cadre to be filled on deputation (Including short-term contract) in the Level-6 in pay matrix (as per 7th CPC) {Pre-revised Pay Band-2 (Rs. 9300-34800/-) (PDF, 2.93 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/ToriaNotification_2026_27_Eng_24112025.pdf",
+      "title": "Minimum Support Price (MSP) of Toria for Rabi Marketing Season (RMS) 2026-27. (PDF, 230 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Checklist_for_FCO_13112025.pdf",
+      "title": "Checklist for consideration of New Chemical Fertilizers in FCO (PDF, 471 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/SeedsBill_12112025_merged.pdf",
+      "title": "Pre-legislative consultation on Seeds Bill, 2025 (PDF, 15.80 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/English_Notification_MSP_09102025.pdf",
+      "title": "Minimum Support Prices (MSPs) of Rabi Crops for Rabi Marketing Season (RMS) 2026-27. (PDF, 385 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Draft_RRs_MII(Eco)_for_NIC_0.pdf",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Market Intelligence Inspector (Economics) in Department of Agriculture and Farmers Welfare (PDF, 1.73 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/PIB2145147.pdf",
+      "title": "Cabinet approves the Prime Minister Dhan-Dhaanya Krishi Yojana (PDF, 70 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/EOI/EOI_CottonMustardGramPilotStudy_DAFW_Final.pdf",
+      "title": "Invitation for Expression of Interest for \"Gram Panchayat (GP) level Crop Yield Estimation Using Technology for selected crops in 2025-26 (PDF, 1.02 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/VacancyCircular_NFPWIS.pdf",
+      "title": "Filling up of Thirteen (13) posts on Deputation (ISTC) basis on National Farmers Welfare Program Implementation Society (NFWPIS) (PDF, 716 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/MSP_Notification_KMS_2025_26_En.pdf",
+      "title": "Minimum Support Prices (MSP) of Kharif Crops for Kharif Marketing Season (KMS) 2025-26. (PDF, 630 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/NCONE_INM_merged_0.pdf",
+      "title": "Vacancies For Stenographer Grade C and D examination, 2025 (PDF, 36.5 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Cabinetapproves_MISS_2025_26.pdf",
+      "title": "Cabinet approves continuation of Modified Interest Subvention Scheme (MISS) for FY 2025-26 with existing 1.5% Interest Subvention (IS) (PDF, 160 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/EOI/EOI_CROPIC_04062025.pdf",
+      "title": "Invitation for Expression of Interest for Collection of Real Time Observations and Photo of Crops (CROPIC) (PDF, 980 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/RR_Amendmentproposal_ALIO_LIA.pdf",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of (i) Assistant Library and Information Officer and (ii) Library and Information Assistant in the Department of Agriculture and Farmers Welfare (PDF, 2.90 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/NMNF_CRG_Notification_13052025.pdf",
+      "title": "Competitive Research Grant Notification on NMNF (PDF, 313 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/AR_Eng_2024_25.pdf",
+      "title": "Annual Report 2024-25 (PDF, 6.44 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Minutesofmeeting_vacancy_170325.pdf",
+      "title": "Minutes of Meeting of Departmental Standing Committee held on 06-09-2024 and 14-11-2024 to consider cases for appointment on compassionate ground against vacancy year 2018, 2019 and 2020. (PDF, 9.55 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/DraftRRs_DespatchRider_130325.pdf",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Despatch Rider in Department of Agriculture and Farmers Welfare. (PDF, 970 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/DraftRRs_DespatchRider_060325.pdf",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Despatch Rider in Department of Agriculture and Farmers Welfare. (PDF, 970 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/SCD_DraftRRs_060325.pdf",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Staff Car Driver (Ordinary Grade) in Department of Agriculture and Farmers Welfare. (PDF, 231 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Jute_2025_26_En.pdf",
+      "title": "Minimum Support Price of Raw Jute for 2025-26 Season (PDF, 341 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Guideline_NMNF_V2_10022025_Revised.pdf",
+      "title": "Revised Guidelines of National Mission on Natural Farming (PDF, 837 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Torianotification_English_27122024.pdf",
+      "title": "Minimum Support Price (MSP) of Toria for Rabi Marketing Season (RMS) 2025-26 (PDF, 267 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/GuidelineofNMNF_FinalApproved_27122024.pdf",
+      "title": "Final Approved Guidelines for National Mission on Natural Farming. (PDF, 480 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/EOI/EoI_F_19122014_Corrigendum.pdf",
+      "title": "(Corrigendum) The National Farmers Welfare Program Implementation Society (NFWPIS) registered under Society registration Act,1860, which is under administration control of Ministry of Agriculture & Farmers Welfare. NFWPIS is operational at 4th & 6th Floor, Plant Authority Bhawan (PAB), PUSA, New Del",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/EOI/EoI_F_06122014.pdf",
+      "title": "(EOI) The National Farmers Welfare Program Implementation Society (NFWPIS) registered under Society registration Act,1860, which is under administration control of Ministry of Agriculture & Farmers Welfare. NFWPIS is operational at 4th & 6th Floor, Plant Authority Bhawan (PAB), PUSA, New Delhi-12 , ",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/DraftRRs_EconomicOfficer_03122024.pdf",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Economic Officer in Department of Agriculture and Farmers Welfare (PDF, 2.18 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/DrafRRs_TC_Eco_02122024.pdf",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Technical Clerk (Economics) in the Department of Agriculture and Farmers Welfare (PDF, 1.56 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Draft_National_Policy_framework_AgriMarketing_25112024.pdf",
+      "title": "Draft National Policy Framework on Agricultural Marketing – public\r\ncomments /suggestions regarding. (PDF, 1.75 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/CORRIGENDUM_final_0.pdf",
+      "title": "Corrigendum1 for the Request for Expressions of Interest (EoI) for a cloud-based APM tool (PDF, 566 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Time_Series_1stAE_2024_25_Eng.pdf",
+      "title": "First Advance Estimates of Production of Foodgrains, Oilseeds and other Commercial Crops for the 2024-25 (Kharif only) (PDF, 256 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/EOI_APM_DA_FW_24102024.pdf",
+      "title": "Request for Expression of Interest EOI (PDF, 566 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/rrta_0.pdf",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules of Technical Assistant (Economics) in Department of Agriculture and Farmers Welfare (PDF, 1.69 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Coffee_Table_book_New_Colour_01_05_2024.pdf",
+      "title": "Compendium on Artificial Intelligence (AI) & Digital Agriculture (PDF, 83.3 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/1033_0.pdf",
+      "title": "Filling up of one (01) post of Member (Official) in the Commission for Agricultural Costs & Prices- (Eng & Hindi) (CACP) under DA&FW (PDF, 4.23 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/Draft_RRs_Scheme_Officer_0.pdf",
+      "title": "Inviting comment/suggestions of all stakeholders on draft Recruitment Rules of Scheme Officer in Department of Agriculture and Farmers Welfare. (PDF, 900 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/cacp_memberOfficial_23092024.pdf",
+      "title": "Filling up of one (01) post of Member (Official) in the Commission for Agricultural Costs & Prices (CACP) under DA&FW (PDF, 1.69 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/Extension_of_date_0.pdf",
+      "title": "Extension of date of filling up 01 post of Member Secretary in CACP (PDF, 471 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Final_Coffee%20_Table_Book_10_04_2024.pdf",
+      "title": "Compendium on Digital Agri Initiatives (PDF, 76.8 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/AR_English_2023_24.pdf",
+      "title": "Annual Report 2023-2024 (PDF, 21.9 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/English_Notification_for_Website_0.pdf",
+      "title": "Minimum Support Prices (MSP) of Kharif Crops for Kharif Marketing Season (KMS) 2024-25 (PDF, 683.1 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/National_policy_onFPOs_18Jun2024.pdf",
+      "title": "Draft of National  Policy on Farmer Producer Organizations (PDF, 1.42 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/ICC_0.pdf",
+      "title": "The revised Composition of Internal Complaint Committee (ICC) for prevention of Sexual Harassment of Women. (PDF, 3.32 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Draft_RRs_of_Credit_Division_published_for_30_days_0.pdf",
+      "title": "Inviting comments/suggestions of all stakeholders on draft Recruitment Rules in respect of technical posts of Credit Division, Department of Agriculture and Farmers Welfare (Proper).Reg (PDF, 671.48 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/MOA_PIN01_Millets_Booklet_Final_(24_Nov_2023)_Web_Version_0.pdf",
+      "title": "G20 OUTCOME DOCUMENTS (PDF, 19.42 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Nursery_accreditation_2_0.pdf",
+      "title": "Accreditation Protocol for Agroforestry Nurseries (PDF, 13.98 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Framework_for_Voluntary_Carbon_Market_1_Feb_2024_Revised_compressed_0.pdf",
+      "title": "Framework for Voluntary Carbon Market in Agriculture Sector (PDF, 11.2 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Concept_note_on_promoting_farmers_for_storage_and_eNWR_trade_via_eNAM_Uploading_0.pdf",
+      "title": "Concept Note to promote farmers for storage & eNWR trade via eNAM & other e-trading platforms - PM Kisan Bhai Scheme- Comments / Inputs -regards. (PDF, 1.45 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/English_MSP_0.pdf",
+      "title": "Minimum Support Price (MSP) for Rabi Crops for Marketing Season 2024-25 (PDF, 1.67 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Image_100_0.pdf",
+      "title": "Selection for the post of Chairman cum Managing Director, National Seeds corporation Ltd. - a schedule  B - Miniratna. (PDF, 297.82 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Notification_for_Website_English_2.pdf",
+      "title": "Minimum Support Prices (MSP) for Kharif Crops for Marketing Season 2023-24 (PDF, 1.9 MB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/Notification_English_Jute_2023_24.pdf",
+      "title": "Notification Price Policy for Raw Jute for 2023-24 season-Fixation of Minimum Support Price of Raw Jute for 2023-24 season. (PDF, 670.91 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/HomeWhatsNew/English_Notification_for_Website_(1).pdf",
+      "title": "MINIMUM SUPPORT PRICES (MSP) FOR RABI CROPS FOR RABI MARKETING SEASON (RMS) 2023-24 (PDF, 928.58 KB, opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge",
+      "title": "For Media",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/",
+      "title": "Home",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/AIF_Guidelines_Hindi_12Jun24.pdf",
+      "title": "Download signed PDF (495 KB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/EOI/COE_EOI_20042026.pdf",
+      "title": "Download signed PDF (6.6 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/operational_guidelines_pmfby_2023.pdf",
+      "title": "Download signed PDF (3.3 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/EOI_YES_TECH_0.pdf",
+      "title": "Download signed PDF (861 KB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/Filling_up_one_post_of_Senior_Administrative_Officer_in_NCONF.pdf",
+      "title": "Download signed PDF (2.5 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/Circular_YP(IT)_dated__0.pdf",
+      "title": "Download signed PDF (6.6 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/Corrigendum_dated_for_extension_of_submission_of_do_0.pdf",
+      "title": "Download signed PDF (186 KB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/Corrigendum_for_empanelment_12092023_0.pdf",
+      "title": "Download signed PDF (211 KB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/Clouds_MSP_08092026.pdf",
+      "title": "Download signed PDF (841 KB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/3rd_Extension_EOI_Cloud%20Services_19082026.pdf",
+      "title": "Download signed PDF (3.0 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/2ndExtension_EoI_Cloud%20Services_03082026.pdf",
+      "title": "Download signed PDF (2.7 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/2",
+      "title": "Rabi 2026-27 crop insurance: last date for enrolment notified by States",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/4",
+      "title": "RKVY: second instalment released to States for 2026-27",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/8",
+      "title": "Press release: Union Minister reviews Kharif procurement preparedness",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge/documents/10",
+      "title": "Minutes: National Conference on Agriculture for Rabi Campaign",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Print_English_Pulses_guidelines_16_6_26.pdf",
+      "title": "Download signed PDF (55.2 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/Corrigendum_II_23032026.pdf",
+      "title": "Download signed PDF (970 KB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/tender_glancePocketB.pdf",
+      "title": "Download signed PDF (536 KB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/List_of_kins_for_compassionate_appointment_2026_0.pdf",
+      "title": "Download signed PDF (875 KB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/EOI_Corrigendum_III_0.pdf",
+      "title": "Download signed PDF (2.2 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/EOICorrigendumII_Pulses.pdf",
+      "title": "Download signed PDF (2.0 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/Corrigendum_EoI_Pulses_Mission_2.pdf",
+      "title": "Download signed PDF (1.8 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/PrivateSecretary_CACP_180826.pdf",
+      "title": "Download signed PDF (1.8 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/PS_0.pdf",
+      "title": "Download signed PDF (1.8 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/Filling_up_one_post_of_at_FMTTIs_reg_0.pdf",
+      "title": "Download signed PDF (2.4 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Recruitment/Dy_AMA_2_POSTS_0.pdf",
+      "title": "Download signed PDF (1.7 MB) (opens in a new tab)",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/knowledge?type=States",
+      "title": "States",
+      "description": ""
+    },
+    {
+      "url": "https://agriwelfare.gov.in/Documents/Tender/CorrigendumRFPMap.pdf",
+      "title": "Download signed PDF (1.2 MB) (opens in a new tab)",
+      "description": ""
+    }
+  ]
+}

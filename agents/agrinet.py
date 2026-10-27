@@ -38,6 +38,10 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
     """Get the system prompt for the agrinet agent."""
     deps = ctx.deps
     lang_code = deps.lang_code if deps.lang_code else 'en'
+    if deps.capabilities.policy.allowed_tools == frozenset({'research_agriwelfare'}):
+        return get_prompt('agriwelfare_website', context={
+            'language': lang_code, 'today_date': get_today_date_str(),
+        })
     scheme_block = format_vector_schemes_prompt_block()
     context = {
         'today_date': get_today_date_str(),
