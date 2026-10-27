@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.15'
       - name: Check localized PMFBY instructions
         run: python -m unittest discover -s tests -p test_prompt_language_contract.py
 
@@ -26,12 +26,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.15'
       - name: Install isolated feature-test dependencies
         run: >-
-          python -m pip install pytest pytest-cov pydantic-ai-slim==1.32.0
+          python -m pip install pytest pytest-cov pydantic-ai-slim==1.32.0 pydantic==2.14.1
           httpx==0.28.1 python-dateutil==2.9.0.post0 pytz python-dotenv
-          Jinja2==3.1.6 rapidfuzz
+          Jinja2==3.1.6 rapidfuzz==3.14.6
       - name: Check KCC and mandi behavior
         run: >-
           python -m pytest -q tests/test_kcc.py tests/test_mandi.py
