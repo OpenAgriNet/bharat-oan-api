@@ -8,18 +8,26 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     supervisor \
     gcc \
+    g++ \
+    libyaml-dev \
     python3-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better Docker layer caching
-COPY requirements.lock .
+COPY requirements.lock requirements-build.lock ./
 
 # Add pip index
 RUN pip config set global.index-url https://pypi.org/simple
 
-# Install the complete lock, including the explicitly selected CPU-only Torch wheel.
-RUN python3 -m pip install --no-cache-dir --only-binary=:all: --require-hashes -r requirements.lock
+# Hash-lock build tools before disabling isolation for the two source builds.
+RUN python3 -m pip install --no-cache-dir --only-binary=:all: --require-hashes -r requirements-build.lock
+# These two packages do not publish CPython 3.15 wheels yet.
+RUN python3 -m pip install --no-cache-dir --no-build-isolation \
+    --only-binary=:all: --no-binary=marisa-trie,pyyaml \
+    --require-hashes -r requirements.lock
+RUN python3 -m pip check && python3 -c \
+    "import marisa_trie, pandas, pydantic, rapidfuzz, zope.interface; from yaml import CLoader; from langcodes import Language; assert Language.get('hi').display_name('en') == 'Hindi'"
 
 # Bake E5 embedding model into the image (avoids HuggingFace download on first search_schemes call)
 ARG HF_TOKEN=

@@ -6,13 +6,26 @@ Use **Python 3.15** for the API, IMD agromet loader, and prompt-contract CI.
 The Docker dependency lock targets Linux amd64 and uses a CPython 3.15
 CPU-only Torch wheel. `psycopg2-binary` is pinned to 2.9.13 for Python 3.15 wheels.
 
-The runtime upgrade updated these wheel pins and published hashes without
-installing packages locally. Full dependency resolution and image validation
-on Python 3.15 are still required before deployment. To regenerate the lock
-in an environment where downloads are allowed:
+Python 3.15 wheels require pandas 3.1.0, pydantic 2.14.1 with pydantic-core
+2.50.1, rapidfuzz 3.14.6, and zope-interface 8.7. The lock includes their
+published Linux amd64 wheel hashes.
+
+`marisa-trie==1.4.1` (used by language-data) and `PyYAML==6.0.3` do not publish
+Python 3.15 wheels. Docker permits source builds **only for these two packages**,
+using their existing locked source hashes, C++/libyaml system headers, and the
+hash-locked tools in `requirements-build.lock`. Build isolation is disabled so
+pip cannot silently install unpinned build tools. All other packages remain
+binary-only, and `--require-hashes` remains enabled for both install steps.
+Docker runs `pip check` and a native-import/language-data smoke check before
+downloading the embedding model.
+
+Published artifact metadata was checked without installing packages locally.
+The Python 3.15 source builds and image smoke check still must pass in CI before
+deployment. To regenerate the application lock where downloads are allowed
+(do not pass `--only-binary=:all:`, since these two source builds are required):
 
 ```sh
-uv pip compile requirements-docker.in --generate-hashes --only-binary :all: --python-version 3.15 --python-platform x86_64-manylinux_2_28 --default-index https://pypi.org/simple -o requirements.lock
+uv pip compile requirements-docker.in --generate-hashes --python-version 3.15 --python-platform x86_64-manylinux_2_28 --default-index https://pypi.org/simple -o requirements.lock
 ```
 
 ## PM-KISAN registration validation
