@@ -1,5 +1,20 @@
 # bharat-oan-api
 
+## Python runtime
+
+Use **Python 3.15** for the API, IMD agromet loader, and prompt-contract CI.
+The Docker dependency lock targets Linux amd64 and uses a CPython 3.15
+CPU-only Torch wheel. `psycopg2-binary` is pinned to 2.9.13 for Python 3.15 wheels.
+
+The runtime upgrade updated these wheel pins and published hashes without
+installing packages locally. Full dependency resolution and image validation
+on Python 3.15 are still required before deployment. To regenerate the lock
+in an environment where downloads are allowed:
+
+```sh
+uv pip compile requirements-docker.in --generate-hashes --only-binary :all: --python-version 3.15 --python-platform x86_64-manylinux_2_28 --default-index https://pypi.org/simple -o requirements.lock
+```
+
 ## PM-KISAN registration validation
 
 Registration numbers contain two letters followed by nine digits (11 characters,
