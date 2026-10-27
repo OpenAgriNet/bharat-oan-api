@@ -41,15 +41,6 @@ from agents.tools.kcc import (
     check_kcc_application_status,
     select_kcc_application,
 )
-from agents.tools.khc import (
-    initiate_khc_otp,
-    verify_khc_otp,
-    lookup_khc_reference,
-    find_khc_location,
-    get_khc_grievance_options,
-    check_khc_grievance_status,
-    register_khc_grievance,
-)
 from agents.tools.terms import search_terms
 from agents.tools.search import (
     search_documents,
@@ -59,7 +50,6 @@ from agents.tools.search import (
 )
 from agents.tools.advisory import search_advisory
 from agents.tools.weather import weather_forecast
-from agents.tools.imd_advisory import imd_agromet_advisory
 from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
 from agents.tools.maps import reverse_geocode, forward_geocode
@@ -73,12 +63,6 @@ from agents.tools.sathi_seed import (
     search_sathi_seed_availability,
 )
 from agents.tools.npss import analyze_crop_image
-from agents.tools.agristack import (
-    get_agristack_farmer_location,
-    get_agristack_farmer_crops,
-    get_agristack_farmer_profile,
-    only_with_agristack_consent,
-)
 
 TOOLS = [
     Tool(
@@ -197,48 +181,13 @@ TOOLS = [
         strict=False,
     ),
     Tool(
-        check_khc_grievance_status,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        initiate_khc_otp,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        verify_khc_otp,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        lookup_khc_reference,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        find_khc_location,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        get_khc_grievance_options,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        register_khc_grievance,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
         search_terms,
         takes_ctx=False,
         strict=False,
     ),
     Tool(
         search_documents,
-        takes_ctx=True,
+        takes_ctx=False,
         strict=False,
     ),
     Tool(
@@ -258,7 +207,7 @@ TOOLS = [
     ),
     Tool(
         search_pests_diseases,
-        takes_ctx=True,
+        takes_ctx=False,
         strict=False,
     ),
     Tool(
@@ -278,7 +227,7 @@ TOOLS = [
     ),
     Tool(
         forward_geocode,
-        takes_ctx=True,
+        takes_ctx=False,
         strict=False,
     ),
     Tool(
@@ -313,30 +262,6 @@ TOOLS = [
     ),
     Tool(
         analyze_crop_image,
-        takes_ctx=True,
-        strict=False,
-    ),
-    # Hidden from the model unless the farmer logged in with AgriStack and gave consent.
-    Tool(
-        get_agristack_farmer_location,
-        takes_ctx=True,
-        strict=False,
-        prepare=only_with_agristack_consent,
-    ),
-    Tool(
-        get_agristack_farmer_crops,
-        takes_ctx=True,
-        strict=False,
-        prepare=only_with_agristack_consent,
-    ),
-    Tool(
-        get_agristack_farmer_profile,
-        takes_ctx=True,
-        strict=False,
-        prepare=only_with_agristack_consent,
-    ),
-    Tool(
-        imd_agromet_advisory,
         takes_ctx=True,
         strict=False,
     ),

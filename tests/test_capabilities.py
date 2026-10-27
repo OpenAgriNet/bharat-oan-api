@@ -65,22 +65,6 @@ def test_lazy_loading_returns_original_instructions(prompt_file):
     assert deps.capabilities.visible == ALL_TOOLS
 
 
-@pytest.mark.parametrize('prompt_file', PROMPTS)
-@pytest.mark.parametrize('preloaded', [None, frozenset()])
-def test_status_routing_gate_is_present_before_any_capability_is_loaded(prompt_file, preloaded):
-    from agents.tools.khc import khc_service_note
-
-    env = Environment(loader=FileSystemLoader(PROMPT_DIR), autoescape=False)
-    deps = deps_for(preloaded=preloaded)
-    prompt = env.get_template(f'{prompt_file}.md').render(
-        **capability_prompt_context(deps, prompt_file, CONTEXT)
-    ) + capability_routing(deps) + khc_service_note([])
-    assert "## Grievance status routing" in prompt
-    assert "Could you please tell me which scheme or service your grievance is with?" in prompt
-    assert "Do not show any service source label while clarifying the route" in prompt
-    assert "This gate overrides generic grievance tool-table entries" in prompt
-
-
 def test_allowlist_and_configuration(monkeypatch):
     with pytest.raises(ValueError):
         ToolPolicy(allowed_tools={'typo'})

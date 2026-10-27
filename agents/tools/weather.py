@@ -16,7 +16,6 @@ from dotenv import load_dotenv
 from langfuse import observe
 from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
-from agents.tools.imd_advisory import agromet_note
 from helpers.langfuse_tracing import lf_update_current_observation
 
 load_dotenv()
@@ -414,7 +413,7 @@ async def weather_forecast(
         logger.info("Weather API response OK")
         data = response.json()
         weather_response = WeatherResponse.model_validate(data)
-        return str(weather_response) + await agromet_note(ctx, latitude, longitude)
+        return str(weather_response)
                 
     except httpx.TimeoutException:
         logger.error("Weather API request timed out")

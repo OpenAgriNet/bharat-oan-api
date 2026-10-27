@@ -8,10 +8,6 @@ from typing import Optional, Any, Tuple
 from urllib.parse import urlparse
 from pydantic import BaseModel, field_validator
 from langfuse import observe
-from pydantic_ai.tools import RunContext
-
-from agents.deps import FarmerContext
-from agents.tools.chat_place import remember_place
 from helpers.utils import get_logger
 
 logger = get_logger(__name__)
@@ -123,7 +119,7 @@ async def locate(place_name: str) -> Optional[Tuple[Location, Optional[str]]]:
 
 
 @observe(name="tool:forward_geocode", as_type="tool")
-async def forward_geocode(ctx: RunContext[FarmerContext], place_name: str) -> str:
+async def forward_geocode(place_name: str) -> str:
     """Forward Geocoding to get latitude and longitude from a place name in India.
 
     Args:
@@ -135,9 +131,7 @@ async def forward_geocode(ctx: RunContext[FarmerContext], place_name: str) -> st
     try:
         found = await locate(place_name)
         if found:
-            location, kind = found
-            if location.latitude is not None and location.longitude is not None:
-                await remember_place(ctx.deps.session_id, location.latitude, location.longitude, kind)
+            location, _ = found
             return location._location_string()
         else:
             logger.info(f"No results found for place: {place_name}")
