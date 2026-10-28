@@ -18,6 +18,9 @@ class PmkisanPromptValidationTests(unittest.TestCase):
                     line for line in prompt.splitlines()
                     if line.startswith("**PM-KISAN Registration Number Validation:**")
                 )
+                self.assertNotIn("Before any PM-KISAN tool call", rule)
+                self.assertIn("Only for personal status or grievance requests", rule)
+                self.assertIn("does not apply to scheme information or public release dates", rule)
                 self.assertIn("trim surrounding whitespace", rule)
                 pattern = rule.split("`")[1]
                 for example in ("TN110700729", "TN110698429"):

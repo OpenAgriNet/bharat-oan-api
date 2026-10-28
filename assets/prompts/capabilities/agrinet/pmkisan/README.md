@@ -21,7 +21,7 @@
 The section manifest preserves existing loading conditions. References to other
 workflows inside an instruction do not automatically enable their tools.
 
-The shared installment section is included in all language prompts and loads
-with `search_schemes` under the `schemes` capability, not the personal-status
-`pmkisan` capability. It distinguishes the general release date from a farmer's
-payment status; responses still use the farmer's selected language.
+The shared installment section is included unconditionally in all language
+prompts. Public release-date questions use its configured announcement directly,
+without loading a capability or calling search/status/OTP tools. Personal payment
+status still uses the existing status flow. Responses use the selected language.

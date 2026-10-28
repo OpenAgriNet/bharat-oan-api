@@ -36,18 +36,20 @@ English and Hindi answers use future tense through October 30 (Asia/Kolkata),
 then past tense from October 31, preserving the existing date-based behavior.
 
 - General release-date questions, including "When will the next PM-KISAN
-  installment be released?", use
-  `search_schemes("PM-KISAN 24th installment release date")`, without a
-  registration number or OTP.
+  installment be released?" and "when will pm kisan installement arrivces",
+  are answered directly from the configured prompt announcement. No search,
+  capability loading, registration number, phone number or OTP is needed.
+  A previous status offer or request for identifiers does not turn a release-date
+  question into consent for a personal status check. Do not append a status-check
+  offer or follow-up question to this announcement.
 - "PM Kisan installment status" and personal payment questions retain the
   existing registration-number and OTP status-check flow.
 - All 13 language prompts share the
   [installment instructions](assets/prompts/capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md).
-  They load with the `schemes` capability and `search_schemes`, including in
-  lazy-loading sessions. Answers still use the selected language.
-- Successful PM-KISAN search results include the configured release section
-  before the existing optional status-check offer. Empty or failed searches do
-  not claim a release date; PM-KISAN must be available in the live search catalog.
+  The announcement is present even when no tools or capabilities are loaded.
+  Answers still use the selected language.
+- This routing change is prompt-only; existing search and personal-status tool
+  implementations are unchanged.
 
 Run the isolated, offline checks with the prompt-contract CI dependencies:
 
@@ -56,6 +58,10 @@ python3 -m pytest -q tests/test_pmkisan_installment_release.py \
   tests/test_prompt_language_contract.py tests/test_pmkisan_prompt_validation.py \
   --cov=helpers.pmkisan_installment_release --cov-fail-under=80
 ```
+
+These checks cover search output and the rendered full/lazy prompt rules,
+including restored personal-status capabilities. They do not call a live model;
+recheck the reported conversation after deploying and restarting the API.
 
 ## PM-KISAN registration validation
 

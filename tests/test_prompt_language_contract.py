@@ -26,10 +26,14 @@ class PromptLanguageContract(unittest.TestCase):
             with self.subTest(language=language):
                 text = render(language, today_date="28 October 2026")
                 blocks = [block for block in text.split("\n\n")
-                          if "**PM-KISAN 24th Installment Release**" in block]
+                          if block.startswith("**PM-KISAN 24th installment release date:**")]
                 self.assertEqual(len(blocks), 1)
                 block = blocks[0]
-                self.assertIn('search_schemes("PM-KISAN 24th installment release date")', block)
+                self.assertIn("Do not call search_schemes, load_capability or any status/OTP tool", block)
+                self.assertIn("The 24th installment of PM kisan will release on 30th October 2026.", text)
+                self.assertIn("The 24th installment of PM kisan was released on 30th October 2026.", text)
+                self.assertIn("पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की जाएगी।", text)
+                self.assertIn("पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की गई।", text)
                 self.assertIn("When will the next PM-KISAN installment be released?", block)
                 self.assertIn("No registration number or OTP is needed", block)
                 self.assertIn("30 October 2026", block)
@@ -40,6 +44,22 @@ class PromptLanguageContract(unittest.TestCase):
                 self.assertIn('"PM Kisan installment status"', text)
                 self.assertIn("initiate_pm_kisan_status_check", text)
                 self.assertIn("check_pm_kisan_status_with_otp", text)
+
+    def test_release_routing_is_visible_before_loading_search(self):
+        for language in ["en", *SCRIPT_RANGES]:
+            with self.subTest(language=language):
+                text = render(language, capability_enabled=lambda names: False)
+                block = next(block for block in text.split("\n\n")
+                             if "**Scheme information vs. status request:**" in block)
+                self.assertIn("When will the next PM-KISAN installment be released?", block)
+                self.assertIn("when will pm kisan installement arrivces", block)
+                self.assertIn("A previous status-check offer is not consent", block)
+                self.assertIn("Do not continue a pending request for identifiers", block)
+                self.assertIn("Answer directly from the configured release announcement in this prompt", block)
+                self.assertIn("do not search or load a capability", block)
+                self.assertLess(block.index("**General PM-KISAN release date**"),
+                                block.index("**Direct status request**"))
+                self.assertIn("do not ask for registration number, phone number or OTP", block)
 
     def test_pmfby_safeguards_keep_language_and_tool_arguments(self):
         for language in ["en", *SCRIPT_RANGES]:
