@@ -1,4 +1,4 @@
-"""Guard for localized PMFBY and IMD agromet instructions in rendered language prompts.
+"""Guard for PM-KISAN routing and localized PMFBY/IMD instructions in rendered prompts.
 
 This checks script and identifiers, not translation quality or model behavior.
 """
@@ -16,11 +16,31 @@ SCRIPT_RANGES = {
 }
 
 
-def render(language):
-    return Environment(loader=FileSystemLoader(ROOT / "assets/prompts")).get_template(f"agrinet_{language}.md").render()
+def render(language, **context):
+    return Environment(loader=FileSystemLoader(ROOT / "assets/prompts")).get_template(f"agrinet_{language}.md").render(**context)
 
 
 class PromptLanguageContract(unittest.TestCase):
+    def test_pmkisan_release_date_is_not_personal_status(self):
+        for language in ["en", *SCRIPT_RANGES]:
+            with self.subTest(language=language):
+                text = render(language, today_date="28 October 2026")
+                blocks = [block for block in text.split("\n\n")
+                          if "**PM-KISAN 24th Installment Release**" in block]
+                self.assertEqual(len(blocks), 1)
+                block = blocks[0]
+                self.assertIn('search_schemes("PM-KISAN 24th installment release date")', block)
+                self.assertIn("When will the next PM-KISAN installment be released?", block)
+                self.assertIn("No registration number or OTP is needed", block)
+                self.assertIn("30 October 2026", block)
+                self.assertIn("31 October 2026", block)
+                self.assertIn("28 October 2026", block)
+                self.assertNotIn("or when the next instalment will come", text)
+                self.assertNotIn("23rd", text)
+                self.assertIn('"PM Kisan installment status"', text)
+                self.assertIn("initiate_pm_kisan_status_check", text)
+                self.assertIn("check_pm_kisan_status_with_otp", text)
+
     def test_pmfby_safeguards_keep_language_and_tool_arguments(self):
         for language in ["en", *SCRIPT_RANGES]:
             with self.subTest(language=language):

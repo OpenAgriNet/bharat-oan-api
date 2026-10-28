@@ -17,7 +17,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.15'
-      - name: Install prompt-test dependency
-        run: 'python -m pip install --only-binary=:all: Jinja2==3.1.6'
-      - name: Check localized PMFBY instructions
+      - name: Install prompt and installment test dependencies
+        run: >-
+          python -m pip install --only-binary=:all: Jinja2==3.1.6
+          pytest pytest-cov pydantic-ai-slim==1.32.0 httpx==0.28.1
+          pytz python-dotenv python-decouple
+      - name: Check localized prompt instructions
         run: python -m unittest discover -s tests -p test_prompt_language_contract.py
+      - name: Check PM-KISAN installment and registration flows
+        run: >-
+          python -m pytest -q tests/test_pmkisan_installment_release.py
+          tests/test_pmkisan_prompt_validation.py
+          --cov=helpers.pmkisan_installment_release --cov-fail-under=80

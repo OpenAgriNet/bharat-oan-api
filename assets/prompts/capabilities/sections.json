@@ -189,6 +189,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
+      "tools": [
+        "search_schemes"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/kcc/status/kcc_status_as.md",
       "tools": [
         "check_kcc_application_status",
@@ -404,6 +410,12 @@
         "check_aif_loan_status",
         "initiate_aif_otp",
         "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
+      "tools": [
+        "search_schemes"
       ]
     },
     {
@@ -625,13 +637,9 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_en.md",
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
       "tools": [
-        "check_pm_kisan_status_with_otp",
-        "initiate_pm_kisan_status_check",
-        "pmkisan_grievance_send_otp",
-        "pmkisan_grievance_status",
-        "pmkisan_submit_grievance"
+        "search_schemes"
       ]
     },
     {
@@ -853,6 +861,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
+      "tools": [
+        "search_schemes"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/kcc/status/kcc_status_gu.md",
       "tools": [
         "check_kcc_application_status",
@@ -1071,13 +1085,9 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_hi.md",
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
       "tools": [
-        "check_pm_kisan_status_with_otp",
-        "initiate_pm_kisan_status_check",
-        "pmkisan_grievance_send_otp",
-        "pmkisan_grievance_status",
-        "pmkisan_submit_grievance"
+        "search_schemes"
       ]
     },
     {
@@ -1299,6 +1309,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
+      "tools": [
+        "search_schemes"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/kcc/status/kcc_status_kn.md",
       "tools": [
         "check_kcc_application_status",
@@ -1517,13 +1533,9 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_mai.md",
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
       "tools": [
-        "check_pm_kisan_status_with_otp",
-        "initiate_pm_kisan_status_check",
-        "pmkisan_grievance_send_otp",
-        "pmkisan_grievance_status",
-        "pmkisan_submit_grievance"
+        "search_schemes"
       ]
     },
     {
@@ -1745,6 +1757,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
+      "tools": [
+        "search_schemes"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/kcc/status/kcc_status_ml.md",
       "tools": [
         "check_kcc_application_status",
@@ -1960,6 +1978,12 @@
         "check_aif_loan_status",
         "initiate_aif_otp",
         "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
+      "tools": [
+        "search_schemes"
       ]
     },
     {
@@ -2181,13 +2205,9 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_or.md",
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
       "tools": [
-        "check_pm_kisan_status_with_otp",
-        "initiate_pm_kisan_status_check",
-        "pmkisan_grievance_send_otp",
-        "pmkisan_grievance_status",
-        "pmkisan_submit_grievance"
+        "search_schemes"
       ]
     },
     {
@@ -2409,13 +2429,9 @@
       ]
     },
     {
-      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_pa.md",
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
       "tools": [
-        "check_pm_kisan_status_with_otp",
-        "initiate_pm_kisan_status_check",
-        "pmkisan_grievance_send_otp",
-        "pmkisan_grievance_status",
-        "pmkisan_submit_grievance"
+        "search_schemes"
       ]
     },
     {
@@ -2637,6 +2653,12 @@
       ]
     },
     {
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
+      "tools": [
+        "search_schemes"
+      ]
+    },
+    {
       "path": "capabilities/agrinet/kcc/status/kcc_status_ta.md",
       "tools": [
         "check_kcc_application_status",
@@ -2852,6 +2874,12 @@
         "check_aif_loan_status",
         "initiate_aif_otp",
         "verify_aif_otp"
+      ]
+    },
+    {
+      "path": "capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md",
+      "tools": [
+        "search_schemes"
       ]
     },
     {

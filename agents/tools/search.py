@@ -19,6 +19,7 @@ from agents.deps import FarmerContext
 from agents.tools.imd_advisory import agromet_note
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
+from helpers.pmkisan_installment_release import get_pm_kisan_24th_installment_release_section
 from helpers.scheme_qdrant_search import (
     format_qdrant_scheme_codes_for_doc,
     format_scheme_unavailable,
@@ -280,6 +281,7 @@ async def search_schemes(
     PLACEHOLDER_SCHEME_CODES
 
     Covers every catalog scheme, including PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM and N.B.M.
+    Use this tool for general PM-KISAN installment release-date questions (no OTP).
     For a direct status/grievance request (e.g. "check my PM-KISAN status"), call the
     status tools instead — do not call this first.
 
@@ -426,6 +428,8 @@ async def search_schemes(
         )
 
         formatted = format_search_results(results, query, scheme_list)
+        if results and status in ("", "success") and (resolved or scheme_code) == "pmkisan":
+            formatted += f"\n\n---\n\n{get_pm_kisan_24th_installment_release_section()}"
         if results:
             formatted += format_status_check_offer(resolved or scheme_code)
         return formatted

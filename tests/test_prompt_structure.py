@@ -64,9 +64,7 @@ def test_prompt_inventory_and_language_coverage():
             coverage.setdefault(path.parent, set()).add(lang)
             referenced.add(path)
     for section, actual in coverage.items():
-        # Inherited source difference, not a translation fallback.
-        expected = {'en', 'hi', 'mai', 'or', 'pa'} if section.as_posix() == (
-            'capabilities/agrinet/pmkisan/instalments') else LANGUAGES
+        expected = LANGUAGES
         assert actual == expected, (section, actual, expected)
     files = {p.relative_to(PROMPTS) for p in base.rglob('*.md') if p.name != 'README.md'}
     assert files == referenced, 'Unreferenced prompt assets or missing files'

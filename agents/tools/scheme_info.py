@@ -11,7 +11,6 @@ from langfuse import observe
 from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from helpers.langfuse_tracing import lf_update_current_observation
-from helpers.pmkisan_installment_release import get_pm_kisan_23rd_installment_release_section
 
 logger = get_logger(__name__)
 
@@ -289,6 +288,7 @@ def get_scheme_info(
     This tool fetches comprehensive scheme data including benefits, eligibility criteria, 
     application process, and other relevant details for agricultural schemes. Use this 
     tool whenever users inquire about specific schemes or need general scheme information.
+    For PM-KISAN installment release-date questions, use search_schemes instead.
 
     Args:
         scheme_name (str): Name of the scheme to retrieve. Options:
@@ -366,10 +366,7 @@ def get_scheme_info(
                 "items_count": items_count,
             }
         )
-        result = str(scheme_response)
-        if scheme_name == "pmkisan":
-            result = f"{result}\n\n---\n\n{get_pm_kisan_23rd_installment_release_section()}"
-        return result
+        return str(scheme_response)
                 
     except httpx.TimeoutException as e:
         logger.error(f"Scheme API request timed out: {str(e)}")
