@@ -37,6 +37,10 @@ openpyxl==3.1.5
 # version actually provides -- ModuleNotFoundError at import time, on any
 # opentelemetry-api version. Fixed upstream in pydantic-ai-slim 1.32.0.
 pydantic-ai==1.32.0
+# genai-prices >=0.1.0 returns `output_reasoning_tokens`, which pydantic-ai 1.32.0's
+# RequestUsage rejects; the TypeError is swallowed and every OpenAI Responses API
+# call (azure_gpt54_mini) reports 0 tokens to Langfuse. Remove on pydantic-ai 2.x.
+genai-prices==0.0.73
 asgiref==3.12.1
 
 # Web Server
