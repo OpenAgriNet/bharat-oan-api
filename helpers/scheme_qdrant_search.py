@@ -24,6 +24,26 @@ SCHEME_SEARCH_SOURCE = "Government Scheme Information"
 _embedder_cache: dict[str, SentenceTransformer] = {}
 _qdrant_client_cache: dict[tuple[str, Optional[str]], QdrantClient] = {}
 
+# Public scheme names outlive catalog codes. Only attach aliases to live entries.
+SCHEME_ALIASES: dict[str, tuple[str, ...]] = {
+    "pk": ("PMKISAN", "PM-KISAN", "Pradhan Mantri Kisan Samman Nidhi",
+           "Pradhanmantri Kisan Samman Nidhi", "पीएम किसान", "प्रधानमंत्री किसान सम्मान निधि"),
+    "pksy": ("PMKSY", "Pradhan Mantri Krishi Sinchayee Yojana"),
+    "pa": ("PMASHA", "PM ASHA", "Pradhan Mantri Annadata Aay Sanrakshan Abhiyan"),
+    "af": ("AIF", "Agriculture Infrastructure Fund"),
+    "aea": ("AIF activities", "AIF eligible activities", "Agriculture Infrastructure Fund eligible activities"),
+    "kcc": ("KCC", "Kisan Credit Card"),
+    "pmfby": ("PMFBY", "Pradhan Mantri Fasal Bima Yojana"),
+    "sathi": ("SATHI", "Seed Authentication Traceability and Holistic Inventory"),
+    "smam": ("SMAM", "Sub Mission on Agricultural Mechanization"),
+    "pkvy-3": ("PKVY", "Paramparagat Krishi Vikas Yojana"),
+    "nfsm": ("NFSM", "National Food Security Mission"),
+    "rad": ("RAD", "Rainfed Area Development"),
+    "ffs-2": ("FFS", "Framework for Fertilizer Sales"),
+    "nbm": ("NBM", "National Bamboo Mission"),
+    "nbhm": ("NBHM", "National Beekeeping and Honey Mission"),
+}
+
 def get_builtin_scheme_list() -> list[dict[str, Any]]:
     """Scheme registry used for query → scheme_code resolution (search_schemes routing).
 
@@ -34,8 +54,7 @@ def get_builtin_scheme_list() -> list[dict[str, Any]]:
     must tolerate that (see get_vector_scheme_entries / get_master_catalog_snapshot
     docstrings for the fails-open contract).
 
-    Legacy scheme information continues to use get_scheme_info in production;
-    this list describes the schemes available through the vector index.
+    Only schemes published in this environment's catalog are advertised.
     """
     scheme_list: list[dict[str, Any]] = []
     for entry in get_vector_scheme_entries():
@@ -46,7 +65,10 @@ def get_builtin_scheme_list() -> list[dict[str, Any]]:
         scheme_list.append({
             "scheme_code": code,
             "scheme_name": name,
-            "scheme_aliases": [str(a).strip() for a in (entry.get("aliases") or []) if str(a).strip()],
+            "scheme_aliases": list(dict.fromkeys([
+                *[str(a).strip() for a in (entry.get("aliases") or []) if str(a).strip()],
+                *SCHEME_ALIASES.get(code, ()),
+            ])),
             "prompt_visible": True,
         })
     return scheme_list
@@ -99,22 +121,6 @@ def format_vector_schemes_prompt_block() -> dict[str, Any]:
     )
     return result
 
-
-def format_qdrant_scheme_codes_for_doc() -> str:
-    """One-line scheme code list for the search_schemes tool docstring.
-
-    Patched into search_schemes.__doc__ once at import time (see bottom of
-    agents/tools/search.py) — reflects the Redis snapshot as of process start,
-    not live per-turn like the system prompt's vector_schemes_bullets. A
-    newly promoted scheme is still fully routable before the next deploy
-    (get_builtin_scheme_list() is re-evaluated live), just not yet named in
-    this particular docstring line.
-    """
-    scheme_list = get_builtin_scheme_list()
-    return ", ".join(
-        f'"{item["scheme_code"]}" ({item["scheme_name"]})'
-        for item in sorted(scheme_list, key=lambda i: i["scheme_code"])
-    )
 
 ALIAS_STOPWORDS = {
     "scheme", "schemes", "mission", "national", "programme", "program",
@@ -232,17 +238,21 @@ APP_UI_NOISE_TERMS = (
 )
 
 
+def _normalize_scheme_name(value: str) -> str:
+    # Treat dotted acronyms and hyphenated names like their spoken forms.
+    value = re.sub(r"(?<=\w)\.(?=\w)", "", value.casefold())
+    return re.sub(r"[\W_]+", " ", value).strip()
+
+
 def _alias_in_query(alias: str, query: str) -> bool:
-    alias = alias.lower().strip()
+    alias = _normalize_scheme_name(alias)
     if not alias:
         return False
-    if len(alias) <= 6 or "-" in alias:
-        return bool(re.search(rf"\b{re.escape(alias)}\b", query))
-    return alias in query
+    return bool(re.search(rf"(?<!\w){re.escape(alias)}(?!\w)", query))
 
 
 def resolve_scheme_code(query: str, scheme_list: list[dict[str, Any]]) -> Optional[str]:
-    q = query.lower()
+    q = _normalize_scheme_name(query)
     best_len = 0
     best_code: Optional[str] = None
 
@@ -250,9 +260,10 @@ def resolve_scheme_code(query: str, scheme_list: list[dict[str, Any]]) -> Option
         code = item["scheme_code"]
         candidates = [code, item.get("scheme_name", "")]
         candidates.extend(item.get("scheme_aliases", []))
+        candidates.extend(SCHEME_ALIASES.get(code, ()))
 
         for candidate in candidates:
-            alias = str(candidate).lower().strip()
+            alias = _normalize_scheme_name(str(candidate))
             if not alias or alias in ALIAS_STOPWORDS:
                 continue
             if not _alias_in_query(alias, q):
@@ -261,6 +272,10 @@ def resolve_scheme_code(query: str, scheme_list: list[dict[str, Any]]) -> Option
                 best_len = len(alias)
                 best_code = code
 
+    # AIF's FAQ and eligible-activities list are separate published documents.
+    if best_code == "af" and re.search(r"\b(?:eligible activit(?:y|ies)|activit(?:y|ies) eligible)\b", q):
+        if any(item["scheme_code"] == "aea" for item in scheme_list):
+            return "aea"
     return best_code
 
 

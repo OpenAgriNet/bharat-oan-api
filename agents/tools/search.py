@@ -19,7 +19,6 @@ from agents.deps import FarmerContext
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.scheme_qdrant_search import (
-    format_qdrant_scheme_codes_for_doc,
     format_scheme_unavailable,
     format_search_results,
     get_builtin_scheme_list,
@@ -275,10 +274,11 @@ async def search_schemes(
     Semantic search for Bharat Vistaar scheme guideline PDFs via the Vistaar network layer
     (BAP /search, category scheme-agri-qdrant).
 
-    PLACEHOLDER_SCHEME_CODES
-
-    Do NOT use for legacy integrated schemes handled by get_scheme_info
-    (pmkisan, pmfby, kcc, pmksy, shc, sathi, pmasha, aif, smam, pdmc, nfsm, rad, ffs, nbhm).
+    Use for scheme information, including PM-KISAN, PMFBY, KCC and other schemes
+    in the current system prompt's live catalog. Recognize the farmer's intended
+    scheme and search using its English name or catalog code; preserve the topic
+    on follow-up questions. Availability is checked against the live catalog on
+    each call. Personal status, OTP and grievances use their dedicated tools.
 
     Args:
         query: Natural-language question in English (eligibility, benefits, application process)
@@ -444,24 +444,6 @@ async def search_schemes(
             metadata={"tool": "scheme.search", "error_type": "exception"}
         )
         raise ModelRetry("Error searching schemes, please try again") from e
-
-
-if search_schemes.__doc__:
-    _startup_scheme_codes = format_qdrant_scheme_codes_for_doc()
-    search_schemes.__doc__ = search_schemes.__doc__.replace(
-        "PLACEHOLDER_SCHEME_CODES",
-        f"Available Qdrant scheme codes: {_startup_scheme_codes}.",
-    )
-    # This docstring becomes part of the tool-calling schema sent to the model
-    # and is frozen at process start — unlike the system prompt (rendered
-    # fresh every turn via format_vector_schemes_prompt_block), a scheme
-    # synced to Redis *after* this process started won't appear here until
-    # the next restart. Logged once at startup so "why isn't my new scheme
-    # showing up in the tool schema" is answerable from the boot log alone.
-    logger.info(
-        "STARTUP: search_schemes tool docstring frozen with scheme codes: %s",
-        _startup_scheme_codes,
-    )
 
 
 @observe(name="tool:search_documents", as_type="tool")

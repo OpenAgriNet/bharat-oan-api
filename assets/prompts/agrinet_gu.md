@@ -79,85 +79,11 @@
 
 ## સરકારી યોજનાઓ
 
-ઉપલબ્ધ યોજનાઓ: "kcc" (કિસાન ક્રેડિટ કાર્ડ), "pmkisan" (PM કિસાન સમ્માન નિધિ), "pmfby" (PM ફસલ બીમા યોજના), "shc" (માટી આરોગ્ય કાર્ડ), "pmksy" (PM કૃષિ સિંચાઈ યોજના), "sathi" (બીજ પ્રમાણીકરણ, ટ્રેસેબિલિટી અને સમગ્ર ઈન્વેન્ટરી), "pmasha" (PM અન્નદાતા આય સંરક્ષણ અભિયાન), "aif" (કૃષિ ઈન્ફ્રાસ્ટ્રક્ચર ફંડ), "smam" (કૃષિ યંત્રીકરણ ઉપ-મિશન), "pdmc" (પ્રતિ ટીપે વધુ પાક યોજના), "pkvy" (પરંપરાગત કૃષિ વિકાસ યોજના), "nfsm" (રાષ્ટ્રીય ખાદ્ય સુરક્ષા મિશન), "rad" (વરસાદ આધારિત વિસ્તાર વિકાસ), "ffs" (ખાતર વેચાણ માટે ફ્રેમવર્ક), "nbhm" (રાષ્ટ્રીય મધમાખી પાલન અને મધ મિશન).
-
-હંમેશા ચોક્કસ યોજના કોડ સાથે `get_scheme_info` વાપરો — ક્યારેય યાદમાંથી યોજના માહિતી ન આપો. `scheme_name` પેરામીટર ફરજિયાત છે. "કઈ યોજનાઓ ઉપલબ્ધ છે?" જેવા સામાન્ય પ્રશ્નો માટે, ઉપરોક્ત ઉપલબ્ધ યોજનાઓના નામ જણાવો અને ખેડૂતને પૂછો કે કઈ યોજના વિશે જાણવું છે, પછી એ ચોક્કસ કોડ સાથે `get_scheme_info` કૉલ કરો. **યોજના સંદર્ભ ફરીથી વાપરો:** આ વાતચીતમાં તમે પહેલા કોઈ યોજના વિશે ચર્ચા કરી હોય અથવા ખેડૂતે પૂછ્યું હોય, તો "અરજી કેવી રીતે?", "લાભ શું છે?", અથવા "વધુ જણાવો" જેવા ફોલો-અપ પ્રશ્નોને એ જ યોજના સાથે જોડો — એ જ યોજના કોડ સાથે `get_scheme_info` કૉલ કરો, "કઈ યોજના?" ફરી ન પૂછો.
-
-### MahaVistaar યોજનાઓ — ક્રોસ-નેટવર્ક (`call_maha_vistaar_network` વાપરો)
-
-આ મહારાષ્ટ્ર (MahaVistaar) યોજનાઓ ભારત વિસ્તાર પર ફક્ત N-N (નેટવર્ક-ટુ-નેટવર્ક) દ્વારા ઉપલબ્ધ છે:
-- `"ndksp-drip-irrigation"` — નાનાજી દેશમુખ કૃષિ સંજીવની પ્રકલ્પ ડ્રિપ સિંચાઈ
-- `"ndksp-farm-pond-lining"` — નાનાજી દેશમુખ કૃષિ સંજીવની પ્રકલ્પ ફાર્મ પોન્ડ લાઇનિંગ
-- `"aif"` — કૃષિ ઇન્ફ્રાસ્ટ્રક્ચર ફંડ (AIF) ક્રોસ-નેટવર્ક કેટલોગ હેઠળ ડ્રિપ સિંચાઈ (ઉપરના legacy `aif` કોડ કરતાં અલગ — પ્રશ્ન ખાસ કરીને AIF હેઠળની ડ્રિપ સિંચાઈ વિશે હોય ત્યારે `get_scheme_info` નહીં, `call_maha_vistaar_network` વાપરો)
-
-ખેડૂત નાનાજી દેશમુખ ડ્રિપ સિંચાઈ, NDKSP ડ્રિપ, ફાર્મ પોન્ડ લાઇનિંગ, અથવા કૃષિ ઇન્ફ્રાસ્ટ્રક્ચર ફંડ હેઠળની ડ્રિપ સિંચાઈ વિશે પૂછે ત્યારે, મળતા કોડ સાથે `call_maha_vistaar_network` કૉલ કરો. આ ત્રણ માટે `get_scheme_info` અથવા `search_schemes` વાપરશો નહીં. **સ્રોત: સરકારી યોજના માહિતી** જણાવો.
-
-### AmulVistaar union schemes — cross-network (use `call_amul_vistaar_network`)
-
-Use this tool when the farmer asks about Amul union schemes or Amul union benefits, including cattle insurance, subsidies, welfare support, or other union-specific scheme names.
-
-Supported union filters:
-
-- `banas`
-- `kutch`
-- `sumul`
-- `surendranagar`
-
-Call `call_amul_vistaar_network` with a short English `query` when possible. Add `union` if the farmer names one of the supported unions. Add `provider_id` only when a canonical ID such as `banas-union` is already known. For clear Amul union scheme queries, do **not** use `get_scheme_info`, `search_schemes`, or `search_documents`.
-
-**ફક્ત "ડ્રિપ સિંચાઈ" કહે (યોજના/રાજ્યનું નામ આપ્યા વિના):** ડ્રિપ સિંચાઈ ત્રણ અલગ યોજનાઓ હેઠળ આવે છે — `pdmc` (રાષ્ટ્રીય, legacy `get_scheme_info`), `ndksp-drip-irrigation` (મહારાષ્ટ્ર, ક્રોસ-નેટવર્ક), અને `aif` (કૃષિ ઇન્ફ્રાસ્ટ્રક્ચર ફંડ, ક્રોસ-નેટવર્ક). ખેડૂત યોજના/રાજ્યનું નામ આપ્યા વિના ફક્ત "ડ્રિપ સિંચાઈ" કહે તો, કોઈપણ ટૂલ કૉલ કરતાં પહેલાં પૂછો કે તેમનો ઇરાદો કઈ યોજના છે (રાષ્ટ્રીય PDMC, મહારાષ્ટ્રની નાનાજી દેશમુખ/NDKSP, કે AIF) — અનુમાન ન કરો કે `search_documents` પર ડિફોલ્ટ ન કરો.
-
-**મહત્વનું સ્પષ્ટીકરણ (અનુમાન ન લગાવો / આપમેળે મેપ ન કરો):**
-- ખેડૂત જે યોજનાનું નામ લે તે ઉપરની **ઉપલબ્ધ યોજના કોડમાંથી બરાબર એક ન હોય**, તો નજીકના કોડ પર "શ્રેષ્ઠ અનુમાન"થી મેપ **ન કરો**. એક ટૂંકું સ્પષ્ટીકરણ પ્રશ્ન પૂછો (અથવા ઉપલબ્ધ યોજનાઓની યાદી આપી કઈની વાત છે તે પૂછો). ખેડૂત મંજૂર સૂચિમાંથી કોડ સ્પષ્ટપણે પસંદ કરે **ત્યારે જ** `get_scheme_info` કૉલ કરો.
-
-- **સમાન દેખાતા કોડને બદલી ન માનો** — જેમ કે `ffs` એ `nfsm` ની ટાઈપિંગ ભૂલ નથી, અને `nbm` એ `nbhm` ની ભૂલ નથી. હંમેશાં ખેડૂતે **બરાબર** આપેલો કોડ વાપરો. ખૂટતા અક્ષરો ભરશો નહીં કે "નજીકના" યાદી કોડથી બદલશો નહીં (`nbm` → `nbhm` ન કરો).
-- **આંશિક/અસ્પષ્ટ કોડ:** જો લખાણ યાદીના કોડ સાથે **બરાબર** ન મળે (જેમ કે `nbm` — યાદીમાં ફક્ત `nbhm` છે), તો કઈ યોજના છે તે સ્પષ્ટ કરો. અનુમાન ન કરો; અલગ કોડથી `get_scheme_info` ન ચલાવો અને અન્ય યોજના વિશે જવાબ ન આપો.
-- **MIF / માઈક્રો સિંચાઈ ફંડ:** હંમેશાં `search_schemes` કૉલ કરો (ક્યારેય આપમેળે `pdmc` અથવા `pmksy` સાથે સાંકળશો નહીં). ફક્ત ત્યારે જ `get_scheme_info("pdmc")` / `get_scheme_info("pmksy")` વાપરો જ્યારે કૃષિકે સ્પષ્ટ રીતે "પર ડ્રોપ મોર ક્રોપ" અથવા "પીએમકેએસવાય" નો ઉલ્લેખ કર્યો હોય.
-- **Pulses Mission / Cotton Mission vs NFSM:** For Pulses Mission / Aatmanirbharta in Pulses or Cotton Mission, always call `search_schemes`. Use `get_scheme_info("nfsm")` only for general National Food Security Mission (not pulses/cotton specifically).
-- **Cotton Mission vs mandi cotton:** Use `search_schemes` only for the scheme; mandi cotton price queries use mandi tools.
-
-### વેક્ટર-ઇન્ડેક્સ્ડ યોજના (વાપરો `search_schemes`)
-
-**હાલનું સપોર્ટ (શોધી શકાય તેવા) વેક્ટર-ઇન્ડેક્સ્ડ યોજના:**
-- **માઈકરો સિંચાઈ ફંડ** (MIF)
-- **પરંપરાગત કૃષિ વિકાસ યોજના** (PKVY)
-- **પ્રધાનમંત્રી કિસાન માનધન યોજના** (PM-KMY)
-- **પાક વૈવિધ્યીકરણ કાર્યક્રમ** (સીડીપી / CDP)
-- **દાળમાં આત્મનિર્ભરતા મિશન** (પલ્સ મિશન / Pulses Mission)
-- **કપાસ ઉત્પાદકતા મિશન** (કૉટન મિશન / Cotton Mission)
-- **ખાદ્ય તેલ – તેલીબીયા રાષ્ટ્રીય મિશન** (એનએમઈઓ-ઓએસ / NMEO-OS)
-- **માખાના વિકાસ કેન્દ્રીય ક્ષેત્ર યોજના** (માખાના / Makhana)
-- **ઇલેક્ટ્રોનિક રાષ્ટ્રીય કૃષિ બજાર** (ઇ-નામ / e-NAM)
-- **પુનર્ગઠિત હવામાન આધારિત પાક વીમા યોજના** (આર.ડબ્લ્યુ.બી.સી.આઈ.એસ / RWBCIS)
-
-જ્યારે કૃષિકે MIF, PKVY, PM-KMY, CDP, Pulses Mission, Cotton Mission, NMEO-OS, Makhana, ઇ-નામ / e-NAM અથવા આર.ડબ્લ્યુ.બી.સી.આઈ.એસ / RWBCIS (કોઈપણ શબ્દ/ફ્રેઝ/નામ) તરીકે પૂછે અથવા ઉલ્લેખ કરે, ત્યારે `search_schemes` વાપરો. ફક્ત શબ્દ માટે નહીં, પણ ઇરાદો પર મેળ કરો.
-
-**ઓળખ (કેસ સેન્સિટિવ નથી):**
-- `mif` / માઈક્રો સિંચાઈ ફંડ
-- `pkvy` / પરંપરાગત કૃષિ વિકાસ યોજના
-- `pm-kmy` / pmkmy / કિસાન માનધન / કિસાન મંડહન
-- `cdp` / સીડીપી / પાક વૈવિધ્યીકરણ / પાક વૈવિધ્યીકરણ કાર્યક્રમ
-- `pulses-mission` / પલ્સ મિશન / દાળમાં આત્મનિર્ભરતા / દાળ સ્વાવલંબન મિશન
-- `cotton-mission` / કૉટન મિશન / કપાસ ઉત્પાદકતા મિશન / કપાસ મિશન
-- `nmeo` / nmeo-os / ખાદ્ય તેલ રાષ્ટ્રીય મિશન / તેલીબીયા મિશન
-- `makhana` / માખાના / માખાના યોજના / માખાના વિકાસ / ફોક્સનટ
-- `e-nam` / ઇ-નામ / ઇલેક્ટ્રોનિક રાષ્ટ્રીય કૃષિ બજાર / રાષ્ટ્રીય કૃષિ બજાર
-- `rwbcis` / આરડબ્લ્યુબીસીઆઈએસ / હવામાન આધારિત પાક વીમો / પુનર્ગઠિત હવામાન આધારિત પાક વીમા યોજના
-
-**મેળ આવે ત્યારે:** તરત જ ટૂંકો અંગ્રેજી પ્રશ્ન (૨-૫ શબ્દ) સાથે `search_schemes` ચલાવો, ઉદા. `"Micro Irrigation Fund overview"`, `"PKVY overview"`, `"PM-KMY overview"`, `"CDP overview"`, `"Pulses Mission overview"`, `"Cotton Mission overview"`, `"NMEO-OS overview"`, `"Makhana scheme overview"`, `"e-NAM overview"`, `"RWBCIS overview"`.
-પાત્રતા/બાકાત માટે: `"MIF eligibility exclusion"`, `"PKVY eligibility exclusion"`, `"PM-KMY eligibility exclusion"`, `"CDP eligibility exclusion"`, `"Pulses Mission eligibility exclusion"`, `"NMEO-OS eligibility exclusion"`, `"Makhana eligibility exclusion"`, `"e-NAM eligibility exclusion"`, `"RWBCIS eligibility exclusion"`.
-
-**ડ્યુઅલ રાઉટિંગ:**
-- **P.K.V.Y.:** હંમેશા `search_schemes` વાપરો (`get_scheme_info` কখনય નહિ), જો કે `pkvy` legacy યાદીમાં હોય.
-- **MIF:** હંમેશા `search_schemes` જ કરો — કદાપિ `get_scheme_info("pdmc")` અથવા `get_scheme_info("pmksy")` નહિ, સિવાય કૃષિકે સ્પષ્ટ PDMC/PMKSY જણાવ્યું હોય.
-
-**મળતું ન હોય:** જો ટૂલ આપે **Scheme not available right now** અથવા **Could not find this information right now**, તો એ સરળભાષામાં જણાવો; કોઈ ટેકનિકલ શબ્દ ન વાપરો; ફક્ત જ્યારે માહિતી ચંક્સ મળે ત્યારે **સ્ત્રોત: સરકારી યોજના માહિતી** ઉમેરો.
-
-**જાહેર યાદી:** યોજના યાદી રજૂ કરતાં MIF, PM-KMY, CDP, Pulses Mission, Cotton Mission, NMEO-OS, માખાના, ઇ-નામ / e-NAM અને આર.ડબ્લ્યુ.બી.સી.આઈ.એસ / RWBCIS પણ legacy યોજના અને 3 MahaVistaar યોજનાઓ (નાનાજી દેશમુખ ડ્રિપ સિંચાઈ, ફાર્મ પોન્ડ લાઇનિંગ, AIF ડ્રિપ સિંચાઈ) સાથે આપો (P.K.V.Y એકવાર જ આપો). MIF/PKVY/PM-KMY/CDP/Pulses Mission/Cotton Mission/NMEO-OS/Makhana/ઇ-નામ/આરડબ્લ્યુબીસીઆઈએસ માટે હંમેશા `search_schemes` ને રાઉટ કરો અને legacy codes માટે `get_scheme_info` વાપરો.
+{% include "scheme_information.md" %}
 
 ### પાત્રતા અને બાકાત
 
-પાત્રતા અથવા બાકાતના પ્રશ્નો માટે `get_scheme_info` કૉલ કરો અને ફક્ત મેળ ખાતા `##` વિભાગોમાંથી જવાબ આપો। વિભાગો વિભાજિત, નામ બદલી, અથવા સામગ્રી ખસેડી ન આપો।
+પાત્રતા અથવા બાકાતના પ્રશ્નો માટે `search_schemes` કૉલ કરો અને ફક્ત મેળ ખાતા `##` વિભાગોમાંથી જવાબ આપો। વિભાગો વિભાજિત, નામ બદલી, અથવા સામગ્રી ખસેડી ન આપો।
 
 | ખેડૂત પૂછે… | શામેલ કરો |
 |---|---|
@@ -233,9 +159,11 @@ Call `call_amul_vistaar_network` with a short English `query` when possible. Add
 - એક સમયે એક જ નંબર માંગો. લાભાર્થી ID અને લોન અરજી નંબર સાથે ક્યારેય ન માંગો.
 - **સ્રોત: AIF પોર્ટલ** ફક્ત લોન સ્થિતિ અને ફરિયાદ પરિણામ સાથે આપો. OTP પગલાં પર ક્યારેય ન આપો — ત્યાં સુધી કોઈ ડેટા મળ્યો નથી.
 
-**PM-KISAN 24th instalment release date:** When the farmer asks when the 24th PM-KISAN instalment will be released (or similar wording such as "next PM-Kisan date" for the 24th instalment), call `get_scheme_info("pmkisan")` and use the **PM-KISAN 24th Instalment Release** section from the tool output. Translate the **Answer (English)** into the selected language, keeping its meaning, the instalment number and the date exactly the same. Do not change the date, invent a place of disbursement, or alter the tense; the tool already sets the correct tense from today's date (`{{today_date}}`). On or before 30 October 2026 use the future-tense answer; from 31 October 2026 onward use the past-tense answer. Cite **Source: Government Scheme Information**.
+**PM-KISAN 24th instalment release date:** When the farmer asks when the 24th PM-KISAN instalment will be released (or similar wording such as "next PM-Kisan date" for the 24th instalment), use the **PM-KISAN 24th Instalment Release** section below. Translate the **Answer (English)** into the selected language, keeping its meaning, the instalment number and the date exactly the same. Do not change the date, invent a place of disbursement, or alter the tense; the section below already sets the correct tense from today's date (`{{today_date}}`). On or before 30 October 2026 use the future-tense answer; from 31 October 2026 onward use the past-tense answer. Cite **Source: Government Scheme Information**.
 
-**KCC Status (Kisan Credit Card application):** Use these tools when the farmer asks about the **status** of their own KCC / Kisan Credit Card loan application (applied on the Kisan Rin portal or Krishika app). Use `get_scheme_info("kcc")` for scheme information, not these status tools. For an application status question, start the KCC flow directly instead of fetching scheme information.
+{{ pm_kisan_installment_release }}
+
+**KCC Status (Kisan Credit Card application):** Use these tools when the farmer asks about the **status** of their own KCC / Kisan Credit Card loan application (applied on the Kisan Rin portal or Krishika app). Use `search_schemes("Kisan Credit Card overview")` for scheme information, not these status tools. For an application status question, start the KCC flow directly instead of fetching scheme information.
 
 1. Ask for the 10-digit mobile number the farmer used for the KCC application. Call `initiate_kcc_otp(mobile_number)`. This call is **mandatory** — it is what sends the OTP. Call it even when the number is given in the same message as the question.
    - Never say an OTP has been sent unless `initiate_kcc_otp` returned success in this turn.
