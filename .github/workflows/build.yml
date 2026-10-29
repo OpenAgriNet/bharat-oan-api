@@ -20,6 +20,11 @@ on:
 env:
   BASE_IMAGE_NAME: bharat-oan-api
 
+# A new push to the same PR cancels its in-flight build; branch builds always finish.
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -30,6 +35,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # PR images are built from the PR head commit so the tag matches the code.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -37,23 +45,29 @@ jobs:
       - name: Set image name and tags based on branch
         id: set-tags
         run: |
-          # Determine the branch name depending on event type
+          REGISTRY="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ env.BASE_IMAGE_NAME }}"
+
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BRANCH="${{ github.base_ref }}"
+            # PR images get only pr-* tags so they never overwrite bh-dev/bh-main tags.
+            # The Artifact Registry cleanup policy deletes pr-* images after 7 days.
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            TAGS="pr-${PR_NUMBER} pr-${PR_NUMBER}-${HEAD_SHA::7}"
           else
             BRANCH="${{ github.ref_name }}"
+            BUILD_TAG=$(echo "$BRANCH" | sed 's/\//-/g')
+            # Extract simple tag (e.g., bh-dev -> dev, bh-main -> main)
+            SIMPLE_TAG=$(echo "$BRANCH" | sed 's/^.*-//')
+            TAGS="${BUILD_TAG}-latest ${BUILD_TAG} ${SIMPLE_TAG} ${{ github.sha }}"
           fi
-          
-          echo "Selected Branch: $BRANCH"
-          
-          BUILD_TAG=$(echo "$BRANCH" | sed 's/\//-/g')
-          # Extract simple tag (e.g., bh-dev -> dev, bh-main -> main)
-          SIMPLE_TAG=$(echo "$BRANCH" | sed 's/^.*-//')
 
-          echo "IMAGE_NAME=${{ env.BASE_IMAGE_NAME }}" >> $GITHUB_OUTPUT
-          echo "BUILD_TAG=${BUILD_TAG}" >> $GITHUB_OUTPUT
-          echo "SIMPLE_TAG=${SIMPLE_TAG}" >> $GITHUB_OUTPUT
-          echo "LATEST_TAG=${BUILD_TAG}-latest" >> $GITHUB_OUTPUT
+          echo "Image tags: $TAGS"
+          echo "IMAGE=${REGISTRY}" >> $GITHUB_OUTPUT
+          {
+            echo "TAGS<<EOF"
+            for TAG in $TAGS; do echo "${REGISTRY}:${TAG}"; done
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -73,19 +87,15 @@ jobs:
           context: .
           push: false
           load: true
-          tags: |
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ steps.set-tags.outputs.LATEST_TAG }}
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ steps.set-tags.outputs.BUILD_TAG }}
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ steps.set-tags.outputs.SIMPLE_TAG }}
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ github.sha }}
+          tags: ${{ steps.set-tags.outputs.TAGS }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Push Docker image
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push_image)
-        run: |
-          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ steps.set-tags.outputs.LATEST_TAG }}
-          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ steps.set-tags.outputs.BUILD_TAG }}
-          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ steps.set-tags.outputs.SIMPLE_TAG }}
-          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ steps.set-tags.outputs.IMAGE_NAME }}:${{ github.sha }}
+        # Fork PRs have no GCP secrets, so they only build.
+        if: >-
+          github.event_name == 'push' ||
+          (github.event_name == 'workflow_dispatch' && inputs.push_image) ||
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+        run: docker push --all-tags ${{ steps.set-tags.outputs.IMAGE }}
