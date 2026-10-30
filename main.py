@@ -3,6 +3,7 @@ import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from langfuse import get_client
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from app.config import settings
@@ -65,9 +66,15 @@ async def lifespan(app: FastAPI):
 
         logger.info("Pre-warming scheme search embedder...")
         await asyncio.to_thread(warm_scheme_search)
-    yield
-    # Shutdown
-    print(f"🛑 {settings.app_name} shutting down...")
+    try:
+        yield
+    finally:
+        print(f"🛑 {settings.app_name} shutting down...")
+        try:
+            # Request handlers rely on background export; drain pending traces on shutdown.
+            await asyncio.to_thread(get_client().flush)
+        except Exception:
+            logger.exception("Failed to flush Langfuse during shutdown")
 
 # Create FastAPI app with settings
 app = FastAPI(
