@@ -6,7 +6,6 @@ Tools for the BharatVistaar AI Agent.
 
 from pydantic_ai import Tool
 
-from agents.tools.scheme_info import get_scheme_info
 from agents.tools.amul_vistaar import call_amul_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
 from agents.tools.pmkisan_scheme_status import (
@@ -64,11 +63,6 @@ from agents.tools.sathi_seed import (
 from agents.tools.npss import analyze_crop_image
 
 TOOLS = [
-    Tool(
-        get_scheme_info,
-        takes_ctx=True,
-        strict=False,
-    ),
     Tool(
         call_amul_vistaar_network,
         takes_ctx=True,

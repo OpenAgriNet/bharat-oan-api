@@ -46,7 +46,7 @@ def test_localized_kcc_and_mandi_routing(language):
     assert "NO_DATA_AT_REQUESTED_MANDI" in prompt
     assert "include_nearby_mandis=true" in prompt
     assert "RANGE_TOO_LONG" in prompt
-    assert 'get_scheme_info("kcc")' in prompt
+    assert 'search_schemes("Kisan Credit Card overview")' in prompt
     assert "price_date_to" in prompt
     assert "**A different mobile number is a new check.**" in prompt
     assert "load_capability" not in prompt
