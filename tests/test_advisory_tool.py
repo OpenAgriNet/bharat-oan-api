@@ -22,7 +22,7 @@ def _ctx(messages):
 ASKED = [
     ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")]),
     ModelResponse(parts=[TextPart(content="Do you want generic or personalised advice?")]),
-    ModelRequest(parts=[UserPromptPart(content="generic")]),
+    ModelRequest(parts=[UserPromptPart(content='**User:** "personalised, Lucknow, Pune, 40 days"\n**Selected Language:** English')]),
 ]
 # first turn: only the farmer's question, nothing said by the assistant yet
 FIRST_TURN = [ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")])]
@@ -551,4 +551,45 @@ class TestDetailsAskedFirst:
 
     def test_details_in_the_call_need_no_second_question(self, bap):
         out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", days_after_sowing=40))
+        assert "Harvest AKJ-1" in out
+
+
+class TestDistrictConfirmationFollowsTheFarmersReply:
+    def test_searching_again_after_the_reply_counts_as_yes(self, bap):
+        # the agent forgot district_fallback_confirmed and repeated the same district
+        out = asyncio.run(sa.search_advisory(_ctx(NO_DATA_ASKED), "aphids", "Wheat", "personalised", district="Lucknow", season="Rabi", days_after_sowing=40))
+        assert "Harvest AKJ-1" in out and sa.NO_DISTRICT_DATA_MARKER not in out
+        assert "district" not in _params(json.loads(bap.requests[0].read()))
+
+    def test_a_new_question_after_an_answer_starts_again(self, bap):
+        answered = NO_DATA_ASKED + [
+            ModelRequest(parts=[UserPromptPart(content="yes")]),
+            ModelResponse(parts=[ToolCallPart(tool_name="search_advisory", args={})]),
+            ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c3", content="advice")]),
+            ModelResponse(parts=[TextPart(content="Here is the advice.")]),
+        ]
+        assert sa._asked_about_district_fallback(_ctx(answered)) is False
+
+
+class TestDistrictMustComeFromTheFarmer:
+    @staticmethod
+    def _history(farmer_reply):
+        coords = "\n**Browser Location Coordinates:** Latitude=12.9, Longitude=77.6 (the device location)"
+        return [
+            ModelRequest(parts=[UserPromptPart(content='**User:** "How can I control aphids in my wheat crop?"' + coords)]),
+            ModelResponse(parts=[TextPart(content="Generic or personalised?")]),
+            ModelRequest(parts=[UserPromptPart(content=f'**User:** "{farmer_reply}"' + coords)]),
+        ]
+
+    def test_a_district_taken_from_the_browser_location_is_refused(self, bap):
+        with pytest.raises(ModelRetry, match="not something the farmer wrote"):
+            asyncio.run(sa.search_advisory(_ctx(self._history("personalised")), "aphids", "Wheat", "personalised", district="Bengaluru Urban", season="Rabi"))
+        assert bap.requests == []
+
+    def test_a_district_the_farmer_typed_is_accepted(self, bap):
+        out = asyncio.run(sa.search_advisory(_ctx(self._history("Rabi, Lucknow, 40 days")), "aphids", "Wheat", "personalised", district="Lucknow district", days_after_sowing=40, season="Rabi"))
+        assert "Harvest AKJ-1" in out
+
+    def test_other_scripts_are_not_compared(self, bap):
+        out = asyncio.run(sa.search_advisory(_ctx(self._history("रबी, लखनऊ, 40 दिन")), "aphids", "Wheat", "personalised", district="Lucknow", days_after_sowing=40, season="Rabi"))
         assert "Harvest AKJ-1" in out
