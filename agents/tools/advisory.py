@@ -360,14 +360,15 @@ async def search_advisory(
 
     # The configured season (env) always wins; the farmer's answer (personalised only) is used when none is set.
     farmer_season = _clean_param(season) if advice_type == "personalised" else ""
-    if advice_type == "personalised":
-        # The farmer must give a season: keep asking until they do (the env season is applied after).
+    if advice_type == "personalised" and not default_season():
+        # No configured season: the farmer must give one, so keep asking until they do.
         if farmer_season.lower() not in _SEASONS:
             raise ModelRetry(
                 "The season is required for personalised advice. Ask the farmer which season it is "
                 "(Rabi, Kharif or Zaid) and wait for the answer. If they have not given a valid season, "
                 "ask again; do not search until they do."
             )
+    if farmer_season.lower() in _SEASONS:
         farmer_season = farmer_season.capitalize()
     season_value = default_season() or farmer_season
 
