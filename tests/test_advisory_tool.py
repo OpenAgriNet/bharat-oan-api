@@ -22,7 +22,7 @@ def _ctx(messages):
 ASKED = [
     ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")]),
     ModelResponse(parts=[TextPart(content="Do you want generic or personalised advice?")]),
-    ModelRequest(parts=[UserPromptPart(content="generic")]),
+    ModelRequest(parts=[UserPromptPart(content='**User:** "personalised, Lucknow, Pune, 40 days"\n**Selected Language:** English')]),
 ]
 # first turn: only the farmer's question, nothing said by the assistant yet
 FIRST_TURN = [ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")])]
@@ -569,3 +569,27 @@ class TestDistrictConfirmationFollowsTheFarmersReply:
             ModelResponse(parts=[TextPart(content="Here is the advice.")]),
         ]
         assert sa._asked_about_district_fallback(_ctx(answered)) is False
+
+
+class TestDistrictMustComeFromTheFarmer:
+    @staticmethod
+    def _history(farmer_reply):
+        coords = "\n**Browser Location Coordinates:** Latitude=12.9, Longitude=77.6 (the device location)"
+        return [
+            ModelRequest(parts=[UserPromptPart(content='**User:** "How can I control aphids in my wheat crop?"' + coords)]),
+            ModelResponse(parts=[TextPart(content="Generic or personalised?")]),
+            ModelRequest(parts=[UserPromptPart(content=f'**User:** "{farmer_reply}"' + coords)]),
+        ]
+
+    def test_a_district_taken_from_the_browser_location_is_refused(self, bap):
+        with pytest.raises(ModelRetry, match="not something the farmer wrote"):
+            asyncio.run(sa.search_advisory(_ctx(self._history("personalised")), "aphids", "Wheat", "personalised", district="Bengaluru Urban", season="Rabi"))
+        assert bap.requests == []
+
+    def test_a_district_the_farmer_typed_is_accepted(self, bap):
+        out = asyncio.run(sa.search_advisory(_ctx(self._history("Rabi, Lucknow, 40 days")), "aphids", "Wheat", "personalised", district="Lucknow district", days_after_sowing=40, season="Rabi"))
+        assert "Harvest AKJ-1" in out
+
+    def test_other_scripts_are_not_compared(self, bap):
+        out = asyncio.run(sa.search_advisory(_ctx(self._history("रबी, लखनऊ, 40 दिन")), "aphids", "Wheat", "personalised", district="Lucknow", days_after_sowing=40, season="Rabi"))
+        assert "Harvest AKJ-1" in out

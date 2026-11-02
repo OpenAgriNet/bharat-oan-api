@@ -18,7 +18,9 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolRetu
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
-from helpers.ask_first import ANSWER_TOOLS, ASK_FIRST_RETRY, NO_DISTRICT_DATA_MARKER, has_text, farmer_was_asked
+from helpers.ask_first import (
+    ANSWER_TOOLS, ASK_FIRST_RETRY, NO_DISTRICT_DATA_MARKER, district_comes_from_farmer, farmer_was_asked, has_text,
+)
 from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -284,7 +286,8 @@ def format_search_notes(
     if district_unavailable:
         lines.append(
             "> The farmer's district has no advisory data and the farmer agreed to the crop advice. "
-            "Say in one short sentence that this advice is for the crop and not specific to their district."
+            "Give the advice from the results above now, in full, and do not ask whether to continue. Say in one "
+            "short sentence that this advice is for the crop and not specific to their district."
         )
     elif location == "location_not_applied":
         lines.append(
@@ -475,6 +478,11 @@ async def search_advisory(
     district_unavailable = _district_fallback_check(ctx, district_fallback_confirmed, district)
     if district_unavailable:
         district = ""
+    elif district and not district_comes_from_farmer(ctx, district):
+        raise ModelRetry(
+            f"The district '{district}' is not something the farmer wrote. Never take the district from the browser "
+            "location or any lookup. Ask the farmer for their district and use exactly what they write."
+        )
 
     payload = build_advisory_search_payload(
         query=query,
