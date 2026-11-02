@@ -8,10 +8,6 @@ import re
 
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
 
-# Appears in the search_advisory result when the farmer's district has no advisory data. A result
-# carrying it is not an answer: the agent is expected to ask the farmer about it next.
-NO_DISTRICT_DATA_MARKER = "[NO_ADVISORY_DATA_FOR_DISTRICT]"
-
 # Tools whose result answers a crop question (so a message written after one is not an ask).
 ANSWER_TOOLS = {"search_advisory", "search_pests_diseases", "search_documents"}
 
@@ -22,11 +18,7 @@ ASK_FIRST_RETRY = (
 
 
 def _is_answer(part) -> bool:
-    return (
-        isinstance(part, ToolReturnPart)
-        and part.tool_name in ANSWER_TOOLS
-        and NO_DISTRICT_DATA_MARKER not in str(part.content)
-    )
+    return isinstance(part, ToolReturnPart) and part.tool_name in ANSWER_TOOLS
 
 
 def has_text(message) -> bool:
@@ -59,11 +51,7 @@ def asked_rounds(ctx) -> int:
     rounds = 0
     for turn_number in range(len(starts) - 2, -1, -1):  # every turn before the latest one
         turn = messages[starts[turn_number]:starts[turn_number + 1]]
-        parts = [part for message in turn if isinstance(message, ModelRequest) for part in message.parts]
-        # A turn that ended with the "no district-specific advisory" question is still an unanswered ask,
-        # even if another search tool also ran in it.
-        asked_no_data = any(isinstance(p, ToolReturnPart) and NO_DISTRICT_DATA_MARKER in str(p.content) for p in parts)
-        if any(_is_answer(p) for p in parts) and not asked_no_data:
+        if any(_is_answer(part) for message in turn if isinstance(message, ModelRequest) for part in message.parts):
             break
         if not any(has_text(message) for message in turn):
             break
@@ -89,42 +77,3 @@ _CROP_RE = re.compile(r"\b(?:" + "|".join(_CROP_WORDS) + r")\b", re.IGNORECASE)
 def mentions_crop(query: str) -> bool:
     """True when an English search query names a crop (used for the general document search)."""
     return bool(_CROP_RE.search(str(query or "")))
-
-
-_STOP_WORDS = {"district", "urban", "rural", "city", "taluk", "taluka", "tehsil", "zilla", "the", "and"}
-
-
-def farmer_texts(ctx) -> list[str]:
-    """What the farmer typed since the last answer, taken from the `**User:** "..."` line of each message."""
-    messages = list(getattr(ctx, "messages", None) or [])
-    start = 0
-    for index, message in enumerate(messages):
-        if isinstance(message, ModelRequest) and any(_is_answer(part) for part in message.parts):
-            start = index + 1
-    texts: list[str] = []
-    for message in messages[start:]:
-        if not isinstance(message, ModelRequest):
-            continue
-        for part in message.parts:
-            if not isinstance(part, UserPromptPart) or not isinstance(part.content, str):
-                continue
-            line = next((l for l in part.content.splitlines() if l.startswith('**User:** "')), None)
-            texts.append(line[len('**User:** "'):].rstrip().rstrip('"') if line else part.content)
-    return texts
-
-
-def district_comes_from_farmer(ctx, district: str) -> bool:
-    """False when the district is not something the farmer wrote (for example taken from the browser location).
-    Used to drop such a district, never to ask the farmer for it again.
-
-    Only checked when the farmer wrote in Latin letters; in other scripts the agent writes the name in
-    English itself, so the text cannot be compared.
-    """
-    texts = farmer_texts(ctx)
-    if not texts or not district:
-        return True
-    combined = " ".join(texts).casefold()
-    if any(ord(ch) > 127 and ch.isalpha() for ch in combined):
-        return True
-    tokens = [t for t in re.findall(r"[a-z]{3,}", district.casefold()) if t not in _STOP_WORDS]
-    return not tokens or any(token in combined for token in tokens)

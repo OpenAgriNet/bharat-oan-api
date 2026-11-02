@@ -14,13 +14,10 @@ from typing import Any, Dict, List, Literal, Optional
 import httpx
 from langfuse import observe
 from pydantic_ai import ModelRetry
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
-from helpers.ask_first import (
-    ANSWER_TOOLS, ASK_FIRST_RETRY, NO_DISTRICT_DATA_MARKER, district_comes_from_farmer, farmer_was_asked, has_text,
-)
+from helpers.ask_first import ASK_FIRST_RETRY, farmer_was_asked
 from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -33,7 +30,7 @@ KNOWLEDGE_ADVISORY_CATEGORY = "knowledge-advisory"
 # Source shown to the farmer for every advisory answer.
 ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
 
-# Longest value forwarded for crop / district, and the accepted range for days after sowing.
+# Longest value forwarded for crop / season, and the accepted range for days after sowing.
 _MAX_PARAM_LENGTH = 100
 _MAX_DAYS_AFTER_SOWING = 730
 _SEASONS = {"rabi", "kharif", "zaid"}
@@ -58,34 +55,6 @@ def _clean_days(value: Optional[int]) -> Optional[int]:
 
 
 
-def _asked_about_district_fallback(ctx: RunContext[FarmerContext]) -> bool:
-    """True when the "no district-specific advisory" result came in an earlier farmer turn and no advice
-    has been given since: the farmer's latest message is then the answer to the yes/no question.
-
-    Deliberately turn-based: it does not depend on the shape of the assistant's reply or on other tools
-    that ran in between, so a "yes" is never ignored (which made the same question repeat). Only a
-    successful advisory search ends the question. A marker from the current turn is not an answer yet.
-    """
-    messages = getattr(ctx, "messages", None)
-    if messages is None:  # cannot verify (not running inside an agent run)
-        return True
-    marker_turn: Optional[int] = None
-    turn = 0
-    for message in messages:
-        if not isinstance(message, ModelRequest):
-            continue
-        if any(isinstance(part, UserPromptPart) for part in message.parts):
-            turn += 1
-        for part in message.parts:
-            if not isinstance(part, ToolReturnPart) or part.tool_name != "search_advisory":
-                continue
-            marker_turn = turn if NO_DISTRICT_DATA_MARKER in str(part.content) else None
-    return marker_turn is not None and marker_turn < turn
-
-
-_farmer_was_asked = farmer_was_asked
-
-
 def default_season() -> str:
     """Season configured in env `ADVISORY_DEFAULT_SEASON` (empty when not set)."""
     return _clean_param(os.getenv("ADVISORY_DEFAULT_SEASON"))
@@ -96,7 +65,8 @@ def advisory_season_note() -> str:
     season = default_season()
     ask = (
         "In the personalised crop advisory flow, ask the farmer for the **season** (Rabi, Kharif or Zaid) "
-        "together with the district and the days since sowing. The season is mandatory: pass their answer "
+        "together with the days since sowing, their location (district or state) and the crop (if not known), all in "
+        "one question. The location is only asked there, never again, and is not used to search. The season is mandatory: pass their answer "
         "as `season` and ask again until they give one. Do not ask for the season in the generic flow."
     )
     if season:
@@ -113,14 +83,11 @@ def advisory_season_note() -> str:
     )
 
 
-def _search_params_tag(
-    crop: str, district: str, days_after_sowing: Optional[int], season: str = ""
-) -> List[Dict[str, Any]]:
-    """`search_params` tag group the provider reads: crop, district, days_after_sowing, season."""
+def _search_params_tag(crop: str, days_after_sowing: Optional[int], season: str = "") -> List[Dict[str, Any]]:
+    """`search_params` tag group the provider reads: crop, days_after_sowing, season (never a location)."""
     entries = []
     for code, value in (
         ("crop", crop),
-        ("district", district),
         ("days_after_sowing", days_after_sowing),
         ("season", season),
     ):
@@ -137,19 +104,16 @@ def build_advisory_search_payload(
     session_id: str = "",
     question_id: str = "",
     crop: str = "",
-    district: str = "",
     days_after_sowing: Optional[int] = None,
     season: str = "",
 ) -> Dict[str, Any]:
     """Beckn /search body for advisory document search (knowledge-advisory).
 
-    `crop`, `district`, `days_after_sowing` and `season` travel in `item.tags` (group `search_params`).
+    `crop`, `days_after_sowing` and `season` travel (the location is never sent) in `item.tags` (group `search_params`).
     """
     now = datetime.now(timezone.utc)
     item: Dict[str, Any] = {"descriptor": {"name": query}}
-    tags = _search_params_tag(
-        _clean_param(crop), _clean_param(district), _clean_days(days_after_sowing), _clean_param(season)
-    )
+    tags = _search_params_tag(_clean_param(crop), _clean_days(days_after_sowing), _clean_param(season))
     if tags:
         item["tags"] = tags
     return {
@@ -269,63 +233,48 @@ def format_search_notes(
     search_ctx: Dict[str, str],
     days_after_sowing: Optional[int],
     personalised: bool = False,
-    district_given: bool = False,
-    district_unavailable: bool = False,
+    location: str = "",
 ) -> str:
     """Notes for the agent about how the search was applied, with what to tell the farmer."""
-    location = str(search_ctx.get("location_status") or "").strip().lower()
     day_range = str(search_ctx.get("has_day_range") or "").strip().lower() == "true"
     days_matched = str(search_ctx.get("days_matched") or "").strip().lower() == "true"
-    facts = []
-    if location:
-        facts.append(f"location_status={location}")
-    facts.append(f"advisory_has_day_range={'yes' if day_range else 'no'}")
+    facts = [f"advisory_has_day_range={'yes' if day_range else 'no'}"]
     if days_after_sowing is not None:
         facts.append(f"days_after_sowing_matched={'yes' if days_matched else 'no'}")
     lines = ["> Search notes: " + "; ".join(facts)]
-    if district_unavailable:
+    if location:
         lines.append(
-            "> The farmer's district has no advisory data and the farmer agreed to the crop advice. "
-            "Give the advice from the results above now, in full, and do not ask whether to continue. Say in one "
-            "short sentence that this advice is for the crop and not specific to their district."
-        )
-    elif location == "location_not_applied":
-        lines.append(
-            "> These advisories are not specific to the farmer's district. Say so in one short sentence "
-            "and do not present the advice as local to their district."
-        )
-    if not day_range or (days_after_sowing is not None and not days_matched):
-        lines.append(
-            "> This advice is general for the crop and not matched to the days since sowing. Say so briefly."
-        )
-    if personalised and not district_given:
-        lines.append(
-            "> The farmer did not give a district, so the location was skipped. Say in one short sentence "
-            "that the advice is not specific to their area."
+            f"> The farmer named a location ({location}). Locations are never used to search. Say in one short "
+            "sentence that there is no advisory specific to that location, and that this advice is for their "
+            "crop, season and sowing days; then give the advice."
         )
     if personalised and days_after_sowing is None:
         lines.append(
             "> The farmer did not give the days since sowing. Say in one short sentence that the advice "
             "is not matched to their sowing stage."
         )
+    elif days_after_sowing is not None and (not day_range or not days_matched):
+        lines.append(
+            f"> The farmer did give the days since sowing ({days_after_sowing}), but this advisory has no guidance "
+            "for that sowing stage. Do not say the farmer did not give the days. Say briefly that this is the "
+            "general advice for the crop and season."
+        )
+    elif not day_range:
+        lines.append("> This advice is general for the crop and not tied to a sowing stage. Say so briefly.")
     return "\n".join(lines)
 
 
-def _personal_details(personalised: bool, district: Optional[str], days: Optional[int]) -> tuple[str, Optional[int]]:
-    if not personalised:
-        return "", None
-    return _clean_param(district), _clean_days(days)
-
-
 _DETAILS_RETRY = (
-    "Do not search yet. For personalised advice, ask the farmer for their district, the days since sowing "
-    "and the season in one question, and wait for the answer. If they say they do not know, search without them."
+    "Do not search yet. For personalised advice, ask the farmer in one question for the season (Rabi, Kharif or "
+    "Zaid), the days since sowing, their location (district or state) and, if not known yet, the crop, then wait "
+    "for the answer. Ask for the location only in this question, never again; it is not used to search. If they "
+    "say they do not know the days or do not give a location, search without them."
 )
 
 
-def _require_details_asked(ctx: RunContext[FarmerContext], personalised: bool, district: str, days: Optional[int], confirmed: bool) -> None:
-    """Personalised search with no district and no days: the farmer must have been asked for them first."""
-    if personalised and not district and days is None and not confirmed and not farmer_was_asked(ctx, rounds=2):
+def _require_details_asked(ctx: RunContext[FarmerContext], personalised: bool, days: Optional[int]) -> None:
+    """Personalised search with no days: the farmer must have been asked for the details first."""
+    if personalised and days is None and not farmer_was_asked(ctx, rounds=2):
         raise ModelRetry(_DETAILS_RETRY)
 
 
@@ -342,22 +291,6 @@ def _resolve_season(advice_type: str, season: Optional[str]) -> str:
     if farmer_season.lower() in _SEASONS:
         farmer_season = farmer_season.capitalize()
     return default_season() or farmer_season
-
-
-def _district_fallback_check(ctx: RunContext[FarmerContext], confirmed: bool) -> bool:
-    """True when the farmer agreed to advice without the district.
-
-    The agent may set `district_fallback_confirmed`, or simply search again after the farmer replied to
-    the "no district-specific advisory" question: both mean yes. Setting it
-    before the farmer was asked is refused.
-    """
-    asked = _asked_about_district_fallback(ctx)
-    if confirmed and not asked:
-        raise ModelRetry(
-            "Do not set district_fallback_confirmed yet. First tell the farmer there is no advisory data "
-            "for their district and ask whether they want the crop advice anyway; use their answer."
-        )
-    return confirmed or (asked and getattr(ctx, "messages", None) is not None)
 
 
 async def _post_search(payload: Dict[str, Any]) -> tuple[Optional[Dict[str, Any]], str]:
@@ -411,39 +344,15 @@ def _top_results(results: List[Dict[str, Any]], top_k: int) -> List[Dict[str, An
     return results[:top_k] if top_k and top_k > 0 else results
 
 
-_DECLINE_REPLY = (
-    "If they decline, tell them in one short sentence that you will not share the general advice and that they "
-    "can ask another farming question; do not search again, do not ask anything else and do not show a Source line."
-)
-
-
-def _yes_no_instruction(crop: str) -> str:
-    return (
-        "Do not give any advice yet. Do not ask for a district again. Ask the farmer one yes/no question, in their "
-        f"language: there is no district-specific advisory, do they want the general advice for {crop}, the season "
-        "and the days they gave? If they agree, call search_advisory again with the same arguments plus "
-        "district_fallback_confirmed=true. " + _DECLINE_REPLY
-    )
-
-
-def _district_without_data_message(district: str, crop: str) -> str:
-    return f"No advisory data is available for the district '{district}'. {NO_DISTRICT_DATA_MARKER}\n" + _yes_no_instruction(crop)
-
-
-def _district_missing_message(crop: str, days: Optional[int]) -> str:
-    return f"No district was given, so nothing was searched. {NO_DISTRICT_DATA_MARKER}\n" + _yes_no_instruction(crop)
-
-
 @observe(name="tool:search_advisory", as_type="tool")
 async def search_advisory(
     ctx: RunContext[FarmerContext],
     query: str,
     crop: str,
     advice_type: Literal["generic", "personalised"],
-    district: Optional[str] = None,
     days_after_sowing: Optional[int] = None,
-    district_fallback_confirmed: bool = False,
     season: Optional[str] = None,
+    location: Optional[str] = None,
     top_k: int = 5,
 ) -> str:
     """
@@ -461,56 +370,39 @@ async def search_advisory(
             when it is not known.
         advice_type: The farmer's own answer to "generic or personalised advice?" (required).
             If the farmer has not answered that question yet, do NOT call this tool: ask them first.
-        district: Personalised advice only: the farmer's district (or state if the district
-            is unknown). Leave empty for generic advice or when the farmer does not know it.
         days_after_sowing: Personalised advice only: whole number of days since the farmer
             sowed the crop. Leave empty for generic advice or when the farmer does not know it.
-        district_fallback_confirmed: Set to true ONLY after the tool said there is no advisory data
-            for the district, you asked the farmer whether they want the crop advice anyway, and
-            they agreed. Leave false otherwise.
         season: Personalised advice only: the season the farmer gave (Rabi, Kharif or Zaid). Leave empty
             when the farmer does not know it; the server default season is then used.
+        location: A district, state or place the farmer mentioned, if any. It is never used to search
+            (advice is filtered on crop, season and days only); it only lets the answer say so.
         top_k: Maximum number of advisories to return (default: 5)
 
     Returns:
         Advisory text, then a "Search notes" line, or a message saying nothing was found.
     """
-    if not _farmer_was_asked(ctx):
+    if not farmer_was_asked(ctx):
         raise ModelRetry(ASK_FIRST_RETRY + " Then call search_advisory with advice_type set to their choice.")
     crop = _clean_param(crop)
     if not crop:
         raise ModelRetry("Ask the farmer which crop they mean, then call search_advisory again with `crop`.")
     personalised = advice_type == "personalised"
     # Generic advice never sends the personal details, even if the model passes them.
-    district, days = _personal_details(personalised, district, days_after_sowing)
-    if district and not district_comes_from_farmer(ctx, district):
-        # Never send a district the farmer did not write (for example one worked out from the browser
-        # location): treat it as not given, so the farmer only gets the yes/no question.
-        district = ""
-    _require_details_asked(ctx, personalised, district, days, district_fallback_confirmed)
+    days = _clean_days(days_after_sowing) if personalised else None
+    _require_details_asked(ctx, personalised, days)
     season_value = _resolve_season(advice_type, season)
-
-    # The farmer agreed to the crop advice without the district: search without it.
-    district_unavailable = _district_fallback_check(ctx, district_fallback_confirmed)
-    if district_unavailable:
-        district = ""
-    # Location is optional, but it is never asked for again: with no district the farmer is asked once
-    # whether the general advice (crop, season, days) is wanted.
-    if personalised and not district and not district_unavailable:
-        return _district_missing_message(crop, days)
 
     payload = build_advisory_search_payload(
         query=query,
         session_id=ctx.deps.session_id,
         question_id=ctx.deps.question_id,
         crop=crop,
-        district=district,
         days_after_sowing=days,
         season=season_value,
     )
     transaction_id = payload["context"]["transaction_id"]
     lf_update_current_observation(
-        input={"query": query, "crop": crop, "advice_type": advice_type, "district": district or None, "days_after_sowing": days, "season": season_value or None, "top_k": top_k},
+        input={"query": query, "crop": crop, "advice_type": advice_type, "days_after_sowing": days, "season": season_value or None, "top_k": top_k},
         metadata={"tool": "advisory.search", "category": KNOWLEDGE_ADVISORY_CATEGORY, "transaction_id": transaction_id},
     )
 
@@ -525,13 +417,7 @@ async def search_advisory(
 
     if not results:
         return _no_results_message(query, status, message)
-    if district and str(search_ctx.get("location_status") or "").strip().lower() == "location_not_applied":
-        return _district_without_data_message(district, crop)
     formatted = format_advisory_results(_top_results(results, top_k), query)
     return formatted + "\n\n" + format_search_notes(
-        search_ctx,
-        days,
-        personalised=personalised,
-        district_given=bool(district) or district_unavailable,
-        district_unavailable=district_unavailable,
+        search_ctx, days, personalised=personalised, location=_clean_param(location)
     )
