@@ -29,7 +29,7 @@ def _is_answer(part) -> bool:
     )
 
 
-def _has_text(message) -> bool:
+def has_text(message) -> bool:
     return isinstance(message, ModelResponse) and any(
         isinstance(part, TextPart) and part.content.strip() for part in message.parts
     )
@@ -61,7 +61,7 @@ def asked_rounds(ctx) -> int:
         turn = messages[starts[turn_number]:starts[turn_number + 1]]
         if any(_is_answer(part) for message in turn if isinstance(message, ModelRequest) for part in message.parts):
             break
-        if not any(_has_text(message) for message in turn):
+        if not any(has_text(message) for message in turn):
             break
         rounds += 1
     return rounds

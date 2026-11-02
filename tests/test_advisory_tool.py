@@ -552,3 +552,20 @@ class TestDetailsAskedFirst:
     def test_details_in_the_call_need_no_second_question(self, bap):
         out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", days_after_sowing=40))
         assert "Harvest AKJ-1" in out
+
+
+class TestDistrictConfirmationFollowsTheFarmersReply:
+    def test_searching_again_after_the_reply_counts_as_yes(self, bap):
+        # the agent forgot district_fallback_confirmed and repeated the same district
+        out = asyncio.run(sa.search_advisory(_ctx(NO_DATA_ASKED), "aphids", "Wheat", "personalised", district="Lucknow", season="Rabi", days_after_sowing=40))
+        assert "Harvest AKJ-1" in out and sa.NO_DISTRICT_DATA_MARKER not in out
+        assert "district" not in _params(json.loads(bap.requests[0].read()))
+
+    def test_a_new_question_after_an_answer_starts_again(self, bap):
+        answered = NO_DATA_ASKED + [
+            ModelRequest(parts=[UserPromptPart(content="yes")]),
+            ModelResponse(parts=[ToolCallPart(tool_name="search_advisory", args={})]),
+            ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c3", content="advice")]),
+            ModelResponse(parts=[TextPart(content="Here is the advice.")]),
+        ]
+        assert sa._asked_about_district_fallback(_ctx(answered)) is False

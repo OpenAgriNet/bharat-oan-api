@@ -18,7 +18,7 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolRetu
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
-from helpers.ask_first import ASK_FIRST_RETRY, NO_DISTRICT_DATA_MARKER, farmer_was_asked
+from helpers.ask_first import ANSWER_TOOLS, ASK_FIRST_RETRY, NO_DISTRICT_DATA_MARKER, has_text, farmer_was_asked
 from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -57,28 +57,28 @@ def _clean_days(value: Optional[int]) -> Optional[int]:
 
 
 def _asked_about_district_fallback(ctx: RunContext[FarmerContext]) -> bool:
-    """True when the "no data for your district" result was followed by an assistant message.
+    """True when, for the current question, the "no data for your district" result was followed by
+    an assistant message (the question to the farmer).
 
-    That message is the question to the farmer, so a later call with district_fallback_confirmed
-    is the answer to it. A confirmation in the same step as the "no data" result is refused.
+    A later call is then the farmer's answer to it. A call in the same step as the "no data"
+    result is not. An answer to an earlier question starts the check again.
     """
     messages = getattr(ctx, "messages", None)
     if messages is None:  # cannot verify (not running inside an agent run)
         return True
-    seen_marker = False
+    state = 0  # 0: nothing yet, 1: "no data" result seen, 2: and the assistant asked about it
     for message in messages:
         if isinstance(message, ModelRequest):
-            if any(
-                isinstance(part, ToolReturnPart)
-                and part.tool_name == "search_advisory"
-                and NO_DISTRICT_DATA_MARKER in str(part.content)
-                for part in message.parts
-            ):
-                seen_marker = True
-        elif seen_marker and isinstance(message, ModelResponse):
-            if any(isinstance(part, TextPart) and part.content.strip() for part in message.parts):
-                return True
-    return False
+            for part in message.parts:
+                if not isinstance(part, ToolReturnPart):
+                    continue
+                if part.tool_name == "search_advisory" and NO_DISTRICT_DATA_MARKER in str(part.content):
+                    state = 1
+                elif part.tool_name in ANSWER_TOOLS:
+                    state = 0
+        elif state == 1 and has_text(message):
+            state = 2
+    return state == 2
 
 
 _farmer_was_asked = farmer_was_asked
@@ -341,14 +341,20 @@ def _resolve_season(advice_type: str, season: Optional[str]) -> str:
     return default_season() or farmer_season
 
 
-def _district_fallback_check(ctx: RunContext[FarmerContext], confirmed: bool) -> bool:
-    """True when the farmer agreed to advice without the district; refuses an unasked confirmation."""
-    if confirmed and not _asked_about_district_fallback(ctx):
+def _district_fallback_check(ctx: RunContext[FarmerContext], confirmed: bool, district: str) -> bool:
+    """True when the farmer agreed to advice without the district.
+
+    The agent may set `district_fallback_confirmed`, or simply search again with the same district
+    after the farmer replied to the "no data for your district" question: both mean yes. Setting it
+    before the farmer was asked is refused.
+    """
+    asked = _asked_about_district_fallback(ctx)
+    if confirmed and not asked:
         raise ModelRetry(
             "Do not set district_fallback_confirmed yet. First tell the farmer there is no advisory data "
             "for their district and ask whether they want the crop advice anyway; use their answer."
         )
-    return confirmed
+    return confirmed or (bool(district) and asked and getattr(ctx, "messages", None) is not None)
 
 
 async def _post_search(payload: Dict[str, Any]) -> tuple[Optional[Dict[str, Any]], str]:
@@ -466,7 +472,7 @@ async def search_advisory(
     season_value = _resolve_season(advice_type, season)
 
     # The farmer agreed to the crop advice without the district: search without it.
-    district_unavailable = _district_fallback_check(ctx, district_fallback_confirmed)
+    district_unavailable = _district_fallback_check(ctx, district_fallback_confirmed, district)
     if district_unavailable:
         district = ""
 
