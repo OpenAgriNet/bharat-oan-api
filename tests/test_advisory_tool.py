@@ -574,6 +574,19 @@ class TestDistrictConfirmationFollowsTheFarmersReply:
         assert "Harvest AKJ-1" in out and sa.NO_DISTRICT_DATA_MARKER not in out
         assert "district" not in _params(json.loads(bap.requests[0].read()))
 
+    def test_yes_still_counts_when_other_tools_ran_after_the_no_data_result(self, bap):
+        # another search tool ran in the same turn and the question was not the very next message
+        history = ASKED + [
+            ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c1",
+                                               content="No advisory data. " + sa.NO_DISTRICT_DATA_MARKER)]),
+            ModelRequest(parts=[ToolReturnPart(tool_name="search_documents", tool_call_id="c2", content="nothing")]),
+            ModelResponse(parts=[ToolCallPart(tool_name="search_terms", args={})]),
+            ModelResponse(parts=[TextPart(content="Do you want the general wheat advice?")]),
+            ModelRequest(parts=[UserPromptPart(content="yes")]),
+        ]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "harvest", "Wheat", "personalised", season="Rabi", district="Lucknow", days_after_sowing=40))
+        assert "Harvest AKJ-1" in out and sa.NO_DISTRICT_DATA_MARKER not in out
+
     def test_a_new_question_after_an_answer_starts_again(self, bap):
         answered = NO_DATA_ASKED + [
             ModelRequest(parts=[UserPromptPart(content="yes")]),

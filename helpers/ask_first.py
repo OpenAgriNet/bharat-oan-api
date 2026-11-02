@@ -59,7 +59,11 @@ def asked_rounds(ctx) -> int:
     rounds = 0
     for turn_number in range(len(starts) - 2, -1, -1):  # every turn before the latest one
         turn = messages[starts[turn_number]:starts[turn_number + 1]]
-        if any(_is_answer(part) for message in turn if isinstance(message, ModelRequest) for part in message.parts):
+        parts = [part for message in turn if isinstance(message, ModelRequest) for part in message.parts]
+        # A turn that ended with the "no district-specific advisory" question is still an unanswered ask,
+        # even if another search tool also ran in it.
+        asked_no_data = any(isinstance(p, ToolReturnPart) and NO_DISTRICT_DATA_MARKER in str(p.content) for p in parts)
+        if any(_is_answer(p) for p in parts) and not asked_no_data:
             break
         if not any(has_text(message) for message in turn):
             break
