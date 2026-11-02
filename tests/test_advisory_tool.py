@@ -224,7 +224,7 @@ class TestSourceLine:
             [{"title": "T", "text": "Advisory: Harvest.\n\nSource: ICAR–DKMA, jak", "section": "full"}], "q"
         )
         assert "jak" not in out and "DKMA" not in out
-        assert out.rstrip().endswith("Source: ICAR - Kisan Sarathi")
+        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
 
     def test_leaves_text_without_a_source_line_alone(self):
         out = sa.format_advisory_results([{"title": "T", "text": "Advisory: Harvest.", "section": "full"}], "q")
@@ -408,6 +408,21 @@ class TestTool:
         assert "Harvest AKJ-1" in out
         assert len(bap.requests) == 1
 
+    def test_a_new_question_after_an_answer_needs_a_new_ask(self, bap):
+        done = ASKED + [
+            ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c1", content="advice")]),
+            ModelResponse(parts=[TextPart(content="Here is the advice. Anything else?")]),
+            ModelRequest(parts=[UserPromptPart(content="anything which you have")]),
+        ]
+        with pytest.raises(ModelRetry, match="generic or personalised"):
+            asyncio.run(sa.search_advisory(_ctx(done), "wheat pests", "Wheat", "personalised"))
+        asked_again = done + [
+            ModelResponse(parts=[TextPart(content="Generic or personalised?")]),
+            ModelRequest(parts=[UserPromptPart(content="generic")]),
+        ]
+        out = asyncio.run(sa.search_advisory(_ctx(asked_again), "wheat pests", "Wheat", "generic"))
+        assert "Harvest AKJ-1" in out
+
     def test_top_k_limits_results(self, bap):
         bap.response = httpx.Response(200, json=_on_search([_item(f"c{i}", title=f"T{i}") for i in range(6)]))
         out = asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic", top_k=2))
@@ -451,3 +466,33 @@ def test_tool_is_registered_with_context():
     assert "advice_type" in schema["required"]
     assert schema["properties"]["advice_type"]["enum"] == ["generic", "personalised"]
     assert "search_schemes" in registered  # scheme routing is untouched
+
+
+def test_season_note_uses_env_default(monkeypatch):
+    from agents.tools.advisory import advisory_season_note
+
+    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
+    note = advisory_season_note()
+    assert "Rabi" in note and "ask the farmer for the **season**" in note and "do not use their answer" in note
+
+    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
+    note = advisory_season_note()
+    assert "Pass their answer as `season`" in note
+
+
+def test_payload_carries_season_tag():
+    from agents.tools.advisory import build_advisory_search_payload
+
+    payload = build_advisory_search_payload("wheat aphids", crop="Wheat", season="Rabi")
+    entries = payload["message"]["intent"]["item"]["tags"][0]["list"]
+    assert {"descriptor": {"code": "season"}, "value": "Rabi"} in entries
+
+
+def test_env_season_beats_the_farmers_answer(monkeypatch, bap):
+    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
+    asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season="Kharif"))
+    assert _params(json.loads(bap.requests[0].read()))["season"] == "Rabi"
+
+    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
+    asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season="Kharif"))
+    assert _params(json.loads(bap.requests[1].read()))["season"] == "Kharif"

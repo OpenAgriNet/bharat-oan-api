@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Literal, Optional
 import httpx
 from langfuse import observe
 from pydantic_ai import ModelRetry
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
@@ -83,26 +83,76 @@ def _asked_about_district_fallback(ctx: RunContext[FarmerContext]) -> bool:
 
 
 def _farmer_was_asked(ctx: RunContext[FarmerContext]) -> bool:
-    """True once the assistant has already said something earlier in this conversation.
+    """True when, for the current advisory question, the farmer was asked and has answered.
 
-    The first reply to a new advisory question has to be the "generic or personalised?" question,
-    so on a conversation with no earlier assistant text the tool refuses to search. This keeps a
-    model that skips the prompt rule from answering before the farmer has chosen.
+    Looks at the messages after the last completed advisory search (or the whole conversation when
+    there was none) for this order: the farmer's question, then an assistant message (the
+    "generic or personalised?" question), then the farmer's reply. So every new advisory question
+    needs its own ask, and an earlier choice is not reused.
     """
     messages = getattr(ctx, "messages", None)
     if messages is None:  # cannot verify (not running inside an agent run)
         return True
-    return any(
-        isinstance(message, ModelResponse)
-        and any(isinstance(part, TextPart) and part.content.strip() for part in message.parts)
-        for message in messages
+    start = 0
+    for index, message in enumerate(messages):
+        if isinstance(message, ModelRequest) and any(
+            isinstance(part, ToolReturnPart)
+            and part.tool_name == "search_advisory"
+            and NO_DISTRICT_DATA_MARKER not in str(part.content)
+            for part in message.parts
+        ):
+            start = index + 1
+    stage = 0  # 0: wait for the question, 1: wait for the ask, 2: wait for the reply
+    for message in messages[start:]:
+        if isinstance(message, ModelRequest):
+            if any(isinstance(part, UserPromptPart) for part in message.parts):
+                if stage == 0:
+                    stage = 1
+                elif stage == 2:
+                    return True
+        elif isinstance(message, ModelResponse) and stage == 1:
+            if any(isinstance(part, TextPart) and part.content.strip() for part in message.parts):
+                stage = 2
+    return False
+
+
+def default_season() -> str:
+    """Season configured in env `ADVISORY_DEFAULT_SEASON` (empty when not set)."""
+    return _clean_param(os.getenv("ADVISORY_DEFAULT_SEASON"))
+
+
+def advisory_season_note() -> str:
+    """System-prompt note telling the agent how the season is handled (depends on env)."""
+    season = default_season()
+    ask = (
+        "In the personalised crop advisory flow, ask the farmer for the **season** (Rabi, Kharif or Zaid) "
+        "together with the district and the days since sowing. Do not ask for the season in the generic flow."
+    )
+    if season:
+        return (
+            f"\n\n## Advisory season (fixed: {season})\n{ask} Whatever the farmer answers, the advice is "
+            f"always searched for the **{season}** season: do not pass `season` and do not use their answer. "
+            f"When your answer uses the crop advisory results, say it is for the {season} season and continue "
+            f"the sentence with the advice, for example \"For the {season} season, ...\". Do this in the "
+            f"generic flow too."
+        )
+    return (
+        "\n\n## Advisory season (asked from the farmer)\n" + ask + " Pass their answer as `season`. If they "
+        "do not know it, call without it and do not ask again."
     )
 
 
-def _search_params_tag(crop: str, district: str, days_after_sowing: Optional[int]) -> List[Dict[str, Any]]:
-    """`search_params` tag group the provider reads: crop, district, days_after_sowing."""
+def _search_params_tag(
+    crop: str, district: str, days_after_sowing: Optional[int], season: str = ""
+) -> List[Dict[str, Any]]:
+    """`search_params` tag group the provider reads: crop, district, days_after_sowing, season."""
     entries = []
-    for code, value in (("crop", crop), ("district", district), ("days_after_sowing", days_after_sowing)):
+    for code, value in (
+        ("crop", crop),
+        ("district", district),
+        ("days_after_sowing", days_after_sowing),
+        ("season", season),
+    ):
         if value is None or value == "":
             continue
         entries.append({"descriptor": {"code": code}, "value": str(value)})
@@ -118,15 +168,17 @@ def build_advisory_search_payload(
     crop: str = "",
     district: str = "",
     days_after_sowing: Optional[int] = None,
+    season: str = "",
 ) -> Dict[str, Any]:
     """Beckn /search body for advisory document search (knowledge-advisory).
 
-    `crop`, `district` and `days_after_sowing` travel in `item.tags` (group `search_params`);
-    the season is decided by the provider, not sent from here.
+    `crop`, `district`, `days_after_sowing` and `season` travel in `item.tags` (group `search_params`).
     """
     now = datetime.now(timezone.utc)
     item: Dict[str, Any] = {"descriptor": {"name": query}}
-    tags = _search_params_tag(_clean_param(crop), _clean_param(district), _clean_days(days_after_sowing))
+    tags = _search_params_tag(
+        _clean_param(crop), _clean_param(district), _clean_days(days_after_sowing), _clean_param(season)
+    )
     if tags:
         item["tags"] = tags
     return {
@@ -238,7 +290,7 @@ def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
     return (
         "> Advisory Search Results for `" + query + "`\n\n"
         + "\n\n----\n\n".join(blocks)
-        + f"\n\n> Cite as: Source: {ADVISORY_SOURCE}"
+        + f"\n\n> Cite as (in bold): **Source: {ADVISORY_SOURCE}**"
     )
 
 
@@ -296,6 +348,7 @@ async def search_advisory(
     district: Optional[str] = None,
     days_after_sowing: Optional[int] = None,
     district_fallback_confirmed: bool = False,
+    season: Optional[str] = None,
     top_k: int = 5,
 ) -> str:
     """
@@ -320,6 +373,8 @@ async def search_advisory(
         district_fallback_confirmed: Set to true ONLY after the tool said there is no advisory data
             for the district, you asked the farmer whether they want the crop advice anyway, and
             they agreed. Leave false otherwise.
+        season: Personalised advice only: the season the farmer gave (Rabi, Kharif or Zaid). Leave empty
+            when the farmer does not know it; the server default season is then used.
         top_k: Maximum number of advisories to return (default: 5)
 
     Returns:
@@ -336,6 +391,10 @@ async def search_advisory(
     # Generic advice never sends the personal details, even if the model passes them.
     district = _clean_param(district) if advice_type == "personalised" else ""
     days = _clean_days(days_after_sowing) if advice_type == "personalised" else None
+
+    # The configured season (env) always wins; the farmer's answer (personalised only) is used when none is set.
+    farmer_season = _clean_param(season) if advice_type == "personalised" else ""
+    season_value = default_season() or farmer_season
 
     # The farmer agreed to the crop advice without the district: search without it.
     district_unavailable = False
@@ -355,10 +414,11 @@ async def search_advisory(
         crop=crop,
         district=district,
         days_after_sowing=days,
+        season=season_value,
     )
     transaction_id = payload["context"]["transaction_id"]
     lf_update_current_observation(
-        input={"query": query, "crop": crop, "advice_type": advice_type, "district": district or None, "days_after_sowing": days, "top_k": top_k},
+        input={"query": query, "crop": crop, "advice_type": advice_type, "district": district or None, "days_after_sowing": days, "season": season_value or None, "top_k": top_k},
         metadata={"tool": "advisory.search", "category": KNOWLEDGE_ADVISORY_CATEGORY, "transaction_id": transaction_id},
     )
 
