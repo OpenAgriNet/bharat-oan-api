@@ -7,13 +7,27 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from pydantic_ai import ModelRetry
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
 from agents.tools import advisory as sa
 
 # The provider appends the Source line to the stored chunk text.
 TEXT = "Advisory: Harvest AKJ-1.\n\nSource: ICAR–DKMA, jak"
 
-CTX = SimpleNamespace(deps=SimpleNamespace(session_id="sess-1", question_id="q-1"))
+def _ctx(messages):
+    return SimpleNamespace(deps=SimpleNamespace(session_id="sess-1", question_id="q-1"), messages=messages)
+
+
+# the farmer already got an assistant reply earlier in the conversation (the generic or personalised question)
+ASKED = [
+    ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")]),
+    ModelResponse(parts=[TextPart(content="Do you want generic or personalised advice?")]),
+    ModelRequest(parts=[UserPromptPart(content="generic")]),
+]
+# first turn: only the farmer's question, nothing said by the assistant yet
+FIRST_TURN = [ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")])]
+
+CTX = _ctx(ASKED)
 
 
 def _tag(code, value):
@@ -205,7 +219,7 @@ class TestSearchNotes:
 
 class TestTool:
     def test_posts_to_bap_search_and_returns_formatted_advice(self, bap):
-        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", "Wheat"))
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", "Wheat", "generic"))
         request = bap.requests[0]
         assert str(request.url) == "http://bap.test/search"
         body = request.read().decode()
@@ -218,7 +232,7 @@ class TestTool:
             json=_on_search([_item("c1")], location_status="location_not_applied", has_day_range="true", days_matched="true"),
         )
         out = asyncio.run(
-            sa.search_advisory(CTX, "aphids in wheat", "wheat", district="Lucknow", days_after_sowing=40)
+            sa.search_advisory(CTX, "aphids in wheat", "wheat", "personalised", district="Lucknow", days_after_sowing=40)
         )
         body = json.loads(bap.requests[0].read())
         assert _params(body) == {"crop": "wheat", "district": "Lucknow", "days_after_sowing": "40"}
@@ -227,36 +241,64 @@ class TestTool:
         assert "days_after_sowing_matched=yes" in out
 
     def test_generic_call_sends_only_the_crop(self, bap):
-        asyncio.run(sa.search_advisory(CTX, "aphids in wheat", "Wheat"))
+        asyncio.run(sa.search_advisory(CTX, "aphids in wheat", "Wheat", "generic"))
         assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat"}
 
     def test_blank_crop_asks_the_model_to_ask_the_farmer(self, bap):
         for blank in ("", "   "):
             with pytest.raises(ModelRetry):
-                asyncio.run(sa.search_advisory(CTX, "aphids", blank))
+                asyncio.run(sa.search_advisory(CTX, "aphids", blank, "generic"))
         assert bap.requests == []
+
+    def test_generic_never_sends_district_or_days(self, bap):
+        asyncio.run(
+            sa.search_advisory(CTX, "aphids", "Wheat", "generic", district="Lucknow", days_after_sowing=40)
+        )
+        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat"}
+
+    def test_refuses_to_search_before_the_farmer_was_asked(self, bap):
+        with pytest.raises(ModelRetry, match="generic or personalised"):
+            asyncio.run(sa.search_advisory(_ctx(FIRST_TURN), "aphids", "Wheat", "generic"))
+        assert bap.requests == []
+
+    def test_refuses_on_an_empty_conversation(self, bap):
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx([]), "aphids", "Wheat", "personalised", district="Pune"))
+        assert bap.requests == []
+
+    def test_a_tool_only_reply_does_not_count_as_asking(self, bap):
+        from pydantic_ai.messages import ToolCallPart
+
+        only_tool_call = FIRST_TURN + [ModelResponse(parts=[ToolCallPart(tool_name="search_advisory", args={})])]
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx(only_tool_call), "aphids", "Wheat", "generic"))
+
+    def test_allows_the_search_once_the_assistant_has_replied(self, bap):
+        out = asyncio.run(sa.search_advisory(_ctx(ASKED), "aphids", "Wheat", "generic"))
+        assert "Harvest AKJ-1" in out
+        assert len(bap.requests) == 1
 
     def test_top_k_limits_results(self, bap):
         bap.response = httpx.Response(200, json=_on_search([_item(f"c{i}", title=f"T{i}") for i in range(6)]))
-        out = asyncio.run(sa.search_advisory(CTX, "q", "Wheat", top_k=2))
+        out = asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic", top_k=2))
         assert "T0" in out and "T1" in out and "T2" not in out
 
     def test_empty_responses_say_nothing_was_found(self, bap):
         bap.response = httpx.Response(200, json={"context": {}, "responses": []})
-        out = asyncio.run(sa.search_advisory(CTX, "something odd", "Wheat"))
+        out = asyncio.run(sa.search_advisory(CTX, "something odd", "Wheat", "generic"))
         assert "No advisory" in out and "something odd" in out
 
     def test_provider_message_is_used_when_not_successful(self, bap):
         bap.response = httpx.Response(200, json=_on_search([], status="error", message="Advisory search failed"))
-        assert asyncio.run(sa.search_advisory(CTX, "q", "Wheat")) == "Advisory search failed"
+        assert asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")) == "Advisory search failed"
 
     def test_non_200_means_unavailable(self, bap):
         bap.response = httpx.Response(502, text="bad gateway")
-        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat")).lower()
+        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")).lower()
 
     def test_missing_bap_endpoint_is_a_configuration_message(self, monkeypatch):
         monkeypatch.delenv("BAP_ENDPOINT", raising=False)
-        assert "not configured" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat")).lower()
+        assert "not configured" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")).lower()
 
     def test_network_error_means_unavailable(self, monkeypatch):
         monkeypatch.setenv("BAP_ENDPOINT", "http://bap.test")
@@ -266,7 +308,7 @@ class TestTool:
             raise httpx.ConnectError("refused")
 
         monkeypatch.setattr(sa.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(boom)))
-        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat")).lower()
+        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")).lower()
 
 
 def test_tool_is_registered_with_context():
@@ -275,4 +317,7 @@ def test_tool_is_registered_with_context():
     registered = {tool.name: tool for tool in TOOLS}
     assert "search_advisory" in registered
     assert registered["search_advisory"].takes_ctx is True
+    schema = registered["search_advisory"].function_schema.json_schema
+    assert "advice_type" in schema["required"]
+    assert schema["properties"]["advice_type"]["enum"] == ["generic", "personalised"]
     assert "search_schemes" in registered  # scheme routing is untouched

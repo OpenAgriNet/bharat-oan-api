@@ -9,11 +9,12 @@ import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import httpx
 from langfuse import observe
 from pydantic_ai import ModelRetry
+from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
@@ -49,6 +50,23 @@ def _clean_days(value: Optional[int]) -> Optional[int]:
     except (TypeError, ValueError):
         return None
     return days if 0 <= days <= _MAX_DAYS_AFTER_SOWING else None
+
+
+def _farmer_was_asked(ctx: RunContext[FarmerContext]) -> bool:
+    """True once the assistant has already said something earlier in this conversation.
+
+    The first reply to a new advisory question has to be the "generic or personalised?" question,
+    so on a conversation with no earlier assistant text the tool refuses to search. This keeps a
+    model that skips the prompt rule from answering before the farmer has chosen.
+    """
+    messages = getattr(ctx, "messages", None)
+    if messages is None:  # cannot verify (not running inside an agent run)
+        return True
+    return any(
+        isinstance(message, ModelResponse)
+        and any(isinstance(part, TextPart) and part.content.strip() for part in message.parts)
+        for message in messages
+    )
 
 
 def _search_params_tag(crop: str, district: str, days_after_sowing: Optional[int]) -> List[Dict[str, Any]]:
@@ -199,6 +217,7 @@ async def search_advisory(
     ctx: RunContext[FarmerContext],
     query: str,
     crop: str,
+    advice_type: Literal["generic", "personalised"],
     district: Optional[str] = None,
     days_after_sowing: Optional[int] = None,
     top_k: int = 5,
@@ -216,6 +235,8 @@ async def search_advisory(
         query: The farming problem in *English*, 2-5 words, including the crop (required)
         crop: The crop in English, for example "Wheat" or "Rice" (required). Ask the farmer
             when it is not known.
+        advice_type: The farmer's own answer to "generic or personalised advice?" (required).
+            If the farmer has not answered that question yet, do NOT call this tool: ask them first.
         district: Personalised advice only: the farmer's district (or state if the district
             is unknown). Leave empty for generic advice or when the farmer does not know it.
         days_after_sowing: Personalised advice only: whole number of days since the farmer
@@ -225,11 +246,17 @@ async def search_advisory(
     Returns:
         Advisory text, then a "Search notes" line, or a message saying nothing was found.
     """
+    if not _farmer_was_asked(ctx):
+        raise ModelRetry(
+            "Do not search yet. Ask the farmer whether they want generic or personalised advice, "
+            "wait for their answer, then call search_advisory with advice_type set to their choice."
+        )
     crop = _clean_param(crop)
     if not crop:
         raise ModelRetry("Ask the farmer which crop they mean, then call search_advisory again with `crop`.")
-    district = _clean_param(district)
-    days = _clean_days(days_after_sowing)
+    # Generic advice never sends the personal details, even if the model passes them.
+    district = _clean_param(district) if advice_type == "personalised" else ""
+    days = _clean_days(days_after_sowing) if advice_type == "personalised" else None
 
     payload = build_advisory_search_payload(
         query=query,
@@ -241,7 +268,7 @@ async def search_advisory(
     )
     transaction_id = payload["context"]["transaction_id"]
     lf_update_current_observation(
-        input={"query": query, "crop": crop, "district": district or None, "days_after_sowing": days, "top_k": top_k},
+        input={"query": query, "crop": crop, "advice_type": advice_type, "district": district or None, "days_after_sowing": days, "top_k": top_k},
         metadata={"tool": "advisory.search", "category": KNOWLEDGE_ADVISORY_CATEGORY, "transaction_id": transaction_id},
     )
 
