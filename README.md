@@ -167,11 +167,18 @@ Unrelated questions do not trigger KHC suggestions.
   or service your grievance is with?", without any service source label.
   PM-Kisan, PMFBY and AIF selections start their own existing status flows;
   an explicit KHC selection asks only for a missing grievance number.
+  KCC (Kisan Credit Card) grievance status and other schemes without a primary
+  grievance-status flow go directly to KHC, with no service-choice question.
+  KCC's own tools are for application status only, not grievance tracking.
   Reuse the route and identifiers for the same grievance. An unrelated earlier
   KHC request, a bare number, a loaded capability or the bot's own KHC source
   label must not select KHC for a new status request. Honor explicit service switches.
-  This gate is supplied on every turn in every language, including before
-  capability loading. Routing remains LLM-driven, not a deterministic state machine.
+  This gate is defined in [the shared routing prompt](assets/prompts/grievance_status_routing.md)
+  and supplied on every turn in every language, including before capability
+  loading. The model uses that prompt and conversation history to route KCC and
+  other schemes; there is no KCC-specific Python history matcher or route lock.
+  The prompt covers repeated scheme/ID/OTP replies after an erroneous bot service
+  question and distinguishes application requests, explicit switches and unrelated turns.
   The current query is passed explicitly into the routing reminder because dynamic
   system prompts run before that user message is added to history. An opening such
   as "i want to check khc grivance status" therefore selects KHC immediately and
@@ -226,7 +233,8 @@ Unrelated questions do not trigger KHC suggestions.
   confirmation; already supplied/resolved location details are reused.
   The final summary confirms the resolved grievance location before submission.
   This does not require an AgriStack login.
-- **Status:** ask for the grievance number, retaining slashes and leading zeros,
+- **Status:** ask "Please share the grievance ID you received by SMS on your
+  registered mobile number. For example, UP/231026/5." Validate the format while retaining slashes and leading zeros,
   then call `check_khc_grievance_status` without `otp` to send an SMS to the mobile
   registered on the grievance. After successful sending, collect the six-digit OTP
   and call the same tool with `grievance_number` and `otp`. No mobile or cookie is
@@ -237,13 +245,24 @@ Unrelated questions do not trigger KHC suggestions.
   when available. Missing registered mobiles and API/authentication failures are
   reported separately from incorrect OTPs. Existing status tool/capability names
   are unchanged, so all language prompts use the shared two-step flow.
+  Only after the send call succeeds, say "An OTP has been sent to your registered
+  mobile number. Please share the 6-digit OTP." Sending is not proof of delivery.
+  Reject malformed OTPs locally with an explanation that exactly six digits are needed.
+  Distinguish grievance-ID/not-found errors from OTP failures using the provider's
+  response. Preserve "invalid or expired" when KHC does not distinguish those causes;
+  never blame an ID/OTP for SMS, authentication or service failures.
 - **Grievance number validation:** before either status OTP call, require
-  `XX/NNNNNN/sequence` (for example `BR/240926/1`): two ASCII letters, exactly six
-  digits and a positive digit-only sequence, within 100 normalized characters.
+  `XX/numeric-section/sequence` (for example `UP/231026/5` or `JK/2310261/1`):
+  two ASCII letters, a nonempty numeric middle section and a positive digit-only
+  sequence, within 100 normalized characters. KHC generates `grievanceNo` on
+  creation; Bharat Vistaar generates only the separate `BV-...` external reference.
+  Do not assume a six-digit middle section from a sample or truncate a returned ID.
   Trim surrounding whitespace, uppercase the prefix and normalize regional digits;
   preserve leading zeros. Zero-only sequences and malformed numbers are rejected
   without HTTP requests, with a prompt to copy the full number from the KHC SMS.
-  The six-digit middle section is not calendar-validated; existence is checked by KHC.
+  The middle section has no locally imposed digit count or calendar interpretation;
+  existence is checked by KHC. Invalid-ID tool results request only an ID correction,
+  never a scheme/service restart. OTPs still require exactly six digits.
 - Registration verification is bound to the conversation/mobile and expires locally after
   five minutes. Changed mobiles, expiry and provider restarts require fresh OTP.
   Do not automatically retry OTP sends or registration after uncertain failures.

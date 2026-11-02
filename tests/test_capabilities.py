@@ -79,6 +79,15 @@ def test_status_routing_gate_is_present_before_any_capability_is_loaded(prompt_f
     assert "Could you please tell me which scheme or service your grievance is with?" in prompt
     assert "Do not show any service source label while clarifying the route" in prompt
     assert "This gate overrides generic grievance tool-table entries" in prompt
+    assert "KCC (Kisan Credit Card) grievance/complaint status -> check_khc_grievance_status" in prompt
+    assert "Do not ask which service to use for KCC grievances" in prompt
+    assert "Do not call initiate_kcc_otp, check_kcc_application_status or select_kcc_application for a grievance" in prompt
+    assert "otherwise PM-Kisan -> pmkisan_grievance_send_otp(purpose='check_status')" in prompt
+    assert "PMFBY -> pmfby_grievance_status" in prompt
+    assert "AIF -> initiate_aif_otp then verify_aif_otp then check_aif_grievance_status" in prompt
+    assert "A short scheme reply such as 'KCC' answers the pending scheme question" in prompt
+    assert "Do not restart scheme/service selection" in prompt
+    assert "Do not carry that route into an application-status request" in prompt
 
 
 @pytest.mark.parametrize("preloaded", [None, frozenset()])
