@@ -59,28 +59,28 @@ def _clean_days(value: Optional[int]) -> Optional[int]:
 
 
 def _asked_about_district_fallback(ctx: RunContext[FarmerContext]) -> bool:
-    """True when, for the current question, the "no data for your district" result was followed by
-    an assistant message (the question to the farmer).
+    """True when the "no district-specific advisory" result came in an earlier farmer turn and no advice
+    has been given since: the farmer's latest message is then the answer to the yes/no question.
 
-    A later call is then the farmer's answer to it. A call in the same step as the "no data"
-    result is not. An answer to an earlier question starts the check again.
+    Deliberately turn-based: it does not depend on the shape of the assistant's reply or on other tools
+    that ran in between, so a "yes" is never ignored (which made the same question repeat). Only a
+    successful advisory search ends the question. A marker from the current turn is not an answer yet.
     """
     messages = getattr(ctx, "messages", None)
     if messages is None:  # cannot verify (not running inside an agent run)
         return True
-    state = 0  # 0: nothing yet, 1: "no data" result seen, 2: and the assistant asked about it
+    marker_turn: Optional[int] = None
+    turn = 0
     for message in messages:
-        if isinstance(message, ModelRequest):
-            for part in message.parts:
-                if not isinstance(part, ToolReturnPart):
-                    continue
-                if part.tool_name == "search_advisory" and NO_DISTRICT_DATA_MARKER in str(part.content):
-                    state = 1
-                elif part.tool_name in ANSWER_TOOLS:
-                    state = 0
-        elif state == 1 and has_text(message):
-            state = 2
-    return state == 2
+        if not isinstance(message, ModelRequest):
+            continue
+        if any(isinstance(part, UserPromptPart) for part in message.parts):
+            turn += 1
+        for part in message.parts:
+            if not isinstance(part, ToolReturnPart) or part.tool_name != "search_advisory":
+                continue
+            marker_turn = turn if NO_DISTRICT_DATA_MARKER in str(part.content) else None
+    return marker_turn is not None and marker_turn < turn
 
 
 _farmer_was_asked = farmer_was_asked
