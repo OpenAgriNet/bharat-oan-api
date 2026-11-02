@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Literal, Optional
 import httpx
 from langfuse import observe
 from pydantic_ai import ModelRetry
-from pydantic_ai.messages import ModelResponse, TextPart
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
@@ -50,6 +50,36 @@ def _clean_days(value: Optional[int]) -> Optional[int]:
     except (TypeError, ValueError):
         return None
     return days if 0 <= days <= _MAX_DAYS_AFTER_SOWING else None
+
+
+# Appears in the tool text when the farmer's district has no advisory data, so the guard below can
+# tell that the farmer was (or was not) asked whether to continue without the district.
+NO_DISTRICT_DATA_MARKER = "[NO_ADVISORY_DATA_FOR_DISTRICT]"
+
+
+def _asked_about_district_fallback(ctx: RunContext[FarmerContext]) -> bool:
+    """True when the "no data for your district" result was followed by an assistant message.
+
+    That message is the question to the farmer, so a later call with district_fallback_confirmed
+    is the answer to it. A confirmation in the same step as the "no data" result is refused.
+    """
+    messages = getattr(ctx, "messages", None)
+    if messages is None:  # cannot verify (not running inside an agent run)
+        return True
+    seen_marker = False
+    for message in messages:
+        if isinstance(message, ModelRequest):
+            if any(
+                isinstance(part, ToolReturnPart)
+                and part.tool_name == "search_advisory"
+                and NO_DISTRICT_DATA_MARKER in str(part.content)
+                for part in message.parts
+            ):
+                seen_marker = True
+        elif seen_marker and isinstance(message, ModelResponse):
+            if any(isinstance(part, TextPart) and part.content.strip() for part in message.parts):
+                return True
+    return False
 
 
 def _farmer_was_asked(ctx: RunContext[FarmerContext]) -> bool:
@@ -217,6 +247,7 @@ def format_search_notes(
     days_after_sowing: Optional[int],
     personalised: bool = False,
     district_given: bool = False,
+    district_unavailable: bool = False,
 ) -> str:
     """Notes for the agent about how the search was applied, with what to tell the farmer."""
     location = str(search_ctx.get("location_status") or "").strip().lower()
@@ -229,7 +260,12 @@ def format_search_notes(
     if days_after_sowing is not None:
         facts.append(f"days_after_sowing_matched={'yes' if days_matched else 'no'}")
     lines = ["> Search notes: " + "; ".join(facts)]
-    if location == "location_not_applied":
+    if district_unavailable:
+        lines.append(
+            "> The farmer's district has no advisory data and the farmer agreed to the crop advice. "
+            "Say in one short sentence that this advice is for the crop and not specific to their district."
+        )
+    elif location == "location_not_applied":
         lines.append(
             "> These advisories are not specific to the farmer's district. Say so in one short sentence "
             "and do not present the advice as local to their district."
@@ -259,6 +295,7 @@ async def search_advisory(
     advice_type: Literal["generic", "personalised"],
     district: Optional[str] = None,
     days_after_sowing: Optional[int] = None,
+    district_fallback_confirmed: bool = False,
     top_k: int = 5,
 ) -> str:
     """
@@ -280,6 +317,9 @@ async def search_advisory(
             is unknown). Leave empty for generic advice or when the farmer does not know it.
         days_after_sowing: Personalised advice only: whole number of days since the farmer
             sowed the crop. Leave empty for generic advice or when the farmer does not know it.
+        district_fallback_confirmed: Set to true ONLY after the tool said there is no advisory data
+            for the district, you asked the farmer whether they want the crop advice anyway, and
+            they agreed. Leave false otherwise.
         top_k: Maximum number of advisories to return (default: 5)
 
     Returns:
@@ -296,6 +336,17 @@ async def search_advisory(
     # Generic advice never sends the personal details, even if the model passes them.
     district = _clean_param(district) if advice_type == "personalised" else ""
     days = _clean_days(days_after_sowing) if advice_type == "personalised" else None
+
+    # The farmer agreed to the crop advice without the district: search without it.
+    district_unavailable = False
+    if district_fallback_confirmed:
+        if not _asked_about_district_fallback(ctx):
+            raise ModelRetry(
+                "Do not set district_fallback_confirmed yet. First tell the farmer there is no advisory data "
+                "for their district and ask whether they want the crop advice anyway; use their answer."
+            )
+        district = ""
+        district_unavailable = True
 
     payload = build_advisory_search_payload(
         query=query,
@@ -356,7 +407,20 @@ async def search_advisory(
         if status and status not in ("success", "not_found") and message:
             return message
         return f"No advisory found for `{query}`."
+    if district and str(search_ctx.get("location_status") or "").strip().lower() == "location_not_applied":
+        return (
+            f"No advisory data is available for the district '{district}'. {NO_DISTRICT_DATA_MARKER}\n"
+            "Do not give any advice yet. Tell the farmer, in their language, that there is no advisory data "
+            f"for their district, and ask whether they want advice for {crop} anyway"
+            + (" (matched to their sowing days)" if days is not None else "")
+            + ". If they agree, call search_advisory again with the same arguments plus "
+            "district_fallback_confirmed=true. If they decline, do not search again."
+        )
     formatted = format_advisory_results(results[:top_k] if top_k and top_k > 0 else results, query)
     return formatted + "\n\n" + format_search_notes(
-        search_ctx, days, personalised=advice_type == "personalised", district_given=bool(district)
+        search_ctx,
+        days,
+        personalised=advice_type == "personalised",
+        district_given=bool(district) or district_unavailable,
+        district_unavailable=district_unavailable,
     )

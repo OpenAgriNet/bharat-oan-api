@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from pydantic_ai import ModelRetry
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
 
 from agents.tools import advisory as sa
 
@@ -28,6 +28,20 @@ ASKED = [
 FIRST_TURN = [ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")])]
 
 CTX = _ctx(ASKED)
+
+# the "no data for your district" result, the assistant's question about it, and the farmer's "yes"
+NO_DATA_ASKED = ASKED + [
+    ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c1",
+                                       content="No advisory data is available for the district 'Lucknow'. " + sa.NO_DISTRICT_DATA_MARKER)]),
+    ModelResponse(parts=[TextPart(content="There is no advisory data for Lucknow. Do you want wheat advice anyway?")]),
+    ModelRequest(parts=[UserPromptPart(content="yes")]),
+]
+# same step: the tool result is there but the assistant has not asked the farmer anything yet
+NO_DATA_NOT_ASKED = ASKED + [
+    ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c1",
+                                       content="No advisory data is available for the district 'Lucknow'. " + sa.NO_DISTRICT_DATA_MARKER)]),
+]
+
 
 
 def _tag(code, value):
@@ -251,6 +265,14 @@ class TestSearchNotes:
         assert "did not give the days since sowing" in out
         assert "did not give a district" not in out
 
+    def test_notes_after_the_farmer_agreed_to_continue_without_the_district(self):
+        ctx = {"location_status": "not_requested", "has_day_range": "true", "days_matched": "true"}
+        out = sa.format_search_notes(
+            ctx, days_after_sowing=40, personalised=True, district_given=True, district_unavailable=True
+        )
+        assert "agreed to the crop advice" in out and "not specific to their district" in out
+        assert "did not give a district" not in out
+
     def test_a_generic_search_never_mentions_skipped_details(self):
         ctx = {"location_status": "not_requested", "has_day_range": "true", "days_matched": "false"}
         out = sa.format_search_notes(ctx, days_after_sowing=None, personalised=False, district_given=False)
@@ -275,7 +297,7 @@ class TestTool:
     def test_sends_crop_district_and_days_and_reports_the_notes(self, bap):
         bap.response = httpx.Response(
             200,
-            json=_on_search([_item("c1")], location_status="location_not_applied", has_day_range="true", days_matched="true"),
+            json=_on_search([_item("c1")], location_status="location_matched", has_day_range="true", days_matched="true"),
         )
         out = asyncio.run(
             sa.search_advisory(CTX, "aphids in wheat", "wheat", "personalised", district="Lucknow", days_after_sowing=40)
@@ -283,7 +305,7 @@ class TestTool:
         body = json.loads(bap.requests[0].read())
         assert _params(body) == {"crop": "wheat", "district": "Lucknow", "days_after_sowing": "40"}
         assert "Harvest AKJ-1" in out
-        assert "location_status=location_not_applied" in out
+        assert "location_status=location_matched" in out
         assert "days_after_sowing_matched=yes" in out
 
     def test_generic_call_sends_only_the_crop(self, bap):
@@ -305,6 +327,58 @@ class TestTool:
             sa.search_advisory(CTX, "aphids", "Wheat", "personalised", district="Lucknow", days_after_sowing=40)
         )
         assert "did not give" not in out
+
+    def test_district_without_data_is_withheld_and_the_agent_must_ask(self, bap):
+        bap.response = httpx.Response(
+            200, json=_on_search([_item("c1")], location_status="location_not_applied", has_day_range="true")
+        )
+        out = asyncio.run(
+            sa.search_advisory(CTX, "aphids", "Wheat", "personalised", district="Lucknow", days_after_sowing=40)
+        )
+        assert sa.NO_DISTRICT_DATA_MARKER in out
+        assert "Lucknow" in out and "ask whether they want advice for Wheat anyway" in out
+        assert "Harvest AKJ-1" not in out  # the advice is not shown before the farmer agrees
+        assert "district_fallback_confirmed=true" in out
+
+    def test_confirmed_after_the_question_searches_without_the_district(self, bap):
+        out = asyncio.run(
+            sa.search_advisory(
+                _ctx(NO_DATA_ASKED), "aphids", "Wheat", "personalised", district="Lucknow",
+                days_after_sowing=40, district_fallback_confirmed=True,
+            )
+        )
+        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat", "days_after_sowing": "40"}
+        assert "Harvest AKJ-1" in out
+        assert "no advisory data and the farmer agreed" in out
+        assert "did not give a district" not in out
+
+    def test_confirmation_without_asking_the_farmer_is_refused(self, bap):
+        with pytest.raises(ModelRetry, match="no advisory data"):
+            asyncio.run(
+                sa.search_advisory(
+                    _ctx(NO_DATA_NOT_ASKED), "aphids", "Wheat", "personalised", district="Lucknow",
+                    days_after_sowing=40, district_fallback_confirmed=True,
+                )
+            )
+        assert bap.requests == []
+
+    def test_confirmation_with_no_earlier_no_data_result_is_refused(self, bap):
+        with pytest.raises(ModelRetry):
+            asyncio.run(
+                sa.search_advisory(CTX, "aphids", "Wheat", "personalised", district="Lucknow",
+                                   district_fallback_confirmed=True)
+            )
+
+    def test_generic_search_is_not_held_back(self, bap):
+        bap.response = httpx.Response(
+            200, json=_on_search([_item("c1")], location_status="location_not_applied")
+        )
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "generic"))
+        assert "Harvest AKJ-1" in out and sa.NO_DISTRICT_DATA_MARKER not in out
+
+    def test_skipping_the_district_is_not_held_back(self, bap):
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", days_after_sowing=40))
+        assert "Harvest AKJ-1" in out and sa.NO_DISTRICT_DATA_MARKER not in out
 
     def test_generic_never_sends_district_or_days(self, bap):
         asyncio.run(
