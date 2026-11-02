@@ -4,6 +4,8 @@ Every crop advisory question must be followed by a "generic or personalised?" qu
 farmer's reply before any advisory search runs. The check works on the message history the tool
 sees (`ctx.messages`), so it holds even when the model tries another search tool first.
 """
+import re
+
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
 
 # Appears in the search_advisory result when the farmer's district has no advisory data. A result
@@ -72,3 +74,18 @@ def farmer_was_asked(ctx) -> bool:
             if any(_is_answer(part) for part in message.parts):
                 return False  # the ask came after an answer, so it is not an ask for this question
     return True
+
+
+_CROP_WORDS = (
+    "wheat rice paddy sorghum jowar maize corn bajra millet millets ragi kodo barley oats cotton sugarcane "
+    "groundnut peanut soybean soyabean mustard rapeseed sunflower chickpea gram lentil moong urad tur arhar "
+    "pigeonpea potato tomato onion brinjal chilli chili cabbage cauliflower okra bhindi pea peas banana mango "
+    "grape grapes tea coffee jute tobacco ajwain turmeric ginger garlic sesame castor safflower linseed "
+    "coconut apple orange pomegranate guava papaya crop crops vegetable vegetables"
+).split()
+_CROP_RE = re.compile(r"\b(?:" + "|".join(_CROP_WORDS) + r")\b", re.IGNORECASE)
+
+
+def mentions_crop(query: str) -> bool:
+    """True when an English search query names a crop (used for the general document search)."""
+    return bool(_CROP_RE.search(str(query or "")))

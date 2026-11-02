@@ -70,3 +70,19 @@ def test_pests_tool_refuses_before_the_ask():
     c = SimpleNamespace(messages=[U("aphids in wheat"), CALL(text="Looking.")], deps=SimpleNamespace())
     with pytest.raises(ModelRetry, match="generic or personalised"):
         asyncio.run(search_tools.search_pests_diseases(c, "aphids wheat"))
+
+
+def test_mentions_crop():
+    from agents.tools.ask_first import mentions_crop
+
+    assert mentions_crop("wheat lodging prevention")
+    assert mentions_crop("Paddy brown planthopper")
+    assert not mentions_crop("cattle foot and mouth disease")
+    assert not mentions_crop("buffalo vaccination schedule")
+    assert mentions_crop("rice")
+
+
+def test_documents_tool_asks_first_for_crop_questions_only():
+    c = SimpleNamespace(messages=[U("wheat lodging"), CALL("search_documents", text="Looking.")], deps=SimpleNamespace())
+    with pytest.raises(ModelRetry, match="generic or personalised"):
+        asyncio.run(search_tools.search_documents(c, "wheat lodging prevention"))
