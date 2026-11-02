@@ -1523,6 +1523,49 @@ def test_the_service_note_is_added_once_the_farmer_asked_for_khc(opening):
     assert "including PM-Kisan, PMFBY and AIF" in note
 
 
+@pytest.mark.parametrize("opening", [
+    "i want to check khc grivance status",
+    "Check my KHC grievance status for AIF",
+    "I want to track my Kisan Helpline Centre complaint",
+])
+def test_current_khc_request_is_available_before_history_is_populated(opening):
+    note = khc.khc_service_note([], current_query=opening)
+    assert "## Service already chosen" in note
+    assert "current request or earlier in this chat" in note
+    assert "KHC alone identifies the service" in note
+    assert "ask only for a missing KHC grievance number" in note
+    assert "Never ask for a PM-Kisan registration number, PMFBY application number or AIF beneficiary ID" in note
+
+
+@pytest.mark.parametrize("scheme", ["aif", "PM-Kisan", "PMFBY"])
+def test_scheme_reply_after_mistaken_service_question_does_not_switch_khc(scheme):
+    history = _chat(
+        "i want to check khc grivance status",
+        ("bot", "Could you please tell me which scheme or service your grievance is with?"),
+    ).messages
+    note = khc.khc_service_note(history, current_query=scheme)
+    assert "## Service already chosen" in note
+    assert "A bare scheme answer such as 'AIF' does not switch an already selected KHC grievance" in note
+    assert "even if the bot mistakenly asked which scheme or service" in note
+    assert "Honor an explicit switch away from KHC" in note
+
+
+def test_embedded_conversation_is_not_mistaken_for_the_current_farmer_turn():
+    history = _chat("Switch to AIF's own service")
+    history.messages[0].parts[0].content = (
+        '**Conversation**\n\n**User Message**:\n**User:** "Check my KHC grievance"\n'
+        '**Selected Language:** English\n\n**Assistant Message**:\nWhich service?\n\n---\n\n'
+        '**User:** "Switch to AIF\'s own service"\n**Selected Language:** English'
+    )
+    assert khc._turns(history.messages) == [("farmer", "Switch to AIF's own service")]
+    assert "## Service already chosen" not in khc.khc_service_note(history.messages)
+
+
+@pytest.mark.parametrize("query", ["aif", "Check my PM-Kisan grievance", "What is the weather?"])
+def test_current_non_khc_query_does_not_create_a_khc_choice(query):
+    assert "## Service already chosen" not in khc.khc_service_note([], current_query=query)
+
+
 @pytest.mark.parametrize("later_turns", [
     (),
     (("bot", "Please share the name of your state"), "Uttar Pradesh"),
@@ -1612,4 +1655,4 @@ def test_the_system_prompt_gets_the_note_on_every_turn():
 
     source = (Path(__file__).resolve().parents[1] / "agents" / "agrinet.py").read_text()
     assert "from agents.tools.khc import khc_service_note" in source
-    assert "+ khc_service_note(ctx.messages)" in source
+    assert "+ khc_service_note(ctx.messages, current_query=deps.query)" in source

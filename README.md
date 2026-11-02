@@ -172,6 +172,14 @@ Unrelated questions do not trigger KHC suggestions.
   label must not select KHC for a new status request. Honor explicit service switches.
   This gate is supplied on every turn in every language, including before
   capability loading. Routing remains LLM-driven, not a deterministic state machine.
+  The current query is passed explicitly into the routing reminder because dynamic
+  system prompts run before that user message is added to history. An opening such
+  as "i want to check khc grivance status" therefore selects KHC immediately and
+  asks only for the missing grievance number. A later bare "aif" does not switch
+  the same grievance to AIF's beneficiary-ID flow, even after an erroneous
+  scheme/service clarification. Embedded conversation summaries are excluded when
+  reading individual historical user turns, so earlier wording is not mistaken
+  for the farmer's latest reply or explicit service switch.
 - **Registration order (all KHC schemes):** scheme, state/district/village,
   concern, matching, issue summary with the mapped sub-category, confirmation,
   mobile, OTP verification, new-farmer profile if required, submission.

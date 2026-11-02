@@ -52,6 +52,8 @@ def _turns(messages) -> list[tuple[str, str]]:
                 content = part.content if isinstance(part.content, str) else " ".join(
                     item for item in part.content if isinstance(item, str)
                 )
+                if content.startswith("**Conversation**\n\n") and "\n\n---\n\n" in content:
+                    content = content.split("\n\n---\n\n", 1)[1]
                 found = re.search(r'\*\*User:\*\* "(.*?)"(?:\n\*\*|\n[A-Z]|\Z)', content, re.S)
                 turns.append(("farmer", found.group(1) if found else content))
             elif kind == "text":
@@ -67,14 +69,19 @@ _KHC_WORDS = re.compile(
 )
 
 
-def khc_service_note(messages) -> str:
+def khc_service_note(messages, current_query: str = "") -> str:
     """Always provide status routing, plus a scoped reminder of an earlier KHC choice.
 
     Routing must be available before lazy-loaded workflow rules. Keep explicit KHC choices
     across follow-up turns without treating them as a permanent choice for the whole chat.
+    Dynamic system prompts run before the current user message is appended to history.
     """
     routing = (
         "\n\n## Grievance status routing\n"
+        "Resolve an explicit service choice before scheme defaults. In a request to check a grievance, "
+        "KHC alone identifies the service; the scheme is not required. "
+        "For 'i want to check khc grivance status', ask only for a missing KHC grievance number, "
+        "not which scheme or service. If the number is already supplied, use the KHC status OTP flow. "
         "Before collecting details or calling a grievance-status tool, identify the scheme or service "
         "for the grievance being checked from the farmer's message or clear context for that same grievance. "
         "If neither is known, ask only 'Could you please tell me which scheme or service your grievance is with?' "
@@ -83,13 +90,17 @@ def khc_service_note(messages) -> str:
         "Do not show any service source label while clarifying the route. "
         "A bare grievance number or the bot's own KHC wording does not select KHC. "
         "Merely loading a capability does not select a service either.\n"
-        "Once known, route directly: PM-Kisan -> pmkisan_grievance_send_otp(purpose='check_status') "
+        "Once known, route directly: explicitly selected KHC -> check_khc_grievance_status; "
+        "otherwise PM-Kisan -> pmkisan_grievance_send_otp(purpose='check_status') "
         "then pmkisan_grievance_status; PMFBY -> pmfby_grievance_status; "
         "AIF -> initiate_aif_otp then verify_aif_otp then check_aif_grievance_status; "
-        "KHC -> check_khc_grievance_status. Collect only the chosen flow's missing details, "
+        "Collect only the chosen flow's missing details, "
         "reusing any identifiers already supplied. "
         "Do not ask which scheme or service again when it is already known. "
         "An explicit KHC choice for this grievance overrides the scheme default. "
+        "A bare scheme answer such as 'AIF' does not switch an already selected KHC grievance, "
+        "even if the bot mistakenly asked which scheme or service. Keep that grievance with KHC "
+        "and collect only its missing grievance number or status OTP, never an AIF beneficiary ID. "
         "A status follow-up clearly about the same KHC grievance stays with KHC. "
         "KHC status needs the grievance number, then a 6-digit OTP, not the scheme, location or mobile number. "
         "Call check_khc_grievance_status without otp to send it, then call the same tool with the same "
@@ -100,11 +111,14 @@ def khc_service_note(messages) -> str:
         "This gate overrides generic grievance tool-table entries and KHC number-collection instructions; "
         "respect the session's permitted tools. It does not change the registration step order."
     )
-    for who, text in _turns(messages):
+    turns = _turns(messages)
+    if current_query:
+        turns.append(("farmer", current_query))
+    for who, text in turns:
         if who == "farmer" and _KHC_WORDS.search(text):
             return routing + (
                 "\n\n## Service already chosen (same grievance only)\n"
-                "The farmer mentioned Kisan Helpline Center (KHC) earlier in this chat. "
+                "The farmer named Kisan Helpline Center (KHC) in the current request or earlier in this chat. "
                 "Apply the earlier KHC choice only to that same grievance, if they requested KHC "
                 "and have not asked to switch away. A mention in an informational question is not a choice. "
                 "For that KHC grievance, for every scheme, including PM-Kisan, PMFBY and AIF, "

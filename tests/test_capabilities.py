@@ -81,6 +81,57 @@ def test_status_routing_gate_is_present_before_any_capability_is_loaded(prompt_f
     assert "This gate overrides generic grievance tool-table entries" in prompt
 
 
+@pytest.mark.parametrize("preloaded", [None, frozenset()])
+def test_production_prompt_keeps_explicit_khc_on_first_turn_and_scheme_reply(monkeypatch, preloaded):
+    import importlib.util
+    import sys
+    from types import ModuleType
+    import agents.tools as tools
+    from helpers import utils
+
+    prompts = []
+    wrong_question = "Could you please tell me which scheme or service your grievance is with?"
+
+    def model(messages, info):
+        prompts.append("\n".join(
+            part.content for message in messages for part in message.parts
+            if part.part_kind == "system-prompt"
+        ))
+        return ModelResponse(parts=[TextPart(wrong_question if len(prompts) == 1 else "offline reply")])
+
+    agent = Agent(FunctionModel(model), deps_type=FarmerContext)
+    models = ModuleType("agents.models")
+    models.configured_agent = lambda *args, **kwargs: agent
+    schemes = ModuleType("helpers.scheme_qdrant_search")
+    schemes.format_vector_schemes_prompt_block = lambda: {
+        key: value for key, value in CONTEXT.items() if key.startswith("vector_")
+    }
+    monkeypatch.setitem(sys.modules, "agents.models", models)
+    monkeypatch.setitem(sys.modules, "helpers.scheme_qdrant_search", schemes)
+    monkeypatch.setattr(tools, "TOOLS", [SimpleNamespace(name=name) for name in ALL_TOOLS], raising=False)
+    for name in ("get_today_date_str", "get_crop_season", "get_last_weekday_table"):
+        monkeypatch.setattr(utils, name, lambda: "offline")
+    spec = importlib.util.spec_from_file_location("khc_routing_agent_test", ROOT / "agents/agrinet.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    first_deps = deps_for(preloaded=preloaded)
+    first_deps.query = "i want to check khc grivance status"
+    first = agent.run_sync(first_deps.get_user_message(), deps=first_deps)
+    assert "## Service already chosen" in prompts[0]
+    assert "KHC alone identifies the service" in prompts[0]
+    assert "ask only for a missing KHC grievance number" in prompts[0]
+
+    second_deps = deps_for(preloaded=preloaded)
+    second_deps.query = "aif"
+    agent.run_sync(second_deps.get_user_message(), deps=second_deps, message_history=first.all_messages())
+    assert "## Service already chosen" in prompts[1]
+    assert "A bare scheme answer such as 'AIF' does not switch an already selected KHC grievance" in prompts[1]
+    assert "even if the bot mistakenly asked which scheme or service" in prompts[1]
+    assert "Never ask for a PM-Kisan registration number, PMFBY application number or AIF beneficiary ID" in prompts[1]
+    assert "Honor an explicit switch away from KHC" in prompts[1]
+
+
 def test_allowlist_and_configuration(monkeypatch):
     with pytest.raises(ValueError):
         ToolPolicy(allowed_tools={'typo'})
