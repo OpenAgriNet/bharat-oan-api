@@ -111,6 +111,7 @@ def farmer_texts(ctx) -> list[str]:
 
 def district_comes_from_farmer(ctx, district: str) -> bool:
     """False when the district is not something the farmer wrote (for example taken from the browser location).
+    Used to drop such a district, never to ask the farmer for it again.
 
     Only checked when the farmer wrote in Latin letters; in other scripts the agent writes the name in
     English itself, so the text cannot be compared.
