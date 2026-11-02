@@ -18,6 +18,7 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolRetu
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
+from helpers.ask_first import ASK_FIRST_RETRY, NO_DISTRICT_DATA_MARKER, farmer_was_asked
 from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -53,9 +54,6 @@ def _clean_days(value: Optional[int]) -> Optional[int]:
     return days if 0 <= days <= _MAX_DAYS_AFTER_SOWING else None
 
 
-# Appears in the tool text when the farmer's district has no advisory data, so the guard below can
-# tell that the farmer was (or was not) asked whether to continue without the district.
-NO_DISTRICT_DATA_MARKER = "[NO_ADVISORY_DATA_FOR_DISTRICT]"
 
 
 def _asked_about_district_fallback(ctx: RunContext[FarmerContext]) -> bool:
@@ -83,38 +81,7 @@ def _asked_about_district_fallback(ctx: RunContext[FarmerContext]) -> bool:
     return False
 
 
-def _farmer_was_asked(ctx: RunContext[FarmerContext]) -> bool:
-    """True when, for the current advisory question, the farmer was asked and has answered.
-
-    Looks at the messages after the last completed advisory search (or the whole conversation when
-    there was none) for this order: the farmer's question, then an assistant message (the
-    "generic or personalised?" question), then the farmer's reply. So every new advisory question
-    needs its own ask, and an earlier choice is not reused.
-    """
-    messages = getattr(ctx, "messages", None)
-    if messages is None:  # cannot verify (not running inside an agent run)
-        return True
-    start = 0
-    for index, message in enumerate(messages):
-        if isinstance(message, ModelRequest) and any(
-            isinstance(part, ToolReturnPart)
-            and part.tool_name == "search_advisory"
-            and NO_DISTRICT_DATA_MARKER not in str(part.content)
-            for part in message.parts
-        ):
-            start = index + 1
-    stage = 0  # 0: wait for the question, 1: wait for the ask, 2: wait for the reply
-    for message in messages[start:]:
-        if isinstance(message, ModelRequest):
-            if any(isinstance(part, UserPromptPart) for part in message.parts):
-                if stage == 0:
-                    stage = 1
-                elif stage == 2:
-                    return True
-        elif isinstance(message, ModelResponse) and stage == 1:
-            if any(isinstance(part, TextPart) and part.content.strip() for part in message.parts):
-                stage = 2
-    return False
+_farmer_was_asked = farmer_was_asked
 
 
 def default_season() -> str:
@@ -383,10 +350,7 @@ async def search_advisory(
         Advisory text, then a "Search notes" line, or a message saying nothing was found.
     """
     if not _farmer_was_asked(ctx):
-        raise ModelRetry(
-            "Do not search yet. Ask the farmer whether they want generic or personalised advice, "
-            "wait for their answer, then call search_advisory with advice_type set to their choice."
-        )
+        raise ModelRetry(ASK_FIRST_RETRY + " Then call search_advisory with advice_type set to their choice.")
     crop = _clean_param(crop)
     if not crop:
         raise ModelRetry("Ask the farmer which crop they mean, then call search_advisory again with `crop`.")
