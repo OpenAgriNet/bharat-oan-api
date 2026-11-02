@@ -505,11 +505,11 @@ def test_payload_carries_season_tag():
 
 def test_env_season_beats_the_farmers_answer(monkeypatch, bap):
     monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
-    asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season="Kharif"))
+    asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", days_after_sowing=40, season="Kharif"))
     assert _params(json.loads(bap.requests[0].read()))["season"] == "Rabi"
 
     monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
-    asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season="Kharif"))
+    asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", days_after_sowing=40, season="Kharif"))
     assert _params(json.loads(bap.requests[1].read()))["season"] == "Kharif"
 
 
@@ -521,7 +521,7 @@ def _no_default_season(monkeypatch):
 def test_personalised_requires_a_valid_season(bap):
     for bad in (None, "", "monsoon"):
         with pytest.raises(ModelRetry, match="season is required"):
-            asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season=bad))
+            asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", days_after_sowing=40, season=bad))
     assert bap.requests == []
 
 
@@ -530,3 +530,25 @@ def test_configured_season_means_the_farmer_need_not_give_one(monkeypatch, bap):
     out = asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", district="Lucknow"))
     assert "Harvest AKJ-1" in out or sa.NO_DISTRICT_DATA_MARKER in out
     assert _params(json.loads(bap.requests[0].read()))["season"] == "Rabi"
+
+
+class TestDetailsAskedFirst:
+    def test_personalised_without_district_and_days_needs_the_details_question(self, bap):
+        # the farmer only chose "personalised"; the details question has not been asked yet
+        with pytest.raises(ModelRetry, match="district"):
+            asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi"))
+        assert bap.requests == []
+
+    def test_proceeds_once_the_details_were_asked_and_answered(self, bap):
+        history = ASKED[:2] + [
+            ModelRequest(parts=[UserPromptPart(content="personalised")]),
+            ModelResponse(parts=[TextPart(content="Which district, how many days since sowing, and which season?")]),
+            ModelRequest(parts=[UserPromptPart(content="I do not know")]),
+        ]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids", "Wheat", "personalised", season="Rabi"))
+        assert "Harvest AKJ-1" in out
+        assert len(bap.requests) == 1
+
+    def test_details_in_the_call_need_no_second_question(self, bap):
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", days_after_sowing=40))
+        assert "Harvest AKJ-1" in out

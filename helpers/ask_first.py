@@ -35,45 +35,41 @@ def _has_text(message) -> bool:
     )
 
 
-def farmer_was_asked(ctx) -> bool:
-    """True when the farmer's latest message answers a "generic or personalised?" question.
+def _is_user_turn_start(message) -> bool:
+    return isinstance(message, ModelRequest) and any(isinstance(part, UserPromptPart) for part in message.parts)
 
-    The assistant message just before the farmer's latest message must be an ask: it must not
-    have been written after an answer (a search result) in the same turn. So a new question after
-    an answer, or an answer followed by a late "generic or personalised?", needs its own ask.
+
+def asked_rounds(ctx) -> int:
+    """How many questions the agent asked, and the farmer answered, for the current question.
+
+    Messages are split into turns, one per farmer message. Looking back from the farmer's latest
+    message, each earlier turn that holds an assistant message and no search result counts as one
+    asked-and-answered question. A turn with a search result is an answer, and ends the count, so a
+    new question after an answer starts again from zero. A message written after a search result in
+    the same turn is not an ask.
     """
     messages = getattr(ctx, "messages", None)
     if messages is None:  # cannot verify (not running inside an agent run)
-        return True
+        return 99
     messages = list(messages)
+    starts = [index for index, message in enumerate(messages) if _is_user_turn_start(message)]
+    if not starts:
+        return 0
 
-    latest = None  # the farmer's latest message
-    for index in range(len(messages) - 1, -1, -1):
-        if isinstance(messages[index], ModelRequest) and any(
-            isinstance(part, UserPromptPart) for part in messages[index].parts
-        ):
-            latest = index
+    rounds = 0
+    for turn_number in range(len(starts) - 2, -1, -1):  # every turn before the latest one
+        turn = messages[starts[turn_number]:starts[turn_number + 1]]
+        if any(_is_answer(part) for message in turn if isinstance(message, ModelRequest) for part in message.parts):
             break
-    if latest is None:
-        return False
-
-    ask = None  # the assistant message right before it
-    for index in range(latest - 1, -1, -1):
-        if _has_text(messages[index]):
-            ask = index
+        if not any(_has_text(message) for message in turn):
             break
-    if ask is None:
-        return False
+        rounds += 1
+    return rounds
 
-    # Walk back to the farmer message that started the turn containing the ask.
-    for index in range(ask - 1, -1, -1):
-        message = messages[index]
-        if isinstance(message, ModelRequest):
-            if any(isinstance(part, UserPromptPart) for part in message.parts):
-                break
-            if any(_is_answer(part) for part in message.parts):
-                return False  # the ask came after an answer, so it is not an ask for this question
-    return True
+
+def farmer_was_asked(ctx, rounds: int = 1) -> bool:
+    """True when the agent asked the farmer `rounds` questions for the current question and got answers."""
+    return asked_rounds(ctx) >= rounds
 
 
 _CROP_WORDS = (
