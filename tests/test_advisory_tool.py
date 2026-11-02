@@ -300,10 +300,10 @@ class TestTool:
             json=_on_search([_item("c1")], location_status="location_matched", has_day_range="true", days_matched="true"),
         )
         out = asyncio.run(
-            sa.search_advisory(CTX, "aphids in wheat", "wheat", "personalised", district="Lucknow", days_after_sowing=40)
+            sa.search_advisory(CTX, "aphids in wheat", "wheat", "personalised", season="Rabi", district="Lucknow", days_after_sowing=40)
         )
         body = json.loads(bap.requests[0].read())
-        assert _params(body) == {"crop": "wheat", "district": "Lucknow", "days_after_sowing": "40"}
+        assert _params(body) == {"crop": "wheat", "district": "Lucknow", "days_after_sowing": "40", "season": "Rabi"}
         assert "Harvest AKJ-1" in out
         assert "location_status=location_matched" in out
         assert "days_after_sowing_matched=yes" in out
@@ -319,12 +319,12 @@ class TestTool:
         assert bap.requests == []
 
     def test_personalised_without_a_district_tells_the_agent_the_location_was_skipped(self, bap):
-        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", days_after_sowing=40))
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", days_after_sowing=40))
         assert "did not give a district" in out
 
     def test_personalised_with_district_and_days_has_no_skipped_note(self, bap):
         out = asyncio.run(
-            sa.search_advisory(CTX, "aphids", "Wheat", "personalised", district="Lucknow", days_after_sowing=40)
+            sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", district="Lucknow", days_after_sowing=40)
         )
         assert "did not give" not in out
 
@@ -333,7 +333,7 @@ class TestTool:
             200, json=_on_search([_item("c1")], location_status="location_not_applied", has_day_range="true")
         )
         out = asyncio.run(
-            sa.search_advisory(CTX, "aphids", "Wheat", "personalised", district="Lucknow", days_after_sowing=40)
+            sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", district="Lucknow", days_after_sowing=40)
         )
         assert sa.NO_DISTRICT_DATA_MARKER in out
         assert "Lucknow" in out and "ask whether they want advice for Wheat anyway" in out
@@ -343,11 +343,11 @@ class TestTool:
     def test_confirmed_after_the_question_searches_without_the_district(self, bap):
         out = asyncio.run(
             sa.search_advisory(
-                _ctx(NO_DATA_ASKED), "aphids", "Wheat", "personalised", district="Lucknow",
+                _ctx(NO_DATA_ASKED), "aphids", "Wheat", "personalised", season="Rabi", district="Lucknow",
                 days_after_sowing=40, district_fallback_confirmed=True,
             )
         )
-        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat", "days_after_sowing": "40"}
+        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat", "days_after_sowing": "40", "season": "Rabi"}
         assert "Harvest AKJ-1" in out
         assert "no advisory data and the farmer agreed" in out
         assert "did not give a district" not in out
@@ -356,7 +356,7 @@ class TestTool:
         with pytest.raises(ModelRetry, match="no advisory data"):
             asyncio.run(
                 sa.search_advisory(
-                    _ctx(NO_DATA_NOT_ASKED), "aphids", "Wheat", "personalised", district="Lucknow",
+                    _ctx(NO_DATA_NOT_ASKED), "aphids", "Wheat", "personalised", season="Rabi", district="Lucknow",
                     days_after_sowing=40, district_fallback_confirmed=True,
                 )
             )
@@ -365,7 +365,7 @@ class TestTool:
     def test_confirmation_with_no_earlier_no_data_result_is_refused(self, bap):
         with pytest.raises(ModelRetry):
             asyncio.run(
-                sa.search_advisory(CTX, "aphids", "Wheat", "personalised", district="Lucknow",
+                sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", district="Lucknow",
                                    district_fallback_confirmed=True)
             )
 
@@ -377,7 +377,7 @@ class TestTool:
         assert "Harvest AKJ-1" in out and sa.NO_DISTRICT_DATA_MARKER not in out
 
     def test_skipping_the_district_is_not_held_back(self, bap):
-        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", days_after_sowing=40))
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", days_after_sowing=40))
         assert "Harvest AKJ-1" in out and sa.NO_DISTRICT_DATA_MARKER not in out
 
     def test_generic_never_sends_district_or_days(self, bap):
@@ -477,7 +477,7 @@ def test_season_note_uses_env_default(monkeypatch):
 
     monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
     note = advisory_season_note()
-    assert "Pass their answer as `season`" in note
+    assert "mandatory" in note and "pass their answer as `season`" in note
 
 
 def test_payload_carries_season_tag():
@@ -496,3 +496,15 @@ def test_env_season_beats_the_farmers_answer(monkeypatch, bap):
     monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
     asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season="Kharif"))
     assert _params(json.loads(bap.requests[1].read()))["season"] == "Kharif"
+
+
+@pytest.fixture(autouse=True)
+def _no_default_season(monkeypatch):
+    monkeypatch.delenv("ADVISORY_DEFAULT_SEASON", raising=False)
+
+
+def test_personalised_requires_a_valid_season(bap):
+    for bad in (None, "", "monsoon"):
+        with pytest.raises(ModelRetry, match="season is required"):
+            asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season=bad))
+    assert bap.requests == []

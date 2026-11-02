@@ -33,6 +33,7 @@ ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
 # Longest value forwarded for crop / district, and the accepted range for days after sowing.
 _MAX_PARAM_LENGTH = 100
 _MAX_DAYS_AFTER_SOWING = 730
+_SEASONS = {"rabi", "kharif", "zaid"}
 
 
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]+")
@@ -126,7 +127,8 @@ def advisory_season_note() -> str:
     season = default_season()
     ask = (
         "In the personalised crop advisory flow, ask the farmer for the **season** (Rabi, Kharif or Zaid) "
-        "together with the district and the days since sowing. Do not ask for the season in the generic flow."
+        "together with the district and the days since sowing. The season is mandatory: pass their answer "
+        "as `season` and ask again until they give one. Do not ask for the season in the generic flow."
     )
     if season:
         return (
@@ -137,8 +139,8 @@ def advisory_season_note() -> str:
             f"generic flow too."
         )
     return (
-        "\n\n## Advisory season (asked from the farmer)\n" + ask + " Pass their answer as `season`. If they "
-        "do not know it, call without it and do not ask again."
+        "\n\n## Advisory season (asked from the farmer)\n" + ask + " The season is mandatory: pass their answer as `season`, and "
+        "if they do not give one of Rabi, Kharif or Zaid, ask again until they do."
     )
 
 
@@ -394,6 +396,15 @@ async def search_advisory(
 
     # The configured season (env) always wins; the farmer's answer (personalised only) is used when none is set.
     farmer_season = _clean_param(season) if advice_type == "personalised" else ""
+    if advice_type == "personalised":
+        # The farmer must give a season: keep asking until they do (the env season is applied after).
+        if farmer_season.lower() not in _SEASONS:
+            raise ModelRetry(
+                "The season is required for personalised advice. Ask the farmer which season it is "
+                "(Rabi, Kharif or Zaid) and wait for the answer. If they have not given a valid season, "
+                "ask again; do not search until they do."
+            )
+        farmer_season = farmer_season.capitalize()
     season_value = default_season() or farmer_season
 
     # The farmer agreed to the crop advice without the district: search without it.
