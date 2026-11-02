@@ -192,24 +192,48 @@ def parse_advisory_response(data: Dict[str, Any]) -> tuple[List[Dict[str, Any]],
     return [], fallback_ctx
 
 
+_TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
+
+
 def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
-    """Readable block per advisory for the agent; each text already ends with its Source line."""
-    blocks = [f"**{r.get('title') or 'Advisory'}**\n```\n{r['text']}\n```" for r in results]
-    return "> Advisory Search Results for `" + query + "`\n\n" + "\n\n----\n\n".join(blocks)
+    """Readable block per advisory for the agent.
+
+    The provider appends "Source: institute, creator" to each text. That line names the
+    institute and a user name, so it is removed here; the answer cites ADVISORY_SOURCE instead.
+    """
+    blocks = []
+    for r in results:
+        text = _TRAILING_SOURCE.sub("", r["text"]).rstrip()
+        blocks.append(f"**{r.get('title') or 'Advisory'}**\n```\n{text}\n```")
+    return (
+        "> Advisory Search Results for `" + query + "`\n\n"
+        + "\n\n----\n\n".join(blocks)
+        + f"\n\n> Cite as: Source: {ADVISORY_SOURCE}"
+    )
 
 
 def format_search_notes(search_ctx: Dict[str, str], days_after_sowing: Optional[int]) -> str:
-    """Short factual notes for the agent about how the search was applied."""
+    """Notes for the agent about how the search was applied, with what to tell the farmer."""
     location = str(search_ctx.get("location_status") or "").strip().lower()
     day_range = str(search_ctx.get("has_day_range") or "").strip().lower() == "true"
     days_matched = str(search_ctx.get("days_matched") or "").strip().lower() == "true"
-    notes = []
+    facts = []
     if location:
-        notes.append(f"location_status={location}")
-    notes.append(f"advisory_has_day_range={'yes' if day_range else 'no'}")
+        facts.append(f"location_status={location}")
+    facts.append(f"advisory_has_day_range={'yes' if day_range else 'no'}")
     if days_after_sowing is not None:
-        notes.append(f"days_after_sowing_matched={'yes' if days_matched else 'no'}")
-    return "> Search notes: " + "; ".join(notes)
+        facts.append(f"days_after_sowing_matched={'yes' if days_matched else 'no'}")
+    lines = ["> Search notes: " + "; ".join(facts)]
+    if location == "location_not_applied":
+        lines.append(
+            "> These advisories are not specific to the farmer's district. Say so in one short sentence "
+            "and do not present the advice as local to their district."
+        )
+    if not day_range or (days_after_sowing is not None and not days_matched):
+        lines.append(
+            "> This advice is general for the crop and not matched to the days since sowing. Say so briefly."
+        )
+    return "\n".join(lines)
 
 
 @observe(name="tool:search_advisory", as_type="tool")

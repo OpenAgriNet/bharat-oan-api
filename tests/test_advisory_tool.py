@@ -199,7 +199,27 @@ class TestFormat:
         )
         assert "aphids" in out
         assert "**Wheat Insect Management**" in out
-        assert "Source: ICAR–DKMA" in out
+        # the provider's "Source: institute, creator" line is removed, the fixed source is offered instead
+        assert "ICAR–DKMA" not in out
+        assert "Source: ICAR - Kisan Sarathi" in out
+
+
+class TestSourceLine:
+    def test_strips_the_providers_source_line_and_the_creator_name(self):
+        out = sa.format_advisory_results(
+            [{"title": "T", "text": "Advisory: Harvest.\n\nSource: ICAR–DKMA, jak", "section": "full"}], "q"
+        )
+        assert "jak" not in out and "DKMA" not in out
+        assert out.rstrip().endswith("Source: ICAR - Kisan Sarathi")
+
+    def test_leaves_text_without_a_source_line_alone(self):
+        out = sa.format_advisory_results([{"title": "T", "text": "Advisory: Harvest.", "section": "full"}], "q")
+        assert "Advisory: Harvest." in out
+
+    def test_only_a_trailing_source_line_is_removed(self):
+        text = "Source of water: canal.\nAdvisory: irrigate.\n\nSource: ICAR–DKMA, jak"
+        out = sa.format_advisory_results([{"title": "T", "text": text, "section": "full"}], "q")
+        assert "Source of water: canal." in out and "jak" not in out
 
 
 class TestSearchNotes:
@@ -209,6 +229,16 @@ class TestSearchNotes:
         assert "location_status=location_not_applied" in out
         assert "advisory_has_day_range=yes" in out
         assert "days_after_sowing_matched=no" in out
+
+    def test_tells_the_agent_when_the_advice_is_not_local(self):
+        ctx = {"location_status": "location_not_applied", "has_day_range": "true", "days_matched": "true"}
+        out = sa.format_search_notes(ctx, days_after_sowing=40)
+        assert "not specific to the farmer's district" in out
+        assert "not matched to the days" not in out
+
+    def test_tells_the_agent_when_days_did_not_match(self):
+        ctx = {"location_status": "not_requested", "has_day_range": "true", "days_matched": "false"}
+        assert "not matched to the days since sowing" in sa.format_search_notes(ctx, days_after_sowing=300)
 
     def test_days_matched_is_only_reported_when_days_were_sent(self):
         out = sa.format_search_notes({"has_day_range": "false"}, days_after_sowing=None)
