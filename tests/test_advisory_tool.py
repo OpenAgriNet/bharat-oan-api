@@ -1,17 +1,47 @@
 """Tests for the search_advisory tool (BAP knowledge-advisory search)."""
 
 import asyncio
+import json
 from types import SimpleNamespace
 
 import httpx
 import pytest
+from pydantic_ai import ModelRetry
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
 
 from agents.tools import advisory as sa
 
 # The provider appends the Source line to the stored chunk text.
 TEXT = "Advisory: Harvest AKJ-1.\n\nSource: ICAR–DKMA, jak"
 
-CTX = SimpleNamespace(deps=SimpleNamespace(session_id="sess-1", question_id="q-1"))
+def _ctx(messages):
+    return SimpleNamespace(deps=SimpleNamespace(session_id="sess-1", question_id="q-1"), messages=messages)
+
+
+# the farmer already got an assistant reply earlier in the conversation (the generic or personalised question)
+ASKED = [
+    ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")]),
+    ModelResponse(parts=[TextPart(content="Do you want generic or personalised advice?")]),
+    ModelRequest(parts=[UserPromptPart(content="generic")]),
+]
+# first turn: only the farmer's question, nothing said by the assistant yet
+FIRST_TURN = [ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")])]
+
+CTX = _ctx(ASKED)
+
+# the "no data for your district" result, the assistant's question about it, and the farmer's "yes"
+NO_DATA_ASKED = ASKED + [
+    ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c1",
+                                       content="No advisory data is available for the district 'Lucknow'. " + sa.NO_DISTRICT_DATA_MARKER)]),
+    ModelResponse(parts=[TextPart(content="There is no advisory data for Lucknow. Do you want wheat advice anyway?")]),
+    ModelRequest(parts=[UserPromptPart(content="yes")]),
+]
+# same step: the tool result is there but the assistant has not asked the farmer anything yet
+NO_DATA_NOT_ASKED = ASKED + [
+    ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c1",
+                                       content="No advisory data is available for the district 'Lucknow'. " + sa.NO_DISTRICT_DATA_MARKER)]),
+]
+
 
 
 def _tag(code, value):
@@ -36,7 +66,8 @@ def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.
     }
 
 
-def _on_search(items, status="success", message="", query="aphids"):
+def _on_search(items, status="success", message="", query="aphids",
+               location_status="not_requested", has_day_range="true", days_matched="false"):
     return {
         "context": {"action": "on_search"},
         "responses": [
@@ -52,6 +83,9 @@ def _on_search(items, status="success", message="", query="aphids"):
                                     _tag("query", query), _tag("status", status),
                                     _tag("message", message), _tag("hit-count", str(len(items))),
                                     _tag("search-backend", "qdrant"),
+                                    _tag("location-status", location_status),
+                                    _tag("has-day-range", has_day_range),
+                                    _tag("days-matched", days_matched),
                                 ],
                             }
                         ],
@@ -95,6 +129,44 @@ class TestPayload:
         assert ctx["transaction_id"] and ctx["message_id"]
 
 
+def _params(payload):
+    """The search_params entries of a payload as {code: value}."""
+    tags = payload["message"]["intent"]["item"].get("tags", [])
+    group = next((t for t in tags if t["descriptor"]["code"] == "search_params"), None)
+    if group is None:
+        return None
+    return {e["descriptor"]["code"]: e["value"] for e in group["list"]}
+
+
+class TestSearchParams:
+    def test_crop_district_and_days_travel_in_search_params(self):
+        payload = sa.build_advisory_search_payload("aphids", crop="Wheat", district="Lucknow", days_after_sowing=45)
+        assert _params(payload) == {"crop": "Wheat", "district": "Lucknow", "days_after_sowing": "45"}
+
+    def test_season_is_never_sent(self):
+        payload = sa.build_advisory_search_payload("aphids", crop="Wheat", district="Lucknow", days_after_sowing=45)
+        assert "season" not in _params(payload)
+
+    def test_generic_search_sends_only_the_crop(self):
+        assert _params(sa.build_advisory_search_payload("aphids", crop="Wheat")) == {"crop": "Wheat"}
+
+    def test_no_tags_when_nothing_is_given(self):
+        assert "tags" not in sa.build_advisory_search_payload("aphids")["message"]["intent"]["item"]
+
+    def test_values_are_cleaned_and_bad_days_are_dropped(self):
+        payload = sa.build_advisory_search_payload(
+            "aphids", crop="  Wheat\n\x00 ", district="x" * 500, days_after_sowing=-5
+        )
+        params = _params(payload)
+        assert params["crop"] == "Wheat"
+        assert len(params["district"]) == 100
+        assert "days_after_sowing" not in params
+        assert "days_after_sowing" not in _params(sa.build_advisory_search_payload("a", crop="W", days_after_sowing=9999))
+
+    def test_zero_days_is_kept(self):
+        assert _params(sa.build_advisory_search_payload("a", crop="Wheat", days_after_sowing=0))["days_after_sowing"] == "0"
+
+
 class TestParse:
     def test_parses_chunk_details(self):
         results, ctx = sa.parse_advisory_response(_on_search([_item("c1"), _item("c2", score="0.5")]))
@@ -109,6 +181,14 @@ class TestParse:
         assert first["text"] == TEXT
         assert ctx["status"] == "success"
         assert ctx["hit_count"] == "2"
+
+    def test_parses_location_and_day_range_notes(self):
+        _, ctx = sa.parse_advisory_response(
+            _on_search([_item("c1")], location_status="location_not_applied", has_day_range="true", days_matched="true")
+        )
+        assert ctx["location_status"] == "location_not_applied"
+        assert ctx["has_day_range"] == "true"
+        assert ctx["days_matched"] == "true"
 
     def test_empty_and_malformed_responses(self):
         assert sa.parse_advisory_response({}) == ([], {})
@@ -133,39 +213,237 @@ class TestFormat:
         )
         assert "aphids" in out
         assert "**Wheat Insect Management**" in out
-        assert "Source: ICAR–DKMA" in out
+        # the provider's "Source: institute, creator" line is removed, the fixed source is offered instead
+        assert "ICAR–DKMA" not in out
+        assert "Source: ICAR - Kisan Sarathi" in out
+
+
+class TestSourceLine:
+    def test_strips_the_providers_source_line_and_the_creator_name(self):
+        out = sa.format_advisory_results(
+            [{"title": "T", "text": "Advisory: Harvest.\n\nSource: ICAR–DKMA, jak", "section": "full"}], "q"
+        )
+        assert "jak" not in out and "DKMA" not in out
+        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
+
+    def test_leaves_text_without_a_source_line_alone(self):
+        out = sa.format_advisory_results([{"title": "T", "text": "Advisory: Harvest.", "section": "full"}], "q")
+        assert "Advisory: Harvest." in out
+
+    def test_only_a_trailing_source_line_is_removed(self):
+        text = "Source of water: canal.\nAdvisory: irrigate.\n\nSource: ICAR–DKMA, jak"
+        out = sa.format_advisory_results([{"title": "T", "text": text, "section": "full"}], "q")
+        assert "Source of water: canal." in out and "jak" not in out
+
+
+class TestSearchNotes:
+    def test_reports_location_status_and_day_range(self):
+        ctx = {"location_status": "location_not_applied", "has_day_range": "true", "days_matched": "false"}
+        out = sa.format_search_notes(ctx, days_after_sowing=45)
+        assert "location_status=location_not_applied" in out
+        assert "advisory_has_day_range=yes" in out
+        assert "days_after_sowing_matched=no" in out
+
+    def test_tells_the_agent_when_the_advice_is_not_local(self):
+        ctx = {"location_status": "location_not_applied", "has_day_range": "true", "days_matched": "true"}
+        out = sa.format_search_notes(ctx, days_after_sowing=40)
+        assert "not specific to the farmer's district" in out
+        assert "not matched to the days" not in out
+
+    def test_tells_the_agent_when_days_did_not_match(self):
+        ctx = {"location_status": "not_requested", "has_day_range": "true", "days_matched": "false"}
+        assert "not matched to the days since sowing" in sa.format_search_notes(ctx, days_after_sowing=300)
+
+    def test_says_so_when_a_personalised_farmer_skipped_the_district(self):
+        ctx = {"location_status": "not_requested", "has_day_range": "true", "days_matched": "true"}
+        out = sa.format_search_notes(ctx, days_after_sowing=40, personalised=True, district_given=False)
+        assert "did not give a district" in out and "location was skipped" in out
+
+    def test_says_so_when_a_personalised_farmer_skipped_the_days(self):
+        ctx = {"location_status": "location_not_applied", "has_day_range": "true", "days_matched": "false"}
+        out = sa.format_search_notes(ctx, days_after_sowing=None, personalised=True, district_given=True)
+        assert "did not give the days since sowing" in out
+        assert "did not give a district" not in out
+
+    def test_notes_after_the_farmer_agreed_to_continue_without_the_district(self):
+        ctx = {"location_status": "not_requested", "has_day_range": "true", "days_matched": "true"}
+        out = sa.format_search_notes(
+            ctx, days_after_sowing=40, personalised=True, district_given=True, district_unavailable=True
+        )
+        assert "agreed to the crop advice" in out and "not specific to their district" in out
+        assert "did not give a district" not in out
+
+    def test_a_generic_search_never_mentions_skipped_details(self):
+        ctx = {"location_status": "not_requested", "has_day_range": "true", "days_matched": "false"}
+        out = sa.format_search_notes(ctx, days_after_sowing=None, personalised=False, district_given=False)
+        assert "did not give" not in out
+
+    def test_days_matched_is_only_reported_when_days_were_sent(self):
+        out = sa.format_search_notes({"has_day_range": "false"}, days_after_sowing=None)
+        assert "advisory_has_day_range=no" in out
+        assert "days_after_sowing_matched" not in out
+        assert "location_status" not in out
 
 
 class TestTool:
     def test_posts_to_bap_search_and_returns_formatted_advice(self, bap):
-        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat"))
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", "Wheat", "generic"))
         request = bap.requests[0]
         assert str(request.url) == "http://bap.test/search"
         body = request.read().decode()
         assert '"knowledge-advisory"' in body and "aphids in wheat" in body
         assert "Harvest AKJ-1" in out and "ICAR" in out
 
+    def test_sends_crop_district_and_days_and_reports_the_notes(self, bap):
+        bap.response = httpx.Response(
+            200,
+            json=_on_search([_item("c1")], location_status="location_matched", has_day_range="true", days_matched="true"),
+        )
+        out = asyncio.run(
+            sa.search_advisory(CTX, "aphids in wheat", "wheat", "personalised", season="Rabi", district="Lucknow", days_after_sowing=40)
+        )
+        body = json.loads(bap.requests[0].read())
+        assert _params(body) == {"crop": "wheat", "district": "Lucknow", "days_after_sowing": "40", "season": "Rabi"}
+        assert "Harvest AKJ-1" in out
+        assert "location_status=location_matched" in out
+        assert "days_after_sowing_matched=yes" in out
+
+    def test_generic_call_sends_only_the_crop(self, bap):
+        asyncio.run(sa.search_advisory(CTX, "aphids in wheat", "Wheat", "generic"))
+        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat"}
+
+    def test_blank_crop_asks_the_model_to_ask_the_farmer(self, bap):
+        for blank in ("", "   "):
+            with pytest.raises(ModelRetry):
+                asyncio.run(sa.search_advisory(CTX, "aphids", blank, "generic"))
+        assert bap.requests == []
+
+    def test_personalised_without_a_district_tells_the_agent_the_location_was_skipped(self, bap):
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", days_after_sowing=40))
+        assert "did not give a district" in out
+
+    def test_personalised_with_district_and_days_has_no_skipped_note(self, bap):
+        out = asyncio.run(
+            sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", district="Lucknow", days_after_sowing=40)
+        )
+        assert "did not give" not in out
+
+    def test_district_without_data_is_withheld_and_the_agent_must_ask(self, bap):
+        bap.response = httpx.Response(
+            200, json=_on_search([_item("c1")], location_status="location_not_applied", has_day_range="true")
+        )
+        out = asyncio.run(
+            sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", district="Lucknow", days_after_sowing=40)
+        )
+        assert sa.NO_DISTRICT_DATA_MARKER in out
+        assert "Lucknow" in out and "ask whether they want advice for Wheat anyway" in out
+        assert "Harvest AKJ-1" not in out  # the advice is not shown before the farmer agrees
+        assert "district_fallback_confirmed=true" in out
+
+    def test_confirmed_after_the_question_searches_without_the_district(self, bap):
+        out = asyncio.run(
+            sa.search_advisory(
+                _ctx(NO_DATA_ASKED), "aphids", "Wheat", "personalised", season="Rabi", district="Lucknow",
+                days_after_sowing=40, district_fallback_confirmed=True,
+            )
+        )
+        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat", "days_after_sowing": "40", "season": "Rabi"}
+        assert "Harvest AKJ-1" in out
+        assert "no advisory data and the farmer agreed" in out
+        assert "did not give a district" not in out
+
+    def test_confirmation_without_asking_the_farmer_is_refused(self, bap):
+        with pytest.raises(ModelRetry, match="no advisory data"):
+            asyncio.run(
+                sa.search_advisory(
+                    _ctx(NO_DATA_NOT_ASKED), "aphids", "Wheat", "personalised", season="Rabi", district="Lucknow",
+                    days_after_sowing=40, district_fallback_confirmed=True,
+                )
+            )
+        assert bap.requests == []
+
+    def test_confirmation_with_no_earlier_no_data_result_is_refused(self, bap):
+        with pytest.raises(ModelRetry):
+            asyncio.run(
+                sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", district="Lucknow",
+                                   district_fallback_confirmed=True)
+            )
+
+    def test_generic_search_is_not_held_back(self, bap):
+        bap.response = httpx.Response(
+            200, json=_on_search([_item("c1")], location_status="location_not_applied")
+        )
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "generic"))
+        assert "Harvest AKJ-1" in out and sa.NO_DISTRICT_DATA_MARKER not in out
+
+    def test_skipping_the_district_is_not_held_back(self, bap):
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", days_after_sowing=40))
+        assert "Harvest AKJ-1" in out and sa.NO_DISTRICT_DATA_MARKER not in out
+
+    def test_generic_never_sends_district_or_days(self, bap):
+        asyncio.run(
+            sa.search_advisory(CTX, "aphids", "Wheat", "generic", district="Lucknow", days_after_sowing=40)
+        )
+        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat"}
+
+    def test_refuses_to_search_before_the_farmer_was_asked(self, bap):
+        with pytest.raises(ModelRetry, match="generic or personalised"):
+            asyncio.run(sa.search_advisory(_ctx(FIRST_TURN), "aphids", "Wheat", "generic"))
+        assert bap.requests == []
+
+    def test_refuses_on_an_empty_conversation(self, bap):
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx([]), "aphids", "Wheat", "personalised", district="Pune"))
+        assert bap.requests == []
+
+    def test_a_tool_only_reply_does_not_count_as_asking(self, bap):
+        from pydantic_ai.messages import ToolCallPart
+
+        only_tool_call = FIRST_TURN + [ModelResponse(parts=[ToolCallPart(tool_name="search_advisory", args={})])]
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx(only_tool_call), "aphids", "Wheat", "generic"))
+
+    def test_allows_the_search_once_the_assistant_has_replied(self, bap):
+        out = asyncio.run(sa.search_advisory(_ctx(ASKED), "aphids", "Wheat", "generic"))
+        assert "Harvest AKJ-1" in out
+        assert len(bap.requests) == 1
+
+    def test_a_new_question_after_an_answer_needs_a_new_ask(self, bap):
+        done = ASKED + [
+            ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c1", content="advice")]),
+            ModelResponse(parts=[TextPart(content="Here is the advice. Anything else?")]),
+            ModelRequest(parts=[UserPromptPart(content="anything which you have")]),
+        ]
+        with pytest.raises(ModelRetry, match="generic or personalised"):
+            asyncio.run(sa.search_advisory(_ctx(done), "wheat pests", "Wheat", "personalised"))
+        asked_again = done + [
+            ModelResponse(parts=[TextPart(content="Generic or personalised?")]),
+            ModelRequest(parts=[UserPromptPart(content="generic")]),
+        ]
+        out = asyncio.run(sa.search_advisory(_ctx(asked_again), "wheat pests", "Wheat", "generic"))
+        assert "Harvest AKJ-1" in out
+
     def test_top_k_limits_results(self, bap):
         bap.response = httpx.Response(200, json=_on_search([_item(f"c{i}", title=f"T{i}") for i in range(6)]))
-        out = asyncio.run(sa.search_advisory(CTX, "q", top_k=2))
+        out = asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic", top_k=2))
         assert "T0" in out and "T1" in out and "T2" not in out
 
     def test_empty_responses_say_nothing_was_found(self, bap):
         bap.response = httpx.Response(200, json={"context": {}, "responses": []})
-        out = asyncio.run(sa.search_advisory(CTX, "something odd"))
+        out = asyncio.run(sa.search_advisory(CTX, "something odd", "Wheat", "generic"))
         assert "No advisory" in out and "something odd" in out
 
     def test_provider_message_is_used_when_not_successful(self, bap):
         bap.response = httpx.Response(200, json=_on_search([], status="error", message="Advisory search failed"))
-        assert asyncio.run(sa.search_advisory(CTX, "q")) == "Advisory search failed"
+        assert asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")) == "Advisory search failed"
 
     def test_non_200_means_unavailable(self, bap):
         bap.response = httpx.Response(502, text="bad gateway")
-        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q")).lower()
+        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")).lower()
 
     def test_missing_bap_endpoint_is_a_configuration_message(self, monkeypatch):
         monkeypatch.delenv("BAP_ENDPOINT", raising=False)
-        assert "not configured" in asyncio.run(sa.search_advisory(CTX, "q")).lower()
+        assert "not configured" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")).lower()
 
     def test_network_error_means_unavailable(self, monkeypatch):
         monkeypatch.setenv("BAP_ENDPOINT", "http://bap.test")
@@ -175,7 +453,7 @@ class TestTool:
             raise httpx.ConnectError("refused")
 
         monkeypatch.setattr(sa.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(boom)))
-        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q")).lower()
+        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")).lower()
 
 
 def test_tool_is_registered_with_context():
@@ -184,4 +462,49 @@ def test_tool_is_registered_with_context():
     registered = {tool.name: tool for tool in TOOLS}
     assert "search_advisory" in registered
     assert registered["search_advisory"].takes_ctx is True
+    schema = registered["search_advisory"].function_schema.json_schema
+    assert "advice_type" in schema["required"]
+    assert schema["properties"]["advice_type"]["enum"] == ["generic", "personalised"]
     assert "search_schemes" in registered  # scheme routing is untouched
+
+
+def test_season_note_uses_env_default(monkeypatch):
+    from agents.tools.advisory import advisory_season_note
+
+    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
+    note = advisory_season_note()
+    assert "Rabi" in note and "ask the farmer for the **season**" in note and "do not use their answer" in note
+
+    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
+    note = advisory_season_note()
+    assert "mandatory" in note and "pass their answer as `season`" in note
+
+
+def test_payload_carries_season_tag():
+    from agents.tools.advisory import build_advisory_search_payload
+
+    payload = build_advisory_search_payload("wheat aphids", crop="Wheat", season="Rabi")
+    entries = payload["message"]["intent"]["item"]["tags"][0]["list"]
+    assert {"descriptor": {"code": "season"}, "value": "Rabi"} in entries
+
+
+def test_env_season_beats_the_farmers_answer(monkeypatch, bap):
+    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
+    asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season="Kharif"))
+    assert _params(json.loads(bap.requests[0].read()))["season"] == "Rabi"
+
+    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
+    asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season="Kharif"))
+    assert _params(json.loads(bap.requests[1].read()))["season"] == "Kharif"
+
+
+@pytest.fixture(autouse=True)
+def _no_default_season(monkeypatch):
+    monkeypatch.delenv("ADVISORY_DEFAULT_SEASON", raising=False)
+
+
+def test_personalised_requires_a_valid_season(bap):
+    for bad in (None, "", "monsoon"):
+        with pytest.raises(ModelRetry, match="season is required"):
+            asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season=bad))
+    assert bap.requests == []

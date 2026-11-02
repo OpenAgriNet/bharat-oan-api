@@ -4,6 +4,7 @@ from helpers.scheme_qdrant_search import format_vector_schemes_prompt_block
 from agents.models import configured_agent
 from agents.tools import TOOLS
 from agents.tools.khc import khc_service_note
+from agents.tools.advisory import advisory_season_note
 from pydantic_ai.models.openai import OpenAIChatModelSettings
 from agents.deps import FarmerContext
 from agents.capabilities import (
@@ -55,4 +56,4 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
     deps.capabilities.restore(ctx.messages)
     prompt_file = f'agrinet_{lang_code}'
     context = capability_prompt_context(deps, prompt_file, context)
-    return get_prompt(prompt_file, context=context) + capability_routing(deps) + khc_service_note(ctx.messages, current_query=deps.query)
+    return get_prompt(prompt_file, context=context) + capability_routing(deps) + khc_service_note(ctx.messages, current_query=deps.query) + advisory_season_note()
