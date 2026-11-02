@@ -86,3 +86,20 @@ def test_documents_tool_asks_first_for_crop_questions_only():
     c = SimpleNamespace(messages=[U("wheat lodging"), CALL("search_documents", text="Looking.")], deps=SimpleNamespace())
     with pytest.raises(ModelRetry, match="generic or personalised"):
         asyncio.run(search_tools.search_documents(c, "wheat lodging prevention"))
+
+
+def test_rounds_count_each_asked_and_answered_question():
+    from helpers.ask_first import asked_rounds
+
+    one = [U("q"), A("generic or personalised?"), U("personalised"), CALL("search_advisory")]
+    assert asked_rounds(ctx(one)) == 1
+    two = [U("q"), A("generic or personalised?"), U("personalised"), A("district, days, season?"), U("Rabi, Pune, 40"), CALL()]
+    assert asked_rounds(ctx(two)) == 2
+    assert asked_rounds(ctx([U("q"), CALL()])) == 0
+
+
+def test_rounds_start_again_after_an_answer():
+    from helpers.ask_first import asked_rounds
+
+    msgs = [U("q"), A("ask"), U("generic"), CALL("search_advisory"), RET("search_advisory"), A("answer"), U("q2"), CALL()]
+    assert asked_rounds(ctx(msgs)) == 0

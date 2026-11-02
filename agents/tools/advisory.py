@@ -314,6 +314,18 @@ def _personal_details(personalised: bool, district: Optional[str], days: Optiona
     return _clean_param(district), _clean_days(days)
 
 
+_DETAILS_RETRY = (
+    "Do not search yet. For personalised advice, ask the farmer for their district, the days since sowing "
+    "and the season in one question, and wait for the answer. If they say they do not know, search without them."
+)
+
+
+def _require_details_asked(ctx: RunContext[FarmerContext], personalised: bool, district: str, days: Optional[int], confirmed: bool) -> None:
+    """Personalised search with no district and no days: the farmer must have been asked for them first."""
+    if personalised and not district and days is None and not confirmed and not farmer_was_asked(ctx, rounds=2):
+        raise ModelRetry(_DETAILS_RETRY)
+
+
 def _resolve_season(advice_type: str, season: Optional[str]) -> str:
     """Season to search with: the configured (env) season wins; else the farmer's (personalised only)."""
     farmer_season = _clean_param(season) if advice_type == "personalised" else ""
@@ -450,6 +462,7 @@ async def search_advisory(
     personalised = advice_type == "personalised"
     # Generic advice never sends the personal details, even if the model passes them.
     district, days = _personal_details(personalised, district, days_after_sowing)
+    _require_details_asked(ctx, personalised, district, days, district_fallback_confirmed)
     season_value = _resolve_season(advice_type, season)
 
     # The farmer agreed to the crop advice without the district: search without it.
