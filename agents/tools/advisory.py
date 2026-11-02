@@ -212,7 +212,12 @@ def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
     )
 
 
-def format_search_notes(search_ctx: Dict[str, str], days_after_sowing: Optional[int]) -> str:
+def format_search_notes(
+    search_ctx: Dict[str, str],
+    days_after_sowing: Optional[int],
+    personalised: bool = False,
+    district_given: bool = False,
+) -> str:
     """Notes for the agent about how the search was applied, with what to tell the farmer."""
     location = str(search_ctx.get("location_status") or "").strip().lower()
     day_range = str(search_ctx.get("has_day_range") or "").strip().lower() == "true"
@@ -232,6 +237,16 @@ def format_search_notes(search_ctx: Dict[str, str], days_after_sowing: Optional[
     if not day_range or (days_after_sowing is not None and not days_matched):
         lines.append(
             "> This advice is general for the crop and not matched to the days since sowing. Say so briefly."
+        )
+    if personalised and not district_given:
+        lines.append(
+            "> The farmer did not give a district, so the location was skipped. Say in one short sentence "
+            "that the advice is not specific to their area."
+        )
+    if personalised and days_after_sowing is None:
+        lines.append(
+            "> The farmer did not give the days since sowing. Say in one short sentence that the advice "
+            "is not matched to their sowing stage."
         )
     return "\n".join(lines)
 
@@ -342,4 +357,6 @@ async def search_advisory(
             return message
         return f"No advisory found for `{query}`."
     formatted = format_advisory_results(results[:top_k] if top_k and top_k > 0 else results, query)
-    return formatted + "\n\n" + format_search_notes(search_ctx, days)
+    return formatted + "\n\n" + format_search_notes(
+        search_ctx, days, personalised=advice_type == "personalised", district_given=bool(district)
+    )

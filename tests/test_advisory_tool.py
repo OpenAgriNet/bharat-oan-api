@@ -240,6 +240,22 @@ class TestSearchNotes:
         ctx = {"location_status": "not_requested", "has_day_range": "true", "days_matched": "false"}
         assert "not matched to the days since sowing" in sa.format_search_notes(ctx, days_after_sowing=300)
 
+    def test_says_so_when_a_personalised_farmer_skipped_the_district(self):
+        ctx = {"location_status": "not_requested", "has_day_range": "true", "days_matched": "true"}
+        out = sa.format_search_notes(ctx, days_after_sowing=40, personalised=True, district_given=False)
+        assert "did not give a district" in out and "location was skipped" in out
+
+    def test_says_so_when_a_personalised_farmer_skipped_the_days(self):
+        ctx = {"location_status": "location_not_applied", "has_day_range": "true", "days_matched": "false"}
+        out = sa.format_search_notes(ctx, days_after_sowing=None, personalised=True, district_given=True)
+        assert "did not give the days since sowing" in out
+        assert "did not give a district" not in out
+
+    def test_a_generic_search_never_mentions_skipped_details(self):
+        ctx = {"location_status": "not_requested", "has_day_range": "true", "days_matched": "false"}
+        out = sa.format_search_notes(ctx, days_after_sowing=None, personalised=False, district_given=False)
+        assert "did not give" not in out
+
     def test_days_matched_is_only_reported_when_days_were_sent(self):
         out = sa.format_search_notes({"has_day_range": "false"}, days_after_sowing=None)
         assert "advisory_has_day_range=no" in out
@@ -279,6 +295,16 @@ class TestTool:
             with pytest.raises(ModelRetry):
                 asyncio.run(sa.search_advisory(CTX, "aphids", blank, "generic"))
         assert bap.requests == []
+
+    def test_personalised_without_a_district_tells_the_agent_the_location_was_skipped(self, bap):
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", days_after_sowing=40))
+        assert "did not give a district" in out
+
+    def test_personalised_with_district_and_days_has_no_skipped_note(self, bap):
+        out = asyncio.run(
+            sa.search_advisory(CTX, "aphids", "Wheat", "personalised", district="Lucknow", days_after_sowing=40)
+        )
+        assert "did not give" not in out
 
     def test_generic_never_sends_district_or_days(self, bap):
         asyncio.run(
