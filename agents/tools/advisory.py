@@ -86,7 +86,7 @@ def _asked_about_district_fallback(ctx: RunContext[FarmerContext]) -> bool:
 def _farmer_was_asked(ctx: RunContext[FarmerContext]) -> bool:
     """True when, for the current advisory question, the farmer was asked and has answered.
 
-    Looks at the messages after the last completed advisory search (or the whole conversation when
+    Looks at the messages after the last completed tool call (or the whole conversation when
     there was none) for this order: the farmer's question, then an assistant message (the
     "generic or personalised?" question), then the farmer's reply. So every new advisory question
     needs its own ask, and an earlier choice is not reused.
@@ -94,12 +94,12 @@ def _farmer_was_asked(ctx: RunContext[FarmerContext]) -> bool:
     messages = getattr(ctx, "messages", None)
     if messages is None:  # cannot verify (not running inside an agent run)
         return True
+    # A tool result of any kind means the previous question was already answered (the model may
+    # have used another search tool); only what follows it can count as asking for this question.
     start = 0
     for index, message in enumerate(messages):
         if isinstance(message, ModelRequest) and any(
-            isinstance(part, ToolReturnPart)
-            and part.tool_name == "search_advisory"
-            and NO_DISTRICT_DATA_MARKER not in str(part.content)
+            isinstance(part, ToolReturnPart) and NO_DISTRICT_DATA_MARKER not in str(part.content)
             for part in message.parts
         ):
             start = index + 1

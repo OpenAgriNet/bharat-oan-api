@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from pydantic_ai import ModelRetry
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolCallPart, ToolReturnPart, UserPromptPart
 
 from agents.tools import advisory as sa
 
@@ -422,6 +422,21 @@ class TestTool:
         ]
         out = asyncio.run(sa.search_advisory(_ctx(asked_again), "wheat pests", "Wheat", "generic"))
         assert "Harvest AKJ-1" in out
+
+    def test_a_question_answered_by_another_tool_does_not_count_as_asked(self, bap):
+        # q1 answered through another search tool and "generic or personalised?" asked afterwards;
+        # the next question must not be read as the farmer's reply to that late question.
+        history = [
+            ModelRequest(parts=[UserPromptPart(content="How can I control aphids in my wheat crop?")]),
+            ModelResponse(parts=[TextPart(content="Let me look."), ToolCallPart(tool_name="search_documents", args={})]),
+            ModelRequest(parts=[ToolReturnPart(tool_name="search_documents", tool_call_id="c9", content="aphid advice")]),
+            ModelResponse(parts=[TextPart(content="Advice... Would you like generic or personalised advice?")]),
+            ModelRequest(parts=[UserPromptPart(content="When is the right time to harvest my wheat crop?")]),
+            ModelResponse(parts=[TextPart(content="Let me search."), ToolCallPart(tool_name="search_advisory", args={})]),
+        ]
+        with pytest.raises(ModelRetry, match="generic or personalised"):
+            asyncio.run(sa.search_advisory(_ctx(history), "wheat harvest", "Wheat", "generic"))
+        assert bap.requests == []
 
     def test_top_k_limits_results(self, bap):
         bap.response = httpx.Response(200, json=_on_search([_item(f"c{i}", title=f"T{i}") for i in range(6)]))
