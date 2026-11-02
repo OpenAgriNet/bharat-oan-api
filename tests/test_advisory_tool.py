@@ -582,3 +582,31 @@ class TestDistrictConfirmationFollowsTheFarmersReply:
             ModelResponse(parts=[TextPart(content="Here is the advice.")]),
         ]
         assert sa._asked_about_district_fallback(_ctx(answered)) is False
+
+
+class TestDistrictNotWrittenByTheFarmerIsNeverSent:
+    @staticmethod
+    def _history(farmer_reply):
+        coords = "\n**Browser Location Coordinates:** Latitude=12.9, Longitude=77.6 (the device location)"
+        return [
+            ModelRequest(parts=[UserPromptPart(content='**User:** "How can I control aphids in my wheat crop?"' + coords)]),
+            ModelResponse(parts=[TextPart(content="Generic or personalised?")]),
+            ModelRequest(parts=[UserPromptPart(content='**User:** "personalised"' + coords)]),
+            ModelResponse(parts=[TextPart(content="Season, district and days since sowing?")]),
+            ModelRequest(parts=[UserPromptPart(content=f'**User:** "{farmer_reply}"' + coords)]),
+        ]
+
+    def test_a_district_from_the_browser_location_is_dropped_not_sent(self, bap):
+        out = asyncio.run(sa.search_advisory(_ctx(self._history("Rabi, 40 days")), "aphids", "Wheat", "personalised", district="Bengaluru Urban", days_after_sowing=40, season="Rabi"))
+        # treated as no district: the farmer gets the yes/no question and nothing is sent to the BAP
+        assert sa.NO_DISTRICT_DATA_MARKER in out and "Do not ask for a district again" in out
+        assert "Bengaluru" not in out
+        assert bap.requests == []
+
+    def test_a_district_the_farmer_typed_is_sent(self, bap):
+        asyncio.run(sa.search_advisory(_ctx(self._history("Rabi, Lucknow, 40 days")), "aphids", "Wheat", "personalised", district="Lucknow district", days_after_sowing=40, season="Rabi"))
+        assert _params(json.loads(bap.requests[0].read()))["district"] == "Lucknow district"
+
+    def test_other_scripts_are_not_compared(self, bap):
+        asyncio.run(sa.search_advisory(_ctx(self._history("रबी, लखनऊ, 40 दिन")), "aphids", "Wheat", "personalised", district="Lucknow", days_after_sowing=40, season="Rabi"))
+        assert _params(json.loads(bap.requests[0].read()))["district"] == "Lucknow"

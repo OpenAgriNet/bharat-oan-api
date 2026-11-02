@@ -18,7 +18,9 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolRetu
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
-from helpers.ask_first import ANSWER_TOOLS, ASK_FIRST_RETRY, NO_DISTRICT_DATA_MARKER, farmer_was_asked, has_text
+from helpers.ask_first import (
+    ANSWER_TOOLS, ASK_FIRST_RETRY, NO_DISTRICT_DATA_MARKER, district_comes_from_farmer, farmer_was_asked, has_text,
+)
 from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -481,6 +483,10 @@ async def search_advisory(
     personalised = advice_type == "personalised"
     # Generic advice never sends the personal details, even if the model passes them.
     district, days = _personal_details(personalised, district, days_after_sowing)
+    if district and not district_comes_from_farmer(ctx, district):
+        # Never send a district the farmer did not write (for example one worked out from the browser
+        # location): treat it as not given, so the farmer only gets the yes/no question.
+        district = ""
     _require_details_asked(ctx, personalised, district, days, district_fallback_confirmed)
     season_value = _resolve_season(advice_type, season)
 
