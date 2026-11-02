@@ -5,7 +5,7 @@ import pytest
 from pydantic_ai import ModelRetry
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, RetryPromptPart, ToolCallPart, ToolReturnPart, UserPromptPart
 
-from agents.tools.ask_first import farmer_was_asked
+from helpers.ask_first import farmer_was_asked
 from agents.tools import search as search_tools
 
 
@@ -73,7 +73,7 @@ def test_pests_tool_refuses_before_the_ask():
 
 
 def test_mentions_crop():
-    from agents.tools.ask_first import mentions_crop
+    from helpers.ask_first import mentions_crop
 
     assert mentions_crop("wheat lodging prevention")
     assert mentions_crop("Paddy brown planthopper")

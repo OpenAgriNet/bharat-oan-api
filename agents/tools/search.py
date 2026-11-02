@@ -14,7 +14,7 @@ from langfuse import observe
 from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
-from agents.tools.ask_first import ASK_FIRST_RETRY, farmer_was_asked, mentions_crop
+from helpers.ask_first import ASK_FIRST_RETRY, farmer_was_asked, mentions_crop
 
 from agents.deps import FarmerContext
 from agents.tools.imd_advisory import agromet_note
