@@ -14,10 +14,15 @@ from agents.deps import FarmerContext
 from agents.tools.aif import _build_payload, _descriptor, _endpoint, _outcome_tag, _values
 from agents.tools.kcc import _mobile
 from app.config import DEFAULT_HTTP_TIMEOUT
-from helpers.utils import get_logger, to_ascii_digits
+from helpers.utils import get_logger, get_prompt, to_ascii_digits
 
 logger = get_logger(__name__)
 SOURCE = "**Source:** Kisan Helpline Center"
+_STATUS_ID_PROMPT = (
+    "Please share the grievance ID you received by SMS on your registered mobile number. "
+    "For example, UP/231026/5."
+)
+_STATUS_OTP_PROMPT = "An OTP has been sent to your registered mobile number. Please share the 6-digit OTP."
 _MASTER_FIELDS = ("stateId", "villageId", "scheme", "division", "problemCategory", "problemSubCategory")
 _LANGUAGE_CODES = {
     "hindi": "hi", "english": "en", "marathi": "mr", "bengali": "bn",
@@ -52,6 +57,8 @@ def _turns(messages) -> list[tuple[str, str]]:
                 content = part.content if isinstance(part.content, str) else " ".join(
                     item for item in part.content if isinstance(item, str)
                 )
+                if content.startswith("**Conversation**\n\n") and "\n\n---\n\n" in content:
+                    content = content.split("\n\n---\n\n", 1)[1]
                 found = re.search(r'\*\*User:\*\* "(.*?)"(?:\n\*\*|\n[A-Z]|\Z)', content, re.S)
                 turns.append(("farmer", found.group(1) if found else content))
             elif kind == "text":
@@ -67,42 +74,25 @@ _KHC_WORDS = re.compile(
 )
 
 
-def khc_service_note(messages) -> str:
+def khc_service_note(messages, current_query: str = "") -> str:
     """Always provide status routing, plus a scoped reminder of an earlier KHC choice.
 
     Routing must be available before lazy-loaded workflow rules. Keep explicit KHC choices
     across follow-up turns without treating them as a permanent choice for the whole chat.
+    Dynamic system prompts run before the current user message is appended to history.
     """
-    routing = (
-        "\n\n## Grievance status routing\n"
-        "Before collecting details or calling a grievance-status tool, identify the scheme or service "
-        "for the grievance being checked from the farmer's message or clear context for that same grievance. "
-        "If neither is known, ask only 'Could you please tell me which scheme or service your grievance is with?' "
-        "in the farmer's selected language, then wait. "
-        "Do not ask for a grievance number, registration number, mobile number or OTP until the route is known. "
-        "Do not show any service source label while clarifying the route. "
-        "A bare grievance number or the bot's own KHC wording does not select KHC. "
-        "Merely loading a capability does not select a service either.\n"
-        "Once known, route directly: PM-Kisan -> pmkisan_grievance_send_otp(purpose='check_status') "
-        "then pmkisan_grievance_status; PMFBY -> pmfby_grievance_status; "
-        "AIF -> initiate_aif_otp then verify_aif_otp then check_aif_grievance_status; "
-        "KHC -> check_khc_grievance_status. Collect only the chosen flow's missing details, "
-        "reusing any identifiers already supplied. "
-        "Do not ask which scheme or service again when it is already known. "
-        "An explicit KHC choice for this grievance overrides the scheme default. "
-        "A status follow-up clearly about the same KHC grievance stays with KHC. "
-        "KHC status needs only the grievance number, not the scheme, location, mobile number or OTP. "
-        "Other named schemes without an existing grievance-status flow use KHC. "
-        "An unrelated earlier KHC mention is not a choice for a new grievance or status request. "
-        "Honor an explicit switch away from KHC. "
-        "This gate overrides generic grievance tool-table entries and KHC number-collection instructions; "
-        "respect the session's permitted tools. It does not change the registration step order."
-    )
-    for who, text in _turns(messages):
+    routing = "\n\n" + get_prompt("grievance_status_routing", context={
+        "status_id_prompt": _STATUS_ID_PROMPT,
+        "status_otp_prompt": _STATUS_OTP_PROMPT,
+    })
+    turns = _turns(messages)
+    if current_query:
+        turns.append(("farmer", current_query))
+    for who, text in turns:
         if who == "farmer" and _KHC_WORDS.search(text):
             return routing + (
                 "\n\n## Service already chosen (same grievance only)\n"
-                "The farmer mentioned Kisan Helpline Center (KHC) earlier in this chat. "
+                "The farmer named Kisan Helpline Center (KHC) in the current request or earlier in this chat. "
                 "Apply the earlier KHC choice only to that same grievance, if they requested KHC "
                 "and have not asked to switch away. A mention in an informational question is not a choice. "
                 "For that KHC grievance, for every scheme, including PM-Kisan, PMFBY and AIF, "
@@ -372,7 +362,9 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
         tag = _outcome_tag(envelope, action)
         code, message = _descriptor(tag)
         fields = _values(tag)
-        expected = "grievance_status" if action == "status" else {
+        expected = (
+            "status_otp_sent" if values.get("request_type") == "get_status_otp" else "grievance_status"
+        ) if action == "status" else {
             "get_otp": "otp_sent", "verify_otp": "otp_verified",
             "get_reference": "khc_reference", "create_grievance": "grievance_created",
             "find_location": "khc_location", "grievance_tree": "khc_grievance_tree",
@@ -392,10 +384,20 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 )
             if code in (
                 "not_found", "invalid_request", "submission_unconfirmed", "upstream_error",
-                "configuration_error", "otp_required", "invalid_otp", "rate_limited",
+                "configuration_error", "otp_required", "invalid_otp", "invalid_mobile", "rate_limited",
             ):
                 return message or failure
             raise ValueError("Missing KHC outcome tag")
+        if code == "status_otp_sent":
+            return (
+                "OTP sent to the mobile registered on this grievance. "
+                f"Tell the farmer in their selected language: '{_STATUS_OTP_PROMPT}' "
+                "Do not claim SMS delivery is confirmed. The OTP is valid for 5 minutes and single-use. "
+                "Do not ask for a mobile number. "
+                "Call check_khc_grievance_status with the same grievance_number and the farmer's otp. "
+                "Do not call initiate_khc_otp or verify_khc_otp: those are for registration. "
+                "Do not send again while waiting. Resend only if requested; a new OTP invalidates the old one."
+            )
         if code == "otp_sent":
             return (
                 "OTP sent successfully. Ask the farmer for the OTP received on their mobile. "
@@ -462,6 +464,21 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
         for field, label in (("currentStatus", "Status"), ("currentLevel", "Current level"), ("createdAt", "Registered on")):
             if fields.get(field):
                 lines.append(f"{label}: {fields[field]}")
+        if action == "status":
+            if fields.get("externalReferenceNo"):
+                lines.append(f"External reference: {fields['externalReferenceNo']}")
+            for field, label, expected_type in (
+                ("address", "Location", dict), ("escalationHistory", "Escalation history", list),
+            ):
+                if fields.get(field):
+                    details = json.loads(fields[field])
+                    if details is None:
+                        continue
+                    if not isinstance(details, expected_type) or (
+                        isinstance(details, list) and not all(isinstance(item, dict) for item in details)
+                    ):
+                        raise ValueError(f"Invalid KHC {field}")
+                    lines.append(f"{label}: {json.dumps(details, ensure_ascii=False)}")
         lines.append(SOURCE)
         return "\n".join(lines)
     except (httpx.RequestError, ValueError, TypeError, AttributeError, KeyError):
@@ -632,27 +649,51 @@ async def lookup_khc_reference(
     return await _call(ctx, "init", **values)
 
 
-@observe(name="tool:check_khc_grievance_status", as_type="tool")
+@observe(name="tool:check_khc_grievance_status", as_type="tool", capture_input=False, capture_output=False)
 async def check_khc_grievance_status(
-    ctx: RunContext[FarmerContext], grievance_number: str = "",
+    ctx: RunContext[FarmerContext], grievance_number: str = "", otp: str = "",
 ) -> str:
-    """Check KHC grievance status.
+    """Send a status OTP, or verify it and retrieve KHC grievance status.
 
     Use only after KHC is identified as the service for this grievance. For a generic status
     request with no known scheme or service, ask which scheme or service first, not for a number.
     Named PM-Kisan, PMFBY and AIF grievances use their own status flows unless KHC was chosen.
     Once KHC is known, ask the farmer for their grievance number only if missing.
 
-    Keep slashes and leading zeros intact, e.g. BR/240926/2. Do not ask for an OTP,
-    mobile, beneficiary ID or cookie. Never invent a grievance number.
+    First call without otp to send SMS to the mobile registered on the grievance.
+    After successful sending, ask for the 6-digit OTP and call this same tool with
+    the same grievance_number and the farmer's otp. Never use registration OTP tools.
+    The OTP expires after 5 minutes and is single-use. Resend only when requested
+    by calling without otp; this invalidates the previous OTP. Never retry automatically.
+    Keep slashes and leading zeros intact, e.g. UP/231026/5 and OTP 012345.
+    Grievance numbers must have two ASCII letters, a numeric middle section and a positive
+    sequence separated by slashes, e.g. UP/231026/5 (an example, never a default).
+    KHC generates the number: JK/2310261/1 is also structurally valid. Do not impose a
+    fixed digit count or calendar-date interpretation on the middle section.
+    Surrounding whitespace and letter case are normalized. Ask for the full ID received by SMS on the registered
+    mobile if missing or invalid. Announce sending only after the send call succeeds.
+    Do not ask for a mobile, beneficiary ID or cookie. Never invent a number or OTP.
+    A wrong OTP can be corrected until expiry; an expired/used OTP needs a fresh send.
+    Explain ID and OTP failures based on the tool result, without guessing a cause.
     """
     number = to_ascii_digits(str(grievance_number or "")).strip()
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9/-]{0,99}", number):
+    if len(number) > 100 or not re.fullmatch(r"[A-Za-z]{2}/[0-9]+/0*[1-9][0-9]*", number):
         return (
-            "If the service for this grievance is unknown, ask which scheme or service first, without a source label. "
-            "Only for a known KHC grievance: Ask the farmer for their Kisan Help Center grievance number, including any slashes."
+            ("The KHC grievance ID format is incorrect. " if number else "")
+            + f"{_STATUS_ID_PROMPT} "
+            "The required format is two letters/numeric middle section/positive sequence. "
+            "KHC assigns the number; the middle section has no fixed digit count. "
+            "The example is not their number. Do not restart scheme/service selection. "
+            "Keep both slashes and any leading zeros. "
+            "Do not send an OTP until a valid number is supplied."
         )
-    return await _call(ctx, "status", grievanceNo=number)
+    number = number.upper()
+    if otp != "":
+        code = to_ascii_digits(str(otp or "")).strip()
+        if not re.fullmatch(r"[0-9]{6}", code):
+            return "The OTP must contain exactly 6 digits. Please share the 6-digit OTP received for this grievance."
+        return await _call(ctx, "status", request_type="verify_status_otp", grievanceNo=number, otp=code)
+    return await _call(ctx, "status", request_type="get_status_otp", grievanceNo=number)
 
 
 @observe(name="tool:register_khc_grievance", as_type="tool")

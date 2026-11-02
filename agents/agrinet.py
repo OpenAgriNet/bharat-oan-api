@@ -56,4 +56,4 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
     deps.capabilities.restore(ctx.messages)
     prompt_file = f'agrinet_{lang_code}'
     context = capability_prompt_context(deps, prompt_file, context)
-    return get_prompt(prompt_file, context=context) + capability_routing(deps) + khc_service_note(ctx.messages) + advisory_season_note()
+    return get_prompt(prompt_file, context=context) + capability_routing(deps) + khc_service_note(ctx.messages, current_query=deps.query) + advisory_season_note()

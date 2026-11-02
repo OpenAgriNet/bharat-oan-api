@@ -1,4 +1,5 @@
 import asyncio
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -47,6 +48,8 @@ def fake_http(monkeypatch, response, calls):
         calls.append(json.loads(request.content))
         if isinstance(response, Exception):
             raise response
+        if callable(response):
+            return response(request)
         return response
 
     monkeypatch.setattr(
@@ -55,21 +58,252 @@ def fake_http(monkeypatch, response, calls):
     )
 
 
-@pytest.mark.parametrize("number", ["", "abc\r\nbad", "a" * 101])
-def test_status_asks_for_number_without_http(monkeypatch, number):
+@pytest.mark.parametrize("number", [
+    "", "abc\r\nbad", "a" * 101, "123456", "9876543210", "BR2409261", "BR-240926-1",
+    "B/240926/1", "BHR/240926/1", "12/240926/1", "BR//1",
+    "BR/24A926/1", "BR/240926/0", "BR/240926/000", "BR/240926/-1", "BR/240926/+1",
+    "BR/240926/1.5", "BR/240926/", "BR/240926/1/2", "BR /240926/1", "BR/240926/1\n2",
+    "BR/240926/" + "1" * 91, "\u00df/240926/1", "\u0131R/240926/1",
+])
+@pytest.mark.parametrize("otp", ["", "012345"])
+def test_status_asks_for_number_without_http(monkeypatch, number, otp):
     call = AsyncMock()
     monkeypatch.setattr(khc, "_call", call)
-    output = asyncio.run(khc.check_khc_grievance_status(ctx(), number))
-    assert "ask which scheme or service first, without a source label" in output
-    assert "Ask the farmer for their Kisan Help Center grievance number" in output
+    output = asyncio.run(khc.check_khc_grievance_status(ctx(), number, otp))
+    assert "which scheme or service" not in output
+    assert "Do not restart scheme/service selection" in output
+    assert "Please share the grievance ID" in output
+    assert "UP/231026/5" in output
+    assert "received by SMS on your registered mobile number" in output
     call.assert_not_called()
+
+
+@pytest.mark.parametrize("number,normalized", [
+    (" br/240926/0002 ", "BR/240926/0002"),
+    (" up/231026/5 ", "UP/231026/5"),
+    (" jk/2310261/1 ", "JK/2310261/1"),
+    ("JK/23102612/0001", "JK/23102612/0001"),
+    ("BR/24092/1", "BR/24092/1"),
+    ("UP/000000/1", "UP/000000/1"),
+    ("BR/999999/1", "BR/999999/1"),
+    ("BR/240926/" + "0" * 89 + "1", "BR/240926/" + "0" * 89 + "1"),
+])
+@pytest.mark.parametrize("otp", ["", "012345"])
+def test_status_grievance_number_format_and_normalization(monkeypatch, number, normalized, otp):
+    call = AsyncMock(return_value="OK")
+    monkeypatch.setattr(khc, "_call", call)
+    assert asyncio.run(khc.check_khc_grievance_status(ctx(), number, otp)) == "OK"
+    expected = {
+        "request_type": "verify_status_otp" if otp else "get_status_otp",
+        "grievanceNo": normalized,
+    }
+    if otp:
+        expected["otp"] = otp
+    assert call.call_args.kwargs == expected
 
 
 def test_status_preserves_slashes_and_normalizes_regional_digits(monkeypatch):
     call = AsyncMock(return_value="OPEN")
     monkeypatch.setattr(khc, "_call", call)
     assert asyncio.run(khc.check_khc_grievance_status(ctx(), " BR/२४०९२६/२ ")) == "OPEN"
-    assert call.call_args.kwargs == {"grievanceNo": "BR/240926/2"}
+    assert call.call_args.kwargs == {"grievanceNo": "BR/240926/2", "request_type": "get_status_otp"}
+
+
+def test_status_verifies_regional_otp_preserving_leading_zero(monkeypatch):
+    call = AsyncMock(return_value="OPEN")
+    monkeypatch.setattr(khc, "_call", call)
+    assert asyncio.run(khc.check_khc_grievance_status(ctx(), "BR/२४०९२६/२", " ०१२३४५ ")) == "OPEN"
+    assert call.call_args.kwargs == {
+        "request_type": "verify_status_otp", "grievanceNo": "BR/240926/2", "otp": "012345",
+    }
+
+
+@pytest.mark.parametrize("otp", [" ", "12345", "1234567", "abcdef", "12 345"])
+def test_status_invalid_otp_does_not_send_or_verify(monkeypatch, otp):
+    call = AsyncMock()
+    monkeypatch.setattr(khc, "_call", call)
+    output = asyncio.run(khc.check_khc_grievance_status(ctx(), "BR/240926/2", otp))
+    assert "must contain exactly 6 digits" in output
+    assert "6-digit OTP" in output
+    call.assert_not_called()
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_status_send_otp_returns_instructions_not_status(monkeypatch, wrapped):
+    response = envelope(code="status_otp_sent", fields={})
+    if wrapped:
+        response = {"responses": [response]}
+    calls = []
+    fake_http(monkeypatch, khc.httpx.Response(200, json=response), calls)
+    result = asyncio.run(khc.check_khc_grievance_status(ctx(), "BR/240926/2"))
+    assert "registered on this grievance" in result
+    assert "5 minutes" in result
+    assert "check_khc_grievance_status" in result
+    assert "An OTP has been sent to your registered mobile number. Please share the 6-digit OTP." in result
+    assert "Do not claim SMS delivery is confirmed" in result
+    assert "Status:" not in result
+    assert "farmerMobileNumber" not in json.dumps(calls)
+
+
+def test_status_renders_full_details_after_verification(monkeypatch):
+    fields = {
+        "grievanceNo": "BR/240926/2", "currentStatus": "PARTIAL_CLOSED", "currentLevel": "L2",
+        "externalReferenceNo": "STATE-REF-10045", "createdAt": "2026-09-24T11:42:18+05:30",
+        "address": json.dumps({"state": "Bihar", "district": "Patna", "subDistrict": None, "village": "Shahpur"}),
+        "escalationHistory": json.dumps([{
+            "level": "L2", "assignedTo": "District Agriculture Officer", "isActive": True,
+            "solutions": [{"at": "2026-09-28 14:10:22", "comment": "Field visit scheduled"}],
+            "source": "AUTO", "reason": "SLA breached at L1", "updatedAt": None,
+        }]),
+    }
+    calls = []
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(fields=fields)), calls)
+    output = asyncio.run(khc.check_khc_grievance_status(ctx(), fields["grievanceNo"], "012345"))
+    for expected in ("PARTIAL_CLOSED", "Bihar", "Patna", "Shahpur", "District Agriculture Officer",
+                     "Field visit scheduled", "SLA breached at L1", "STATE-REF-10045"):
+        assert expected in output
+    assert "012345" not in output
+    assert output.endswith(khc.SOURCE)
+    tags = calls[0]["message"]["order"]["fulfillments"][0]["customer"]["person"]["tags"]
+    assert {tag["descriptor"]["code"]: tag["value"] for tag in tags} == {
+        "request_type": "verify_status_otp", "grievanceNo": fields["grievanceNo"], "otp": "012345",
+    }
+
+
+def test_status_send_correct_retry_verify_and_new_check(monkeypatch):
+    replies = iter([
+        envelope(code="status_otp_sent", fields={}),
+        envelope(code="invalid_otp", fields={}, message="Invalid or expired OTP"),
+        envelope(),
+        envelope(code="status_otp_sent", fields={}),
+    ])
+    calls = []
+    fake_http(monkeypatch, lambda _: khc.httpx.Response(200, json=next(replies)), calls)
+    conversation = ctx()
+    number = "BR/240926/2"
+    assert "OTP sent" in asyncio.run(khc.check_khc_grievance_status(conversation, number))
+    assert asyncio.run(khc.check_khc_grievance_status(conversation, number, "999999")) == "Invalid or expired OTP"
+    assert "OPEN" in asyncio.run(khc.check_khc_grievance_status(conversation, number, "012345"))
+    assert "OTP sent" in asyncio.run(khc.check_khc_grievance_status(conversation, number))
+    request_types = []
+    for request in calls:
+        assert request["context"]["action"] == "status"
+        tags = request["message"]["order"]["fulfillments"][0]["customer"]["person"]["tags"]
+        values = {tag["descriptor"]["code"]: tag["value"] for tag in tags}
+        assert values["grievanceNo"] == number
+        assert "farmerMobileNumber" not in values
+        request_types.append(values["request_type"])
+    assert request_types == ["get_status_otp", "verify_status_otp", "verify_status_otp", "get_status_otp"]
+
+
+def test_khc_created_id_with_seven_middle_digits_round_trips_into_status(monkeypatch):
+    number = "JK/2310261/1"
+    replies = iter([
+        envelope("init", fields={"grievanceNo": number}),
+        envelope(code="status_otp_sent", fields={}),
+        envelope(fields={"grievanceNo": number, "currentStatus": "OPEN"}),
+    ])
+    calls = []
+    fake_http(monkeypatch, lambda _: khc.httpx.Response(200, json=next(replies)), calls)
+    conversation = ctx()
+    created = asyncio.run(khc.register_khc_grievance(conversation, **registration()))
+    assert f"Grievance number: {number}" in created
+    sent = asyncio.run(khc.check_khc_grievance_status(conversation, number))
+    assert "OTP sent" in sent and "which scheme or service" not in sent
+    status = asyncio.run(khc.check_khc_grievance_status(conversation, number, "012345"))
+    assert f"Grievance number: {number}" in status and "Status: OPEN" in status
+    for request in calls[1:]:
+        values = {tag["descriptor"]["code"]: tag["value"] for tag in
+                  request["message"]["order"]["fulfillments"][0]["customer"]["person"]["tags"]}
+        assert values["grievanceNo"] == number
+    creation_values = {tag["descriptor"]["code"]: tag["value"] for tag in
+                       calls[0]["message"]["order"]["fulfillments"][0]["customer"]["person"]["tags"]}
+    assert "grievanceNo" not in creation_values
+    assert creation_values["externalReferenceNo"].startswith("BV-")
+
+
+@pytest.mark.parametrize("number", ["JK/2310261/1", "JK/2310261/"])
+def test_kcc_status_followup_never_returns_to_scheme_selection(monkeypatch, number):
+    conversation = _chat(
+        "I want to check a grievance status",
+        ("bot", "Could you please tell me which scheme or service your grievance is with?"),
+        "KCC",
+        ("bot", "Please share your grievance number."),
+        number,
+        ("bot", "Could you please tell me which scheme or service your grievance is with?"),
+        "KCC",
+        ("bot", "Could you please tell me your grievance number?"),
+        number,
+    )
+    note = khc.khc_service_note(conversation.messages)
+    assert "KCC (Kisan Credit Card) grievance/complaint status -> check_khc_grievance_status" in note
+    assert "Do not restart scheme/service selection" in note
+    calls = []
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(code="status_otp_sent", fields={})), calls)
+    output = asyncio.run(khc.check_khc_grievance_status(conversation, number))
+    assert "which scheme or service" not in output
+    if number.endswith("/1"):
+        assert "OTP sent" in output
+        assert len(calls) == 1
+    else:
+        assert "format is incorrect" in output
+        assert not calls
+
+
+@pytest.mark.parametrize("query", [
+    "KCC", "JK/2310261/1", "012345", "Check my KCC grievance status",
+    "Check my KCC application status", "What is KCC?", "Switch to the AIF grievance service",
+    "Check a different PM-Kisan grievance", "What is the weather?", "Cancel",
+    "I want to register a KCC grievance", "Check my AIF grievance status",
+    "Check my PM-Kisan grievance status", "Check my PMFBY grievance status",
+    "File a KCC grievance about my application status",
+])
+def test_kcc_routing_is_left_to_the_prompt_not_python_history_matching(query):
+    history = _chat(
+        "Check my KCC grievance status", ("bot", "Please share your grievance number."),
+        "JK/2310261/1", ("bot", "Which scheme or service?"), "KCC",
+    ).messages
+    assert khc.khc_service_note(history, current_query=query) == khc.khc_service_note([])
+
+
+def test_status_routing_is_rendered_from_the_prompt_asset(monkeypatch):
+    calls = []
+
+    def render(prompt_file, context):
+        calls.append((prompt_file, context))
+        return "Routing rules supplied by the prompt asset."
+
+    monkeypatch.setattr(khc, "get_prompt", render, raising=False)
+    assert khc.khc_service_note([], current_query="Check my KCC grievance status") == (
+        "\n\nRouting rules supplied by the prompt asset."
+    )
+    assert calls == [("grievance_status_routing", {
+        "status_id_prompt": khc._STATUS_ID_PROMPT,
+        "status_otp_prompt": khc._STATUS_OTP_PROMPT,
+    })]
+
+
+def test_status_accepts_null_optional_details(monkeypatch):
+    fields = {
+        "grievanceNo": "BR/240926/2", "currentStatus": "CLOSED",
+        "address": "null", "escalationHistory": "null",
+    }
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(fields=fields)), [])
+    output = asyncio.run(khc.check_khc_grievance_status(ctx(), fields["grievanceNo"], "012345"))
+    assert "CLOSED" in output
+    assert "Location:" not in output
+    assert "Escalation history:" not in output
+
+
+@pytest.mark.parametrize("extra", [
+    {"address": "[]"}, {"address": "bad json"}, {"escalationHistory": "{}"},
+    {"escalationHistory": '["bad"]'},
+])
+def test_status_rejects_malformed_structured_details(monkeypatch, extra):
+    fields = {"grievanceNo": "BR/240926/2", "currentStatus": "OPEN", **extra}
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(fields=fields)), [])
+    output = asyncio.run(khc.check_khc_grievance_status(ctx(), fields["grievanceNo"], "012345"))
+    assert "unavailable" in output
 
 
 @pytest.mark.parametrize("changes,expected", [
@@ -230,11 +464,33 @@ def test_missing_configuration_does_not_claim_submission(monkeypatch):
     assert "not configured" in asyncio.run(khc._call(ctx(), "init"))
 
 
-@pytest.mark.parametrize("code", ["not_found", "submission_unconfirmed", "invalid_request"])
+@pytest.mark.parametrize("code", [
+    "not_found", "submission_unconfirmed", "invalid_request", "invalid_otp",
+    "invalid_mobile", "configuration_error", "rate_limited", "upstream_error",
+])
 def test_returns_provider_errors_without_source(monkeypatch, code):
     calls = []
     fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(code=code, message="Specific error")), calls)
     assert asyncio.run(khc._call(ctx(), "status", grievanceNo="BR/240926/2")) == "Specific error"
+
+
+@pytest.mark.parametrize("otp,code,message", [
+    ("", "not_found", "Grievance not found. Please check the grievance ID in the SMS on your registered mobile number."),
+    ("012345", "not_found", "Grievance not found. Please check the grievance ID in the SMS on your registered mobile number."),
+    ("012345", "invalid_otp", "Invalid or expired OTP. Check the OTP and try again."),
+    ("012345", "invalid_request", "KHC says the grievance ID is missing. Please check the ID in your SMS."),
+    ("012345", "invalid_request", "KHC says the OTP is missing. Please share the 6-digit OTP again."),
+    ("", "upstream_error", "KHC could not send the OTP. Please request it again later."),
+    ("012345", "configuration_error", "KHC authentication failed. Please contact support."),
+])
+def test_status_preserves_error_reason_without_claiming_otp_delivery_or_status(monkeypatch, otp, code, message):
+    calls = []
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(code=code, fields={}, message=message)), calls)
+    output = asyncio.run(khc.check_khc_grievance_status(ctx(), "UP/231026/5", otp))
+    assert output == message
+    assert len(calls) == 1
+    assert "Status:" not in output
+    assert "OTP has been sent" not in output
 
 
 @pytest.mark.parametrize("fields", [{}, {"grievanceNo": "OTHER", "currentStatus": "OPEN"}])
@@ -256,6 +512,19 @@ def test_all_language_prompts_include_khc_rules():
         assert "register_khc_grievance" in prompt
         assert "initiate_khc_otp" in prompt
         assert "verify_khc_otp" in prompt
+        assert "check_khc_grievance_status(grievance_number, otp)" in prompt
+        assert "single-use" in prompt
+        assert "No OTP, mobile number" not in prompt
+        assert "two ASCII letters, a numeric middle section and a positive sequence" in prompt
+        assert "Do not impose a fixed digit count or calendar-date interpretation" in prompt
+        assert "JK/2310261/1" in prompt
+        assert "Do not restart scheme/service selection" in prompt
+        assert "Please share the grievance ID you received by SMS on your registered mobile number." in prompt
+        assert "For example, UP/231026/5." in prompt
+        assert "An OTP has been sent to your registered mobile number. Please share the 6-digit OTP." in prompt
+        assert "Only after the tool confirms sending" in prompt
+        assert "do not invent a more specific cause" in prompt
+        assert "must contain exactly 6 digits" in prompt
         assert "**Location reuse:**" in prompt
         assert "call `reverse_geocode`" in prompt
         assert "call `forward_geocode` first" in prompt
@@ -382,7 +651,7 @@ def test_all_language_prompts_include_khc_rules():
         assert "Never write any text before calling a tool" in prompt
         assert "Never pick a scheme for the farmer" in prompt
         assert "At most 3 OTPs can be sent per hour" in prompt
-        assert "A wrong OTP gives 5 tries" in prompt
+        assert "A wrong registration OTP gives 5 tries" in prompt
         assert "ask which listed village is nearest and use it only if the farmer clearly says yes" in prompt
         assert "Do not submit again on your own" in prompt
         assert "Then call `find_khc_location(place=<village>, state=<state>, district=<district>)`" in prompt
@@ -1378,6 +1647,49 @@ def test_the_service_note_is_added_once_the_farmer_asked_for_khc(opening):
     assert "including PM-Kisan, PMFBY and AIF" in note
 
 
+@pytest.mark.parametrize("opening", [
+    "i want to check khc grivance status",
+    "Check my KHC grievance status for AIF",
+    "I want to track my Kisan Helpline Centre complaint",
+])
+def test_current_khc_request_is_available_before_history_is_populated(opening):
+    note = khc.khc_service_note([], current_query=opening)
+    assert "## Service already chosen" in note
+    assert "current request or earlier in this chat" in note
+    assert "KHC alone identifies the service" in note
+    assert "ask only for a missing KHC grievance number" in note
+    assert "Never ask for a PM-Kisan registration number, PMFBY application number or AIF beneficiary ID" in note
+
+
+@pytest.mark.parametrize("scheme", ["aif", "PM-Kisan", "PMFBY"])
+def test_scheme_reply_after_mistaken_service_question_does_not_switch_khc(scheme):
+    history = _chat(
+        "i want to check khc grivance status",
+        ("bot", "Could you please tell me which scheme or service your grievance is with?"),
+    ).messages
+    note = khc.khc_service_note(history, current_query=scheme)
+    assert "## Service already chosen" in note
+    assert "A bare scheme answer such as 'AIF' does not switch an already selected KHC grievance" in note
+    assert "even if the bot mistakenly asked which scheme or service" in note
+    assert "Honor an explicit switch away from KHC" in note
+
+
+def test_embedded_conversation_is_not_mistaken_for_the_current_farmer_turn():
+    history = _chat("Switch to AIF's own service")
+    history.messages[0].parts[0].content = (
+        '**Conversation**\n\n**User Message**:\n**User:** "Check my KHC grievance"\n'
+        '**Selected Language:** English\n\n**Assistant Message**:\nWhich service?\n\n---\n\n'
+        '**User:** "Switch to AIF\'s own service"\n**Selected Language:** English'
+    )
+    assert khc._turns(history.messages) == [("farmer", "Switch to AIF's own service")]
+    assert "## Service already chosen" not in khc.khc_service_note(history.messages)
+
+
+@pytest.mark.parametrize("query", ["aif", "Check my PM-Kisan grievance", "What is the weather?"])
+def test_current_non_khc_query_does_not_create_a_khc_choice(query):
+    assert "## Service already chosen" not in khc.khc_service_note([], current_query=query)
+
+
 @pytest.mark.parametrize("later_turns", [
     (),
     (("bot", "Please share the name of your state"), "Uttar Pradesh"),
@@ -1434,6 +1746,7 @@ def test_status_routing_gate_does_not_assume_khc(turns):
     ("PM-Kisan", "pmkisan_grievance_send_otp"),
     ("PMFBY", "pmfby_grievance_status"),
     ("AIF", "initiate_aif_otp"),
+    ("KCC", "check_khc_grievance_status"),
     ("KHC", "check_khc_grievance_status"),
 ])
 def test_status_routing_gate_preserves_direct_named_routes(scheme, tool):
@@ -1441,7 +1754,25 @@ def test_status_routing_gate_preserves_direct_named_routes(scheme, tool):
     assert tool in note
     assert "Do not ask which scheme or service again when it is already known" in note
     assert "An explicit KHC choice for this grievance overrides the scheme default" in note
-    assert "KHC status needs only the grievance number, not the scheme, location, mobile number or OTP" in note
+    assert "KHC status needs the grievance number, then a 6-digit OTP" in note
+    assert "Other named schemes without an existing grievance-status flow use KHC" in note
+    assert "Please share the grievance ID you received by SMS on your registered mobile number." in note
+    assert "Only after the tool confirms sending" in note
+    assert "not_found" in note and "invalid_otp" in note
+
+
+@pytest.mark.parametrize("query", [
+    "I want to check my KCC grievance status",
+    "kcc complaint status",
+    "Check grievance status for Kisan Credit Card",
+])
+def test_kcc_grievance_status_routes_to_khc_not_kcc_application_status(query):
+    note = khc.khc_service_note([], current_query=query)
+    assert "KCC (Kisan Credit Card) grievance/complaint status -> check_khc_grievance_status" in note
+    assert "Do not call initiate_kcc_otp, check_kcc_application_status or select_kcc_application for a grievance" in note
+    assert "Do not ask which service to use for KCC grievances" in note
+    assert "KCC application-status requests still use the KCC application tools" in note
+    assert "UP/231026/5" in note
 
 
 @pytest.mark.parametrize("later_request", [
@@ -1467,4 +1798,4 @@ def test_the_system_prompt_gets_the_note_on_every_turn():
 
     source = (Path(__file__).resolve().parents[1] / "agents" / "agrinet.py").read_text()
     assert "from agents.tools.khc import khc_service_note" in source
-    assert "+ khc_service_note(ctx.messages)" in source
+    assert "+ khc_service_note(ctx.messages, current_query=deps.query)" in source
