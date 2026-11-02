@@ -308,6 +308,99 @@ def format_search_notes(
     return "\n".join(lines)
 
 
+def _personal_details(personalised: bool, district: Optional[str], days: Optional[int]) -> tuple[str, Optional[int]]:
+    if not personalised:
+        return "", None
+    return _clean_param(district), _clean_days(days)
+
+
+def _resolve_season(advice_type: str, season: Optional[str]) -> str:
+    """Season to search with: the configured (env) season wins; else the farmer's (personalised only)."""
+    farmer_season = _clean_param(season) if advice_type == "personalised" else ""
+    if advice_type == "personalised" and not default_season() and farmer_season.lower() not in _SEASONS:
+        # No configured season: the farmer must give one, so keep asking until they do.
+        raise ModelRetry(
+            "The season is required for personalised advice. Ask the farmer which season it is "
+            "(Rabi, Kharif or Zaid) and wait for the answer. If they have not given a valid season, "
+            "ask again; do not search until they do."
+        )
+    if farmer_season.lower() in _SEASONS:
+        farmer_season = farmer_season.capitalize()
+    return default_season() or farmer_season
+
+
+def _district_fallback_check(ctx: RunContext[FarmerContext], confirmed: bool) -> bool:
+    """True when the farmer agreed to advice without the district; refuses an unasked confirmation."""
+    if confirmed and not _asked_about_district_fallback(ctx):
+        raise ModelRetry(
+            "Do not set district_fallback_confirmed yet. First tell the farmer there is no advisory data "
+            "for their district and ask whether they want the crop advice anyway; use their answer."
+        )
+    return confirmed
+
+
+async def _post_search(payload: Dict[str, Any]) -> tuple[Optional[Dict[str, Any]], str]:
+    """POST the search to the BAP; returns (response data, error message for the agent)."""
+    bap_endpoint = os.getenv("BAP_ENDPOINT")
+    if not bap_endpoint:
+        logger.error("BAP_ENDPOINT is not set")
+        return None, "Advisory search service is not configured. Please try again later."
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                bap_endpoint.rstrip("/") + "/search", json=payload, timeout=DEFAULT_HTTP_TIMEOUT
+            )
+    except httpx.HTTPError as exc:
+        logger.error("Advisory search request failed: %s", exc)
+        return None, "Advisory search service is unavailable. Please try again later."
+    if response.status_code != 200:
+        logger.error("Advisory search returned status %s", response.status_code)
+        return None, "Advisory search service is unavailable. Please try again later."
+    try:
+        return response.json(), ""
+    except ValueError:
+        logger.error("Advisory search returned a non-JSON body")
+        return None, "Advisory search returned an unexpected response. Please try again later."
+
+
+def _log_results(transaction_id: str, results: List[Dict[str, Any]], search_ctx: Dict[str, str], status: str) -> None:
+    lf_update_current_observation(
+        metadata={
+            "tool": "advisory.search",
+            "category": KNOWLEDGE_ADVISORY_CATEGORY,
+            "transaction_id": transaction_id,
+            "network_status": status or None,
+            "location_status": search_ctx.get("location_status") or None,
+            "has_day_range": search_ctx.get("has_day_range") or None,
+            "days_matched": search_ctx.get("days_matched") or None,
+            "hit_count": len(results),
+            "doc_ids": list(dict.fromkeys(r["doc_id"] for r in results if r["doc_id"])),
+            "chunk_ids": [r["chunk_id"] for r in results if r["chunk_id"]],
+        }
+    )
+
+
+def _no_results_message(query: str, status: str, message: str) -> str:
+    if status and status not in ("success", "not_found") and message:
+        return message
+    return f"No advisory found for `{query}`."
+
+
+def _top_results(results: List[Dict[str, Any]], top_k: int) -> List[Dict[str, Any]]:
+    return results[:top_k] if top_k and top_k > 0 else results
+
+
+def _district_without_data_message(district: str, crop: str, days: Optional[int]) -> str:
+    return (
+        f"No advisory data is available for the district '{district}'. {NO_DISTRICT_DATA_MARKER}\n"
+        "Do not give any advice yet. Tell the farmer, in their language, that there is no advisory data "
+        f"for their district, and ask whether they want advice for {crop} anyway"
+        + (" (matched to their sowing days)" if days is not None else "")
+        + ". If they agree, call search_advisory again with the same arguments plus "
+        "district_fallback_confirmed=true. If they decline, do not search again."
+    )
+
+
 @observe(name="tool:search_advisory", as_type="tool")
 async def search_advisory(
     ctx: RunContext[FarmerContext],
@@ -354,33 +447,15 @@ async def search_advisory(
     crop = _clean_param(crop)
     if not crop:
         raise ModelRetry("Ask the farmer which crop they mean, then call search_advisory again with `crop`.")
+    personalised = advice_type == "personalised"
     # Generic advice never sends the personal details, even if the model passes them.
-    district = _clean_param(district) if advice_type == "personalised" else ""
-    days = _clean_days(days_after_sowing) if advice_type == "personalised" else None
-
-    # The configured season (env) always wins; the farmer's answer (personalised only) is used when none is set.
-    farmer_season = _clean_param(season) if advice_type == "personalised" else ""
-    if advice_type == "personalised":
-        # The farmer must give a season: keep asking until they do (the env season is applied after).
-        if farmer_season.lower() not in _SEASONS:
-            raise ModelRetry(
-                "The season is required for personalised advice. Ask the farmer which season it is "
-                "(Rabi, Kharif or Zaid) and wait for the answer. If they have not given a valid season, "
-                "ask again; do not search until they do."
-            )
-        farmer_season = farmer_season.capitalize()
-    season_value = default_season() or farmer_season
+    district, days = _personal_details(personalised, district, days_after_sowing)
+    season_value = _resolve_season(advice_type, season)
 
     # The farmer agreed to the crop advice without the district: search without it.
-    district_unavailable = False
-    if district_fallback_confirmed:
-        if not _asked_about_district_fallback(ctx):
-            raise ModelRetry(
-                "Do not set district_fallback_confirmed yet. First tell the farmer there is no advisory data "
-                "for their district and ask whether they want the crop advice anyway; use their answer."
-            )
+    district_unavailable = _district_fallback_check(ctx, district_fallback_confirmed)
+    if district_unavailable:
         district = ""
-        district_unavailable = True
 
     payload = build_advisory_search_payload(
         query=query,
@@ -397,65 +472,24 @@ async def search_advisory(
         metadata={"tool": "advisory.search", "category": KNOWLEDGE_ADVISORY_CATEGORY, "transaction_id": transaction_id},
     )
 
-    bap_endpoint = os.getenv("BAP_ENDPOINT")
-    if not bap_endpoint:
-        logger.error("BAP_ENDPOINT is not set")
-        return "Advisory search service is not configured. Please try again later."
-    search_url = bap_endpoint.rstrip("/") + "/search"
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(search_url, json=payload, timeout=DEFAULT_HTTP_TIMEOUT)
-    except httpx.HTTPError as exc:
-        logger.error("Advisory search request failed: %s", exc)
-        return "Advisory search service is unavailable. Please try again later."
-
-    if response.status_code != 200:
-        logger.error("Advisory search returned status %s", response.status_code)
-        return "Advisory search service is unavailable. Please try again later."
-
-    try:
-        data = response.json()
-    except ValueError:
-        logger.error("Advisory search returned a non-JSON body")
-        return "Advisory search returned an unexpected response. Please try again later."
+    data, error = await _post_search(payload)
+    if data is None:
+        return error
 
     results, search_ctx = parse_advisory_response(data)
     status = str(search_ctx.get("status") or "").strip().lower()
     message = str(search_ctx.get("message") or "").strip()
-    lf_update_current_observation(
-        metadata={
-            "tool": "advisory.search",
-            "category": KNOWLEDGE_ADVISORY_CATEGORY,
-            "transaction_id": transaction_id,
-            "network_status": status or None,
-            "location_status": search_ctx.get("location_status") or None,
-            "has_day_range": search_ctx.get("has_day_range") or None,
-            "days_matched": search_ctx.get("days_matched") or None,
-            "hit_count": len(results),
-            "doc_ids": list(dict.fromkeys(r["doc_id"] for r in results if r["doc_id"])),
-            "chunk_ids": [r["chunk_id"] for r in results if r["chunk_id"]],
-        }
-    )
+    _log_results(transaction_id, results, search_ctx, status)
 
     if not results:
-        if status and status not in ("success", "not_found") and message:
-            return message
-        return f"No advisory found for `{query}`."
+        return _no_results_message(query, status, message)
     if district and str(search_ctx.get("location_status") or "").strip().lower() == "location_not_applied":
-        return (
-            f"No advisory data is available for the district '{district}'. {NO_DISTRICT_DATA_MARKER}\n"
-            "Do not give any advice yet. Tell the farmer, in their language, that there is no advisory data "
-            f"for their district, and ask whether they want advice for {crop} anyway"
-            + (" (matched to their sowing days)" if days is not None else "")
-            + ". If they agree, call search_advisory again with the same arguments plus "
-            "district_fallback_confirmed=true. If they decline, do not search again."
-        )
-    formatted = format_advisory_results(results[:top_k] if top_k and top_k > 0 else results, query)
+        return _district_without_data_message(district, crop, days)
+    formatted = format_advisory_results(_top_results(results, top_k), query)
     return formatted + "\n\n" + format_search_notes(
         search_ctx,
         days,
-        personalised=advice_type == "personalised",
+        personalised=personalised,
         district_given=bool(district) or district_unavailable,
         district_unavailable=district_unavailable,
     )

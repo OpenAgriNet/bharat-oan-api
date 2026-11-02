@@ -523,3 +523,10 @@ def test_personalised_requires_a_valid_season(bap):
         with pytest.raises(ModelRetry, match="season is required"):
             asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", season=bad))
     assert bap.requests == []
+
+
+def test_configured_season_means_the_farmer_need_not_give_one(monkeypatch, bap):
+    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
+    out = asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", district="Lucknow"))
+    assert "Harvest AKJ-1" in out or sa.NO_DISTRICT_DATA_MARKER in out
+    assert _params(json.loads(bap.requests[0].read()))["season"] == "Rabi"

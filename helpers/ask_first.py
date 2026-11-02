@@ -17,7 +17,7 @@ ANSWER_TOOLS = {"search_advisory", "search_pests_diseases", "search_documents"}
 
 ASK_FIRST_RETRY = (
     "Do not search yet. Ask the farmer whether they want generic or personalised advice, "
-    "wait for their answer, then search."
+    "wait for their answer, then search. Ask it once, and do not repeat a question you have already written."
 )
 
 
