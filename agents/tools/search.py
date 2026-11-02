@@ -14,6 +14,7 @@ from langfuse import observe
 from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
+from agents.tools.ask_first import ASK_FIRST_RETRY, farmer_was_asked
 
 from agents.deps import FarmerContext
 from agents.tools.imd_advisory import agromet_note
@@ -587,6 +588,9 @@ async def search_pests_diseases(
     Returns:
         search_results: Formatted list of pests and diseases information
     """
+    # Crop advisory rule: the farmer is asked "generic or personalised?" before any crop search.
+    if not farmer_was_asked(ctx):
+        raise ModelRetry(ASK_FIRST_RETRY)
     try:
         # Initialize Marqo client
         endpoint_url = os.getenv('MARQO_ENDPOINT_URL')
