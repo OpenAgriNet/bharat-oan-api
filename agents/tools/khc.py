@@ -678,12 +678,24 @@ async def check_khc_grievance_status(
     """
     number = to_ascii_digits(str(grievance_number or "")).strip()
     if len(number) > 100 or not re.fullmatch(r"[A-Za-z]{2}/[0-9]{6}/0*[1-9][0-9]*", number):
+        reply = _STATUS_ID_PROMPT
+        if number:
+            parts = number.split("/")
+            reason = (
+                f"The middle section has {len(parts[1])} digits; exactly six digits are required."
+                if len(parts) == 3 and re.fullmatch(r"[0-9]+", parts[1]) and len(parts[1]) != 6
+                else "Use two letters, exactly six digits in the middle and a positive numeric sequence, separated by two slashes."
+            )
+            reply = (
+                f"The KHC grievance ID format is incorrect. {reason} "
+                "Please check your SMS and share the complete grievance ID again. "
+                "Explain this validation error in the farmer's language before asking for the correction. "
+                "Do not repeat the initial missing-ID prompt or its example."
+            )
         return (
-            ("The KHC grievance ID format is incorrect. " if number else "")
-            + f"{_STATUS_ID_PROMPT} "
-            "The required format is two letters, exactly six digits in the middle and a positive numeric "
-            "sequence, separated by two slashes. Never truncate, pad or replace characters to make it valid. "
-            "The example is not their number. Do not restart scheme/service selection. "
+            f"{reply} Ask for the grievance ID only once in this reply. "
+            "Never truncate, pad or replace characters to make it valid. "
+            "Do not restart scheme/service selection. "
             "Keep both slashes and any leading zeros. "
             "Do not send an OTP until a valid number is supplied."
         )

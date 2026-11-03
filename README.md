@@ -263,7 +263,10 @@ Unrelated questions do not trigger KHC suggestions.
   without HTTP requests, with a prompt to copy the full number from the KHC SMS.
   The six-digit middle section is not interpreted as a calendar date;
   existence is checked by KHC. Invalid-ID tool results request only an ID correction,
-  never a scheme/service restart. OTPs still require exactly six digits.
+  never a scheme/service restart. A supplied invalid ID gets an explicit error
+  explanation, including the actual middle-section digit count when its length
+  is wrong, followed by one correction request. Do not repeat the initial example
+  prompt or append another question after the source. OTPs still require exactly six digits.
 - Registration verification is bound to the conversation/mobile and expires locally after
   five minutes. Changed mobiles, expiry and provider restarts require fresh OTP.
   Do not automatically retry OTP sends or registration after uncertain failures.

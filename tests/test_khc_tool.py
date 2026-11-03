@@ -74,10 +74,39 @@ def test_status_asks_for_number_without_http(monkeypatch, number, otp):
     output = asyncio.run(khc.check_khc_grievance_status(ctx(), number, otp))
     assert "which scheme or service" not in output
     assert "Do not restart scheme/service selection" in output
-    assert "Please share the grievance ID" in output
-    assert "UP/231026/5" in output
-    assert "received by SMS on your registered mobile number" in output
-    assert "exactly six digits in the middle" in output
+    if number:
+        assert output.startswith("The KHC grievance ID format is incorrect.")
+        assert "exactly six digits" in output
+        assert "Please check your SMS and share the complete grievance ID again." in output
+        assert khc._STATUS_ID_PROMPT not in output
+        assert "For example" not in output
+    else:
+        assert khc._STATUS_ID_PROMPT in output
+        assert "format is incorrect" not in output
+    call.assert_not_called()
+
+
+@pytest.mark.parametrize("number,count", [
+    ("JK/2310261/1", 7), ("BR/24092/1", 5), ("JK/23102612/1", 8),
+    (" jk/२३१०२६१/१ ", 7),
+])
+@pytest.mark.parametrize("otp", ["", "012345"])
+def test_invalid_status_id_explains_middle_length_before_one_correction_request(monkeypatch, number, count, otp):
+    call = AsyncMock()
+    monkeypatch.setattr(khc, "_call", call)
+    conversation = _chat(
+        "I want to know my KCC grievance status",
+        ("bot", khc._STATUS_ID_PROMPT + "\nSource: Kisan Helpline Center\nCould you share the grievance ID now?"),
+        number,
+    )
+    output = asyncio.run(khc.check_khc_grievance_status(conversation, number, otp))
+    reason = f"The middle section has {count} digits; exactly six digits are required."
+    request = "Please check your SMS and share the complete grievance ID again."
+    assert reason in output
+    assert output.index(reason) < output.index(request)
+    assert output.count(request) == 1
+    assert khc._STATUS_ID_PROMPT not in output
+    assert "Do not repeat the initial missing-ID prompt or its example" in output
     call.assert_not_called()
 
 
@@ -525,6 +554,8 @@ def test_all_language_prompts_include_khc_rules():
         assert "UP/2345232/fdf" in prompt
         assert "Never truncate, pad or replace" in prompt
         assert "Do not restart scheme/service selection" in prompt
+        assert "Do not treat an invalid ID as a missing ID" in prompt
+        assert "Never append a second request for the same ID" in prompt
         assert "Please share the grievance ID you received by SMS on your registered mobile number." in prompt
         assert "For example, UP/231026/5." in prompt
         assert "An OTP has been sent to your registered mobile number. Please share the 6-digit OTP." in prompt

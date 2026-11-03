@@ -88,6 +88,9 @@ def test_status_routing_gate_is_present_before_any_capability_is_loaded(prompt_f
     assert "A short scheme reply such as 'KCC' answers the pending scheme question" in prompt
     assert "Do not restart scheme/service selection" in prompt
     assert "Do not carry that route into an application-status request" in prompt
+    assert "Do not treat an invalid ID as a missing ID" in prompt
+    assert "Never append a second request for the same ID" in prompt
+    assert "nothing after the source" in prompt
 
 
 @pytest.mark.parametrize("preloaded", [None, frozenset()])
@@ -115,8 +118,11 @@ def test_production_prompt_keeps_explicit_khc_on_first_turn_and_scheme_reply(mon
     schemes.format_vector_schemes_prompt_block = lambda: {
         key: value for key, value in CONTEXT.items() if key.startswith("vector_")
     }
+    advisory = ModuleType("agents.tools.advisory")
+    advisory.advisory_season_note = lambda: ""
     monkeypatch.setitem(sys.modules, "agents.models", models)
     monkeypatch.setitem(sys.modules, "helpers.scheme_qdrant_search", schemes)
+    monkeypatch.setitem(sys.modules, "agents.tools.advisory", advisory)
     monkeypatch.setattr(tools, "TOOLS", [SimpleNamespace(name=name) for name in ALL_TOOLS], raising=False)
     for name in ("get_today_date_str", "get_crop_season", "get_last_weekday_table"):
         monkeypatch.setattr(utils, name, lambda: "offline")
