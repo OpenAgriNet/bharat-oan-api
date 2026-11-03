@@ -83,7 +83,9 @@ class FarmerContext(BaseModel):
         if self.latitude is not None and self.longitude is not None:
             return (
                 "**Browser Location Coordinates:** "
-                f"Latitude={self.latitude}, Longitude={self.longitude}"
+                f"Latitude={self.latitude}, Longitude={self.longitude} "
+                "(the device location; never use it, or a place worked out from it, for a crop advisory question: "
+                "locations are not used for crop advice)"
             )
         return None
     
