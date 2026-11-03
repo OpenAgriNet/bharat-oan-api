@@ -64,6 +64,8 @@ def fake_http(monkeypatch, response, calls):
     "BR/24A926/1", "BR/240926/0", "BR/240926/000", "BR/240926/-1", "BR/240926/+1",
     "BR/240926/1.5", "BR/240926/", "BR/240926/1/2", "BR /240926/1", "BR/240926/1\n2",
     "BR/240926/" + "1" * 91, "\u00df/240926/1", "\u0131R/240926/1",
+    "UP/2345232/fdf", "UP/2345232/1", "UP/234523/fdf",
+    "BR/24092/1", "JK/2310261/1", "JK/23102612/0001", "UP/२३४५२३२/१",
 ])
 @pytest.mark.parametrize("otp", ["", "012345"])
 def test_status_asks_for_number_without_http(monkeypatch, number, otp):
@@ -75,15 +77,15 @@ def test_status_asks_for_number_without_http(monkeypatch, number, otp):
     assert "Please share the grievance ID" in output
     assert "UP/231026/5" in output
     assert "received by SMS on your registered mobile number" in output
+    assert "exactly six digits in the middle" in output
     call.assert_not_called()
 
 
 @pytest.mark.parametrize("number,normalized", [
     (" br/240926/0002 ", "BR/240926/0002"),
     (" up/231026/5 ", "UP/231026/5"),
-    (" jk/2310261/1 ", "JK/2310261/1"),
-    ("JK/23102612/0001", "JK/23102612/0001"),
-    ("BR/24092/1", "BR/24092/1"),
+    (" jk/231026/1 ", "JK/231026/1"),
+    ("JK/231026/0001", "JK/231026/0001"),
     ("UP/000000/1", "UP/000000/1"),
     ("BR/999999/1", "BR/999999/1"),
     ("BR/240926/" + "0" * 89 + "1", "BR/240926/" + "0" * 89 + "1"),
@@ -196,8 +198,8 @@ def test_status_send_correct_retry_verify_and_new_check(monkeypatch):
     assert request_types == ["get_status_otp", "verify_status_otp", "verify_status_otp", "get_status_otp"]
 
 
-def test_khc_created_id_with_seven_middle_digits_round_trips_into_status(monkeypatch):
-    number = "JK/2310261/1"
+def test_khc_created_id_with_six_middle_digits_round_trips_into_status(monkeypatch):
+    number = "JK/231026/1"
     replies = iter([
         envelope("init", fields={"grievanceNo": number}),
         envelope(code="status_otp_sent", fields={}),
@@ -222,8 +224,11 @@ def test_khc_created_id_with_seven_middle_digits_round_trips_into_status(monkeyp
     assert creation_values["externalReferenceNo"].startswith("BV-")
 
 
-@pytest.mark.parametrize("number", ["JK/2310261/1", "JK/2310261/"])
-def test_kcc_status_followup_never_returns_to_scheme_selection(monkeypatch, number):
+@pytest.mark.parametrize("number,valid", [
+    ("JK/231026/1", True), ("JK/231026/", False),
+    ("JK/2310261/1", False), ("UP/2345232/fdf", False),
+])
+def test_kcc_status_followup_never_returns_to_scheme_selection(monkeypatch, number, valid):
     conversation = _chat(
         "I want to check a grievance status",
         ("bot", "Could you please tell me which scheme or service your grievance is with?"),
@@ -242,7 +247,7 @@ def test_kcc_status_followup_never_returns_to_scheme_selection(monkeypatch, numb
     fake_http(monkeypatch, khc.httpx.Response(200, json=envelope(code="status_otp_sent", fields={})), calls)
     output = asyncio.run(khc.check_khc_grievance_status(conversation, number))
     assert "which scheme or service" not in output
-    if number.endswith("/1"):
+    if valid:
         assert "OTP sent" in output
         assert len(calls) == 1
     else:
@@ -515,9 +520,10 @@ def test_all_language_prompts_include_khc_rules():
         assert "check_khc_grievance_status(grievance_number, otp)" in prompt
         assert "single-use" in prompt
         assert "No OTP, mobile number" not in prompt
-        assert "two ASCII letters, a numeric middle section and a positive sequence" in prompt
-        assert "Do not impose a fixed digit count or calendar-date interpretation" in prompt
-        assert "JK/2310261/1" in prompt
+        assert "two ASCII letters, exactly six digits in the middle and a positive numeric sequence" in prompt
+        assert "Do not interpret the middle section as a calendar date" in prompt
+        assert "UP/2345232/fdf" in prompt
+        assert "Never truncate, pad or replace" in prompt
         assert "Do not restart scheme/service selection" in prompt
         assert "Please share the grievance ID you received by SMS on your registered mobile number." in prompt
         assert "For example, UP/231026/5." in prompt

@@ -252,15 +252,16 @@ Unrelated questions do not trigger KHC suggestions.
   response. Preserve "invalid or expired" when KHC does not distinguish those causes;
   never blame an ID/OTP for SMS, authentication or service failures.
 - **Grievance number validation:** before either status OTP call, require
-  `XX/numeric-section/sequence` (for example `UP/231026/5` or `JK/2310261/1`):
-  two ASCII letters, a nonempty numeric middle section and a positive digit-only
+  `XX/NNNNNN/sequence` (for example `UP/231026/5` or `JK/231026/1`):
+  two ASCII letters, exactly six digits in the middle and a positive digit-only
   sequence, within 100 normalized characters. KHC generates `grievanceNo` on
   creation; Bharat Vistaar generates only the separate `BV-...` external reference.
-  Do not assume a six-digit middle section from a sample or truncate a returned ID.
+  Reject `UP/2345232/fdf`, `UP/2345232/1` and `UP/234523/fdf` locally,
+  before sending or verifying an OTP. Never truncate, pad or replace invalid characters.
   Trim surrounding whitespace, uppercase the prefix and normalize regional digits;
   preserve leading zeros. Zero-only sequences and malformed numbers are rejected
   without HTTP requests, with a prompt to copy the full number from the KHC SMS.
-  The middle section has no locally imposed digit count or calendar interpretation;
+  The six-digit middle section is not interpreted as a calendar date;
   existence is checked by KHC. Invalid-ID tool results request only an ID correction,
   never a scheme/service restart. OTPs still require exactly six digits.
 - Registration verification is bound to the conversation/mobile and expires locally after

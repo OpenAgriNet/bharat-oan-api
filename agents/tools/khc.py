@@ -666,10 +666,10 @@ async def check_khc_grievance_status(
     The OTP expires after 5 minutes and is single-use. Resend only when requested
     by calling without otp; this invalidates the previous OTP. Never retry automatically.
     Keep slashes and leading zeros intact, e.g. UP/231026/5 and OTP 012345.
-    Grievance numbers must have two ASCII letters, a numeric middle section and a positive
+    Grievance numbers must have two ASCII letters, exactly six digits in the middle and a positive numeric
     sequence separated by slashes, e.g. UP/231026/5 (an example, never a default).
-    KHC generates the number: JK/2310261/1 is also structurally valid. Do not impose a
-    fixed digit count or calendar-date interpretation on the middle section.
+    Do not interpret the middle section as a calendar date. Never truncate, pad or replace
+    characters to make an invalid number pass; ask for the full ID from the SMS again.
     Surrounding whitespace and letter case are normalized. Ask for the full ID received by SMS on the registered
     mobile if missing or invalid. Announce sending only after the send call succeeds.
     Do not ask for a mobile, beneficiary ID or cookie. Never invent a number or OTP.
@@ -677,12 +677,12 @@ async def check_khc_grievance_status(
     Explain ID and OTP failures based on the tool result, without guessing a cause.
     """
     number = to_ascii_digits(str(grievance_number or "")).strip()
-    if len(number) > 100 or not re.fullmatch(r"[A-Za-z]{2}/[0-9]+/0*[1-9][0-9]*", number):
+    if len(number) > 100 or not re.fullmatch(r"[A-Za-z]{2}/[0-9]{6}/0*[1-9][0-9]*", number):
         return (
             ("The KHC grievance ID format is incorrect. " if number else "")
             + f"{_STATUS_ID_PROMPT} "
-            "The required format is two letters/numeric middle section/positive sequence. "
-            "KHC assigns the number; the middle section has no fixed digit count. "
+            "The required format is two letters, exactly six digits in the middle and a positive numeric "
+            "sequence, separated by two slashes. Never truncate, pad or replace characters to make it valid. "
             "The example is not their number. Do not restart scheme/service selection. "
             "Keep both slashes and any leading zeros. "
             "Do not send an OTP until a valid number is supplied."
