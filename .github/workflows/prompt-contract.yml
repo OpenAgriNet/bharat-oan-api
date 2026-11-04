@@ -18,7 +18,8 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.15'
+          # PyYAML 6.0.3 has no CPython 3.15 binary wheel; keep binary-only CI installs.
+          python-version: '3.13'
       - name: Install prompt and installment test dependencies
         run: >-
           python -m pip install --only-binary=:all: Jinja2==3.1.6
@@ -31,7 +32,7 @@ jobs:
           python -m pytest -q tests/test_pmkisan_installment_release.py
           tests/test_pmkisan_prompt_validation.py
           --cov=helpers.pmkisan_installment_release --cov-fail-under=80
-      - name: Check skill inventory, policy, loop and migration wording
+      - name: Check skill inventory, language coverage and agent loop
         run: >-
           python -m pytest -q tests/test_skills.py tests/test_prompt_structure.py
           tests/test_advisory_prompts.py
