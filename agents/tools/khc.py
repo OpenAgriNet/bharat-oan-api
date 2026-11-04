@@ -90,21 +90,7 @@ def khc_service_note(messages, current_query: str = "") -> str:
         turns.append(("farmer", current_query))
     for who, text in turns:
         if who == "farmer" and _KHC_WORDS.search(text):
-            return routing + (
-                "\n\n## Service already chosen (same grievance only)\n"
-                "The farmer named Kisan Helpline Center (KHC) in the current request or earlier in this chat. "
-                "Apply the earlier KHC choice only to that same grievance, if they requested KHC "
-                "and have not asked to switch away. A mention in an informational question is not a choice. "
-                "For that KHC grievance, for every scheme, including PM-Kisan, PMFBY and AIF, "
-                "follow the KHC rules and do not ask which service to use. "
-                "Never ask for a PM-Kisan registration number, PMFBY application number or AIF beneficiary ID "
-                "for this KHC grievance. Do not combine KHC and scheme-service questions. "
-                "For registration: If the scheme is already named, skip the scheme question. Ask only the first missing KHC "
-                "detail, reusing everything already supplied; for registration, location comes before the "
-                "mobile number and OTP. For status, follow the routing gate above, not the registration steps. "
-                "These KHC rules override the general follow-up and source-order "
-                "rules: ask one question only, and put the source last with nothing after it."
-            )
+            return routing + get_prompt("skills/khc/grievances/service_selected", context={})
     return routing
 
 

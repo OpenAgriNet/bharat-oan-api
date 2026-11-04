@@ -76,3 +76,28 @@ def test_every_instruction_word_is_preserved(language, old_prompts):
     missing = content_tokens(before) - content_tokens(after)
     added = content_tokens(after) - content_tokens(before)
     assert not missing and not added, {'missing':missing,'added':added}
+
+
+def test_dynamic_policy_notes_match_git_revision(old_prompts):
+    """Execute the real old/new rendering functions without importing network clients."""
+    import ast
+    root = PROMPT_DIR.parents[1]
+    ref = os.environ['PROMPT_COMPARE_REF']
+    def function(source, name, namespace):
+        node = next(n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name == name)
+        exec(compile(ast.Module(body=[node], type_ignores=[]), name, 'exec'), namespace)
+        return namespace[name]
+    for path, name in [('agents/tools/advisory.py', 'advisory_season_note'),
+                       ('agents/tools/khc.py', 'khc_service_note')]:
+        old = subprocess.check_output(['git','show',f'{ref}:{path}'],text=True)
+        new = (root/path).read_text()
+        for season in ['', 'Kharif', 'Rabi', 'Zaid']:
+            shared = dict(default_season=lambda:season, _turns=lambda messages:messages,
+                          _KHC_WORDS=re.compile('KHC'), _STATUS_ID_PROMPT='identifier', _STATUS_OTP_PROMPT='otp')
+            before = function(old,name,{**shared,'get_prompt':lambda p,context:old_prompts.get_template(p+'.md').render(**context)})
+            after = function(new,name,{**shared,'get_prompt':lambda p,context:get_catalog().env.get_template(p+'.md').render(**context)})
+            if name == 'advisory_season_note':
+                assert before() == after()
+            else:
+                for messages,query in [([],''),([], 'KHC status'),([('farmer','KHC')],'AIF')]:
+                    assert before(messages,query) == after(messages,query)
