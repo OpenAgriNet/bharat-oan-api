@@ -1,5 +1,7 @@
 ---
-summary: Crop/seed info
+summary: 'Crop/seed info; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; Crop pests
+  & diseases; Livestock diseases & issues; Term lookup'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

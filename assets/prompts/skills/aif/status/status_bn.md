@@ -1,5 +1,5 @@
 ---
-summary: AIF ঋণ স্থিতি
+summary: AIF ঋণ স্থিতি; AIF অভিযোগ স্থিতি
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

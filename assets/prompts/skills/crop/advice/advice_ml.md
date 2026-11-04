@@ -1,5 +1,7 @@
 ---
-summary: വിള/വിത്ത് വിവരം
+summary: 'വിള/വിത്ത് വിവരം; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; വിള കീടങ്ങളും
+  രോഗങ്ങളും; കന്നുകാലി രോഗങ്ങളും പ്രശ്നങ്ങളും; പദ ലുക്ക്അപ്പ്'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

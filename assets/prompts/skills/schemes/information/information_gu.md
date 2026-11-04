@@ -1,5 +1,9 @@
 ---
-summary: eNAM કાર્યપ્રવાહ અને તાલીમ
+summary: eNAM કાર્યપ્રવાહ અને તાલીમ; MahaVistaar યોજનાઓ (ક્રોસ-નેટવર્ક); AmulVistaar
+  યુનિયન યોજનાઓ (ક્રોસ-નેટવર્ક); વેક્ટર-ઇન્ડેક્સ્ડ યોજના માહિતી ({{ vector_scheme_count
+  }} ઇન્ડેક્સ્ડ યોજનાઓ); ખેડૂત પૂછે છે…; પાત્રતા (ઉદા. "who is eligible?", "eligibility
+  criteria", "am I eligible?"); ફક્ત બાકાત (ઉદા. "who is excluded?", "who cannot apply?",
+  "exclusion criteria", "exclusion for nbm?")
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

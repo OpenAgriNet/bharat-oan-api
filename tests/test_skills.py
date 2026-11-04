@@ -205,3 +205,11 @@ def test_retired_environment_filter_cannot_silently_widen_permissions(monkeypatc
     monkeypatch.setenv('CAPABILITY_ALLOWED_TOOLS', 'weather_forecast')
     with pytest.raises(ValueError, match='retired'):
         SkillState()
+
+
+def test_discovery_summary_covers_the_whole_scheme_bundle():
+    summary = CAT.render_summary('schemes.information', 'en', CONTEXT)
+    assert 'MahaVistaar' in summary and 'AmulVistaar' in summary and 'eNAM' in summary
+    assert '{{' not in summary
+    # No long workflow body should be needed to discover the right bundle.
+    assert 'How to write the' not in summary

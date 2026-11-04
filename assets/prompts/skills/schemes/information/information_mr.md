@@ -1,5 +1,9 @@
 ---
-summary: eNAM कार्यप्रवाह व प्रशिक्षण
+summary: eNAM कार्यप्रवाह व प्रशिक्षण; MahaVistaar योजना (क्रॉस-नेटवर्क); AmulVistaar
+  युनियन योजना (क्रॉस-नेटवर्क); व्हेक्टर-इंडेक्स्ड योजना माहिती ({{ vector_scheme_count
+  }} इंडेक्स्ड योजना); शेतकरी विचारतो…; पात्रता (उदा. "who is eligible?", "eligibility
+  criteria", "am I eligible?"); फक्त वगळणी (उदा. "who is excluded?", "who cannot apply?",
+  "exclusion criteria", "exclusion for nbm?")
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

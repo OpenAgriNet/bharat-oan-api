@@ -1,5 +1,7 @@
 ---
-summary: पीक/बियाणे माहिती
+summary: 'पीक/बियाणे माहिती; Crop advisories from agricultural institutions (e.g.
+  ICAR): insect/pest management, crop practices, harvesting for a named crop; पिकांवरील
+  कीड आणि रोग; पशुधन रोग आणि समस्या; शब्द शोध'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

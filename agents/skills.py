@@ -17,7 +17,7 @@ def render_prompt(state: SkillState, language: str, context: dict) -> str:
                   for name in catalog.manifest.skills if name in active)
     pending = state.permitted - active
     if pending:
-        summaries = [f'- {name}: {catalog.document(name, language, state.agent)[0]}'
+        summaries = [f'- {name}: {catalog.render_summary(name, language, context, state.agent)}'
                      for name in catalog.manifest.skills if name in pending]
         chunks.append(
             '## Available skills\nLoad a relevant skill with load_skill before using its workflow. '

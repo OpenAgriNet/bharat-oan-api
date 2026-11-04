@@ -1,5 +1,5 @@
 ---
-summary: ದೂರು ಸಲ್ಲಿಕೆ
+summary: ದೂರು ಸಲ್ಲಿಕೆ; ದೂರು ಸ್ಥಿತಿ; PMFBY ದೂರು ಸ್ಥಿತಿ
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

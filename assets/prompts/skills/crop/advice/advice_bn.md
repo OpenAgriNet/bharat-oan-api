@@ -1,5 +1,7 @@
 ---
-summary: ফসল/বীজ তথ্য
+summary: 'ফসল/বীজ তথ্য; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; ফসলের কীটপতঙ্গ
+  ও রোগ; পশুপালনের রোগ ও সমস্যা; শব্দ খোঁজা'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

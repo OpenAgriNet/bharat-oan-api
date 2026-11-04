@@ -1,5 +1,5 @@
 ---
-summary: AIF loan status
+summary: AIF loan status; AIF grievance status
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

@@ -1,5 +1,5 @@
 ---
-summary: AIF લોન સ્થિતિ
+summary: AIF લોન સ્થિતિ; AIF ફરિયાદ સ્થિતિ
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

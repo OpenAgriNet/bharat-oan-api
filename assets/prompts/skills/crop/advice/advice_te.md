@@ -1,5 +1,7 @@
 ---
-summary: పంట/విత్తన సమాచారం
+summary: 'పంట/విత్తన సమాచారం; Crop advisories from agricultural institutions (e.g.
+  ICAR): insect/pest management, crop practices, harvesting for a named crop; పంట
+  పురుగులు మరియు వ్యాధులు; పశువుల వ్యాధులు మరియు సమస్యలు; పద శోధన'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

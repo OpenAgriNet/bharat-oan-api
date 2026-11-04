@@ -1,5 +1,5 @@
 ---
-summary: ફરિયાદ નોંધણી
+summary: ફરિયાદ નોંધણી; ફરિયાદ સ્થિતિ; PMFBY ફરિયાદ સ્થિતિ
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

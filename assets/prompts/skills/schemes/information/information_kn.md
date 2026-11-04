@@ -1,5 +1,9 @@
 ---
-summary: eNAM ಕಾರ್ಯವಿಧಾನ ಮತ್ತು ತರಬೇತಿ
+summary: eNAM ಕಾರ್ಯವಿಧಾನ ಮತ್ತು ತರಬೇತಿ; MahaVistaar ಯೋಜನೆಗಳು (ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್); AmulVistaar
+  ಯೂನಿಯನ್ ಯೋಜನೆಗಳು (ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್); ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆ ಮಾಹಿತಿ ({{ vector_scheme_count
+  }} ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು); ರೈತರು ಕೇಳುವುದು…; ಅರ್ಹತೆ (ಉದಾ. "who is eligible?", "eligibility
+  criteria", "am I eligible?"); ಬಹಿಷ್ಕಾರ ಮಾತ್ರ (ಉದಾ. "who is excluded?", "who cannot
+  apply?", "exclusion criteria", "exclusion for nbm?")
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

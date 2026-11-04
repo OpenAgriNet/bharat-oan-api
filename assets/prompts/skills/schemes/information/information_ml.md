@@ -1,5 +1,10 @@
 ---
-summary: eNAM പ്രവർത്തനരീതിയും പരിശീലനവും
+summary: eNAM പ്രവർത്തനരീതിയും പരിശീലനവും; MahaVistaar പദ്ധതികൾ (ക്രോസ്-നെറ്റ്‌വർക്ക്);
+  AmulVistaar യൂണിയൻ പദ്ധതികൾ (ക്രോസ്-നെറ്റ്‌വർക്ക്); വെക്ടർ-ഇൻഡെക്സ്ഡ് പദ്ധതി വിവരങ്ങൾ
+  ({{ vector_scheme_count }} ഇൻഡെക്സ്ഡ് പദ്ധതികൾ); കർഷകൻ ചോദിക്കുന്നത്…; യോഗ്യത (ഉദാ.
+  "who is eligible?", "eligibility criteria", "am I eligible?"); ഒഴിവാക്കൽ മാത്രം
+  (ഉദാ. "who is excluded?", "who cannot apply?", "exclusion criteria", "exclusion
+  for nbm?")
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

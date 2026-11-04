@@ -1,5 +1,7 @@
 ---
-summary: ଫସଲ/ବିହନ ସୂଚନା
+summary: 'ଫସଲ/ବିହନ ସୂଚନା; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; ଫସଲ କୀଟ ଏବଂ
+  ରୋଗ; ପ୍ରାଣୀସମ୍ପଦ ରୋଗ ଏବଂ ସମସ୍ୟା; ଶବ୍ଦ ଖୋଜିବା'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

@@ -1,5 +1,5 @@
 ---
-summary: புகார் பதிவு
+summary: புகார் பதிவு; புகார் நிலை; PMFBY புகார் நிலை
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

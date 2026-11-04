@@ -1,5 +1,5 @@
 ---
-summary: ఫిర్యాదు నమోదు
+summary: ఫిర్యాదు నమోదు; ఫిర్యాదు స్థితి; PMFBY ఫిర్యాదు స్థితి
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

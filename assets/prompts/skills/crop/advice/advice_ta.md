@@ -1,5 +1,7 @@
 ---
-summary: பயிர்/விதை தகவல்
+summary: 'பயிர்/விதை தகவல்; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; பயிர் பூச்சிகள்
+  மற்றும் நோய்கள்; கால்நடை நோய்கள் மற்றும் பிரச்சனைகள்; சொல் தேடல்'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

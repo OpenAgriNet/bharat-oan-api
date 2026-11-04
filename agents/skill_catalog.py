@@ -106,6 +106,10 @@ class SkillCatalog:
             raise ValueError(f'Expected a nonempty summary and body: {skill_id}/{language}')
         return metadata['summary'], match[2]
 
+    def render_summary(self, skill_id: str, language: str, context: dict, agent: str = 'chat') -> str:
+        summary, _ = self.document(skill_id, language, agent)
+        return self.env.from_string(summary).render(**context)
+
     def render_skill(self, skill_id: str, language: str, context: dict, agent: str = 'chat') -> str:
         _, body = self.document(skill_id, language, agent)
         return self.env.from_string(body).render(**context)

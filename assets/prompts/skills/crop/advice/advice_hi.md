@@ -1,5 +1,7 @@
 ---
-summary: फसल/बीज जानकारी
+summary: 'फसल/बीज जानकारी; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; फसल के कीट
+  और रोग; पशुधन रोग और समस्याएं; शब्द खोज'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

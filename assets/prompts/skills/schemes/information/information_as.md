@@ -1,5 +1,9 @@
 ---
-summary: eNAM কাৰ্যপ্ৰবাহ আৰু প্ৰশিক্ষণ
+summary: eNAM কাৰ্যপ্ৰবাহ আৰু প্ৰশিক্ষণ; MahaVistaar আঁচনি (ক্ৰছ-নেটৱৰ্ক); AmulVistaar
+  ইউনিয়ন আঁচনি (ক্ৰছ-নেটৱৰ্ক); ভেক্টৰ-ইনডেক্স আঁচনি তথ্য ({{ vector_scheme_count }}
+  ইনডেক্স আঁচনি); কৃষকে সুধে…; যোগ্যতা (যেনে "who is eligible?", "eligibility criteria",
+  "am I eligible?"); কেৱল বৰ্জন (যেনে "who is excluded?", "who cannot apply?", "exclusion
+  criteria", "exclusion for nbm?")
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

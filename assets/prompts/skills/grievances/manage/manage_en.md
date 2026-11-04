@@ -1,5 +1,5 @@
 ---
-summary: Grievance submit
+summary: Grievance submit; Grievance status; PMFBY grievance status
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

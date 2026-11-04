@@ -1,5 +1,7 @@
 ---
-summary: ಬೆಳೆ/ಬೀಜ ಮಾಹಿತಿ
+summary: 'ಬೆಳೆ/ಬೀಜ ಮಾಹಿತಿ; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; ಬೆಳೆ ಕೀಟ ಮತ್ತು
+  ರೋಗಗಳು; ಜಾನುವಾರು ರೋಗ ಮತ್ತು ಸಮಸ್ಯೆಗಳು; ಪದ ಹುಡುಕಾಟ'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

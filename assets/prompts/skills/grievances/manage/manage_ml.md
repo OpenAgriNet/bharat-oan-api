@@ -1,5 +1,5 @@
 ---
-summary: പരാതി സമർപ്പിക്കൽ
+summary: പരാതി സമർപ്പിക്കൽ; പരാതി സ്ഥിതി; PMFBY പരാതി സ്ഥിതി
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

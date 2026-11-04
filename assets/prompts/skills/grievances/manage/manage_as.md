@@ -1,5 +1,5 @@
 ---
-summary: অভিযোগ দাখিল
+summary: অভিযোগ দাখিল; অভিযোগৰ স্থিতি; PMFBY অভিযোগৰ স্থিতি
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

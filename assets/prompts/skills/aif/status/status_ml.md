@@ -1,5 +1,5 @@
 ---
-summary: AIF വായ്പ നില
+summary: AIF വായ്പ നില; AIF പരാതി നില
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

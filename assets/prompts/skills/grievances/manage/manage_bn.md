@@ -1,5 +1,5 @@
 ---
-summary: অভিযোগ দায়ের
+summary: অভিযোগ দায়ের; অভিযোগের অবস্থা; PMFBY অভিযোগের অবস্থা
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

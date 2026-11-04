@@ -1,5 +1,9 @@
 ---
-summary: eNAM workflows and training
+summary: eNAM workflows and training; MahaVistaar schemes (cross-network); AmulVistaar
+  union schemes (cross-network); Vector-indexed scheme info ({{ vector_scheme_count
+  }} indexed schemes); Farmer asks about…; Eligibility (e.g. "who is eligible?", "eligibility
+  criteria", "am I eligible?"); Exclusion only (e.g. "who is excluded?", "who cannot
+  apply?", "exclusion criteria", "exclusion for nbm?")
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

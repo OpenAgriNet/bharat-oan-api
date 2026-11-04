@@ -1,5 +1,7 @@
 ---
-summary: শস্য/বীজৰ তথ্য
+summary: 'শস্য/বীজৰ তথ্য; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; শস্যৰ কীট আৰু
+  ৰোগ; পশুধনৰ ৰোগ আৰু সমস্যা; শব্দ সন্ধান'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

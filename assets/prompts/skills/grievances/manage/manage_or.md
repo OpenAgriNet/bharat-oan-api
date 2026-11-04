@@ -1,5 +1,5 @@
 ---
-summary: ଅଭିଯୋଗ ଦାଖଲ
+summary: ଅଭିଯୋଗ ଦାଖଲ; ଅଭିଯୋଗ ସ୍ଥିତି; PMFBY ଅଭିଯୋଗ ସ୍ଥିତି
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

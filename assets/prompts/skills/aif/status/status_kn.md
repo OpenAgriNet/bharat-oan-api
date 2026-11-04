@@ -1,5 +1,5 @@
 ---
-summary: AIF ಸಾಲ ಸ್ಥಿತಿ
+summary: AIF ಸಾಲ ಸ್ಥಿತಿ; AIF ದೂರು ಸ್ಥಿತಿ
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

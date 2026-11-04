@@ -1,5 +1,5 @@
 ---
-summary: शिकायत दर्ज
+summary: शिकायत दर्ज; शिकायत स्थिति; PMFBY शिकायत स्थिति
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

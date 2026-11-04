@@ -1,5 +1,5 @@
 ---
-summary: AIF ଋଣ ସ୍ଥିତି
+summary: AIF ଋଣ ସ୍ଥିତି; AIF ଅଭିଯୋଗ ସ୍ଥିତି
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

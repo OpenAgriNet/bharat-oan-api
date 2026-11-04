@@ -1,5 +1,7 @@
 ---
-summary: ਫਸਲ/ਬੀਜ ਜਾਣਕਾਰੀ
+summary: 'ਫਸਲ/ਬੀਜ ਜਾਣਕਾਰੀ; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; ਫਸਲ ਦੇ ਕੀੜੇ
+  ਅਤੇ ਬਿਮਾਰੀਆਂ; ਪਸ਼ੂ ਧਨ ਦੀਆਂ ਬਿਮਾਰੀਆਂ ਅਤੇ ਸਮੱਸਿਆਵਾਂ; ਸ਼ਬਦ ਖੋਜ'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

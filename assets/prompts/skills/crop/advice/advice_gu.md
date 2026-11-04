@@ -1,5 +1,7 @@
 ---
-summary: પાક/બીજ માહિતી
+summary: 'પાક/બીજ માહિતી; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; પાક જીવાત અને
+  રોગો; પશુધન રોગ અને સમસ્યાઓ; શબ્દ શોધ'
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
