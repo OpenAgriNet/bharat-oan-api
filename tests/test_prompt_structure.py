@@ -18,11 +18,20 @@ from tests.test_skills import CONTEXT, LANGUAGES
 def test_inventory_and_language_coverage():
     cat = get_catalog()
     assert len(LANGUAGES) == 13
-    folders = {cat.path(skill.prompt_dir) for skill in cat.manifest.skills.values()}
-    found = {p.parent for p in (PROMPT_DIR / 'skills').rglob('*.md') if re.search(r'_[a-z]{2,3}\.md$',p.name)}
-    assert found == folders, 'Unregistered skill folders or missing languages'
-    for folder in folders:
-        assert {p.stem.rsplit('_',1)[1] for p in folder.glob(f'{folder.name}_*.md')} == set(LANGUAGES)
+    expected = {}
+    for agent, config in cat.manifest.agents.items():
+        names = cat.manifest.skills if config.enabled_skills == 'all' else config.enabled_skills
+        for name in names:
+            folder = cat.path(cat.manifest.skills[name].prompt_dir)
+            stem = folder.name
+            variant = config.skill_variants.get(name)
+            if variant:
+                folder /= variant
+            for language in config.languages:
+                expected.setdefault(folder, set()).add(f'{stem}_{language}.md')
+    found = {p for p in (PROMPT_DIR / 'skills').rglob('*.md') if re.search(r'_[a-z]{2,3}\.md$',p.name)}
+    assert found == {folder / filename for folder, files in expected.items() for filename in files}, \
+        'Unregistered skill/variant files or missing translations'
     for lang in LANGUAGES:
         root = (PROMPT_DIR / 'chat' / f'agrinet_{lang}.md').read_text()
         assert 'capability_enabled' not in root and '{% include' not in root
@@ -33,7 +42,9 @@ def test_inventory_and_language_coverage():
 
 @pytest.fixture(scope='module')
 def old_prompts():
-    ref = os.environ.get('PROMPT_COMPARE_REF', 'e272042')
+    ref = os.environ.get('PROMPT_COMPARE_REF')
+    if not ref:
+        pytest.skip('Set PROMPT_COMPARE_REF for a one-off migration wording comparison')
     # Full baseline is named in the migration report; allow an explicit comparison revision.
     archive = subprocess.check_output(['git', 'archive', ref, 'assets/prompts'])
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:

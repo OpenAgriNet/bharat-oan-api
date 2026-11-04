@@ -79,7 +79,10 @@ python -m pytest -q tests/test_skills.py tests/test_prompt_structure.py \
   tests/test_pmkisan_prompt_validation.py tests/test_pmkisan_installment_release.py
 ```
 
-The migration comparison reads baseline `e272042` from Git. It compares the
+For the one-off migration comparison, run the same command with
+`PROMPT_COMPARE_REF=e272042`. Without that variable the historical comparison is
+skipped, so later intentional prompt edits are not frozen to an old revision.
+The migration comparison reads that baseline from Git. It compares the
 instruction-word inventory, including repetitions, in every language. Differences
 allowed are replacing the old overview/table headings and renaming the loader.
 Prompt order and whitespace change as workflows become contiguous; this test does
