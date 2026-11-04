@@ -213,3 +213,12 @@ def test_discovery_summary_covers_the_whole_scheme_bundle():
     assert '{{' not in summary
     # No long workflow body should be needed to discover the right bundle.
     assert 'How to write the' not in summary
+
+
+def test_repeated_loading_uses_retry_budget_instead_of_looping_successfully():
+    state = SkillState(enabled_skills=['mandi.prices'], preloaded_skills=[])
+    render_prompt(state, 'en', CONTEXT)
+    ctx = SimpleNamespace(deps=SimpleNamespace(skills=state))
+    asyncio.run(load_skill(ctx, 'mandi.prices'))
+    with pytest.raises(ModelRetry, match='already loaded'):
+        asyncio.run(load_skill(ctx, 'mandi.prices'))

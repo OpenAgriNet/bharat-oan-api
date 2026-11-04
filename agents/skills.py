@@ -36,6 +36,8 @@ async def load_skill(ctx: RunContext[Any], skill: str) -> dict:
     state = ctx.deps.skills
     if skill not in state.permitted:
         raise ModelRetry('Choose a skill from the available skill index.')
+    if skill in state.active:
+        raise ModelRetry('This skill is already loaded. Use its available tools or choose another pending skill.')
     instructions = get_catalog().render_skill(skill, state.language, state.context, state.agent)
     state.loaded_skills.add(skill)
     return {'skill': skill, 'loaded': True, 'instructions': instructions,

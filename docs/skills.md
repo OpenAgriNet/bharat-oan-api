@@ -46,7 +46,10 @@ can ever be loaded. A globally disabled skill is never offered. The index and
 
 The model receives the full instructions in the loader result and can call the
 new tools on its next step. Successful loads persist through conversation history;
-topic changes can add skills. There is no automatic eviction in this version.
+topic changes can add skills. A repeated load is rejected through the existing
+agent retry budget, so successful discovery is bounded by the permitted skill set.
+There is no automatic eviction in this version. Restart the application after
+editing prompt assets or manifest definitions; these are cached for the process.
 
 `SkillState(enabled_skills=[...], preloaded_skills=[...])` is the application-level
 session selection API. Omitted selections use manifest defaults; `[]` explicitly
