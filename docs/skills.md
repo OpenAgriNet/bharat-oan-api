@@ -12,6 +12,20 @@ Find the workflow in `assets/prompts/skills/<service>/<workflow>/`. Edit its
 `summary`; everything below it is the detailed instruction body. Existing Jinja
 variables such as `today_date` and the live scheme catalogue remain supported.
 
+For example, the shape of `prices_en.md` is:
+
+```markdown
+---
+summary: Find mandi prices for a crop, place and date.
+---
+Detailed workflow instructions, prerequisites and response guidance go here.
+```
+
+The summary is shown only while that skill is available but not loaded. The body
+is included when preloaded, returned by `load_skill` when discovered mid-turn,
+and included in the system prompt on subsequent turns. Tool schemas are taken
+from the existing Python registry, never reconstructed from the Markdown.
+
 `assets/prompts/chat/agrinet_<language>.md` contains only conversation-wide rules.
 Do not paste tool tables or workflow steps into it. Existing repetitions inside
 skills are intentionally preserved for the subsequent prompt review.
