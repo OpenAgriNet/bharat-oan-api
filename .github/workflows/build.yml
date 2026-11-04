@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     # Manual runs use the selected source branch for credentials and image tags.
     if: github.event_name != 'workflow_dispatch' || github.ref_name == 'bh-dev' || github.ref_name == 'bh-main'
-    environment: ${{ github.base_ref || github.ref_name }}
+    environment: ${{ (github.base_ref || github.ref_name) == 'bh-main' && 'main' || (github.base_ref || github.ref_name) }}
 
     steps:
       - name: Checkout repository
@@ -58,6 +58,7 @@ jobs:
             BUILD_TAG=$(echo "$BRANCH" | sed 's/\//-/g')
             # Extract simple tag (e.g., bh-dev -> dev, bh-main -> main)
             SIMPLE_TAG=$(echo "$BRANCH" | sed 's/^.*-//')
+            if [[ "$BRANCH" == "bh-main" ]]; then SIMPLE_TAG="$BUILD_TAG"; fi
             TAGS="${BUILD_TAG}-latest ${BUILD_TAG} ${SIMPLE_TAG} ${{ github.sha }}"
           fi
 

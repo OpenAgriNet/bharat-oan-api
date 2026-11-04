@@ -27,7 +27,7 @@ RUN python3 -m pip install --no-cache-dir --no-build-isolation \
     --only-binary=:all: --no-binary=marisa-trie,pyyaml \
     --require-hashes -r requirements.lock
 RUN python3 -m pip check && python3 -c \
-    "import marisa_trie, pandas, pydantic, rapidfuzz, zope.interface; from yaml import CLoader; from langcodes import Language; assert Language.get('hi').display_name('en') == 'Hindi'"
+    "import httptools, marisa_trie, numpy, pandas, pydantic, rapidfuzz, scipy, torch, zope.interface; from yaml import CLoader; from langcodes import Language; from sentence_transformers import SentenceTransformer; assert torch.version.cuda is None, 'Expected CPU-only Torch'; assert Language.get('hi').display_name('en') == 'Hindi'"
 
 # Bake E5 embedding model into the image (avoids HuggingFace download on first search_schemes call)
 ARG HF_TOKEN=
