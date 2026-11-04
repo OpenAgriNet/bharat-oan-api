@@ -5,7 +5,9 @@ This checks script and identifiers, not translation quality or model behavior.
 from pathlib import Path
 import re
 import unittest
-from jinja2 import Environment, FileSystemLoader
+from agents.skill_catalog import get_catalog
+from agents.skill_policy import SkillState
+from agents.skills import render_prompt
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_RANGES = {
@@ -17,7 +19,7 @@ SCRIPT_RANGES = {
 
 
 def render(language, **context):
-    return Environment(loader=FileSystemLoader(ROOT / "assets/prompts")).get_template(f"agrinet_{language}.md").render(**context)
+    return render_prompt(SkillState(), language, context)
 
 
 class PromptLanguageContract(unittest.TestCase):
@@ -29,7 +31,7 @@ class PromptLanguageContract(unittest.TestCase):
                           if block.startswith("**PM-KISAN 24th installment release date:**")]
                 self.assertEqual(len(blocks), 1)
                 block = blocks[0]
-                self.assertIn("Do not call search_schemes, load_capability or any status/OTP tool", block)
+                self.assertIn("Do not call search_schemes, load_skill or any status/OTP tool", block)
                 self.assertIn("The 24th installment of PM kisan will release on 30th October 2026.", text)
                 self.assertIn("The 24th installment of PM kisan was released on 30th October 2026.", text)
                 self.assertIn("पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की जाएगी।", text)
@@ -45,10 +47,10 @@ class PromptLanguageContract(unittest.TestCase):
                 self.assertIn("initiate_pm_kisan_status_check", text)
                 self.assertIn("check_pm_kisan_status_with_otp", text)
 
-    def test_release_routing_is_visible_before_loading_search(self):
+    def test_scheme_skill_keeps_release_routing(self):
         for language in ["en", *SCRIPT_RANGES]:
             with self.subTest(language=language):
-                text = render(language, capability_enabled=lambda names: False)
+                text = get_catalog().render_skill("schemes.information", language, {})
                 block = next(block for block in text.split("\n\n")
                              if "**Scheme information vs. status request:**" in block)
                 self.assertIn("When will the next PM-KISAN installment be released?", block)
@@ -56,7 +58,7 @@ class PromptLanguageContract(unittest.TestCase):
                 self.assertIn("A previous status-check offer is not consent", block)
                 self.assertIn("Do not continue a pending request for identifiers", block)
                 self.assertIn("Answer directly from the configured release announcement in this prompt", block)
-                self.assertIn("do not search or load a capability", block)
+                self.assertIn("do not search or load a skill", block)
                 self.assertLess(block.index("**General PM-KISAN release date**"),
                                 block.index("**Direct status request**"))
                 self.assertIn("do not ask for registration number, phone number or OTP", block)
@@ -64,12 +66,14 @@ class PromptLanguageContract(unittest.TestCase):
     def test_pmfby_safeguards_keep_language_and_tool_arguments(self):
         for language in ["en", *SCRIPT_RANGES]:
             with self.subTest(language=language):
-                text = render(language)
+                text = get_catalog().render_skill("grievances.manage", language, {})
                 self.assertNotIn("### PMFBY grievance verification rules", text)
                 headings = list(re.finditer(r"^### .*PMFBY.*$", text, re.M))
                 self.assertTrue(headings, "Missing localized PMFBY safeguards")
                 start = headings[-1].start()
-                end = text.index("\n## ", start)
+                end = text.find("\n## ", start)
+                if end < 0:
+                    end = len(text)
                 block = text[start:end]
                 for call in [
                     "initiate_pmfby_grievance_otp(phone_number)",
@@ -95,8 +99,8 @@ class PromptLanguageContract(unittest.TestCase):
                 rows = [line for line in render(language).splitlines()
                         if line.startswith("|") and "`imd_agromet_advisory`" in line]
                 self.assertEqual(len(rows), 1, "Expected exactly one IMD agromet tool row")
-                section = (ROOT / "assets/prompts/capabilities/agrinet/weather/agromet"
-                           / f"agromet_{language}.md").read_text()
+                section = get_catalog().render_skill("weather.agromet", language, {})
+                section = "\n".join(line for line in section.splitlines() if not line.startswith("|"))
                 self.assertIn(section.strip(), render(language), "IMD agromet section is not included")
                 for name in ["place", "forward_geocode", "search_documents", "search_pests_diseases"]:
                     self.assertIn(f"`{name}`", rows[0])

@@ -534,7 +534,7 @@ async def stream_chat_messages(
                 ),
             )
 
-            deps.capabilities.restore(history)
+            deps.skills.restore(history)
             message_pairs = "\n\n".join(format_message_pairs(history, 3))
             logger.info("Message pairs: %s", message_pairs)
             pending_npss_image_url = find_pending_npss_image_url(history)

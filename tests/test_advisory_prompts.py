@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-PROMPTS = sorted((Path(__file__).resolve().parent.parent / "assets" / "prompts").glob("agrinet_*.md"))
+PROMPTS = sorted((Path(__file__).resolve().parent.parent / "assets" / "prompts"/ "skills" / "crop" / "advice").glob("advice_*.md"))
 
 
 def test_all_thirteen_language_prompts_are_covered():

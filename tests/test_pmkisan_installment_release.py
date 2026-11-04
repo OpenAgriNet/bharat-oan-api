@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, Mock
 import httpx
 import pytest
 
-from agents.capabilities import capability_prompt_context
-from agents.capability_policy import CapabilityState, ToolPolicy
+from agents.skills import render_prompt
+from agents.skill_policy import SkillState
 from helpers import pmkisan_installment_release as release
 from tests.test_production_reconciliation import load_module
 from tests.test_prompt_language_contract import SCRIPT_RANGES, render
@@ -158,44 +158,23 @@ def test_unknown_scheme_is_not_sent_to_network(search, monkeypatch):
 
 
 @pytest.mark.parametrize("language", ["en", *SCRIPT_RANGES])
-def test_release_announcement_needs_no_loaded_tools(language):
-    for tools in [
-        set(), {"search_schemes"},
-        {"initiate_pm_kisan_status_check", "check_pm_kisan_status_with_otp"},
-    ]:
-        deps = SimpleNamespace(capabilities=CapabilityState(policy=ToolPolicy(
-            allowed_tools=tools, preloaded_tools=frozenset(),
-        )))
-        context = capability_prompt_context(deps, f"agrinet_{language}", {"today_date": "28 October 2026"})
-        prompt = render(language, **context)
-        assert "The 24th installment of PM kisan will release on 30th October 2026." in prompt
-        assert "Do not call search_schemes, load_capability or any status/OTP tool" in prompt
-        assert not deps.capabilities.visible
-        assert not deps.capabilities.loaded_tools
+def test_release_announcement_skill_needs_no_business_tools(language):
+    state = SkillState(enabled_skills=["pm_kisan.installments"])
+    prompt = render_prompt(state, language, {"today_date": "28 October 2026"})
+    assert "The 24th installment of PM kisan will release on 30th October 2026." in prompt
+    assert "Do not call search_schemes, load_skill or any status/OTP tool" in prompt
+    assert not state.visible
 
 
 @pytest.mark.parametrize("language", ["en", *SCRIPT_RANGES])
-def test_release_routing_remains_visible_after_status_capability_was_loaded(language):
-    from pydantic_ai.messages import ModelRequest, ToolReturnPart
-
-    status_tools = {"initiate_pm_kisan_status_check", "check_pm_kisan_status_with_otp"}
-    deps = SimpleNamespace(capabilities=CapabilityState(policy=ToolPolicy(
-        allowed_tools=status_tools | {"search_schemes"}, preloaded_tools=frozenset(),
-    )))
-    deps.capabilities.restore([ModelRequest(parts=[ToolReturnPart(
-        tool_name="load_capability",
-        content={"capability": "pmkisan", "loaded_tools": sorted(status_tools)},
-        tool_call_id="previous-status-check",
-    )])])
-    context = capability_prompt_context(deps, f"agrinet_{language}", {})
-    prompt = render(language, **context)
+def test_release_and_status_rules_remain_present_in_default_mode(language):
+    prompt = render_prompt(SkillState(), language, {})
     assert "Do not continue a pending request for identifiers" in prompt
     assert "A previous status-check offer is not consent" in prompt
     assert "Before any PM-KISAN tool call" not in prompt
     assert "does not apply to scheme information or public release dates" in prompt
     assert "The 24th installment of PM kisan will release on 30th October 2026." in prompt
-    assert "Do not call search_schemes, load_capability or any status/OTP tool" in prompt
-    assert "search_schemes" not in deps.capabilities.visible
+    assert "Do not call search_schemes, load_skill or any status/OTP tool" in prompt
 
 
 @pytest.mark.parametrize("scheme_code", ["pmkisan", "kcc"])

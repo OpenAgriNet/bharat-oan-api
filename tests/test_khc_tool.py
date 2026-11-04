@@ -311,7 +311,7 @@ def test_status_routing_is_rendered_from_the_prompt_asset(monkeypatch):
     assert khc.khc_service_note([], current_query="Check my KCC grievance status") == (
         "\n\nRouting rules supplied by the prompt asset."
     )
-    assert calls == [("grievance_status_routing", {
+    assert calls == [("skills/grievances/manage/status_routing", {
         "status_id_prompt": khc._STATUS_ID_PROMPT,
         "status_otp_prompt": khc._STATUS_OTP_PROMPT,
     })]
@@ -534,10 +534,11 @@ def test_incomplete_or_wrong_grievance_is_not_reported_as_success(monkeypatch, f
 
 
 def test_all_language_prompts_include_khc_rules():
-    from helpers.utils import get_prompt
+    from agents.skills import render_prompt
+    from agents.skill_policy import SkillState
 
     for language in ("en", "hi", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te"):
-        prompt = get_prompt(f"agrinet_{language}", context={
+        prompt = render_prompt(SkillState(), language, context={
             "today_date": "x", "crop_season": "x", "last_weekday_table": "",
             "vector_scheme_count": 0, "vector_schemes_bullets": "", "vector_schemes_identifiers": "",
         })
@@ -1213,10 +1214,10 @@ def test_find_location_lists_districts_when_the_district_did_not_match(monkeypat
     assert "Then call this tool again with their pick as district" in output
 
 
-def test_new_khc_tools_are_registered_in_the_khc_capability():
-    from agents.capability_manifest import CAPABILITIES
+def test_new_khc_tools_are_registered_in_the_khc_skill():
+    from agents.skill_catalog import get_catalog
 
-    assert {"find_khc_location", "get_khc_grievance_options"} <= CAPABILITIES["khc"]
+    assert {"find_khc_location", "get_khc_grievance_options"} <= set(get_catalog().manifest.skills["khc.grievances"].tools)
 
 
 def test_rate_limited_message_reaches_the_model(monkeypatch):
@@ -1835,4 +1836,9 @@ def test_the_system_prompt_gets_the_note_on_every_turn():
 
     source = (Path(__file__).resolve().parents[1] / "agents" / "agrinet.py").read_text()
     assert "from agents.tools.khc import khc_service_note" in source
-    assert "+ khc_service_note(ctx.messages, current_query=deps.query)" in source
+    assert "context['khc_service_note'] = khc_service_note(ctx.messages, current_query=deps.query)" in source
+    from agents.skills import render_prompt
+    from agents.skill_policy import SkillState
+    note = khc.khc_service_note([], current_query="check my KHC grievance")
+    assert note in render_prompt(SkillState(), "en", {"khc_service_note": note})
+    assert note not in render_prompt(SkillState(enabled_skills=[]), "en", {"khc_service_note": note})

@@ -1,0 +1,165 @@
+# Skill catalogue and agent defaults. Tool implementations remain in agents/tools.
+skills:
+  schemes.information:
+    prompt_dir: skills/schemes/information
+    enabled: true
+    tools:
+    - call_amul_vistaar_network
+    - call_maha_vistaar_network
+    - get_scheme_info
+    - search_documents
+    - search_schemes
+    - search_terms
+    - search_video
+  pm_kisan.status:
+    prompt_dir: skills/pm_kisan/status
+    enabled: true
+    tools:
+    - check_pm_kisan_status_with_otp
+    - initiate_pm_kisan_status_check
+  pmfby.status:
+    prompt_dir: skills/pmfby/status
+    enabled: true
+    tools:
+    - check_pmfby_status_with_otp
+    - initiate_pmfby_status_check
+  soil_health.status:
+    prompt_dir: skills/soil_health/status
+    enabled: true
+    tools:
+    - check_shc_status
+  smam.status:
+    prompt_dir: skills/smam/status
+    enabled: true
+    tools:
+    - check_smam_scheme_status
+  aif.status:
+    prompt_dir: skills/aif/status
+    enabled: true
+    tools:
+    - check_aif_grievance_status
+    - check_aif_loan_status
+    - initiate_aif_otp
+    - verify_aif_otp
+  kcc.status:
+    prompt_dir: skills/kcc/status
+    enabled: true
+    tools:
+    - check_kcc_application_status
+    - initiate_kcc_otp
+    - select_kcc_application
+  khc.grievances:
+    prompt_dir: skills/khc/grievances
+    enabled: true
+    tools:
+    - check_khc_grievance_status
+    - find_khc_location
+    - get_khc_grievance_options
+    - initiate_khc_otp
+    - lookup_khc_reference
+    - register_khc_grievance
+    - verify_khc_otp
+  crop.advice:
+    prompt_dir: skills/crop/advice
+    enabled: true
+    tools:
+    - analyze_crop_image
+    - search_advisory
+    - search_documents
+    - search_pests_diseases
+    - search_terms
+  weather.forecast:
+    prompt_dir: skills/weather/forecast
+    enabled: true
+    tools:
+    - forward_geocode
+    - weather_forecast
+  location.resolve:
+    prompt_dir: skills/location/resolve
+    enabled: true
+    tools:
+    - forward_geocode
+    - reverse_geocode
+  mandi.prices:
+    prompt_dir: skills/mandi/prices
+    enabled: true
+    tools:
+    - forward_geocode
+    - get_mandi_prices
+    - search_commodity
+  fertilizer.recommendations:
+    prompt_dir: skills/fertilizer/recommendations
+    enabled: true
+    tools:
+    - forward_geocode
+    - gfr_get_crop_registries
+    - gfr_get_recommendations
+  seeds.availability:
+    prompt_dir: skills/seeds/availability
+    enabled: true
+    tools:
+    - forward_geocode
+    - get_sathi_crop_groups
+    - list_sathi_crops_in_group
+    - search_sathi_seed_availability
+  agristack.profile:
+    prompt_dir: skills/agristack/profile
+    enabled: true
+    tools:
+    - get_agristack_farmer_crops
+    - get_agristack_farmer_location
+    - get_agristack_farmer_profile
+  weather.agromet:
+    prompt_dir: skills/weather/agromet
+    enabled: true
+    tools:
+    - imd_agromet_advisory
+  grievances.manage:
+    prompt_dir: skills/grievances/manage
+    enabled: true
+    tools:
+    - check_aif_grievance_status
+    - check_aif_loan_status
+    - check_khc_grievance_status
+    - check_pm_kisan_status_with_otp
+    - check_pmfby_grievance_otp
+    - check_pmfby_status_with_otp
+    - find_khc_location
+    - get_khc_grievance_options
+    - initiate_aif_otp
+    - initiate_khc_otp
+    - initiate_pm_kisan_status_check
+    - initiate_pmfby_grievance_otp
+    - initiate_pmfby_status_check
+    - lookup_khc_reference
+    - pmfby_grievance_status
+    - pmfby_submit_grievance
+    - pmkisan_grievance_send_otp
+    - pmkisan_grievance_status
+    - pmkisan_submit_grievance
+    - register_khc_grievance
+    - verify_aif_otp
+    - verify_khc_otp
+  pm_kisan.installments:
+    prompt_dir: skills/pm_kisan/installments
+    enabled: true
+    tools: []
+agents:
+  chat:
+    prompt_dir: chat
+    languages:
+    - as
+    - bn
+    - en
+    - gu
+    - hi
+    - kn
+    - mai
+    - ml
+    - mr
+    - or
+    - pa
+    - ta
+    - te
+    enabled_skills: all
+    preloaded_skills: all

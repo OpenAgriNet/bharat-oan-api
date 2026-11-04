@@ -1,7 +1,9 @@
 import re
 import unittest
 from pathlib import Path
-from jinja2 import Environment, FileSystemLoader
+from agents.skill_catalog import get_catalog
+from agents.skill_policy import SkillState
+from agents.skills import render_prompt
 
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "assets" / "prompts"
@@ -9,11 +11,11 @@ PROMPT_DIR = Path(__file__).resolve().parents[1] / "assets" / "prompts"
 
 class PmkisanPromptValidationTests(unittest.TestCase):
     def test_registration_examples_and_tool_handoff_in_every_language(self):
-        prompts = sorted(PROMPT_DIR.glob("agrinet_*.md"))
+        prompts = sorted((PROMPT_DIR / "chat").glob("agrinet_*.md"))
         self.assertTrue(prompts)
         for path in prompts:
             with self.subTest(language=path.stem):
-                prompt = Environment(loader=FileSystemLoader(PROMPT_DIR)).get_template(path.name).render()
+                prompt = render_prompt(SkillState(), path.stem.rsplit("_", 1)[1], {})
                 rule = next(
                     line for line in prompt.splitlines()
                     if line.startswith("**PM-KISAN Registration Number Validation:**")
