@@ -195,16 +195,22 @@ class FFSService:
             kwargs["content"] = base64.b64encode(AES.new(key, AES.MODE_CBC, iv).encrypt(pad(payload, 16)))
         elif body is not None:
             kwargs["json"] = body
-        logger.info("FFS API request method=%s url=%s encrypted=%s params=%s payload=%s",
-                    method, url, encrypted, _log_value(params), _log_value(body))
+        req_args = (method, url, encrypted, _log_value(params), _log_value(body))
+        if logger.isEnabledFor(logging.INFO):
+            logger.info("FFS API request method=%s url=%s encrypted=%s params=%s payload=%s", *req_args)
+        else:
+            logger.warning("FFS API request method=%s url=%s encrypted=%s params=%s payload=%s", *req_args)
         response = await self.client.request(method, url, headers=headers, **kwargs)
         response_data = None
         try:
             response_data = response.json()
         except ValueError:
             response_data = response.text
-        logger.info("FFS API response method=%s url=%s status=%s body=%s",
-                    method, url, response.status_code, _log_value(response_data))
+        resp_args = (method, url, response.status_code, _log_value(response_data))
+        if logger.isEnabledFor(logging.INFO):
+            logger.info("FFS API response method=%s url=%s status=%s body=%s", *resp_args)
+        else:
+            logger.warning("FFS API response method=%s url=%s status=%s body=%s", *resp_args)
         if response.status_code == 401:
             self.state.pop("token", None)
             self.state["stage"] = "login_expired"
