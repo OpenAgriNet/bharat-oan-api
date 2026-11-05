@@ -335,8 +335,8 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
     if need_days:
         args.append("`days_after_sowing`")
         parts.append("how many days ago you sowed it")
-    example = "Which season is it, and how many days ago did you sow?" if need_season and need_days else (
-        "Which season is your crop in?" if need_season else "How many days ago did you sow the crop?"
+    example = "Could you please tell me which season you are growing your crop in, and how many days ago you sowed it?" if need_season and need_days else (
+        "Could you please tell me which season you are growing your crop in?" if need_season else "Could you please tell me how many days ago you sowed your crop?"
     )
     # Name the seasons only when there is a real choice. With a single season, saying so makes the question
     # read as if that season were expected, and the farmer may well be in another one.
@@ -352,7 +352,7 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
         "advice yet. Your whole reply is only that one question: no introduction or explanation of why you are "
         "asking, no repeated sentence, and no Source line. Ask the farmer ONE short, natural question asking "
         + " and ".join(parts)
-        + f". Example (translate it to the farmer's language): \"{example}\"." + seasons_note
+        + f". Example (use the farmer's crop name instead of \"your crop\" and translate it to the farmer's language): \"{example}\"." + seasons_note
         + " Do not suggest which season it is or say which season the advice is for: the farmer decides."
         " Write it as normal sentences: never put season names in brackets or in a list."
         " When they answer, call `search_advisory` again with the same `query` and `crop` plus their "
