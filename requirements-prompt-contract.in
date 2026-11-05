@@ -1,0 +1,11 @@
+# Dependencies for .github/workflows/prompt-contract.yml (CPython 3.13).
+# Regenerate the complete hash lock from the repository root:
+# uv pip compile requirements-prompt-contract.in --generate-hashes --only-binary=:all: --python-version 3.13 --python-platform x86_64-manylinux_2_28 --default-index https://pypi.org/simple -o requirements-prompt-contract.lock
+Jinja2==3.1.6
+pytest==9.1.1
+pydantic-ai-slim==1.32.0
+httpx==0.28.1
+pytz==2026.3.post1
+python-dotenv==1.2.2
+python-decouple==3.8
+PyYAML==6.0.3

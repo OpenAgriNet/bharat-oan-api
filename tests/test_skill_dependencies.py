@@ -48,6 +48,43 @@ def test_old_capability_history_restores_permitted_workflow_dependencies():
     assert not denied.active
 
 
+@pytest.mark.parametrize('tool,content,expected', [
+    ('load_skill', {'skill': 'mandi.prices', 'loaded': True}, {'mandi.prices'}),
+    ('load_skill', {'skill': 'mandi.prices', 'loaded': 1}, set()),
+    ('load_skill', {'skill': 'mandi.prices', 'loaded': 'true'}, set()),
+    ('load_skill', {'skill': ['mandi.prices'], 'loaded': True}, set()),
+    ('load_skill', {'skill': 'weather.forecast', 'loaded': True}, set()),
+    ('load_skill', None, set()),
+    ('other_tool', {'skill': 'mandi.prices', 'loaded': True}, set()),
+    ('load_capability', {'capability': 'mandi', 'loaded_tools': ['get_mandi_prices']}, set()),
+    ('load_capability', {'capability': 'mandi', 'loaded_tools': ['get_mandi_prices', 'search_commodity']}, {'mandi.prices'}),
+    ('load_capability', {'capability': ['mandi'], 'loaded_tools': []}, set()),
+    ('load_capability', {'capability': 'mandi', 'loaded_tools': 'get_mandi_prices'}, set()),
+    ('load_capability', {'capability': 'mandi', 'loaded_tools': ['get_mandi_prices', 'search_commodity', None]}, set()),
+])
+def test_history_restoration_requires_valid_success_with_current_permissions(tool, content, expected):
+    state = SkillState(enabled_skills=['mandi.prices'], preloaded_skills=[],
+                       loaded_skills={'weather.forecast'})
+    history = [SimpleNamespace(), ModelResponse(parts=[TextPart('ignore')]),
+               ModelRequest(parts=[ToolReturnPart(tool, content)])]
+    state.restore(history)
+    state.restore(history)  # Replaying the same history is idempotent.
+    assert state.loaded_skills == expected
+    assert state.active == (set(CAT.resolve(expected)) if expected else set())
+
+
+@pytest.mark.parametrize('group,prefix', [('pmkisan', 'pm_kisan'), ('crop_advice', 'crop'),
+                                        ('amul', 'schemes'), ('maha', 'schemes')])
+def test_legacy_aliases_restore_only_complete_nonempty_tool_bindings(group, prefix):
+    state = SkillState(preloaded_skills=[])
+    content = {'capability': group, 'loaded_tools': sorted(CAT.tools)}
+    state.restore([ModelRequest(parts=[ToolReturnPart('load_capability', content)])])
+    expected = {name for name, skill in CAT.manifest.skills.items()
+                if name.startswith(prefix + '.') and skill.tools}
+    assert state.loaded_skills == expected
+    assert 'pm_kisan.installments' not in state.loaded_skills  # No tools to recover from old history.
+
+
 def test_documents_shared_by_two_workflows_load_once():
     state = SkillState(enabled_skills=['crop.advice', 'schemes.information'], preloaded_skills=[])
     skills.render_prompt(state, 'hi', CONTEXT)

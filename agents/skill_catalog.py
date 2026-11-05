@@ -153,8 +153,16 @@ class SkillCatalog:
         m = self.manifest
         if not m.skills or not m.agents:
             raise ValueError('Manifest must define skills and agents')
+        self._validate_skill_definitions()
+        self.resolve(set(m.skills))  # Validate the entire catalogue, including unused skills.
+        for agent, config in m.agents.items():
+            self._validate_agent(agent, config)
+        for name, config in m.environments.items():
+            self._validate_environment(name, config)
+
+    def _validate_skill_definitions(self) -> None:
         folders = []
-        for name, skill in m.skills.items():
+        for name, skill in self.manifest.skills.items():
             if not re.fullmatch(r'[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+', name):
                 raise ValueError(f'Invalid skill ID: {name}')
             folder = self.path(skill.prompt_dir)
@@ -165,37 +173,42 @@ class SkillCatalog:
                 raise ValueError(f'Duplicate required skill: {name}')
         if len(folders) != len(set(folders)):
             raise ValueError('Each skill needs its own prompt folder')
-        self.resolve(set(m.skills))  # Validate the entire catalogue, including unused skills.
-        for agent, config in m.agents.items():
-            roots = select(config.enabled_skills, set(m.skills), 'agent skills')
-            enabled = set(self.resolve(roots))
-            if config.preloaded_skills != 'all':
-                select(config.preloaded_skills, enabled, 'preloaded skills')
-            if not set(config.skill_variants) <= enabled:
-                raise ValueError(f'Variant selected for unavailable skill: {agent}')
-            if not config.languages or len(config.languages) != len(set(config.languages)):
-                raise ValueError(f'Invalid languages: {agent}')
-            for variant in config.skill_variants.values():
-                if not re.fullmatch(r'[a-z][a-z0-9_]*', variant):
-                    raise ValueError(f'Invalid variant: {variant}')
-            for language in config.languages:
-                if not re.fullmatch('[a-z]{2,3}', language):
-                    raise ValueError(f'Invalid language: {language}')
-                if not self.path(f'{config.prompt_dir}/agrinet_{language}.md').is_file():
-                    raise ValueError(f'Missing global prompt: {agent}/{language}')
-                for skill_id in enabled:
-                    self.document(skill_id, language, agent)
-        for name, config in m.environments.items():
-            allowed = select(config.allowed_skills, set(m.skills), 'environment skills')
-            tools = select(config.allowed_tools, self.tools, 'environment tools')
-            if config.allowed_skills != 'all':
-                denied = set(self.resolve(allowed)) - allowed
-                if denied:
-                    raise ValueError(f'{name} requires denied skills: {sorted(denied)}')
-                for skill_id in allowed:
-                    missing = self.tools_for({skill_id}) - tools
-                    if missing:
-                        raise ValueError(f'{name}/{skill_id} requires denied tools: {sorted(missing)}')
+
+    def _validate_agent(self, agent: str, config: AgentConfig) -> None:
+        roots = select(config.enabled_skills, set(self.manifest.skills), 'agent skills')
+        enabled = set(self.resolve(roots))
+        if config.preloaded_skills != 'all':
+            select(config.preloaded_skills, enabled, 'preloaded skills')
+        if not set(config.skill_variants) <= enabled:
+            raise ValueError(f'Variant selected for unavailable skill: {agent}')
+        if not config.languages or len(config.languages) != len(set(config.languages)):
+            raise ValueError(f'Invalid languages: {agent}')
+        for variant in config.skill_variants.values():
+            if not re.fullmatch(r'[a-z][a-z0-9_]*', variant):
+                raise ValueError(f'Invalid variant: {variant}')
+        self._validate_language_assets(agent, config, enabled)
+
+    def _validate_language_assets(self, agent: str, config: AgentConfig, enabled: set[str]) -> None:
+        for language in config.languages:
+            if not re.fullmatch('[a-z]{2,3}', language):
+                raise ValueError(f'Invalid language: {language}')
+            if not self.path(f'{config.prompt_dir}/agrinet_{language}.md').is_file():
+                raise ValueError(f'Missing global prompt: {agent}/{language}')
+            for skill_id in enabled:
+                self.document(skill_id, language, agent)
+
+    def _validate_environment(self, name: str, config: EnvironmentConfig) -> None:
+        allowed = select(config.allowed_skills, set(self.manifest.skills), 'environment skills')
+        tools = select(config.allowed_tools, self.tools, 'environment tools')
+        if config.allowed_skills == 'all':
+            return
+        denied = set(self.resolve(allowed)) - allowed
+        if denied:
+            raise ValueError(f'{name} requires denied skills: {sorted(denied)}')
+        for skill_id in allowed:
+            missing = self.tools_for({skill_id}) - tools
+            if missing:
+                raise ValueError(f'{name}/{skill_id} requires denied tools: {sorted(missing)}')
 
     def validate_tools(self, tools: list) -> None:
         names = [tool.name for tool in tools]

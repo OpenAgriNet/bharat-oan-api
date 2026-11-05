@@ -188,6 +188,27 @@ def test_duplicate_manifest_keys_rejected(tmp_path):
         SkillCatalog(tmp_path)
 
 
+@pytest.mark.parametrize('section,name,field,value,error', [
+    ('skills', 'mandi.prices', 'prompt_dir', '../outside', 'outside assets'),
+    ('skills', 'mandi.prices', 'prompt_dir', 'missing', 'Missing folder'),
+    ('skills', 'mandi.prices', 'prompt_dir', 'skills/location/resolve', 'own prompt folder'),
+    ('skills', 'mandi.prices', 'tools', ['get_mandi_prices', 'get_mandi_prices'], 'duplicate tool binding'),
+    ('agents', 'chat', 'enabled_skills', ['missing.skill'], 'Unknown or disallowed agent skills'),
+    ('agents', 'chat', 'preloaded_skills', ['missing.skill'], 'Unknown or disallowed preloaded skills'),
+    ('agents', 'chat', 'skill_variants', {'missing.skill': 'voice'}, 'Variant selected for unavailable'),
+    ('agents', 'chat', 'skill_variants', {'mandi.prices': '../voice'}, 'Invalid variant'),
+    ('agents', 'chat', 'languages', [], 'Invalid languages'),
+    ('agents', 'chat', 'languages', ['en', 'en'], 'Invalid languages'),
+    ('agents', 'chat', 'languages', ['../en'], 'Invalid language'),
+    ('agents', 'chat', 'languages', ['zz'], 'Missing global prompt'),
+])
+def test_invalid_manifest_definitions_rejected(tmp_path, section, name, field, value, error):
+    def change(manifest, root):
+        manifest[section][name][field] = value
+    with pytest.raises(ValueError, match=error):
+        temporary_catalog(tmp_path, change)
+
+
 def test_tool_prepare_guards_and_execution_permissions():
     def forbidden():
         raise AssertionError('Hidden tool executed')

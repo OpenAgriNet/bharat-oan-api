@@ -91,26 +91,34 @@ class SkillState(BaseModel):
             for part in getattr(message, 'parts', ()):
                 if getattr(part, 'part_kind', None) != 'tool-return':
                     continue
-                content = getattr(part, 'content', None)
-                if not isinstance(content, dict):
-                    continue
-                if part.tool_name == 'load_skill':
-                    skill = content.get('skill')
-                    if isinstance(skill, str) and skill in permitted and content.get('loaded') is True:
-                        self.loaded_skills.add(skill)
-                elif part.tool_name == 'load_capability':
-                    # Compatibility for sessions begun before migration. Partial workflows
-                    # cannot be restored; history never widens current permissions.
-                    group = content.get('capability')
-                    aliases = {'pmkisan': 'pm_kisan', 'crop_advice': 'crop',
-                               'schemes': 'schemes', 'amul': 'schemes', 'maha': 'schemes'}
-                    if not isinstance(group, str):
-                        continue
-                    prefix = aliases.get(group, group) + '.'
-                    tools = content.get('loaded_tools')
-                    if isinstance(tools, list) and all(isinstance(t, str) for t in tools):
-                        for name in permitted:
-                            bound = set(get_catalog().manifest.skills[name].tools)
-                            if name.startswith(prefix) and bound and bound <= set(tools):
-                                self.loaded_skills.add(name)
+                self._restore_tool_return(part, permitted)
         self.loaded_skills &= permitted
+
+    def _restore_tool_return(self, part: Any, permitted: set[str]) -> None:
+        content = getattr(part, 'content', None)
+        if not isinstance(content, dict):
+            return
+        if part.tool_name == 'load_skill':
+            skill = content.get('skill')
+            if isinstance(skill, str) and skill in permitted and content.get('loaded') is True:
+                self.loaded_skills.add(skill)
+        elif part.tool_name == 'load_capability':
+            self._restore_capability(content, permitted)
+
+    def _restore_capability(self, content: dict, permitted: set[str]) -> None:
+        # Compatibility for sessions begun before migration. Partial workflows
+        # cannot be restored; history never widens current permissions.
+        group = content.get('capability')
+        tools = content.get('loaded_tools')
+        if not isinstance(group, str) or not isinstance(tools, list):
+            return
+        if not all(isinstance(tool, str) for tool in tools):
+            return
+        aliases = {'pmkisan': 'pm_kisan', 'crop_advice': 'crop',
+                   'schemes': 'schemes', 'amul': 'schemes', 'maha': 'schemes'}
+        prefix = aliases.get(group, group) + '.'
+        loaded_tools = set(tools)
+        for name in permitted:
+            bound = set(get_catalog().manifest.skills[name].tools)
+            if name.startswith(prefix) and bound and bound <= loaded_tools:
+                self.loaded_skills.add(name)
