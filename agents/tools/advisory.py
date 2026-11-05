@@ -349,7 +349,8 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
     return (
         f"{PENDING_MARKER}\n> Advisory Search Results for `{query}`\n\n"
         "> Advisories were found, but the right one depends on details the farmer has not given. Do not give any "
-        "advice yet and do not show a Source line. Ask the farmer ONE short, natural question asking "
+        "advice yet. Your whole reply is only that one question: no introduction or explanation of why you are "
+        "asking, no repeated sentence, and no Source line. Ask the farmer ONE short, natural question asking "
         + " and ".join(parts)
         + f". Example (translate it to the farmer's language): \"{example}\"." + seasons_note
         + " Do not suggest which season it is or say which season the advice is for: the farmer decides."

@@ -381,6 +381,7 @@ class TestAskWhatTheChunksNeed:
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
         assert "cover the Rabi and Kharif seasons" in out and "(Rabi" not in out and "Scout for aphids" not in out
         assert "farmer decides" in out
+        assert "Your whole reply is only that one question" in out and "no Source line" in out
 
     def test_season_and_days_are_asked_in_one_question(self, bap):
         bap.response = _respond([_chunk("c1", "Rabi")], has_day_range="true")
