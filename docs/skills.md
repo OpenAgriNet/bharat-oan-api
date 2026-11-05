@@ -177,6 +177,11 @@ their existing wording; this change moves instructions rather than rewriting the
 
 ## Crop sources
 
+Each `advice_<language>.md` explicitly includes `flow.md` and `season_note.md`.
+Python supplies only `advisory_default_season` from `ADVISORY_DEFAULT_SEASON`;
+the template chooses and renders the season guidance. There is no pre-rendered
+season-note variable.
+
 `skills/crop/advice/flow.md` contains the common workflow included by all 13
 localized crop prompts. After the existing generic/personalised and crop-field
 prerequisites, search ICAR–Kisan Sarathi (`search_advisory`) **first**, then check

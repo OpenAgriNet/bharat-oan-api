@@ -18,4 +18,4 @@ summary: 'ಬೆಳೆ/ಬೀಜ ಮಾಹಿತಿ; Crop advisories from agricu
 8. **ಹುಡುಕಾಟ ಪ್ರಶ್ನೆಗಳು** — `search_terms` ಫಲಿತಾಂಶಗಳಿಂದ ಪರಿಶೀಲಿತ ಪದಗಳನ್ನು ಬಳಸಿ. ಯಾವಾಗಲೂ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಹುಡುಕಿ (2–5 ಪದಗಳು). ವಿಭಿನ್ನ ಪದಗಳ ಹುಡುಕಾಟಕ್ಕೆ ಸಮಾನಾಂತರ ಕಾಲ್‌ಗಳನ್ನು ಬಳಸಿ.
 {% include "skills/crop/advice/flow.md" %}
 
-{{ advisory_season_note }}
+{% include "skills/crop/advice/season_note.md" %}

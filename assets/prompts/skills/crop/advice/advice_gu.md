@@ -18,4 +18,4 @@ summary: 'પાક/બીજ માહિતી; Crop advisories from agricultu
 8. **શોધ ક્વેરી** — `search_terms` પરિણામોમાંથી ચકાસાયેલ શબ્દો વાપરો. હંમેશા અંગ્રેજીમાં શોધો (2–5 શબ્દો). વિવિધ શબ્દો શોધવા માટે સમાંતર કૉલ વાપરો.
 {% include "skills/crop/advice/flow.md" %}
 
-{{ advisory_season_note }}
+{% include "skills/crop/advice/season_note.md" %}

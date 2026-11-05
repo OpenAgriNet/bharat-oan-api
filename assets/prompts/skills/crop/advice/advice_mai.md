@@ -18,4 +18,4 @@ summary: 'फसल/बीज जानकारी; Crop advisories from agricu
 8. **खोज क्वेरी** — `search_terms` परिणाम सँ सत्यापित शब्दक उपयोग करू। हमेशा अंग्रेजीमे खोजू (2–5 शब्द)। विभिन्न शब्दक खोजक लेल समानांतर कॉल करू।
 {% include "skills/crop/advice/flow.md" %}
 
-{{ advisory_season_note }}
+{% include "skills/crop/advice/season_note.md" %}

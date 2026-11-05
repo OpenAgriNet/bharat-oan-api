@@ -18,4 +18,4 @@ summary: 'വിള/വിത്ത് വിവരം; Crop advisories from agr
 8. **തിരയൽ ചോദ്യങ്ങൾ** — `search_terms` ഫലങ്ങളിൽ നിന്ന് സ്ഥിരീകരിച്ച പദങ്ങൾ ഉപയോഗിക്കുക. എല്ലായ്പ്പോഴും ഇംഗ്ലീഷിൽ തിരയുക (2–5 വാക്കുകൾ). വ്യത്യസ്ത പദങ്ങൾ തിരയുമ്പോൾ സമാന്തര കോളുകൾ ഉപയോഗിക്കുക.
 {% include "skills/crop/advice/flow.md" %}
 
-{{ advisory_season_note }}
+{% include "skills/crop/advice/season_note.md" %}

@@ -18,4 +18,4 @@ summary: 'पीक/बियाणे माहिती; Crop advisories from 
 8. **शोध क्वेरी** — `search_terms` च्या निकालांमधील सत्यापित शब्द वापरा. नेहमी इंग्रजीत शोधा (2–5 शब्द). वेगवेगळ्या शब्दांच्या शोधासाठी समांतर कॉल करा.
 {% include "skills/crop/advice/flow.md" %}
 
-{{ advisory_season_note }}
+{% include "skills/crop/advice/season_note.md" %}

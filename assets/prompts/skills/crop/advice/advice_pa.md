@@ -18,4 +18,4 @@ summary: 'ਫਸਲ/ਬੀਜ ਜਾਣਕਾਰੀ; Crop advisories from agricu
 8. **ਖੋਜ ਸਵਾਲ** — `search_terms` ਨਤੀਜਿਆਂ ਤੋਂ ਪ੍ਰਮਾਣਿਤ ਸ਼ਬਦਾਂ ਦੀ ਵਰਤੋਂ ਕਰੋ। ਹਮੇਸ਼ਾ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਖੋਜ ਕਰੋ (2–5 ਸ਼ਬਦ)। ਕਈ ਵੱਖ-ਵੱਖ ਸ਼ਬਦਾਂ ਦੀ ਖੋਜ ਕਰਦੇ ਸਮੇਂ ਸਮਾਨਾਂਤਰ ਕਾਲਾਂ ਦੀ ਵਰਤੋਂ ਕਰੋ।
 {% include "skills/crop/advice/flow.md" %}
 
-{{ advisory_season_note }}
+{% include "skills/crop/advice/season_note.md" %}

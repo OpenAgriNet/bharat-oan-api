@@ -18,4 +18,4 @@ summary: 'শস্য/বীজৰ তথ্য; Crop advisories from agricultu
 8. **সন্ধান প্ৰশ্ন** — `search_terms` ফলাফলৰ পৰা প্ৰমাণিত শব্দ ব্যৱহাৰ কৰক। সদায় ইংৰাজীত সন্ধান কৰক (2–5 শব্দ)। বিভিন্ন শব্দৰ সন্ধানৰ বাবে সমান্তৰাল কল কৰক।
 {% include "skills/crop/advice/flow.md" %}
 
-{{ advisory_season_note }}
+{% include "skills/crop/advice/season_note.md" %}

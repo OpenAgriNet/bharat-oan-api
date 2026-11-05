@@ -18,4 +18,4 @@ summary: 'ফসল/বীজ তথ্য; Crop advisories from agricultural in
 8. **অনুসন্ধান কোয়েরি** — `search_terms`-এর ফলাফল থেকে যাচাইকৃত শব্দ ব্যবহার করুন। সবসময় ইংরেজিতে অনুসন্ধান করুন (2–5 শব্দ)। একাধিক ভিন্ন শব্দের অনুসন্ধানে সমান্তরাল কল করুন।
 {% include "skills/crop/advice/flow.md" %}
 
-{{ advisory_season_note }}
+{% include "skills/crop/advice/season_note.md" %}

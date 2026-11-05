@@ -18,7 +18,6 @@ from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
 from helpers.ask_first import ASK_FIRST_RETRY, farmer_was_asked
-from helpers.utils import get_prompt
 from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -59,11 +58,6 @@ def _clean_days(value: Optional[int]) -> Optional[int]:
 def default_season() -> str:
     """Season configured in env `ADVISORY_DEFAULT_SEASON` (empty when not set)."""
     return _clean_param(os.getenv("ADVISORY_DEFAULT_SEASON"))
-
-
-def advisory_season_note() -> str:
-    """Render the crop skill's unchanged season policy using the configured season."""
-    return get_prompt("skills/crop/advice/season_note", context={"season": default_season()})
 
 
 def _search_params_tag(crop: str, days_after_sowing: Optional[int], season: str = "") -> List[Dict[str, Any]]:

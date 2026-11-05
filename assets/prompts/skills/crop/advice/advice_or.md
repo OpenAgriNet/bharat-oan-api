@@ -18,4 +18,4 @@ summary: 'ଫସଲ/ବିହନ ସୂଚନା; Crop advisories from agricultu
 8. **ସର୍ଚ୍ଚ କ୍ୱେରୀ** — `search_terms` ଫଳାଫଳରୁ ଯାଞ୍ଚ ହୋଇଥିବା ଶବ୍ଦଗୁଡ଼ିକ ବ୍ୟବହାର କରନ୍ତୁ। ସର୍ବଦା ଇଂରାଜୀରେ ସର୍ଚ୍ଚ କରନ୍ତୁ (2–5 ଶବ୍ଦ)। ଏକାଧିକ ବିଭିନ୍ନ ଶବ୍ଦ ଖୋଜିବା ସମୟରେ ସମାନ୍ତରାଳ କଲ୍ ବ୍ୟବହାର କରନ୍ତୁ।
 {% include "skills/crop/advice/flow.md" %}
 
-{{ advisory_season_note }}
+{% include "skills/crop/advice/season_note.md" %}

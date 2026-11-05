@@ -18,4 +18,4 @@ summary: 'పంట/విత్తన సమాచారం; Crop advisories fr
 8. **శోధన క్వెరీలు** — `search_terms` ఫలితాల నుండి ధృవీకరించబడిన పదాలను ఉపయోగించండి. ఎల్లప్పుడూ ఆంగ్లంలో శోధించండి (2–5 పదాలు). విభిన్న పదాల శోధనకు సమాంతర కాల్‌లు ఉపయోగించండి.
 {% include "skills/crop/advice/flow.md" %}
 
-{{ advisory_season_note }}
+{% include "skills/crop/advice/season_note.md" %}
