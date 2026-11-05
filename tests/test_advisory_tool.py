@@ -72,12 +72,6 @@ def _on_search(items, status="success", message="", query="aphids",
     }
 
 
-@pytest.fixture(autouse=True)
-def _no_default_season(monkeypatch):
-    """A season configured in the developer's .env must not change the tests."""
-    monkeypatch.delenv("ADVISORY_DEFAULT_SEASON", raising=False)
-
-
 @pytest.fixture
 def bap(monkeypatch):
     """Point the tool at a fake BAP; returns a recorder of the requests it received."""
@@ -413,12 +407,6 @@ class TestAskWhatTheChunksNeed:
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=40))
         assert "Scout for aphids (c1)" in out and len(bap.requests) == 1
 
-    def test_the_question_is_not_repeated_by_the_tool_when_the_env_season_is_set(self, monkeypatch, bap):
-        monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
-        bap.response = _respond([_chunk("c1", "Rabi"), _chunk("c2", "Kharif")], **NO_DAYS)
-        out = asyncio.run(sa.search_advisory(CTX, "aphids", crop="Wheat"))
-        assert "(c1)" in out and "(c2)" not in out and "Which season" not in out
-
 
 class TestSeasonInspection:
     def test_season_in_the_chunks_is_one_search_and_keeps_only_matching(self, bap):
@@ -464,13 +452,6 @@ class TestSeasonInspection:
         out = asyncio.run(sa.search_advisory(CTX, "something odd", crop="Sorghum", season="Rabi"))
         assert len(bap.requests) == 1
         assert "No advisory" in out and "something odd" in out
-
-    def test_env_season_overrides_the_farmers_answer(self, monkeypatch, bap):
-        monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
-        bap.response = _respond([_chunk("c1", "Rabi"), _chunk("c2", "Kharif")], **NO_DAYS)
-        out = asyncio.run(sa.search_advisory(CTX, "aphids", crop="Wheat", season="Kharif"))
-        assert _params(_sent(bap, 0))["season"] == "Rabi"
-        assert "(c1)" in out and "(c2)" not in out
 
 
 class TestCropCheck:

@@ -4,7 +4,6 @@ from helpers.scheme_qdrant_search import format_vector_schemes_prompt_block
 from agents.models import configured_agent
 from agents.tools import TOOLS
 from agents.tools.khc import khc_service_note
-from agents.tools.advisory import default_season
 from pydantic_ai.models.openai import OpenAIChatModelSettings
 from agents.deps import FarmerContext
 from agents.skill_catalog import get_catalog
@@ -54,5 +53,4 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
     )
     deps.skills.restore(ctx.messages)
     context['khc_service_note'] = khc_service_note(ctx.messages, current_query=deps.query)
-    context['advisory_default_season'] = default_season()
     return render_prompt(deps.skills, lang_code, context)

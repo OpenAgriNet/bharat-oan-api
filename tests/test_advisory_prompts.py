@@ -50,7 +50,7 @@ def test_source_order_and_fallback_are_consistent_in_every_language(path):
 
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
 def test_prompt_has_no_generic_or_personalised_flow(path):
-    text = _render(path, {"advisory_default_season": "Rabi"}) + path.read_text(encoding="utf-8")
+    text = _render(path) + path.read_text(encoding="utf-8")
     for old in ("advice_type", "generic or personalised", "Generic or personalised", "personalised advice", "ask-first"):
         assert old not in text, f"{path.name}: still mentions {old!r}"
 
@@ -65,6 +65,7 @@ def test_prompt_has_the_search_first_advisory_flow(path):
     assert "your first reply is only one short question asking which crop" in flow
     assert "`answer_now=true`" in flow and "`crop=\"Wheat\"`, `days_after_sowing=40`" in flow
     assert "never put season names in brackets" in flow
+    assert "not when it asked you to put a question to the farmer" in flow
 
 
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
@@ -74,10 +75,3 @@ def test_a_missing_crop_is_asked_first_in_the_tool_rows(path):
     assert any("ask which crop first" in r and "`crop`" in r for r in pests), f"{path.name}: pests row must ask for a missing crop"
     advisory = [l for l in lines if l.startswith("|") and "`search_advisory`" in l and "ask which crop first" in l]
     assert len(advisory) == 1 and "general knowledge" in advisory[0]
-
-
-def test_the_configured_season_note_only_renders_when_a_season_is_set():
-    path = PROMPTS[0]
-    with_season = _render(path, {"advisory_default_season": "Rabi"})
-    assert "Advisory season (fixed: Rabi)" in with_season and "do not pass `season`" in with_season
-    assert "Advisory season" not in _render(path, {"advisory_default_season": ""})

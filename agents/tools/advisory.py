@@ -24,6 +24,7 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
 from app.config import DEFAULT_HTTP_TIMEOUT
+from helpers.advisory_pending import PENDING_MARKER
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger
 
@@ -67,11 +68,6 @@ def _clean_top_k(value: Optional[int]) -> Optional[int]:
     except (TypeError, ValueError):
         return None
     return min(top_k, _MAX_TOP_K) if top_k > 0 else None
-
-
-def default_season() -> str:
-    """Season configured in env `ADVISORY_DEFAULT_SEASON` (empty when not set)."""
-    return _clean_param(os.getenv("ADVISORY_DEFAULT_SEASON"))
 
 
 # ---------------------------------------------------------------------------
@@ -349,7 +345,7 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
         else ""
     )
     return (
-        f"> Advisory Search Results for `{query}`\n\n"
+        f"{PENDING_MARKER}\n> Advisory Search Results for `{query}`\n\n"
         "> Advisories were found, but the right one depends on details the farmer has not given. Do not give any "
         "advice yet and do not show a Source line. Ask the farmer ONE short, natural question asking "
         + " and ".join(parts)
@@ -364,7 +360,7 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
 def format_season_suggestion(season: str, subject: str, seasons: List[str]) -> str:
     """Result when no advisory exists for the farmer's season: offer the seasons that do."""
     return (
-        f"> No advisory is available for the {season} season for {subject}. Advisories are available for the "
+        f"{PENDING_MARKER}\n> No advisory is available for the {season} season for {subject}. Advisories are available for the "
         f"{' / '.join(seasons)} season. Tell the farmer in one short sentence that nothing is available for "
         f"{season}, and ask whether they would like the advice for {' or '.join(seasons)}. Do not give any advice "
         "yet and do not show a Source line. If they say yes, call `search_advisory` again with the same `query` "
@@ -504,7 +500,7 @@ async def search_advisory(
         offer of the seasons that are available; or a message saying nothing was found.
     """
     days = _clean_days(days_after_sowing)
-    season_value = default_season() or normalize_season(season)
+    season_value = normalize_season(season)
     location_value = _clean_param(location)
     crop_hint = _clean_param(crop)
     if not crop_hint:
