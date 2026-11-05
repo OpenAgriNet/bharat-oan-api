@@ -98,7 +98,7 @@ class FarmerContext(BaseModel):
             return (
                 "**AgriStack status:** logged in with consent. If this question needs the farmer's place, crop, or "
                 "profile details and the farmer did not name/give them, call the AgriStack tool first instead of "
-                "asking or following the normal ask-first flow: `get_agristack_farmer_location` for weather "
+                "asking: `get_agristack_farmer_location` for weather "
                 "forecast/advisory/alerts; `get_agristack_farmer_crops` for crop advisory, pests/diseases and mandi "
                 "prices; `get_agristack_farmer_profile` for scheme eligibility/application/renewal, grievance "
                 "submission, and fertilizer recommendation/quota."

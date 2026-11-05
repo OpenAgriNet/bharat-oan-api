@@ -14,7 +14,6 @@ from langfuse import observe
 from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
-from helpers.ask_first import ASK_FIRST_RETRY, farmer_was_asked, mentions_crop
 
 from agents.deps import FarmerContext
 from agents.tools.imd_advisory import agromet_note
@@ -468,9 +467,6 @@ async def search_documents(
     Returns:
         search_results: Formatted list of documents
     """
-    # Crop advice questions: the farmer is asked "generic or personalised?" before the search.
-    if mentions_crop(query) and not farmer_was_asked(ctx):
-        raise ModelRetry(ASK_FIRST_RETRY)
     try:
         # Initialize Marqo client
         endpoint_url = os.getenv('MARQO_ENDPOINT_URL')
@@ -554,8 +550,9 @@ async def search_video(
 @observe(name="tool:search_pests_diseases", as_type="tool")
 async def search_pests_diseases(
     ctx: RunContext[FarmerContext],
-    query: str, 
-    top_k: int = 10, 
+    query: str,
+    crop: str,
+    top_k: int = 10,
 ) -> str:
     """
     Semantic search for **crop** pests and diseases only (e.g. crop insects, fungal/bacterial diseases of plants).
@@ -563,14 +560,18 @@ async def search_pests_diseases(
     
     Args:
         query: The search query in *English* (required)
+        crop: The crop in English, for example "Wheat" (required). If the farmer has not said which crop,
+            do not call this tool: ask which crop first.
         top_k: Maximum number of results to return (default: 10)
         
     Returns:
         search_results: Formatted list of pests and diseases information
     """
-    # Crop advisory rule: the farmer is asked "generic or personalised?" before any crop search.
-    if not farmer_was_asked(ctx):
-        raise ModelRetry(ASK_FIRST_RETRY)
+    if not " ".join(str(crop or "").split()):
+        raise ModelRetry(
+            "The crop is required. If the farmer named a crop, call search_pests_diseases again with `crop`. "
+            "If they did not, ask them which crop in one short question, wait for the answer, then search."
+        )
     try:
         # Initialize Marqo client
         endpoint_url = os.getenv('MARQO_ENDPOINT_URL')

@@ -7,8 +7,6 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from pydantic_ai import ModelRetry
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolCallPart, ToolReturnPart, UserPromptPart
 
 from agents.tools import advisory as sa
 
@@ -19,16 +17,7 @@ def _ctx(messages):
     return SimpleNamespace(deps=SimpleNamespace(session_id="sess-1", question_id="q-1"), messages=messages)
 
 
-# the farmer already got an assistant reply earlier in the conversation (the generic or personalised question)
-ASKED = [
-    ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")]),
-    ModelResponse(parts=[TextPart(content="Do you want generic or personalised advice?")]),
-    ModelRequest(parts=[UserPromptPart(content='**User:** "personalised, Lucknow, Pune, 40 days"\n**Selected Language:** English')]),
-]
-# first turn: only the farmer's question, nothing said by the assistant yet
-FIRST_TURN = [ModelRequest(parts=[UserPromptPart(content="How do I control aphids in my wheat crop?")])]
-
-CTX = _ctx(ASKED)
+CTX = _ctx([])
 
 def _tag(code, value):
     return {"descriptor": {"code": code, "name": code}, "value": value, "display": True}
@@ -83,18 +72,24 @@ def _on_search(items, status="success", message="", query="aphids",
     }
 
 
+@pytest.fixture(autouse=True)
+def _no_default_season(monkeypatch):
+    """A season configured in the developer's .env must not change the tests."""
+    monkeypatch.delenv("ADVISORY_DEFAULT_SEASON", raising=False)
+
+
 @pytest.fixture
 def bap(monkeypatch):
     """Point the tool at a fake BAP; returns a recorder of the requests it received."""
     monkeypatch.setenv("BAP_ENDPOINT", "http://bap.test/")
     monkeypatch.setenv("BAP_ID", "bap-id")
     monkeypatch.setenv("BAP_URI", "https://bap.test")
-    seen = SimpleNamespace(requests=[], response=httpx.Response(200, json=_on_search([_item("c1")])))
+    seen = SimpleNamespace(requests=[], queue=[], response=httpx.Response(200, json=_on_search([_item("c1")])))
     real = httpx.AsyncClient
 
     def handler(request):
         seen.requests.append(request)
-        return seen.response
+        return seen.queue.pop(0) if seen.queue else seen.response
 
     monkeypatch.setattr(sa.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler)))
     return seen
@@ -132,7 +127,12 @@ class TestSearchParams:
     def test_a_location_is_never_sent(self):
         assert "district" not in inspect.signature(sa.build_advisory_search_payload).parameters
 
-    def test_generic_search_sends_only_the_crop(self):
+    def test_top_k_travels_clamped(self):
+        assert _params(sa.build_advisory_search_payload("a", top_k=7)) == {"top_k": "7"}
+        assert _params(sa.build_advisory_search_payload("a", top_k=500)) == {"top_k": "20"}
+        assert _params(sa.build_advisory_search_payload("a", top_k=0)) is None
+
+    def test_crop_only_search_sends_only_the_crop(self):
         assert _params(sa.build_advisory_search_payload("aphids", crop="Wheat")) == {"crop": "Wheat"}
 
     def test_no_tags_when_nothing_is_given(self):
@@ -218,6 +218,75 @@ class TestSourceLine:
         assert "Source of water: canal." in out and "jak" not in out
 
 
+
+def _chunk(chunk_id, season=None, crop="Wheat", title="Wheat Insect Management", **kw):
+    """A chunk whose text has the docs-pipeline header line (`Crop: .. | Problem type: .. | Season: ..`)."""
+    header = f"Crop: {crop} | Problem type: Insect"
+    if season is not None:
+        header += f" | Season: {season}"
+    text = f"{title}\n{header}\nAdvisory: Scout for aphids ({chunk_id}).\n\nSource: ICAR–DKMA, jak"
+    return _item(chunk_id, title=title, text=text, crop=crop, **kw)
+
+
+def _respond(items, **kw):
+    return httpx.Response(200, json=_on_search(items, **kw))
+
+
+def _sent(bap, index):
+    return json.loads(bap.requests[index].read())
+
+
+class TestSeasonParsing:
+    @pytest.mark.parametrize(
+        "text, expected",
+        [
+            ("T\nCrop: Wheat | Problem type: Insect | Season: Rabi\nAdvisory: x", ["rabi"]),
+            ("T\nCrop: Wheat | Season: Rabi,Kharif\nAdvisory: x", ["rabi", "kharif"]),
+            ("T\nSeason: Rabi / Zaid\nAdvisory: x", ["rabi", "zaid"]),
+            ("T\nCrop: Wheat | Season: OTHER\nAdvisory: x", ["other"]),
+            ("T\nCrop: Wheat | Season: \nAdvisory: x", []),
+            ("T\nCrop: Wheat\nAdvisory: x", []),
+            ("", []),
+        ],
+    )
+    def test_reads_the_season_header(self, text, expected):
+        assert sa.parse_chunk_seasons(text) == expected
+
+    def test_a_season_word_in_the_body_is_not_the_header(self):
+        assert sa.parse_chunk_seasons("T\nCrop: Wheat\nAdvisory: sow in the Season: Rabi") == []
+
+    def test_results_carry_their_seasons(self):
+        results, _ = sa.parse_advisory_response(_on_search([_chunk("c1", "Rabi,Kharif")]))
+        assert results[0]["seasons"] == ["rabi", "kharif"]
+
+    def test_matching_rules(self):
+        rabi = {"seasons": ["rabi"]}
+        assert sa.season_matches(rabi, "Rabi") and not sa.season_matches(rabi, "Zaid")
+        assert sa.season_matches({"seasons": ["rabi", "kharif"]}, "kharif")
+        # Other / no season / unreadable header: not tied to a season, matches any
+        assert sa.season_matches({"seasons": ["other"]}, "Zaid")
+        assert sa.season_matches({"seasons": []}, "Zaid")
+
+    def test_explicit_seasons_are_distinct_and_exclude_other(self):
+        results = [{"seasons": ["rabi"]}, {"seasons": ["other"]}, {"seasons": ["kharif", "rabi"]}, {"seasons": []}]
+        assert sa.explicit_seasons(results) == ["Rabi", "Kharif"]
+
+    def test_normalize_season(self):
+        assert sa.normalize_season(" rabi ") == "Rabi"
+        assert sa.normalize_season("summer") == "Zaid"
+        assert sa.normalize_season(None) == ""
+
+    def test_crop_relevance(self):
+        wheat, rice, nameless = {"crop": "Wheat"}, {"crop": "Rice"}, {"crop": ""}
+        # crop named by the model: only that crop's chunks, and it is the re-query filter
+        assert sa.relevant_for_crop([wheat, rice], "Rice", "aphids") == ([rice], "Rice")
+        assert sa.relevant_for_crop([wheat, rice], "sorghum", "aphids") == ([], "sorghum")
+        # no hint: a crop named in the query picks the chunks
+        assert sa.relevant_for_crop([wheat, rice], "", "aphids in rice") == ([rice], "Rice")
+        # nothing tells the crop: keep everything, no filter
+        assert sa.relevant_for_crop([wheat, rice, nameless], "", "aphids") == ([wheat, rice, nameless], "")
+
+
 class TestSearchNotes:
     def test_reports_day_range(self):
         ctx = {"has_day_range": "true", "days_matched": "false"}
@@ -233,155 +302,237 @@ class TestSearchNotes:
 
     def test_a_named_location_is_reported_as_not_used(self):
         ctx = {"has_day_range": "true", "days_matched": "true"}
-        out = sa.format_search_notes(ctx, days_after_sowing=40, personalised=True, location="Lucknow")
+        out = sa.format_search_notes(ctx, days_after_sowing=40, location="Lucknow")
         assert "Lucknow" in out and "no advisory specific to that location" in out
         assert "never used to search" in out
 
     def test_no_location_note_without_a_location(self):
         ctx = {"has_day_range": "true", "days_matched": "true"}
-        assert "location" not in sa.format_search_notes(ctx, days_after_sowing=40, personalised=True)
+        assert "location" not in sa.format_search_notes(ctx, days_after_sowing=40)
 
-    def test_says_so_when_a_personalised_farmer_skipped_the_days(self):
+    def test_skipped_days_are_never_mentioned(self):
         ctx = {"has_day_range": "true", "days_matched": "false"}
-        out = sa.format_search_notes(ctx, days_after_sowing=None, personalised=True)
-        assert "did not give the days since sowing" in out
+        assert "did not give" not in sa.format_search_notes(ctx, days_after_sowing=None)
 
-    def test_a_generic_search_never_mentions_skipped_details(self):
-        ctx = {"has_day_range": "true", "days_matched": "false"}
-        out = sa.format_search_notes(ctx, days_after_sowing=None, personalised=False)
-        assert "did not give" not in out
-
-    def test_days_matched_is_only_reported_when_days_were_sent(self):
+    def test_general_advice_note_without_a_day_range(self):
         out = sa.format_search_notes({"has_day_range": "false"}, days_after_sowing=None)
-        assert "advisory_has_day_range=no" in out
+        assert "advisory_has_day_range=no" in out and "not tied to a sowing stage" in out
         assert "days_after_sowing_matched" not in out
 
 
-class TestTool:
+# no day range in the chunks, so only the season decides whether the farmer is asked
+NO_DAYS = {"has_day_range": "false"}
+
+
+class TestSearchFirst:
     def test_posts_to_bap_search_and_returns_formatted_advice(self, bap):
-        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", "Wheat", "generic"))
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Sorghum"))
         request = bap.requests[0]
         assert str(request.url) == "http://bap.test/search"
         body = request.read().decode()
         assert '"knowledge-advisory"' in body and "aphids in wheat" in body
         assert "Harvest AKJ-1" in out and "ICAR" in out
 
-    def test_sends_crop_season_and_days_and_reports_the_notes(self, bap):
-        bap.response = httpx.Response(200, json=_on_search([_item("c1")], has_day_range="true", days_matched="true"))
+    def test_the_first_search_sends_no_crop_filter(self, bap):
+        bap.response = _respond([_chunk("c1")], **NO_DAYS)
+        asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
+        assert len(bap.requests) == 1
+        assert _params(_sent(bap, 0)) == {"top_k": "5"}
+
+    def test_details_in_the_first_message_are_sent_with_the_first_search(self, bap):
+        bap.response = _respond([_chunk("c1", "Rabi")], has_day_range="true", days_matched="true")
         out = asyncio.run(
-            sa.search_advisory(CTX, "aphids in wheat", "wheat", "personalised", season="Rabi", days_after_sowing=40)
+            sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", days_after_sowing=40, season="rabi", location="Pune")
         )
-        body = json.loads(bap.requests[0].read())
-        assert _params(body) == {"crop": "wheat", "days_after_sowing": "40", "season": "Rabi"}
-        assert "Harvest AKJ-1" in out
-        assert "days_after_sowing_matched=yes" in out
-        assert "location" not in out
-
-    def test_generic_call_sends_only_the_crop(self, bap):
-        asyncio.run(sa.search_advisory(CTX, "aphids in wheat", "Wheat", "generic"))
-        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat"}
-
-    def test_blank_crop_asks_the_model_to_ask_the_farmer(self, bap):
-        for blank in ("", "   "):
-            with pytest.raises(ModelRetry):
-                asyncio.run(sa.search_advisory(CTX, "aphids", blank, "generic"))
-        assert bap.requests == []
-
-    def test_a_named_location_is_not_sent_but_the_answer_says_so(self, bap):
-        out = asyncio.run(
-            sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", days_after_sowing=40, location="Lucknow")
-        )
-        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat", "days_after_sowing": "40", "season": "Rabi"}
-        assert "Lucknow" not in bap.requests[0].read().decode()
-        assert "Harvest AKJ-1" in out  # advice is still given, not held back for a yes/no question
-        assert "Lucknow" in out and "no advisory specific to that location" in out
-
-    def test_generic_search_with_a_location_notes_it_too(self, bap):
-        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "generic", location="Pune"))
-        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat"}
+        assert _params(_sent(bap, 0)) == {"days_after_sowing": "40", "season": "Rabi", "top_k": "5"}
+        assert "Scout for aphids (c1)" in out and "days_after_sowing_matched=yes" in out
         assert "Pune" in out and "no advisory specific to that location" in out
-
-    def test_the_tool_has_no_district_parameter(self):
-        params = inspect.signature(sa.search_advisory).parameters
-        assert "district" not in params and "district_fallback_confirmed" not in params
-
-    def test_generic_never_sends_days(self, bap):
-        asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "generic", days_after_sowing=40))
-        assert _params(json.loads(bap.requests[0].read())) == {"crop": "Wheat"}
-
-    def test_refuses_to_search_before_the_farmer_was_asked(self, bap):
-        with pytest.raises(ModelRetry, match="generic or personalised"):
-            asyncio.run(sa.search_advisory(_ctx(FIRST_TURN), "aphids", "Wheat", "generic"))
-        assert bap.requests == []
-
-    def test_refuses_on_an_empty_conversation(self, bap):
-        with pytest.raises(ModelRetry):
-            asyncio.run(sa.search_advisory(_ctx([]), "aphids", "Wheat", "personalised"))
-        assert bap.requests == []
-
-    def test_a_tool_only_reply_does_not_count_as_asking(self, bap):
-        from pydantic_ai.messages import ToolCallPart
-
-        only_tool_call = FIRST_TURN + [ModelResponse(parts=[ToolCallPart(tool_name="search_advisory", args={})])]
-        with pytest.raises(ModelRetry):
-            asyncio.run(sa.search_advisory(_ctx(only_tool_call), "aphids", "Wheat", "generic"))
-
-    def test_allows_the_search_once_the_assistant_has_replied(self, bap):
-        out = asyncio.run(sa.search_advisory(_ctx(ASKED), "aphids", "Wheat", "generic"))
-        assert "Harvest AKJ-1" in out
         assert len(bap.requests) == 1
 
-    def test_a_new_question_after_an_answer_needs_a_new_ask(self, bap):
-        done = ASKED + [
-            ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c1", content="advice")]),
-            ModelResponse(parts=[TextPart(content="Here is the advice. Anything else?")]),
-            ModelRequest(parts=[UserPromptPart(content="anything which you have")]),
+    def test_the_tool_signature(self):
+        params = inspect.signature(sa.search_advisory).parameters
+        assert list(params)[1:] == [
+            "query", "crop", "days_after_sowing", "season", "location", "top_k", "answer_now",
         ]
-        with pytest.raises(ModelRetry, match="generic or personalised"):
-            asyncio.run(sa.search_advisory(_ctx(done), "wheat pests", "Wheat", "personalised"))
-        asked_again = done + [
-            ModelResponse(parts=[TextPart(content="Generic or personalised?")]),
-            ModelRequest(parts=[UserPromptPart(content="generic")]),
-        ]
-        out = asyncio.run(sa.search_advisory(_ctx(asked_again), "wheat pests", "Wheat", "generic"))
-        assert "Harvest AKJ-1" in out
+        assert "advice_type" not in params and "district" not in params
 
-    def test_a_question_answered_by_another_tool_does_not_count_as_asked(self, bap):
-        # q1 answered through another search tool and "generic or personalised?" asked afterwards;
-        # the next question must not be read as the farmer's reply to that late question.
-        history = [
-            ModelRequest(parts=[UserPromptPart(content="How can I control aphids in my wheat crop?")]),
-            ModelResponse(parts=[TextPart(content="Let me look."), ToolCallPart(tool_name="search_documents", args={})]),
-            ModelRequest(parts=[ToolReturnPart(tool_name="search_documents", tool_call_id="c9", content="aphid advice")]),
-            ModelResponse(parts=[TextPart(content="Advice... Would you like generic or personalised advice?")]),
-            ModelRequest(parts=[UserPromptPart(content="When is the right time to harvest my wheat crop?")]),
-            ModelResponse(parts=[TextPart(content="Let me search."), ToolCallPart(tool_name="search_advisory", args={})]),
-        ]
-        with pytest.raises(ModelRetry, match="generic or personalised"):
-            asyncio.run(sa.search_advisory(_ctx(history), "wheat harvest", "Wheat", "generic"))
-        assert bap.requests == []
+    def test_a_location_is_never_sent_and_never_asked(self, bap):
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", crop="Sorghum", location="Lucknow"))
+        assert "Lucknow" not in bap.requests[0].read().decode()
+        assert "Harvest AKJ-1" in out and "no advisory specific to that location" in out
+
+    def test_no_location_means_no_location_text(self, bap):
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        assert "location" not in asyncio.run(sa.search_advisory(CTX, "aphids", crop="Sorghum")).lower()
 
     def test_top_k_limits_results(self, bap):
-        bap.response = httpx.Response(200, json=_on_search([_item(f"c{i}", title=f"T{i}") for i in range(6)]))
-        out = asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic", top_k=2))
+        bap.response = _respond([_item(f"c{i}", title=f"T{i}") for i in range(6)], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "q", crop="Sorghum", top_k=2))
         assert "T0" in out and "T1" in out and "T2" not in out
 
-    def test_empty_responses_say_nothing_was_found(self, bap):
+
+class TestAskWhatTheChunksNeed:
+    def test_a_named_season_in_the_chunks_means_the_farmer_is_asked_even_for_one_season(self, bap):
+        bap.response = _respond([_chunk("c1", "Rabi"), _chunk("c2", "Rabi")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
+        assert "Which season is your crop in?" in out and "Rabi season" in out and "(Rabi)" not in out
+        assert "Scout for aphids" not in out and "Cite as" not in out  # no advice yet
+        assert len(bap.requests) == 1
+
+    def test_several_seasons_are_all_named_in_the_question(self, bap):
+        bap.response = _respond([_chunk("c1", "Rabi"), _chunk("c2", "Kharif")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
+        assert "Rabi and Kharif seasons" in out and "(Rabi" not in out and "Scout for aphids" not in out
+
+    def test_season_and_days_are_asked_in_one_question(self, bap):
+        bap.response = _respond([_chunk("c1", "Rabi")], has_day_range="true")
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
+        assert "Which season is it, and how many days ago did you sow?" in out
+        assert "`season` and `days_after_sowing`" in out
+
+    def test_only_the_days_are_asked_when_the_season_is_known(self, bap):
+        bap.response = _respond([_chunk("c1", "Rabi")], has_day_range="true")
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", season="Rabi"))
+        assert "How many days ago did you sow the crop?" in out and "Which season" not in out
+        assert "Scout for aphids" not in out
+
+    def test_nothing_is_asked_when_the_chunks_have_no_named_season_or_day_range(self, bap):
+        bap.response = _respond([_chunk("c1", "Other"), _chunk("c2")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
+        assert "Scout for aphids (c1)" in out and "Ask the farmer" not in out
+
+    def test_answer_now_skips_the_question(self, bap):
+        bap.response = _respond([_chunk("c1", "Rabi")], has_day_range="true")
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", answer_now=True))
+        assert "Scout for aphids (c1)" in out and "Cite as" in out
+
+    def test_everything_given_is_answered_in_one_search(self, bap):
+        bap.response = _respond([_chunk("c1", "Rabi")], has_day_range="true", days_matched="true")
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=40))
+        assert "Scout for aphids (c1)" in out and len(bap.requests) == 1
+
+    def test_the_question_is_not_repeated_by_the_tool_when_the_env_season_is_set(self, monkeypatch, bap):
+        monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
+        bap.response = _respond([_chunk("c1", "Rabi"), _chunk("c2", "Kharif")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", crop="Wheat"))
+        assert "(c1)" in out and "(c2)" not in out and "Which season" not in out
+
+
+class TestSeasonInspection:
+    def test_season_in_the_chunks_is_one_search_and_keeps_only_matching(self, bap):
+        bap.response = _respond([_chunk("c1", "Kharif"), _chunk("c2", "Rabi,Zaid"), _chunk("c3", "Other")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", season="Rabi"))
+        assert len(bap.requests) == 1
+        assert "(c2)" in out and "(c3)" in out and "(c1)" not in out
+
+    def test_a_season_missing_from_the_chunks_triggers_exactly_one_requery(self, bap):
+        bap.queue = [
+            _respond([_chunk("c1", "Rabi"), _chunk("c2", "Kharif")]),
+            _respond([_chunk("c9", "Zaid")], has_day_range="true", days_matched="true"),
+        ]
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", season="Zaid", days_after_sowing=30))
+        assert len(bap.requests) == 2
+        assert "(c9)" in out and "(c1)" not in out and "days_after_sowing_matched=yes" in out
+        assert "crop" not in (_params(_sent(bap, 0)) or {})
+        assert _params(_sent(bap, 1)) == {"crop": "Wheat", "days_after_sowing": "30", "season": "Zaid", "top_k": "20"}
+
+    def test_requery_finding_nothing_offers_the_seasons_that_exist(self, bap):
+        bap.queue = [
+            _respond([_chunk("c1", "Rabi"), _chunk("c2", "Kharif")]),
+            _respond([_chunk("c3", "Rabi")]),
+        ]
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", season="Zaid", crop="Wheat"))
+        assert len(bap.requests) == 2  # never a third search
+        assert "No advisory is available for the Zaid season for Wheat" in out
+        assert "Rabi" in out and "Kharif" in out
+        assert "Scout for aphids" not in out and "Cite as" not in out
+
+    def test_requery_with_an_empty_response_still_suggests(self, bap):
+        bap.queue = [_respond([_chunk("c1", "Rabi")]), httpx.Response(200, json={"responses": []})]
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", season="Kharif"))
+        assert "No advisory is available for the Kharif season" in out and "Rabi" in out
+
+    def test_requery_failure_still_suggests_instead_of_failing(self, bap):
+        bap.queue = [_respond([_chunk("c1", "Rabi")]), httpx.Response(502, text="bad")]
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", season="Kharif"))
+        assert "No advisory is available for the Kharif season" in out
+
+    def test_a_first_search_with_no_results_is_not_requeried(self, bap):
         bap.response = httpx.Response(200, json={"context": {}, "responses": []})
-        out = asyncio.run(sa.search_advisory(CTX, "something odd", "Wheat", "generic"))
+        out = asyncio.run(sa.search_advisory(CTX, "something odd", crop="Sorghum", season="Rabi"))
+        assert len(bap.requests) == 1
         assert "No advisory" in out and "something odd" in out
 
+    def test_env_season_overrides_the_farmers_answer(self, monkeypatch, bap):
+        monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
+        bap.response = _respond([_chunk("c1", "Rabi"), _chunk("c2", "Kharif")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", crop="Wheat", season="Kharif"))
+        assert _params(_sent(bap, 0))["season"] == "Rabi"
+        assert "(c1)" in out and "(c2)" not in out
+
+
+class TestCropCheck:
+    def test_chunks_of_another_crop_trigger_one_requery_with_the_crop_filter(self, bap):
+        bap.queue = [
+            _respond([_chunk("w1", "Rabi", crop="Wheat"), _chunk("w2", "Rabi", crop="Wheat")]),
+            _respond([_chunk("s1", "Kharif", crop="Sorghum")], **NO_DAYS),
+        ]
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in sorghum", crop="Sorghum"))
+        assert len(bap.requests) == 2
+        assert _params(_sent(bap, 1))["crop"] == "Sorghum"
+        assert "Which season is your crop in?" in out and "Kharif season" in out and "w1" not in out
+
+    def test_other_crop_chunks_are_never_shown_when_the_crop_has_no_advisory(self, bap):
+        bap.queue = [
+            _respond([_chunk("w1", "Rabi", crop="Wheat")]),
+            httpx.Response(200, json={"responses": []}),
+        ]
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in sorghum", crop="Sorghum"))
+        assert len(bap.requests) == 2
+        assert "No advisory found" in out and "Scout for aphids" not in out
+
+    def test_a_sorghum_chunk_among_wheat_chunks_is_enough_no_requery(self, bap):
+        bap.response = _respond(
+            [_chunk("w1", "Rabi", crop="Wheat"), _chunk("s1", "Kharif", crop="Sorghum")], **NO_DAYS
+        )
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in sorghum", crop="sorghum", answer_now=True))
+        assert len(bap.requests) == 1
+        assert "(s1)" in out and "(w1)" not in out
+
+    def test_one_requery_covers_both_a_crop_miss_and_a_season_miss(self, bap):
+        bap.queue = [
+            _respond([_chunk("w1", "Rabi", crop="Wheat")]),
+            _respond([_chunk("s1", "Kharif", crop="Sorghum")], **NO_DAYS),
+        ]
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in sorghum", crop="Sorghum", season="Rabi"))
+        assert len(bap.requests) == 2
+        assert "No advisory is available for the Rabi season for Sorghum" in out and "Kharif" in out
+
+
+class TestCropRequired:
+    @pytest.mark.parametrize("blank", ["", "   ", None])
+    def test_no_crop_means_no_search_and_the_agent_is_told_to_ask(self, bap, blank):
+        from pydantic_ai import ModelRetry
+
+        with pytest.raises(ModelRetry, match="ask them which crop"):
+            asyncio.run(sa.search_advisory(CTX, "aphids", crop=blank))
+        assert bap.requests == []
+
+
+class TestFailures:
     def test_provider_message_is_used_when_not_successful(self, bap):
-        bap.response = httpx.Response(200, json=_on_search([], status="error", message="Advisory search failed"))
-        assert asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")) == "Advisory search failed"
+        bap.response = _respond([], status="error", message="Advisory search failed")
+        assert asyncio.run(sa.search_advisory(CTX, "q", crop="Sorghum")) == "Advisory search failed"
 
     def test_non_200_means_unavailable(self, bap):
         bap.response = httpx.Response(502, text="bad gateway")
-        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")).lower()
+        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q", crop="Sorghum")).lower()
 
     def test_missing_bap_endpoint_is_a_configuration_message(self, monkeypatch):
         monkeypatch.delenv("BAP_ENDPOINT", raising=False)
-        assert "not configured" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")).lower()
+        assert "not configured" in asyncio.run(sa.search_advisory(CTX, "q", crop="Sorghum")).lower()
 
     def test_network_error_means_unavailable(self, monkeypatch):
         monkeypatch.setenv("BAP_ENDPOINT", "http://bap.test")
@@ -391,7 +542,7 @@ class TestTool:
             raise httpx.ConnectError("refused")
 
         monkeypatch.setattr(sa.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(boom)))
-        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "generic")).lower()
+        assert "unavailable" in asyncio.run(sa.search_advisory(CTX, "q", crop="Sorghum")).lower()
 
 
 def test_tool_is_registered_with_context():
@@ -401,99 +552,15 @@ def test_tool_is_registered_with_context():
     assert "search_advisory" in registered
     assert registered["search_advisory"].takes_ctx is True
     schema = registered["search_advisory"].function_schema.json_schema
-    assert "advice_type" in schema["required"]
-    assert schema["properties"]["advice_type"]["enum"] == ["generic", "personalised"]
+    assert schema["required"] == ["query", "crop"]
+    assert "advice_type" not in schema["properties"]
+    assert {"crop", "season", "days_after_sowing", "answer_now"} <= set(schema["properties"])
     assert "search_schemes" in registered  # scheme routing is untouched
 
 
-def test_season_note_uses_env_default(monkeypatch):
-    from agents.tools.advisory import default_season
-    from agents.skill_catalog import get_catalog
-
-    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
-    note = get_catalog().render_skill('crop.advice', 'en', {'advisory_default_season': default_season()})
-    assert "Rabi" in note and "ask the farmer for the **season**" in note and "do not use their answer" in note
-
-    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
-    note = get_catalog().render_skill('crop.advice', 'en', {'advisory_default_season': default_season()})
-    assert "mandatory" in note and "pass their answer as `season`" in note
 
 
 def test_payload_carries_season_tag():
-    from agents.tools.advisory import build_advisory_search_payload
-
-    payload = build_advisory_search_payload("wheat aphids", crop="Wheat", season="Rabi")
+    payload = sa.build_advisory_search_payload("wheat aphids", crop="Wheat", season="Rabi")
     entries = payload["message"]["intent"]["item"]["tags"][0]["list"]
     assert {"descriptor": {"code": "season"}, "value": "Rabi"} in entries
-
-
-def test_env_season_beats_the_farmers_answer(monkeypatch, bap):
-    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
-    asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", days_after_sowing=40, season="Kharif"))
-    assert _params(json.loads(bap.requests[0].read()))["season"] == "Rabi"
-
-    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
-    asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", days_after_sowing=40, season="Kharif"))
-    assert _params(json.loads(bap.requests[1].read()))["season"] == "Kharif"
-
-
-@pytest.fixture(autouse=True)
-def _no_default_season(monkeypatch):
-    monkeypatch.delenv("ADVISORY_DEFAULT_SEASON", raising=False)
-
-
-def test_personalised_requires_a_valid_season(bap):
-    for bad in (None, "", "monsoon"):
-        with pytest.raises(ModelRetry, match="season is required"):
-            asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", days_after_sowing=40, season=bad))
-    assert bap.requests == []
-
-
-def test_configured_season_means_the_farmer_need_not_give_one(monkeypatch, bap):
-    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
-    out = asyncio.run(sa.search_advisory(CTX, "q", "Wheat", "personalised", days_after_sowing=40))
-    assert "Harvest AKJ-1" in out
-    assert _params(json.loads(bap.requests[0].read()))["season"] == "Rabi"
-
-
-class TestDetailsAskedFirst:
-    def test_personalised_without_days_needs_the_details_question(self, bap):
-        # the farmer only chose "personalised"; the details question has not been asked yet
-        with pytest.raises(ModelRetry, match="season"):
-            asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi"))
-        assert bap.requests == []
-
-    def test_the_details_question_asks_for_the_location_once(self):
-        assert "location" in sa._DETAILS_RETRY and "never again" in sa._DETAILS_RETRY
-
-    def test_no_location_means_no_location_note_and_no_second_question(self, bap):
-        history = ASKED[:2] + [
-            ModelRequest(parts=[UserPromptPart(content="personalised")]),
-            ModelResponse(parts=[TextPart(content="Season, days since sowing and location?")]),
-            ModelRequest(parts=[UserPromptPart(content="rabi, 40 days")]),
-        ]
-        out = asyncio.run(sa.search_advisory(_ctx(history), "harvest", "Wheat", "personalised", season="Rabi", days_after_sowing=40))
-        assert "Harvest AKJ-1" in out and "location" not in out
-
-    def test_proceeds_once_the_details_were_asked_and_answered(self, bap):
-        history = ASKED[:2] + [
-            ModelRequest(parts=[UserPromptPart(content="personalised")]),
-            ModelResponse(parts=[TextPart(content="Which season and how many days since sowing?")]),
-            ModelRequest(parts=[UserPromptPart(content="Rabi, I do not know the days")]),
-        ]
-        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids", "Wheat", "personalised", season="Rabi"))
-        assert "Harvest AKJ-1" in out and "did not give the days" in out
-
-    def test_details_in_the_call_need_no_second_question(self, bap):
-        out = asyncio.run(sa.search_advisory(CTX, "aphids", "Wheat", "personalised", season="Rabi", days_after_sowing=40))
-        assert "Harvest AKJ-1" in out
-
-    def test_a_location_with_the_details_is_never_a_reason_to_ask_again(self, bap):
-        # "rabi season, sowed 40 days ago and Lucknow": one answer is enough to search
-        history = ASKED[:2] + [
-            ModelRequest(parts=[UserPromptPart(content="personalised")]),
-            ModelResponse(parts=[TextPart(content="Which season and how many days since sowing?")]),
-            ModelRequest(parts=[UserPromptPart(content="rabi season, sowed 40 days ago and Lucknow state")]),
-        ]
-        out = asyncio.run(sa.search_advisory(_ctx(history), "harvest", "Wheat", "personalised", season="Rabi", days_after_sowing=40, location="Lucknow"))
-        assert "Harvest AKJ-1" in out and "no advisory specific to that location" in out
