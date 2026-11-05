@@ -77,3 +77,12 @@ def test_a_missing_crop_is_asked_first_in_the_tool_rows(path):
     assert any("ask which crop first" in r and "`crop`" in r for r in pests), f"{path.name}: pests row must ask for a missing crop"
     advisory = [l for l in lines if l.startswith("|") and "`search_advisory`" in l and "ask which crop first" in l]
     assert len(advisory) == 1 and "general knowledge" in advisory[0]
+
+
+def test_global_prompt_lets_a_tool_question_stand_alone():
+    """A question the farmer must answer first is the whole reply: no source line, no extra follow-up."""
+    from pathlib import Path
+
+    prompt = (Path(__file__).resolve().parents[1] / "assets/prompts/chat/agrinet_en.md").read_text()
+    assert "Exception — asking the farmer" in prompt
+    assert "no source citation and no extra follow-up question" in prompt
