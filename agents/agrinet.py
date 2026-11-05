@@ -1,6 +1,7 @@
 from pydantic_ai import RunContext
 from helpers.utils import get_today_date_str, get_crop_season, get_last_weekday_table, get_logger
 from helpers.scheme_qdrant_search import format_vector_schemes_prompt_block
+from helpers.pmkisan_installment_release import get_pm_kisan_24th_installment_release_section
 from agents.models import configured_agent
 from agents.tools import TOOLS
 from agents.tools.khc import khc_service_note
@@ -43,6 +44,7 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
         'today_date': get_today_date_str(),
         'crop_season': get_crop_season(),
         'last_weekday_table': get_last_weekday_table(),
+        'pm_kisan_installment_release': get_pm_kisan_24th_installment_release_section(),
         **scheme_block,
     }
     # Rendered fresh every turn (unlike the tool docstring, frozen at startup —

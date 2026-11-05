@@ -58,8 +58,12 @@ def content_tokens(text):
 
 
 @pytest.mark.parametrize('language', LANGUAGES)
-def test_every_instruction_word_is_preserved(language, old_prompts):
-    before = old_prompts.get_template(f'agrinet_{language}.md').render(**CONTEXT)
+@pytest.mark.parametrize('release_section', [None, 'Configured release announcement for this date.'])
+def test_every_instruction_word_is_preserved(language, release_section, old_prompts):
+    context = dict(CONTEXT)
+    if release_section is not None:
+        context['pm_kisan_installment_release'] = release_section
+    before = old_prompts.get_template(f'agrinet_{language}.md').render(**context)
     # Only old overview/table headings are replaced by per-skill presentation.
     before = before.replace('load_capability', 'load_skill').replace('load a capability', 'load a skill').replace('capability-loading', 'skill-loading')
     original = before.splitlines()
@@ -70,7 +74,7 @@ def test_every_instruction_word_is_preserved(language, old_prompts):
     removed.add(table_header)
     removed.add('|---|---|---|---|')
     before = '\n'.join(line for line in original if line not in removed)
-    after = render_prompt(SkillState(), language, CONTEXT)
+    after = render_prompt(SkillState(), language, context)
     after = '\n'.join(line for line in after.splitlines()
                       if line not in {'| Query | Tools | Source | Instructions |', '|---|---|---|---|'})
     missing = content_tokens(before) - content_tokens(after)

@@ -97,7 +97,7 @@ python -m pytest -q tests/test_skills.py tests/test_prompt_structure.py \
 ```
 
 For the one-off migration comparison, run the same command with
-`PROMPT_COMPARE_REF=e272042`. Without that variable the historical comparison is
+`PROMPT_COMPARE_REF=d8dd247`. Without that variable the historical comparison is
 skipped, so later intentional prompt edits are not frozen to an old revision.
 The migration comparison reads that baseline from Git. It compares the
 instruction-word inventory, including repetitions, in every language. Differences
@@ -106,3 +106,16 @@ Prompt order and whitespace change as workflows become contiguous; this test doe
 **not** prove behavioral equivalence. The before/after API benchmark uses the
 existing `oan-evaluation/inference/run_simulated_scenario.py` runner. Behavior and
 latency must be measured separately; all-preloaded remains the default until then.
+
+## Latest scheme changes
+
+This migration includes `bh-dev` revision `d8dd247`. Its shared scheme-search
+instructions live in `skills/schemes/information/shared.md` and are included by
+all 13 language files. Edit that file for the shared guidance; localized routing
+and discovery summaries remain in their language files. This keeps the upstream
+wording without copying the shared text into each translation.
+
+The removed `get_scheme_info` tool is not registered or bound to a skill. The
+remaining 50 business tools retain the updated upstream schemas and behavior,
+including live-catalog aliases and the configured PM-KISAN announcement. Both
+benchmark arms must use this same upstream revision and catalogue snapshot.

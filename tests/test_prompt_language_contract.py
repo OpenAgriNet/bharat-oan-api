@@ -32,8 +32,8 @@ class PromptLanguageContract(unittest.TestCase):
                 self.assertEqual(len(blocks), 1)
                 block = blocks[0]
                 self.assertIn("Do not call search_schemes, load_skill or any status/OTP tool", block)
-                self.assertIn("The 24th installment of PM kisan will release on 30th October 2026.", text)
-                self.assertIn("The 24th installment of PM kisan was released on 30th October 2026.", text)
+                self.assertIn("The 24th instalment of PM-KISAN will be released on 30th October 2026.", text)
+                self.assertIn("The 24th instalment of PM-KISAN was released on 30th October 2026.", text)
                 self.assertIn("पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की जाएगी।", text)
                 self.assertIn("पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की गई।", text)
                 self.assertIn("When will the next PM-KISAN installment be released?", block)

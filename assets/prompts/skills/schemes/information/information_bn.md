@@ -1,9 +1,7 @@
 ---
 summary: eNAM কার্যপ্রবাহ ও প্রশিক্ষণ; MahaVistaar প্রকল্প (ক্রস-নেটওয়ার্ক); AmulVistaar
   ইউনিয়ন প্রকল্প (ক্রস-নেটওয়ার্ক); ভেক্টর-ইনডেক্সড প্রকল্প তথ্য ({{ vector_scheme_count
-  }}টি ইনডেক্সড প্রকল্প); কৃষক যা জিজ্ঞেস করেন…; যোগ্যতা (যেমন "কারা যোগ্য?", "যোগ্যতার
-  মানদণ্ড", "আমি কি যোগ্য?"); শুধু বর্জন (যেমন "কারা বাদ?", "কারা আবেদন করতে পারবেন
-  না?", "বর্জনের মানদণ্ড", "exclusion for nbm?")
+  }}টি ইনডেক্সড প্রকল্প)
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
@@ -60,15 +58,8 @@ Supported union filters:
 **মিলানোর শনাক্তকারী (বড়-ছোট অক্ষর অবহেলা, অতিরিক্ত শব্দ বা প্রসঙ্গ অনুমোদিত):**
 {{ vector_schemes_identifiers }}
 
-**How to write the `search_schemes` query (mandatory — overrides the example queries below):**
-The tool finds the scheme by matching its code, name or alias in your query, so the wording must be copied from the lists above, never guessed:
-1. **Look the scheme up.** Compare what the farmer said (full name, short name, acronym, spelling variant, or the English meaning of a regional-language name) with the scheme names in the **scheme list** and the names/aliases in the **identifiers list** above. Ignore case, dots, hyphens and spaces when comparing (e.g. "P.M. Kisan", "PM-KISAN" and "pm kisan" are the same).
-2. **Copy that entry's code** exactly as shown in backticks. Codes in this list are catalog codes and often differ from well-known acronyms — **never invent, shorten or build a code from the acronym**; a code that is not in the list always fails.
-3. **If several entries match** the same scheme (e.g. separate documents for one scheme's FAQ, eligible activities, guidelines), pick the entry whose name best fits the question; if unsure, call `search_schemes` once for each matching code in parallel and combine the answers.
-4. **Query format is fixed:** `"<code> <intent>"`, where `<intent>` is exactly one of: `overview`, `eligibility exclusion`, `how to apply`, `benefits`, `documents required`. Add **nothing else** — no years or numbers, no state or place names, no filler words (`by`, `for`, `scheme`, …). Extra words can match a different scheme. Choose the intent by what is being asked: `eligibility exclusion` **only** when the farmer asks who (which person/farmer) can or cannot apply or benefit. Questions about eligible *activities, projects, items, crops, components or costs* ("eligible activities", "what can be funded") are content questions — use `overview` (or `benefits`), even if the word "eligible" appears.
-5. Use plain English letters only: **no dots or spaces inside acronyms** (never `P.M. Kisan`, `P.M.F.B.Y.`, `K.C.C.`) and no regional script. The dotted acronym style is only for the reply to the farmer — never for tool arguments.
-6. **Retry once:** if the tool returns **Scheme not available right now**, call `search_schemes` again in the same turn with the entry's **name copied exactly as written in bold in the scheme list** (`"<exact scheme name> overview"`) before telling the farmer the details are unavailable.
-7. **No matching entry at all:** the scheme is not in the indexed list — follow **Schemes outside the indexed list** below (do not call `search_schemes` with a guessed code).
+{% include "skills/schemes/information/shared.md" %}
+
 8. **Status-check offer:** after a successful answer about a scheme that has a status or grievance flow described in this prompt, offer that status check in the follow-up question — decide by the scheme itself, not by its code — even if the tool output has no **Status check available for this scheme** block. Never offer a status check for schemes without such a flow.
 9. **Judge each returned chunk by its scheme.** Each chunk in the tool output is headed `**<scheme name>** (<code>, section=…)`, and results are often mixed. Handle the four cases below; in every case **never** mention the tool, the search, "results", "chunks", what was returned, or the names of unrelated schemes, **never** explain your reasoning, and **never** fill a gap from memory.
   - **All or some chunks belong to the requested scheme** (same code/name, or another document of the same scheme such as its FAQ or guidelines): answer from those chunks only and silently ignore the rest. The **Source:** line lists only the sources of the chunks you actually used.

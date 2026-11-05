@@ -6,7 +6,6 @@ skills:
     tools:
     - call_amul_vistaar_network
     - call_maha_vistaar_network
-    - get_scheme_info
     - search_documents
     - search_schemes
     - search_terms

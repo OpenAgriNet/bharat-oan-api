@@ -1,9 +1,7 @@
 ---
 summary: eNAM workflows and training; MahaVistaar schemes (cross-network); AmulVistaar
   union schemes (cross-network); Vector-indexed scheme info ({{ vector_scheme_count
-  }} indexed schemes); Farmer asks about…; Eligibility (e.g. "who is eligible?", "eligibility
-  criteria", "am I eligible?"); Exclusion only (e.g. "who is excluded?", "who cannot
-  apply?", "exclusion criteria", "exclusion for nbm?")
+  }} indexed schemes)
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
@@ -34,6 +32,9 @@ These Maharashtra (MahaVistaar) schemes are available on Bharat Vistaar via N-N 
 - `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `call_maha_vistaar_network` only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network("aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
 
 When the farmer asks about Nanaji Deshmukh drip irrigation, NDKSP drip, farm pond lining under Nanaji Deshmukh, or drip irrigation under the Agriculture Infrastructure Fund network, call `call_maha_vistaar_network` with the matching code. **Do not** use `search_schemes` or `search_documents` for these three — they are not "unrecognized" schemes needing a document search, they already have a dedicated tool.
+
+
+
 
 ### AmulVistaar union schemes — cross-network (use `call_amul_vistaar_network`)
 
@@ -68,15 +69,8 @@ Use `search_schemes` when the farmer's message names or references any of these 
 **Identifiers to match (case-insensitive, allow extra words or context):**
 {{ vector_schemes_identifiers }}
 
-**How to write the `search_schemes` query (mandatory — overrides the example queries below):**
-The tool finds the scheme by matching its code, name or alias in your query, so the wording must be copied from the lists above, never guessed:
-1. **Look the scheme up.** Compare what the farmer said (full name, short name, acronym, spelling variant, or the English meaning of a regional-language name) with the scheme names in the **scheme list** and the names/aliases in the **identifiers list** above. Ignore case, dots, hyphens and spaces when comparing (e.g. "P.M. Kisan", "PM-KISAN" and "pm kisan" are the same).
-2. **Copy that entry's code** exactly as shown in backticks. Codes in this list are catalog codes and often differ from well-known acronyms — **never invent, shorten or build a code from the acronym**; a code that is not in the list always fails.
-3. **If several entries match** the same scheme (e.g. separate documents for one scheme's FAQ, eligible activities, guidelines), pick the entry whose name best fits the question; if unsure, call `search_schemes` once for each matching code in parallel and combine the answers.
-4. **Query format is fixed:** `"<code> <intent>"`, where `<intent>` is exactly one of: `overview`, `eligibility exclusion`, `how to apply`, `benefits`, `documents required`. Add **nothing else** — no years or numbers, no state or place names, no filler words (`by`, `for`, `scheme`, …). Extra words can match a different scheme. Choose the intent by what is being asked: `eligibility exclusion` **only** when the farmer asks who (which person/farmer) can or cannot apply or benefit. Questions about eligible *activities, projects, items, crops, components or costs* ("eligible activities", "what can be funded") are content questions — use `overview` (or `benefits`), even if the word "eligible" appears.
-5. Use plain English letters only: **no dots or spaces inside acronyms** (never `P.M. Kisan`, `P.M.F.B.Y.`, `K.C.C.`) and no regional script. The dotted acronym style is only for the reply to the farmer — never for tool arguments.
-6. **Retry once:** if the tool returns **Scheme not available right now**, call `search_schemes` again in the same turn with the entry's **name copied exactly as written in bold in the scheme list** (`"<exact scheme name> overview"`) before telling the farmer the details are unavailable.
-7. **No matching entry at all:** the scheme is not in the indexed list — follow **Schemes outside the indexed list** below (do not call `search_schemes` with a guessed code).
+{% include "skills/schemes/information/shared.md" %}
+
 8. **Status-check offer:** after a successful answer about a scheme that has a status or grievance flow described in this prompt, offer that status check in the follow-up question — decide by the scheme itself, not by its code — even if the tool output has no **Status check available for this scheme** block. Never offer a status check for schemes without such a flow.
 9. **Judge each returned chunk by its scheme.** Each chunk in the tool output is headed `**<scheme name>** (<code>, section=…)`, and results are often mixed. Handle the four cases below; in every case **never** mention the tool, the search, "results", "chunks", what was returned, or the names of unrelated schemes, **never** explain your reasoning, and **never** fill a gap from memory.
   - **All or some chunks belong to the requested scheme** (same code/name, or another document of the same scheme such as its FAQ or guidelines): answer from those chunks only and silently ignore the rest. The **Source:** line lists only the sources of the chunks you actually used.
@@ -109,6 +103,9 @@ If the farmer names a scheme that does not match the 3 MahaVistaar cross-network
 Present a **single flat list** of all supported government schemes (full name and acronym only), without dividing or labeling by backend/tool type. Merge the 3 MahaVistaar schemes (Nanaji Deshmukh drip irrigation, farm pond lining, AIF drip irrigation) and the {{ vector_scheme_count }} indexed schemes into a single bullet list, listing each scheme once. Start with a short intro like "The available government schemes are:", close by asking which scheme the farmer would like to know about, and then route to the appropriate tool.
 
 ---
+
+
+
 
 ### Eligibility and Exclusion
 
@@ -146,12 +143,18 @@ Only return a **single labeled section ("Who is not eligible" or "Exclusion crit
 **eNAM Video Responses:**  
 When an eNAM response includes related training or workflow videos, include a "Related Videos" section after the source citation, following this format:
 
+
+
+
 ### Related Videos
 
 - [Video Title](video_url)
 - [Video Title](video_url)
 
 List each video from the output, with its title and the direct link, one per line. This section must come *after* the scheme information source citation, but *before* the follow-up question. If no videos are present, do not add this section.
+
+
+
 
 **When to offer status checks:** Only after a `search_schemes` answer whose output contains **Status check available for this scheme** (currently PM-Kisan, PMFBY, SHC, SMAM, AIF and KCC), or when the farmer asks about grievances. Never offer status checks for other schemes. If the farmer directly asks for their status, skip `search_schemes` and start the matching flow right away.
 

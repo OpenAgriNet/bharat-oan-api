@@ -22,9 +22,9 @@ from tests.test_prompt_language_contract import SCRIPT_RANGES, render
 def test_release_messages_and_section(today, future):
     en, hi = release.get_pm_kisan_24th_installment_release_messages(today)
     assert en == (
-        "The 24th installment of PM kisan will release on 30th October 2026."
+        "The 24th instalment of PM-KISAN will be released on 30th October 2026."
         if future else
-        "The 24th installment of PM kisan was released on 30th October 2026."
+        "The 24th instalment of PM-KISAN was released on 30th October 2026."
     )
     assert hi == (
         "पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की जाएगी।"
@@ -32,8 +32,8 @@ def test_release_messages_and_section(today, future):
         "पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की गई।"
     )
     section = release.get_pm_kisan_24th_installment_release_section(today)
-    assert "## PM-KISAN 24th Installment Release" in section
-    assert "**Installment number:** 24" in section
+    assert "## PM-KISAN 24th Instalment Release" in section
+    assert "**Instalment number:** 24" in section
     assert "**Official release date:** 30 October 2026" in section
     assert f"**Status as of today:** {'upcoming' if future else 'released'}" in section
     assert en in section and hi in section
@@ -46,7 +46,7 @@ def test_default_date_switches_at_ist_midnight(monkeypatch, minute, future):
     clock.now.side_effect = lambda tz: instant.astimezone(tz)
     monkeypatch.setattr(release, "datetime", clock)
     en, _ = release.get_pm_kisan_24th_installment_release_messages()
-    assert ("will release" in en) is future
+    assert ("will be released" in en) is future
     assert en in release.get_pm_kisan_24th_installment_release_section()
     assert str(clock.now.call_args.args[0]) == "Asia/Kolkata"
 
@@ -113,16 +113,17 @@ def run_search(search, monkeypatch, response, query="PM-KISAN 24th installment r
 @pytest.mark.parametrize("scheme,resolved", [
     ("pmkisan", True), ("pmkisan", False), ("mif", True),
 ])
-def test_search_returns_release_only_for_pmkisan(search, monkeypatch, scheme, resolved):
+def test_search_does_not_append_system_announcement(search, monkeypatch, scheme, resolved):
     result, post = run_search(
         search, monkeypatch,
         httpx.Response(200, json=network_response(scheme, resolved=resolved)),
         f"{scheme} 24th installment release date",
     )
     assert "Scheme details" in result
-    assert ("PM-KISAN 24th Installment Release" in result) is (scheme == "pmkisan")
+    assert "PM-KISAN 24th Instalment Release" not in result
+    assert "30th October" not in result
     if scheme == "pmkisan":
-        assert result.index("PM-KISAN 24th Installment Release") < result.index("Status check available")
+        assert "Status check available" in result
     assert "23rd" not in result and "20 June 2026" not in result
     assert post.call_args.args[0] == "https://example.test/search"
     assert post.call_args.kwargs["json"]["message"]["intent"]["item"]["descriptor"]["code"] == scheme
@@ -140,7 +141,7 @@ def test_search_returns_release_only_for_pmkisan(search, monkeypatch, scheme, re
 def test_search_failures_do_not_claim_release(search, monkeypatch, response):
     result, _ = run_search(search, monkeypatch, response)
     assert result
-    assert "PM-KISAN 24th Installment Release" not in result
+    assert "PM-KISAN 24th Instalment Release" not in result
     assert "30th October" not in result
 
 
@@ -161,7 +162,7 @@ def test_unknown_scheme_is_not_sent_to_network(search, monkeypatch):
 def test_release_announcement_skill_needs_no_business_tools(language):
     state = SkillState(enabled_skills=["pm_kisan.installments"])
     prompt = render_prompt(state, language, {"today_date": "28 October 2026"})
-    assert "The 24th installment of PM kisan will release on 30th October 2026." in prompt
+    assert "The 24th instalment of PM-KISAN will be released on 30th October 2026." in prompt
     assert "Do not call search_schemes, load_skill or any status/OTP tool" in prompt
     assert not state.visible
 
@@ -173,35 +174,25 @@ def test_release_and_status_rules_remain_present_in_default_mode(language):
     assert "A previous status-check offer is not consent" in prompt
     assert "Before any PM-KISAN tool call" not in prompt
     assert "does not apply to scheme information or public release dates" in prompt
-    assert "The 24th installment of PM kisan will release on 30th October 2026." in prompt
+    assert "The 24th instalment of PM-KISAN will be released on 30th October 2026." in prompt
     assert "Do not call search_schemes, load_skill or any status/OTP tool" in prompt
 
 
-@pytest.mark.parametrize("scheme_code", ["pmkisan", "kcc"])
-def test_legacy_scheme_information_stays_available(load_module, monkeypatch, scheme_code):
-    scheme = load_module("agents/tools/scheme_info.py")
-    context = {
-        "ttl": "PT10M", "action": "search", "timestamp": "2026-10-28T00:00:00Z",
-        "message_id": "test", "transaction_id": "test", "domain": "schemes:vistaar",
-        "version": "1.1.0",
-    }
-    data = {"context": context, "responses": [{
-        "context": context,
-        "message": {"catalog": {"descriptor": {}, "providers": [{
-            "descriptor": {}, "items": [{
-                "id": scheme_code, "descriptor": {"name": scheme_code},
-                "tags": [{"descriptor": {}, "list": [{
-                    "descriptor": {"name": "Scheme Eligibility"},
-                    "value": "Eligible farmers.",
-                }]}],
-            }],
-        }]}},
-    }]}
-    monkeypatch.setenv("BAP_ENDPOINT", "https://example.test")
-    post = Mock(return_value=httpx.Response(200, json=data))
-    monkeypatch.setattr(scheme.httpx, "post", post)
-    ctx = SimpleNamespace(deps=SimpleNamespace(session_id="test", question_id="test"))
-    result = scheme.get_scheme_info(ctx, scheme_code)
-    assert "Scheme Eligibility" in result and "Eligible farmers." in result
-    assert "Installment Release" not in result and "Instalment Release" not in result
-    assert post.call_args.kwargs["json"]["message"]["intent"]["item"]["descriptor"]["name"] == scheme_code
+def test_removed_legacy_tool_is_not_registered():
+    from pathlib import Path
+    from agents.skill_catalog import get_catalog
+    root = Path(__file__).resolve().parents[1]
+    assert not (root / "agents/tools/scheme_info.py").exists()
+    assert "get_scheme_info" not in get_catalog().tools
+    assert "get_scheme_info" not in (root / "agents/tools/__init__.py").read_text()
+
+
+@pytest.mark.parametrize("language", ["en", *SCRIPT_RANGES])
+@pytest.mark.parametrize("today", [date(2026, 10, 28), date(2026, 10, 31)])
+def test_configured_release_replaces_fallback(language, today):
+    section = release.get_pm_kisan_24th_installment_release_section(today)
+    prompt = render_prompt(SkillState(), language, {"pm_kisan_installment_release": section})
+    assert prompt.count(section) == 1
+    en, hi = release.get_pm_kisan_24th_installment_release_messages(today)
+    assert en in prompt and hi in prompt
+    assert "**Through 30 October 2026 (IST):**" not in prompt
