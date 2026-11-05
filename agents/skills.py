@@ -31,6 +31,9 @@ def render_prompt(state: SkillState, language: str, context: dict) -> str:
                      for name in catalog.manifest.skills if name in pending]
         chunks.append(
             '## Available skills\nLoad a relevant skill with load_skill before using its workflow. '
+            'Call only tools whose definitions are available in the current request. '
+            'Skill IDs are not tool names or namespaces. Call load_skill on its own and wait for '
+            'its result; use the newly exposed business tools in the next step. '
             'Loading is not execution. Reuse information already supplied; ask only for missing or '
             'ambiguous information. Do not narrate loading. Loaded skills remain available for this session.\n'
             + '\n'.join(summaries))
