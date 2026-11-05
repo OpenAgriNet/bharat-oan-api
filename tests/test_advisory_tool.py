@@ -371,7 +371,7 @@ class TestAskWhatTheChunksNeed:
     def test_a_named_season_in_the_chunks_means_the_farmer_is_asked_even_for_one_season(self, bap):
         bap.response = _respond([_chunk("c1", "Rabi"), _chunk("c2", "Rabi")], **NO_DAYS)
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
-        assert "Which season is your crop in?" in out and "(Rabi)" not in out
+        assert "Could you please tell me which season you are growing your crop in?" in out and "(Rabi)" not in out
         assert "Rabi" not in out  # one season: do not hint that it is the expected one
         assert "Scout for aphids" not in out and "Cite as" not in out  # no advice yet
         assert len(bap.requests) == 1
@@ -386,13 +386,13 @@ class TestAskWhatTheChunksNeed:
     def test_season_and_days_are_asked_in_one_question(self, bap):
         bap.response = _respond([_chunk("c1", "Rabi")], has_day_range="true")
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
-        assert "Which season is it, and how many days ago did you sow?" in out
+        assert "Could you please tell me which season you are growing your crop in, and how many days ago you sowed it?" in out
         assert "`season` and `days_after_sowing`" in out
 
     def test_only_the_days_are_asked_when_the_season_is_known(self, bap):
         bap.response = _respond([_chunk("c1", "Rabi")], has_day_range="true")
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", season="Rabi"))
-        assert "How many days ago did you sow the crop?" in out and "Which season" not in out
+        assert "Could you please tell me how many days ago you sowed your crop?" in out and "Which season" not in out
         assert "Scout for aphids" not in out
 
     def test_nothing_is_asked_when_the_chunks_have_no_named_season_or_day_range(self, bap):
@@ -466,7 +466,7 @@ class TestCropCheck:
         out = asyncio.run(sa.search_advisory(CTX, "aphids in sorghum", crop="Sorghum"))
         assert len(bap.requests) == 2
         assert _params(_sent(bap, 1))["crop"] == "Sorghum"
-        assert "Which season is your crop in?" in out and "Kharif" not in out and "w1" not in out
+        assert "Could you please tell me which season you are growing your crop in?" in out and "Kharif" not in out and "w1" not in out
 
     def test_other_crop_chunks_are_never_shown_when_the_crop_has_no_advisory(self, bap):
         bap.queue = [

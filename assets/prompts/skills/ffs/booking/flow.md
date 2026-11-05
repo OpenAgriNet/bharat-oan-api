@@ -1,7 +1,7 @@
-FFS v0 covers fertilizer entitlement and shop discovery only. It cannot place,
-confirm, cancel or reserve a booking. Public questions about what FFS is use
-scheme information; SHC-based fertilizer advice remains fertilizer.recommendations.
-Do not start an OTP for general advice or an ambiguous request.
+FFS covers fertilizer entitlement, shop discovery and final booking creation.
+Public questions about what FFS is use scheme information; SHC-based fertilizer
+advice remains fertilizer.recommendations. Do not start an OTP for general
+advice or an ambiguous request.
 
 1. For an explicit FFS availability/booking request, collect only missing farmer
    ID (11 digits) and state. Call ffs_send_otp(farmer_id, state) once. Do not use
@@ -32,10 +32,15 @@ Do not start an OTP for general advice or an ambiguous request.
    for more choices, action="widen" for complete supply in a wider territory.
    Do not call stock-ranked results physically nearest, or an incomplete scan
    exhaustive. Unknown complete_supply_further is not proof of a farther shop.
-7. If the farmer picks a shop or says to book, explain that no booking or
-   reservation has been made and submission is unavailable in this version.
-   Never invent a booking code, promise an SMS confirmation or offer a booking
-   tool that is not defined. A partial-stock shop supplies only the named products.
+7. If the farmer picks a shop or says to book, call
+   ffs_create_booking(shop_ref, confirmed=false) first. Read that exact summary
+   back. Only after explicit consent, call ffs_create_booking with
+   confirmed=true and the same confirmation_token. Never skip this confirmation
+   step, and never alter bags/products manually.
+8. After booking, read the booking result exactly from the tool response.
+   If the selected shop had partial stock, state the booking covers only those
+   products. If status is booking_uncertain, do not retry blindly; explain the
+   outcome is uncertain and ask the farmer whether to check status later.
 
 Follow returned status/next_action. On token expiry ask whether to start login
 again; on wrong OTP ask for the correct one, and after three failures offer a

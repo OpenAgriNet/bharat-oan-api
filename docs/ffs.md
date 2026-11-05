@@ -1,8 +1,9 @@
 # FFS integration v0
 
-`ffs.booking` adds four tools: `ffs_send_otp`, `ffs_verify_otp`,
-`ffs_get_entitlement` and `ffs_find_shops`. It covers farmer login, land/crop
-selection, urea/DAP entitlement and shop discovery. **It cannot create a booking.**
+`ffs.booking` adds five tools: `ffs_send_otp`, `ffs_verify_otp`,
+`ffs_get_entitlement`, `ffs_find_shops` and `ffs_create_booking`. It covers
+farmer login, land/crop selection, urea/DAP entitlement, shop discovery and
+final booking creation with explicit confirmation.
 The branch starts from `bh-dev b263117` after the skill-breakdown-v2 merge.
 
 ## Configuration and authentication
@@ -86,6 +87,10 @@ cannot remove a query string already logged by a proxy or ASGI access logger.
   each territory, then urea-only/DAP-only. Page/time budgets report incomplete
   coverage honestly. More/widen preserve a cursor and deduplicate presented shops;
   widening keeps subsequent results restricted to complete supply in wider areas.
+- Booking requires two-step confirmation through `ffs_create_booking`: first a
+  summary/token response, then an explicit confirmed submission with the same
+  token. If submission fails after dispatch, the status is `booking_uncertain`
+  and retries must not be automatic.
 - The supplied land response lacks a verified booked-land signal. It is shown
   as unknown, not inferred from quota. Disputed/unconfirmed approval records are
   restricted; no claim is made that unknown plots are bookable.
@@ -93,7 +98,7 @@ cannot remove a query string already logged by a proxy or ASGI access logger.
 ## Validation
 
 Offline checks use Pydantic AI **1.32.0**, matching this branch. Tests exercise
-the four tools, selective skill loading, all 13 language assets, OTP privacy and
+the five tools, selective skill loading, all 13 language assets, OTP privacy and
 caller isolation, setup recovery, partial crop writes, expiry, quantities and shop
 ranking/paging. A deterministic Pydantic model drives the multi-turn tool loop;
 this verifies orchestration, not live model answer quality.
@@ -113,7 +118,16 @@ FFS_MOCK_TEST_URL=http://127.0.0.1:18140 FFS_REDIS_TEST_PORT=6401 \
 Use the pinned test environment at
 `/mnt/raid/gautam/python_envs/ffs-integration-v0-checks/bin/python` here. Without
 `FFS_MOCK_TEST_URL`, the external HTTP test is skipped and tests use an isolated
-transport. **Do not point this test at real FFS.** It never calls booking API 12.
+transport. **Do not point this test at real FFS.**
 No additional live OTP, production model request, or live booking is part of v0
 validation. Fixed GFR and synthetic retailer territories cannot prove real
 multi-plot calculations/geography. Live multilingual Gemma checks remain separate.
+
+## OTP-send request headers
+
+The initial `/authenticate/user/loginByFarmerId` request explicitly sends
+`isForMobile: false`, `appType: APPLICANT`, and `platform: ANDROID`, alongside
+Content-Type and the session ID. The `version` header uses `FFS_APP_VERSION`
+when configured; it is omitted when blank. The encrypted body continues to use
+`"isForMobile": "false"`. Verification and subsequent request headers are unchanged.
+This does not request the mobile CAPTCHA exemption or generate a reCAPTCHA token.
