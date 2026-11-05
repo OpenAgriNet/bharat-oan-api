@@ -91,7 +91,7 @@ shared. The chat branch does **not** merge or deploy the separate voice backend.
 ## Validation
 
 ```sh
-python -m pytest -q tests/test_skills.py tests/test_prompt_structure.py \
+python -m pytest -q tests/test_skills.py tests/test_skill_dependencies.py tests/test_prompt_structure.py \
   tests/test_prompt_language_contract.py tests/test_advisory_prompts.py \
   tests/test_pmkisan_prompt_validation.py tests/test_pmkisan_installment_release.py
 ```
@@ -101,7 +101,10 @@ For the one-off migration comparison, run the same command with
 skipped, so later intentional prompt edits are not frozen to an old revision.
 The migration comparison reads that baseline from Git. It compares the
 instruction-word inventory, including repetitions, in every language. Differences
-allowed are replacing the old overview/table headings and renaming the loader.
+allowed are replacing the old overview/table headings, renaming the loader, and
+the explicitly requested ICAR/document-source policy, shared dependencies and
+removal of the contradictory FYM-to-FFS instruction. The test accounts for these
+changes explicitly and checks all remaining instruction words.
 Prompt order and whitespace change as workflows become contiguous; this test does
 **not** prove behavioral equivalence. The before/after API benchmark uses the
 existing `oan-evaluation/inference/run_simulated_scenario.py` runner. Behavior and
@@ -119,3 +122,52 @@ The removed `get_scheme_info` tool is not registered or bound to a skill. The
 remaining 50 business tools retain the updated upstream schemas and behavior,
 including live-catalog aliases and the configured PM-KISAN announcement. Both
 benchmark arms must use this same upstream revision and catalogue snapshot.
+
+## Dependencies: one loading call, shared instructions once
+
+A skill can declare `requires` next to its own tools:
+
+```yaml
+skills:
+  location.resolve:
+    prompt_dir: skills/location/resolve
+    tools: [forward_geocode, reverse_geocode]
+  mandi.prices:
+    prompt_dir: skills/mandi/prices
+    requires: [location.resolve]
+    tools: [search_commodity, get_mandi_prices]
+```
+
+`load_skill("mandi.prices")` loads both skills and their tools in one response.
+Dependencies appear before consumers, are loaded transitively and only once,
+and persist through history. Already-loaded dependencies are not returned again.
+The manifest is the only dependency declaration; language files do not repeat it.
+Unknown dependencies, duplicates, cycles and globally disabled dependencies fail
+validation. Loading does not execute any business tool.
+
+Agent/session `enabled_skills` selections name workflow roots; their dependencies
+are included automatically within the server's permissions. Preloading a workflow
+also preloads its dependencies. An optional environment `allowed_skills` list is a
+**hard allowlist**, so it must contain the dependencies as well. Denied tools cannot
+be re-enabled by a dependency: unavailable workflows are omitted, or an explicit
+inconsistent allowlist fails validation. Selecting a denied workflow fails.
+
+Mandi, weather forecasts, fertilizer recommendations and seed availability reuse
+`location.resolve`. Their specific prerequisites remain in each workflow; loading
+location does not bypass mandi's date check. `crop.advice` and `schemes.information`
+reuse `documents.search`. Document search explains tool usage and grounding;
+the calling workflow decides when a document lookup is appropriate.
+
+## Crop sources
+
+`skills/crop/advice/flow.md` contains the common workflow included by all 13
+localized crop prompts. After the existing generic/personalised and crop-field
+prerequisites, search ICAR–Kisan Sarathi (`search_advisory`) **first**, then check
+`search_documents` for the same question, including when ICAR returned an advisory.
+Prefer relevant ICAR guidance and use documents for supporting details or when ICAR
+has no relevant result. Cite whichever sources actually support the answer. The
+pest tool remains additional for crop pests/diseases. Livestock document queries,
+scheme-specific routing and IMD requests keep their separate workflows.
+
+This is an explicitly requested behavior change beyond the initial packaging-only
+migration. Earlier benchmark results at `bfe7e52` do not validate this version.

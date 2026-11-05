@@ -1,4 +1,4 @@
-# Skill catalogue and agent defaults. Tool implementations remain in agents/tools.
+# Skill catalogue, dependencies and agent defaults. Implementations stay in agents/tools.
 skills:
   schemes.information:
     prompt_dir: skills/schemes/information
@@ -6,10 +6,11 @@ skills:
     tools:
     - call_amul_vistaar_network
     - call_maha_vistaar_network
-    - search_documents
     - search_schemes
     - search_terms
     - search_video
+    requires:
+    - documents.search
   pm_kisan.status:
     prompt_dir: skills/pm_kisan/status
     enabled: true
@@ -64,15 +65,17 @@ skills:
     tools:
     - analyze_crop_image
     - search_advisory
-    - search_documents
     - search_pests_diseases
     - search_terms
+    requires:
+    - documents.search
   weather.forecast:
     prompt_dir: skills/weather/forecast
     enabled: true
     tools:
-    - forward_geocode
     - weather_forecast
+    requires:
+    - location.resolve
   location.resolve:
     prompt_dir: skills/location/resolve
     enabled: true
@@ -83,24 +86,27 @@ skills:
     prompt_dir: skills/mandi/prices
     enabled: true
     tools:
-    - forward_geocode
     - get_mandi_prices
     - search_commodity
+    requires:
+    - location.resolve
   fertilizer.recommendations:
     prompt_dir: skills/fertilizer/recommendations
     enabled: true
     tools:
-    - forward_geocode
     - gfr_get_crop_registries
     - gfr_get_recommendations
+    requires:
+    - location.resolve
   seeds.availability:
     prompt_dir: skills/seeds/availability
     enabled: true
     tools:
-    - forward_geocode
     - get_sathi_crop_groups
     - list_sathi_crops_in_group
     - search_sathi_seed_availability
+    requires:
+    - location.resolve
   agristack.profile:
     prompt_dir: skills/agristack/profile
     enabled: true
@@ -143,6 +149,11 @@ skills:
     prompt_dir: skills/pm_kisan/installments
     enabled: true
     tools: []
+  documents.search:
+    prompt_dir: skills/documents/search
+    enabled: true
+    tools:
+    - search_documents
 agents:
   chat:
     prompt_dir: chat

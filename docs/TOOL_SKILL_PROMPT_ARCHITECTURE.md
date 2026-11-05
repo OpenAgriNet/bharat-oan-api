@@ -270,4 +270,30 @@ Do not assume a smaller prompt automatically improves accuracy or latency. Dynam
 
 ## Current status
 
-The chat implementation now uses the shared manifest format, localized skill documents, and agent-specific global prompts. All 50 current business tools remain registered (the latest upstream removes legacy `get_scheme_info`); all 18 skills are enabled and preloaded by default across 13 languages. Agent variants and optional environment selection are implemented in the loader; the separate voice backend and HTTP/UI selection contract have not been migrated. Wording-preservation and offline integration checks pass; see the validation report for the separate behavioral benchmark status. Skill-level wording optimization remains a later phase.
+The chat implementation now uses the shared manifest format, localized skill documents, and agent-specific global prompts. All 50 current business tools remain registered (the latest upstream removes legacy `get_scheme_info`); all 19 skills are enabled and preloaded by default across 13 languages. Agent variants and optional environment selection are implemented in the loader; the separate voice backend and HTTP/UI selection contract have not been migrated. Wording-preservation and offline integration checks pass; see the validation report for the separate behavioral benchmark status. Skill-level wording optimization remains a later phase.
+
+
+## Dependency update (2026-11-05)
+
+The implemented manifest now supports `requires: [skill.id]`. This is a directed,
+acyclic dependency relationship, not another capability hierarchy. Workflow
+selection and preload settings expand required skills within server permissions.
+The loader resolves them together, renders supporting instructions first and once,
+and exposes the union of their real tool schemas. It never needs an extra model
+round trip for a declared dependency. Optional unrelated workflows remain discoverable
+through the normal skill catalogue.
+
+Shared operations have one owner: `location.resolve` owns geocoding; mandi,
+weather forecasts, fertilizer and seeds require it. `documents.search` owns
+`search_documents`; crop advice and scheme information require it. Consumers retain
+their own intent routing and prerequisites. A dependency does not authorize skipping
+consent, date confirmation or other workflow checks. Explicit environment allowlists
+and disabled skills cannot be bypassed through a dependency.
+
+The user also requested a source-order change: applicable crop queries use ICAR–Kisan
+Sarathi first, then document search, preferring relevant ICAR guidance. This lives in
+one `crop/advice/flow.md` included by all language variants. Shared document-search
+instructions do not duplicate that routing policy. The old FYM-to-FFS sentence was
+removed because it contradicted the upstream scheme guidance; ordinary manure advice
+must not be turned into a scheme search. These changes need their own evaluation;
+prior packaging-only scores are not a no-regression certificate for this version.

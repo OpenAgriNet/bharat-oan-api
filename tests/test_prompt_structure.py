@@ -11,7 +11,7 @@ import pytest
 
 from agents.skill_catalog import PROMPT_DIR, get_catalog
 from agents.skill_policy import SkillState
-from agents.skills import render_prompt
+from agents.skills import render_prompt, skill_instructions
 from tests.test_skills import CONTEXT, LANGUAGES
 
 
@@ -20,7 +20,8 @@ def test_inventory_and_language_coverage():
     assert len(LANGUAGES) == 13
     expected = {}
     for agent, config in cat.manifest.agents.items():
-        names = cat.manifest.skills if config.enabled_skills == 'all' else config.enabled_skills
+        roots = set(cat.manifest.skills) if config.enabled_skills == 'all' else set(config.enabled_skills)
+        names = cat.resolve(roots)
         for name in names:
             folder = cat.path(cat.manifest.skills[name].prompt_dir)
             stem = folder.name
@@ -59,13 +60,32 @@ def content_tokens(text):
 
 @pytest.mark.parametrize('language', LANGUAGES)
 @pytest.mark.parametrize('release_section', [None, 'Configured release announcement for this date.'])
-def test_every_instruction_word_is_preserved(language, release_section, old_prompts):
+def test_instructions_preserved_except_requested_source_policy(language, release_section, old_prompts):
     context = dict(CONTEXT)
     if release_section is not None:
         context['pm_kisan_installment_release'] = release_section
     before = old_prompts.get_template(f'agrinet_{language}.md').render(**context)
     # Only old overview/table headings are replaced by per-skill presentation.
     before = before.replace('load_capability', 'load_skill').replace('load a capability', 'load a skill').replace('capability-loading', 'skill-loading')
+    # Explicitly approved changes after the initial byte/word-preserving migration:
+    # ICAR first then documents, no FYM->FFS substitution, and shared dependencies.
+    cat = get_catalog()
+    crop = cat.render_skill('crop.advice', language, context)
+    for row in crop.splitlines():
+        if row.startswith('|') and '`search_advisory`' in row:
+            label = row.split('|')[1].strip()
+            prior = [line for line in before.splitlines()
+                     if line.startswith('|') and line.split('|')[1].strip() == label]
+            assert len(prior) == 1
+            before = before.replace(prior[0], row)
+    flow = cat.env.get_template('skills/crop/advice/flow.md').render(**context).strip()
+    before, count = re.subn(
+        r'### Crop advisory flow .*?Do not repeat the per-advisory "Source:" lines that appear inside the tool text\.',
+        lambda match: flow, before, flags=re.S)
+    assert count == 1
+    before = before.replace(
+        ' If the farmer asks about F.Y.M. or Farm Yard Manure, call `search_schemes` with an FFS query (e.g. `"FFS Farm Yard Manure"`).', '')
+    before = before.replace('`search_documents` / `search_pests_diseases`', '`crop.advice`')
     original = before.splitlines()
     headings = [line for line in original if line.startswith('## ')]
     removed = {headings[0], headings[3]}
@@ -75,6 +95,12 @@ def test_every_instruction_word_is_preserved(language, release_section, old_prom
     removed.add('|---|---|---|---|')
     before = '\n'.join(line for line in original if line not in removed)
     after = render_prompt(SkillState(), language, context)
+    before += '\n' + cat.render_skill('documents.search', language, context)
+    state = SkillState(language=language, context=context)
+    for name, definition in cat.manifest.skills.items():
+        if definition.requires:
+            body = cat.render_skill(name, language, context)
+            before += '\n' + skill_instructions(name, state).removesuffix(body)
     after = '\n'.join(line for line in after.splitlines()
                       if line not in {'| Query | Tools | Source | Instructions |', '|---|---|---|---|'})
     missing = content_tokens(before) - content_tokens(after)

@@ -21,25 +21,31 @@ def resolve_selection(catalog: SkillCatalog, agent: str, environment: str | None
     config = m.agents[agent]
     available = select(config.enabled_skills, set(m.skills), 'agent skills')
     available &= {name for name, skill in m.skills.items() if skill.enabled}
+    available = set(catalog.resolve(available))
     if m.environments:
         if environment not in m.environments:
             raise ValueError('Select a known SKILL_ENVIRONMENT when environment restrictions are configured')
         env = m.environments[environment]
         available &= select(env.allowed_skills, set(m.skills), 'environment skills')
         tools = select(env.allowed_tools, catalog.tools, 'environment tools')
-        omitted = {name for name in available if not set(m.skills[name].tools) <= tools}
+        omitted = {name for name in available
+                   if not set(catalog.resolve({name})) <= available
+                   or not catalog.tools_for({name}) <= tools}
         if omitted:
-            logger.warning('Skills unavailable because required tools are denied: %s', sorted(omitted))
+            logger.warning('Skills unavailable because dependencies or tools are denied: %s', sorted(omitted))
         available -= omitted
     elif environment:
         raise ValueError(f'No environments configured; unknown selection {environment}')
     selected = available if enabled is None else select(enabled, available, 'session skills')
+    selected = set(catalog.resolve(selected))
+    if not selected <= available:
+        raise ValueError(f'Session requires denied skills: {sorted(selected - available)}')
     if preloaded is None:
         defaults = select(config.preloaded_skills, set(m.skills), 'preloaded skills')
         initial = defaults & selected
     else:
         initial = select(preloaded, selected, 'session preloaded skills')
-    return selected, initial
+    return selected, set(catalog.resolve(initial))
 
 
 class SkillState(BaseModel):
@@ -68,7 +74,7 @@ class SkillState(BaseModel):
     @property
     def active(self) -> set[str]:
         permitted, initial = self.selection()
-        return (initial | self.loaded_skills) & permitted
+        return set(get_catalog().resolve((initial | self.loaded_skills) & permitted))
 
     @property
     def allowed_tools(self) -> set[str]:

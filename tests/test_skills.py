@@ -29,8 +29,9 @@ def test_registry_covers_all_tools_with_shared_bindings():
     names = [call.args[0].id for call in assignment.value.elts]
     CAT.validate_tools([SimpleNamespace(name=name) for name in names])
     assert names
-    assert 'forward_geocode' in CAT.manifest.skills['mandi.prices'].tools
-    assert 'forward_geocode' in CAT.manifest.skills['weather.forecast'].tools
+    assert 'forward_geocode' in CAT.tools_for({'mandi.prices'})
+    assert 'forward_geocode' not in CAT.manifest.skills['mandi.prices'].tools
+    assert 'forward_geocode' in CAT.tools_for({'weather.forecast'})
     with pytest.raises(ValueError):
         CAT.validate_tools([SimpleNamespace(name=name) for name in names[:-1]])
 
@@ -56,9 +57,14 @@ def test_every_skill_loads_instructions_in_selected_language(language):
     ctx = SimpleNamespace(deps=SimpleNamespace(skills=state))
     for name in CAT.manifest.skills:
         assert f'- {name}:' in prompt
+        if name in state.active:
+            continue
+        prior = state.active
         output = asyncio.run(load_skill(ctx, name))
-        assert output['instructions'] == CAT.render_skill(name, language, CONTEXT)
-        assert set(output['loaded_tools']) == set(CAT.manifest.skills[name].tools)
+        assert set(output['loaded_skills']) == set(CAT.resolve({name})) - prior
+        for loaded in output['loaded_skills']:
+            assert CAT.render_skill(loaded, language, CONTEXT) in output['instructions']
+        assert set(output['loaded_tools']) == CAT.tools_for({name})
     assert state.visible == CAT.tools
     assert '## Available skills' not in render_prompt(state, language, CONTEXT)
 
@@ -66,7 +72,7 @@ def test_every_skill_loads_instructions_in_selected_language(language):
 def test_empty_subsets_and_invalid_requests():
     assert not SkillState(enabled_skills=[]).visible
     assert not SkillState(preloaded_skills=[]).visible
-    assert SkillState(enabled_skills=['mandi.prices']).visible == set(CAT.manifest.skills['mandi.prices'].tools)
+    assert SkillState(enabled_skills=['mandi.prices']).visible == CAT.tools_for({'mandi.prices'})
     for kwargs in [dict(enabled_skills=['typo']), dict(enabled_skills=[], preloaded_skills=['mandi.prices']),
                    dict(agent='typo'), dict(environment='prod')]:
         with pytest.raises(ValueError):
@@ -88,7 +94,7 @@ def test_history_reuses_skills_without_leaking_between_sessions():
     history = [ModelRequest(parts=[ToolReturnPart(tool_name='load_skill', content=result)])]
     fresh = SkillState(preloaded_skills=[])
     fresh.restore(history)
-    assert fresh.active == {'mandi.prices'}
+    assert fresh.active == {'mandi.prices', 'location.resolve'}
     assert not SkillState(preloaded_skills=[]).active
     restricted = SkillState(enabled_skills=['weather.forecast'], preloaded_skills=[])
     restricted.restore(history)
@@ -129,7 +135,7 @@ def test_real_pydantic_loop_loads_then_calls_and_restores_on_next_turn():
     assert calls == ['weather']
     new = SimpleNamespace(skills=SkillState(enabled_skills=['weather.forecast'], preloaded_skills=[]))
     agent.run_sync('Thanks', deps=new, message_history=result.all_messages())
-    assert new.skills.active == {'weather.forecast'}
+    assert new.skills.active == {'weather.forecast', 'location.resolve'}
 
 
 def temporary_catalog(tmp_path, mutate):
@@ -144,10 +150,10 @@ def temporary_catalog(tmp_path, mutate):
 
 def test_optional_environment_restrictions(tmp_path):
     def change(m, root):
-        m['environments'] = {'prod': {'allowed_skills': 'all', 'allowed_tools': ['forward_geocode', 'weather_forecast']}}
+        m['environments'] = {'prod': {'allowed_skills': 'all', 'allowed_tools': ['forward_geocode', 'reverse_geocode', 'weather_forecast']}}
     cat = temporary_catalog(tmp_path, change)
     permitted, loaded = resolve_selection(cat, 'chat', 'prod', None, None)
-    assert permitted == loaded == {'weather.forecast', 'pm_kisan.installments'}
+    assert permitted == loaded == {'weather.forecast', 'location.resolve', 'pm_kisan.installments'}
     with pytest.raises(ValueError):
         resolve_selection(cat, 'chat', None, None, None)
     with pytest.raises(ValueError):
@@ -156,7 +162,7 @@ def test_optional_environment_restrictions(tmp_path):
 
 def test_explicit_broken_dependency_rejected(tmp_path):
     def change(m, root):
-        m['environments'] = {'prod': {'allowed_skills': ['mandi.prices'], 'allowed_tools': ['get_mandi_prices']}}
+        m['environments'] = {'prod': {'allowed_skills': ['mandi.prices', 'location.resolve'], 'allowed_tools': ['get_mandi_prices']}}
     with pytest.raises(ValueError, match='requires denied tools'):
         temporary_catalog(tmp_path, change)
 

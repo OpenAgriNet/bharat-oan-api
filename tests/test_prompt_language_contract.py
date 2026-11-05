@@ -102,7 +102,7 @@ class PromptLanguageContract(unittest.TestCase):
                 section = get_catalog().render_skill("weather.agromet", language, {})
                 section = "\n".join(line for line in section.splitlines() if not line.startswith("|"))
                 self.assertIn(section.strip(), render(language), "IMD agromet section is not included")
-                for name in ["place", "forward_geocode", "search_documents", "search_pests_diseases"]:
+                for name in ["place", "forward_geocode", "crop.advice"]:
                     self.assertIn(f"`{name}`", rows[0])
                 self.assertIn("`crop`", section)
                 if language == "en":
