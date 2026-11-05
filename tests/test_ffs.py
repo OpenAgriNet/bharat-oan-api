@@ -185,7 +185,8 @@ def test_first_otp_headers_preserve_non_mobile_flag_and_configured_version(setup
     path, body = setup.backend.calls[0]
     headers = setup.backend.request_headers[0]
     assert path.endswith("/loginByFarmerId")
-    assert headers["isformobile"] == body["isForMobile"] == "false"
+    assert headers["isformobile"] == "false"
+    assert "isForMobile" not in body  # Current bh-dev login contract uses the header only.
     assert headers["apptype"] == "APPLICANT"
     assert headers["platform"] == "ANDROID"
     assert headers.get("version") == (version or None)

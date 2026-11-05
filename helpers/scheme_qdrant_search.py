@@ -74,7 +74,7 @@ def get_builtin_scheme_list() -> list[dict[str, Any]]:
     return scheme_list
 
 
-@observe(name="tool:master_catalog_redis_check", as_type="tool")
+@observe(name="prompt:master_catalog_redis_check", as_type="span", capture_input=False, capture_output=False)
 def format_vector_schemes_prompt_block() -> dict[str, Any]:
     """Render the system prompt's dynamic "vector-indexed schemes" section
     (bullets + match-identifiers) from get_builtin_scheme_list() — the SAME
@@ -85,7 +85,7 @@ def format_vector_schemes_prompt_block() -> dict[str, Any]:
     available always consistent with what the resolver actually accepts, even
     though today both ultimately read the same Redis snapshot.
 
-    @observe-wrapped (as_type="tool") purely for Langfuse visibility: this
+    @observe-wrapped as a preparation span for Langfuse visibility: this
     runs once every turn as part of system-prompt construction, not as an
     LLM-invoked tool, but it's the single call site that triggers the actual
     Redis read (get_master_catalog_snapshot, via get_builtin_scheme_list) —
@@ -116,7 +116,6 @@ def format_vector_schemes_prompt_block() -> dict[str, Any]:
             "redis_snapshot_updated_at": (snapshot or {}).get("updated_at"),
             "redis_entry_count": len((snapshot or {}).get("entries", [])) if snapshot else 0,
             "merged_scheme_count": len(scheme_list),
-            "merged_scheme_codes": [item["scheme_code"] for item in scheme_list],
         },
     )
     return result

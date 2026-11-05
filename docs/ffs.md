@@ -128,6 +128,52 @@ multi-plot calculations/geography. Live multilingual Gemma checks remain separat
 The initial `/authenticate/user/loginByFarmerId` request explicitly sends
 `isForMobile: false`, `appType: APPLICANT`, and `platform: ANDROID`, alongside
 Content-Type and the session ID. The `version` header uses `FFS_APP_VERSION`
-when configured; it is omitted when blank. The encrypted body continues to use
-`"isForMobile": "false"`. Verification and subsequent request headers are unchanged.
+when configured; it is omitted when blank. On current `bh-dev`, the encrypted
+body has the state code and farmer ID; `isForMobile` is a header only.
+Verification and subsequent request headers are unchanged.
 This does not request the mobile CAPTCHA exemption or generate a reCAPTCHA token.
+
+## Chat tracing
+
+FFS tools emit explicit summaries to Langfuse and structured `ffs` log lines:
+
+Console summaries fall back from INFO to WARNING when INFO is disabled, preserving
+the visibility added on `bh-dev` without printing raw provider payloads. Failures
+are logged at ERROR.
+
+```text
+agent.vistaar                         final answer, not internal AgentRunResult
+  tool:ffs_get_entitlement            status, stages, decisions, quantities
+    ffs.api:/applicant/land/crop/add   endpoint, duration, HTTP/provider status
+    ffs.api:/...                      one span per actual HTTP request
+```
+
+All five FFS tools use the same tracing wrapper. Each tool/API event carries
+session and question IDs; console events also include trace/span IDs when
+available. Tool completion reports lock wait, API count, stage before/after,
+cache reuse, OTP suppression, crop reconciliation, quantity source, shop search
+territory/page counts and booking confirmation/submission decisions where relevant.
+An API span records method, host/path, encryption, public application headers,
+authorization/CAPTCHA presence, HTTP status, numeric provider code and a fixed
+failure category. Exception **classes**, not messages, identify transport/state
+failures. A cached result has no new API spans and includes a reuse decision.
+
+Request/response bodies, OTPs, tokens, farmer identifiers, names, phone numbers,
+land registry IDs and booking confirmation/reference codes are excluded from
+these new summaries. Do not restore raw body logging for debugging. This is not
+a claim that the existing conversation input/output is redacted: those fields
+retain the application's existing chat behavior.
+
+`prompt:master_catalog_redis_check` is a preparation span with catalogue metadata
+and counts, not a tool call dumping the full multilingual prompt. The chat agent
+span keeps its explicitly recorded final answer instead of serializing the
+internal completed-run object. Telemetry setup, update or handler errors must
+not change a business result.
+
+Use `tests/test_ffs_tracing.py` for real SDK/in-memory exporter checks: parent-child
+links, safe summaries, HTTP/provider errors, timeouts, cache reuse, booking and
+final-answer capture. No external model, Langfuse export or real FFS request is
+needed. The existing `bh-dev` booking test currently fails because login does not
+retain `userMobileNumber`, while booking requires it. The tracing booking fixture
+supplies that missing field to test telemetry separately; this logging change
+does not repair or conceal the existing business-flow failure.
