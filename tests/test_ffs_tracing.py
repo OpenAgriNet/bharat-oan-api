@@ -140,14 +140,10 @@ def test_booking_logging_omits_confirmation_and_reference_codes(setup, tracing, 
     caplog.set_level(logging.INFO, logger='helpers.ffs_tracing')
     async def run():
         village, crops = selection(await login())
-        # Isolate booking tracing from bh-dev's existing login profile omission.
-        state = await ffs.get_session('session-1')
-        state['user']['userMobileNumber'] = '9999999999'
-        await setup.memory.set(ffs.session_key('session-1'), state, namespace=ffs.NAMESPACE)
         await ffs_get_entitlement(context('3'), village, crops)
         shops = await ffs_find_shops(context('4'))
         shop = shops['data']['shops'][0]['shop_ref']
-        preview = await ffs_create_booking(context('5'), shop)
+        preview = await ffs_create_booking(context('5'), shop, quantities=[ffs.BookingQuantity(product='urea', bags=4)])
         token = preview['data']['confirmation_token']
         result = await ffs_create_booking(context('6'), shop, True, token)
         assert result['status'] == 'ok'

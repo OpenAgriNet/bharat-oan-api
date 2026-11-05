@@ -1,8 +1,8 @@
 ---
-summary: "FFS fertilizer availability through farmer ID and OTP; urea/DAP entitlement and shops, without booking submission."
+summary: "FFS farmer-ID/OTP login, urea/DAP entitlement, shops and farmer-confirmed fertilizer booking."
 ---
 ## FFS fertilizer availability
 
-Ask only for missing details. Use the FFS tools for this flow; explain shop coverage and that no booking has been placed.
+Ask only for missing details.
 
 {% include "skills/ffs/booking/flow.md" %}

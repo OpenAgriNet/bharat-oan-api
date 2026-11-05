@@ -1,0 +1,240 @@
+{
+  "data": {
+    "fidState": 24,
+    "loginLogoutActivityLog": {
+      "appType": "applicant",
+      "appVersion": "1.0.72",
+      "authToken": "test.eyJleHAiOjQxMDI0NDQ4MDB9.signature",
+      "createdBy": null,
+      "createdIp": "127.0.0.1",
+      "createdOn": "2026-10-14T08:08:28.072Z",
+      "deviceId": "900000",
+      "id": 900001,
+      "ipAddress": "127.0.0.1",
+      "isActive": true,
+      "isDeleted": false,
+      "logInDate": "2026-10-14T08:08:28.071Z",
+      "login": false,
+      "loginFrom": "MOBILE_ANDROID",
+      "logoutDate": "2026-10-14T08:14:25.565Z",
+      "modifiedBy": null,
+      "modifiedIp": null,
+      "modifiedOn": "2026-10-14T08:14:25.566Z",
+      "sessionDuration": 5,
+      "tokenType": "NEW_TOKEN_AND_LOGOUT",
+      "userId": 900002,
+      "userName": null
+    },
+    "menuList": [
+      {
+        "displaySrNo": 2,
+        "isAdd": false,
+        "isDelete": false,
+        "isEdit": false,
+        "isView": false,
+        "menuDescription": "My Lands",
+        "menuIcon": "pi pi-fw pi-my_land",
+        "menuId": 900003,
+        "menuName": "My Lands",
+        "menuType": "WEB",
+        "menuUrl": "/pages/myLand"
+      },
+      {
+        "displaySrNo": 4,
+        "isAdd": false,
+        "isDelete": false,
+        "isEdit": false,
+        "isView": false,
+        "menuDescription": "My Orders",
+        "menuIcon": "pi pi-fw pi-my_orders",
+        "menuId": 900004,
+        "menuName": "My Orders",
+        "menuType": "WEB",
+        "menuUrl": "/pages/myOrders"
+      },
+      {
+        "displaySrNo": 5,
+        "isAdd": false,
+        "isDelete": false,
+        "isEdit": false,
+        "isView": false,
+        "menuDescription": "My Profile",
+        "menuIcon": "pi pi-fw pi-my_profile",
+        "menuId": 900005,
+        "menuName": "My Profile",
+        "menuType": "WEB",
+        "menuUrl": "/pages/myProfile"
+      },
+      {
+        "displaySrNo": 2,
+        "isAdd": false,
+        "isDelete": false,
+        "isEdit": false,
+        "isView": false,
+        "menuDescription": "Land Approval & Dispute Tracker",
+        "menuId": 900006,
+        "menuName": "Land Approval & Dispute Tracker",
+        "menuParentId": 900007,
+        "menuType": "WEB",
+        "menuUrl": "/pages/booking/landApprovalDisputeTracker"
+      },
+      {
+        "displaySrNo": 1,
+        "isAdd": false,
+        "isDelete": false,
+        "isEdit": false,
+        "isView": false,
+        "menuDescription": "Bookings",
+        "menuIcon": "pi pi-booking",
+        "menuId": 900008,
+        "menuName": "Bookings",
+        "menuType": "WEB",
+        "menuUrl": "/pages/booking"
+      },
+      {
+        "displaySrNo": 3,
+        "isAdd": false,
+        "isDelete": false,
+        "isEdit": false,
+        "isView": false,
+        "menuDescription": "Add New Land",
+        "menuIcon": "pi pi-fw pi-add_new_land",
+        "menuId": 900009,
+        "menuName": "Add New Land",
+        "menuType": "WEB",
+        "menuUrl": "/pages/myLand/add"
+      },
+      {
+        "displaySrNo": 1,
+        "isAdd": false,
+        "isDelete": false,
+        "isEdit": false,
+        "isView": false,
+        "menuDescription": "Farmer Dashboard",
+        "menuIcon": "pi pi-fw pi-dashboard",
+        "menuId": 900010,
+        "menuLevel": 1,
+        "menuName": "Farmer Dashboard",
+        "menuType": "WEB",
+        "menuUrl": "/pages/farmerDashboard"
+      }
+    ],
+    "passwordExpiryDays": 90,
+    "role": {
+      "createdOn": "2026-05-14T07:35:34.364Z",
+      "isActive": true,
+      "isBookingOperator": false,
+      "isDefault": true,
+      "isDeleted": false,
+      "isDistrictCollector": false,
+      "menuList": [
+        {
+          "displaySrNo": 4,
+          "menuDescription": "My Orders",
+          "menuIcon": "pi pi-fw pi-my_orders",
+          "menuId": 900004,
+          "menuName": "My Orders",
+          "menuUrl": "/pages/myOrders",
+          "projectType": [
+            "FRAMEWORK_FOR_FERTILIZER_SALE"
+          ]
+        },
+        {
+          "displaySrNo": 3,
+          "menuDescription": "Add New Land",
+          "menuIcon": "pi pi-fw pi-add_new_land",
+          "menuId": 900009,
+          "menuName": "Add New Land",
+          "menuUrl": "/pages/myLand/add",
+          "projectType": [
+            "FRAMEWORK_FOR_FERTILIZER_SALE"
+          ]
+        },
+        {
+          "displaySrNo": 1,
+          "menuDescription": "Bookings",
+          "menuIcon": "pi pi-booking",
+          "menuId": 900008,
+          "menuName": "Bookings",
+          "menuUrl": "/pages/booking",
+          "projectType": [
+            "FRAMEWORK_FOR_FERTILIZER_SALE"
+          ]
+        },
+        {
+          "displaySrNo": 2,
+          "menuDescription": "Land Approval & Dispute Tracker",
+          "menuId": 900006,
+          "menuName": "Land Approval & Dispute Tracker",
+          "menuParentId": 900007,
+          "menuUrl": "/pages/booking/landApprovalDisputeTracker",
+          "projectType": [
+            "FRAMEWORK_FOR_FERTILIZER_SALE"
+          ]
+        },
+        {
+          "displaySrNo": 1,
+          "menuDescription": "Farmer Dashboard",
+          "menuIcon": "pi pi-fw pi-dashboard",
+          "menuId": 900010,
+          "menuLevel": 1,
+          "menuName": "Farmer Dashboard",
+          "menuUrl": "/pages/farmerDashboard",
+          "projectType": [
+            "FRAMEWORK_FOR_FERTILIZER_SALE"
+          ]
+        },
+        {
+          "displaySrNo": 2,
+          "menuDescription": "My Lands",
+          "menuIcon": "pi pi-fw pi-my_land",
+          "menuId": 900003,
+          "menuName": "My Lands",
+          "menuUrl": "/pages/myLand",
+          "projectType": [
+            "FRAMEWORK_FOR_FERTILIZER_SALE"
+          ]
+        },
+        {
+          "displaySrNo": 5,
+          "menuDescription": "My Profile",
+          "menuIcon": "pi pi-fw pi-my_profile",
+          "menuId": 900005,
+          "menuName": "My Profile",
+          "menuUrl": "/pages/myProfile",
+          "projectType": [
+            "FRAMEWORK_FOR_FERTILIZER_SALE"
+          ]
+        }
+      ],
+      "modifiedOn": "2026-05-14T07:35:34.364Z",
+      "roleCode": "APPLICANT",
+      "roleId": 900011,
+      "roleName": "Applicant"
+    },
+    "roles": [
+      {
+        "isDefault": true,
+        "roleId": 900011,
+        "roleName": "Applicant"
+      }
+    ],
+    "userAadhaarBase64Hash": "test-hash",
+    "userAadhaarHash": "test-hash",
+    "userDistrictLGDCode": 458,
+    "userFarmerId": "99999999999",
+    "userFullName": "Mock Farmer",
+    "userId": 900002,
+    "userMobileNumber": "9999999999",
+    "userStateLGDCode": 24,
+    "userToken": "test.eyJleHAiOjQxMDI0NDQ4MDB9.signature"
+  },
+  "message": "success",
+  "code": 200,
+  "status": "User login successfully.",
+  "method": "POST",
+  "pageNo": null,
+  "pageSize": null,
+  "totalPages": null,
+  "totalRecords": null
+}

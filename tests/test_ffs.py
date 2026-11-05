@@ -52,12 +52,43 @@ class MemoryCache:
             yield
 
 
+def validate_booking_payload(body):
+    # Contract from the supplied Bruno v2 collection, not a permissive success stub.
+    required = set("seasonId year month requestedDatetime applicantUserId contactNoForCommunication "
+                   "isReceiverApplicantSame receiverUserId receiverName receiverMobileNo receiverAadharHash "
+                   "stateLgdCode districtLgdCode subDistrictLgdCode villageLgdCode selectedLandIds "
+                   "bookingRequest GFRRecommendation gfrType isProceedWithGfr".split())
+    assert set(body) == required
+    assert body["isReceiverApplicantSame"] is True and body["isProceedWithGfr"] is True
+    assert body["receiverUserId"] == body["applicantUserId"]
+    assert body["receiverMobileNo"] == body["contactNoForCommunication"]
+    assert re.fullmatch(r"[6-9]\d{9}", body["contactNoForCommunication"])
+    assert body["receiverName"] and body["receiverAadharHash"]
+    assert body["selectedLandIds"]
+    for land in body["selectedLandIds"]:
+        assert set(land) == {"farmLandOwnershipId", "cropCode", "farmLandPlotRegistryId"}
+        assert all(isinstance(x, str) and x for x in land.values())
+    assert len(body["bookingRequest"]) == 1
+    lines = body["bookingRequest"][0]["productLines"]
+    assert lines
+    for line in lines:
+        assert set(line) == set("productGroupId productId plantId isLooseBuy noBagsRequested quantityOfBagKg totalQuantityKgRequested".split())
+        assert line["isLooseBuy"] is False
+        assert type(line["noBagsRequested"]) is int and line["noBagsRequested"] > 0
+        assert line["totalQuantityKgRequested"] == line["noBagsRequested"] * line["quantityOfBagKg"]
+        assert line["productId"] in {1089, 1005}
+
+
 class Backend:
     def __init__(self):
         self.calls, self.failed, self.fail_path, self.fail_after_write = [], False, None, False
         self.request_headers = []
         self.stock = {}
         self.booking_payloads = []
+        self.booking_error = None
+        self.booking_http_status = 200
+        self.booking_timeout = False
+        self.booking_data_override = None
         self.land = [{"farmlandPlotRegistryId": 101 + i, "farmlandOwnershipId": 201 + i,
                       "ownershipMappingId": 301 + i, "landAreaHectares": 1.23 if i == 0 else 0.96,
                       "stateLgdCode": 27, "districtLgdCode": 496, "subDistrictLgdCode": 4245,
@@ -124,11 +155,19 @@ class Backend:
             meta = {"totalPages": 1, "totalRecords": limit}
         elif path.endswith("createMultipleBookingV2"):
             self.booking_payloads.append(deepcopy(body))
+            validate_booking_payload(body)
+            if self.booking_error:
+                return httpx.Response(self.booking_http_status, json=self.booking_error)
+            if self.booking_timeout:
+                raise httpx.ReadTimeout("Booking accepted but response lost", request=request)
             data = {
                 "isValid": True,
                 "message": "All 1 booking(s) created successfully",
                 "bookingResults": [{
                     "retailerId": body["bookingRequest"][0]["retailerId"],
+                    "isValid": True,
+                    "statusCode": 304,
+                    "expiryDatetime": "2026-11-06 23:00:00",
                     "procurementId": 123456,
                     "procurementApplicationCode": "PRC-TEST-001",
                     "isWaitlisted": False,
@@ -138,6 +177,8 @@ class Backend:
                 "totalBookingsFailed": 0,
                 "applicantUserId": body["applicantUserId"],
             }
+            if self.booking_data_override is not None:
+                data = deepcopy(self.booking_data_override)
         else:
             raise AssertionError("Unexpected API: " + path)
         return httpx.Response(200, json={"code": 200, "status": "success", "data": data, **meta})
@@ -410,7 +451,7 @@ def test_create_booking_requires_confirmation_and_submits_once(setup):
         shops = await ffs_find_shops(context("turn-4"))
         shop_ref = shops["data"]["shops"][0]["shop_ref"]
 
-        preview = await ffs_create_booking(context("turn-5"), shop_ref)
+        preview = await ffs_create_booking(context("turn-5"), shop_ref, quantities=[ffs.BookingQuantity(product="urea", bags=4)])
         assert preview["status"] == "needs_confirmation"
         token = preview["data"]["confirmation_token"]
 
@@ -418,11 +459,13 @@ def test_create_booking_requires_confirmation_and_submits_once(setup):
         assert mismatch["status"] == "needs_confirmation"
         assert setup.backend.count("createMultipleBookingV2") == 0
 
+        token = mismatch["data"]["confirmation_token"]
         booked = await ffs_create_booking(context("turn-7"), shop_ref, True, token)
         assert booked["status"] == "ok"
         assert booked["data"]["booking"]["is_valid"] is True
         assert booked["data"]["booking"]["bookings"][0]["booking_code"] == "PRC-TEST-001"
         assert setup.backend.count("createMultipleBookingV2") == 1
+        assert setup.backend.booking_payloads[0]["contactNoForCommunication"] == "9999999999"
     asyncio.run(run())
 
 
