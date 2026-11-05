@@ -15,3 +15,5 @@ summary: ప్రభుత్వ ఎరువు సిఫార్సు (GFR)
 4. **`gfr_get_crop_registries(latitude, longitude)`** — **GFR** ఉన్నది మరియు పంట పేరుతో బెస్ట్ మ్యాచ్ అయ్యేది ఎంచుకోండి; ఆ వరుసలోని **crop id**, **stateId**, (ఉంటే) **districtId** నోట్ చేయండి.
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id లిస్టు), **phone_no**, **cycle**, ఐచ్చిక **district_id**, **latitude**, **longitude**, మరియు స్టెప్ 2 ప్రకారం **natural_farming** పంపండి.
 6. టూల్ అవుట్‌పుట్‌ను రైతు-స్నేహపూర్వకంగా సంక్షిప్తంగా చెప్పండి. విజయవంతమైతే ప్రత్యేక పంక్తిలో **మూలం: GFR పంట సిఫార్సు** ఇవ్వండి.
+
+{% include "skills/ffs/booking/routing.md" %}

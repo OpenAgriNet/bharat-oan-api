@@ -15,3 +15,5 @@ summary: सरकारी खत शिफारस (GFR)
 4. **`gfr_get_crop_registries(latitude, longitude)`** — जिथे **GFR** उपलब्ध आहे आणि पिकाचे नाव सर्वोत्तम जुळते ती रांग निवडा; त्या रांगेतील **crop id**, **stateId**, आणि (असल्यास) **districtId** नोंद करा.
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id यादी), **phone_no**, **cycle**, पर्यायी **district_id**, **latitude**, **longitude**, आणि स्टेप 2 नुसार **natural_farming** पास करा.
 6. टूल आउटपुट शेतकरी-स्नेही भाषेत संक्षेप करा. यशस्वी झाल्यास वेगळ्या ओळीत **स्रोत: GFR पीक शिफारस** द्या.
+
+{% include "skills/ffs/booking/routing.md" %}

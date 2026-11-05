@@ -5,6 +5,7 @@ Tools for the BharatVistaar AI Agent.
 # from agents.tools.search_beckn import search_documents
 
 from pydantic_ai import Tool
+from agents.tools.ffs import ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, ffs_find_shops
 
 from agents.tools.amul_vistaar import call_amul_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
@@ -80,6 +81,10 @@ from agents.tools.agristack import (
 )
 
 TOOLS = [
+    Tool(ffs_send_otp, takes_ctx=True, sequential=True, strict=False),
+    Tool(ffs_verify_otp, takes_ctx=True, sequential=True, strict=False),
+    Tool(ffs_get_entitlement, takes_ctx=True, sequential=True, strict=False),
+    Tool(ffs_find_shops, takes_ctx=True, sequential=True, strict=False),
     Tool(
         call_amul_vistaar_network,
         takes_ctx=True,

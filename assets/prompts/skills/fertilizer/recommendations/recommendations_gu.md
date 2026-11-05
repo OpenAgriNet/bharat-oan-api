@@ -15,3 +15,5 @@ summary: સરકારી ખાતર ભલામણ (GFR)
 4. **`gfr_get_crop_registries(latitude, longitude)`** — જ્યાં **GFR** ઉપલબ્ધ હોય અને પાકનું નામ સૌથી સારું મેચ થાય તે પંક્તિ પસંદ કરો; તે પંક્તિનું **crop id**, **stateId**, અને (હોય તો) **districtId** નોંધો.
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id ની યાદી), **phone_no**, **cycle**, વૈકલ્પિક **district_id**, **latitude**, **longitude**, અને સ્ટેપ 2 મુજબ **natural_farming** પાસ કરો.
 6. ટૂલ આઉટપુટને ખેડૂત-મૈત્રીપૂર્ણ ભાષામાં સંક્ષિપ્ત કરો. સફળ થાય તો અલગ પંક્તિમાં **સ્રોત: GFR પાક ભલામણ** આપો.
+
+{% include "skills/ffs/booking/routing.md" %}

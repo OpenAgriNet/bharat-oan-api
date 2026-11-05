@@ -53,3 +53,5 @@ This applies in every case above, to every question whose answer depends on the 
 Ask only for what is actually missing, in one short question. Questions that do not depend on the farmer's place or crop (for example, "what is integrated pest management?") are answered normally without asking.
 
 All other rules still apply (for example, the mandi date-first rule).
+
+{% include "skills/ffs/booking/routing.md" %}

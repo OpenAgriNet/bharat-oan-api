@@ -1,6 +1,8 @@
 # Skill prompts and loading
 
 `assets/prompts/manifest.yaml` is the catalogue and configuration entry point.
+The `ffs.booking` workflow and its runtime authentication setup are documented in
+[ffs.md](ffs.md); v0 exposes four tools through shop discovery, with no booking submission.
 There is no additional capability hierarchy, hand-maintained `sections.json`, or
 per-language binding list. Business schemas and implementations stay in
 `agents/tools/`; the manifest binds them to workflows, including shared tools.

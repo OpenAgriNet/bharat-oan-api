@@ -9,6 +9,7 @@ from fastapi import BackgroundTasks
 from langfuse import get_client, observe, propagate_attributes
 from pydantic_ai import AgentRunResultEvent, FinalResultEvent, PartDeltaEvent, PartStartEvent, TextPartDelta
 from pydantic_ai.messages import TextPart
+from pydantic import SecretStr
 
 from agents.agrinet import agrinet_agent
 from agents.deps import FarmerContext
@@ -450,6 +451,9 @@ async def stream_chat_messages(
     longitude: Optional[float] = None,
     qid: str = "",
     current_user: Optional[dict] = None,
+    ffs_otp: Optional[SecretStr] = None,
+    ffs_owner: str = "",
+    ffs_context: Optional[dict] = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
     telemetry_user = current_user or {"channel": channel}
@@ -521,6 +525,9 @@ async def stream_chat_messages(
                 latitude is not None and longitude is not None,
             )
             deps = FarmerContext(
+                ffs_otp=ffs_otp,
+                ffs_owner=ffs_owner,
+                ffs_context=ffs_context or {},
                 query=query,
                 lang_code=target_lang,
                 session_id=session_id,

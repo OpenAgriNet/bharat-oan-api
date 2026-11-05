@@ -15,3 +15,5 @@ summary: அரசு உர பரிந்துரை (GFR)
 4. **`gfr_get_crop_registries(latitude, longitude)`** — **GFR** கிடைக்கும் மற்றும் பயிர் பெயர் சிறப்பாக பொருந்தும் வரியைத் தேர்வு செய்யவும்; அந்த வரியின் **crop id**, **stateId**, மற்றும் (இருந்தால்) **districtId** குறித்துக் கொள்ளவும்.
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id பட்டியல்), **phone_no**, **cycle**, விருப்பமான **district_id**, **latitude**, **longitude**, மற்றும் படி 2-ன் படி **natural_farming** அனுப்பவும்.
 6. கருவி வெளியீட்டை விவசாயி-நட்பு மொழியில் சுருக்கவும். வெற்றி என்றால் தனி வரியில் **ஆதாரம்: GFR பயிர் பரிந்துரை** என்பதைச் சேர்க்கவும்.
+
+{% include "skills/ffs/booking/routing.md" %}
