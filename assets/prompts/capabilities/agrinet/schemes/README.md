@@ -2,7 +2,6 @@
 
 ## Tools
 
-- `get_scheme_info`
 - `search_schemes`
 - `search_video`
 

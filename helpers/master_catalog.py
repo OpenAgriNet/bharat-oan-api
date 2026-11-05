@@ -121,10 +121,7 @@ def _log_if_new_sync(tier: str, payload: dict[str, Any]) -> None:
 
 
 def get_vector_scheme_entries(tier: Optional[str] = None) -> list[dict[str, Any]]:
-    """Return catalog entries assigned to search_schemes by docs-pipeline.
-
-    Legacy get_scheme_info registrations are maintained separately.
-    """
+    """Return catalog entries assigned to search_schemes by docs-pipeline."""
     snapshot = get_master_catalog_snapshot(tier)
     if not snapshot:
         return []

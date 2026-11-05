@@ -11,7 +11,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -19,7 +18,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_as.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -27,7 +25,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_as.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -35,7 +32,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_as.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -73,7 +69,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -235,7 +230,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -243,7 +237,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_bn.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -251,7 +244,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_bn.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -259,7 +251,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_bn.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -297,7 +288,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -459,7 +449,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -467,7 +456,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_en.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -475,7 +463,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_en.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -483,7 +470,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_en.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -521,7 +507,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -683,7 +668,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -691,7 +675,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_gu.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -699,7 +682,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_gu.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -707,7 +689,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_gu.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -745,7 +726,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -907,7 +887,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -915,7 +894,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_hi.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -923,7 +901,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_hi.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -931,7 +908,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_hi.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -969,7 +945,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -1131,7 +1106,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1139,7 +1113,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_kn.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1147,7 +1120,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_kn.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1155,7 +1127,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_kn.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1193,7 +1164,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -1355,7 +1325,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1363,7 +1332,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_mai.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1371,7 +1339,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_mai.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1379,7 +1346,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_mai.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1417,7 +1383,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -1579,7 +1544,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1587,7 +1551,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_ml.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1595,7 +1558,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_ml.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1603,7 +1565,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_ml.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1641,7 +1602,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -1803,7 +1763,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1811,7 +1770,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_mr.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1819,7 +1777,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_mr.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1827,7 +1784,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_mr.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -1865,7 +1821,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -2027,7 +1982,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2035,7 +1989,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_or.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2043,7 +1996,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_or.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2051,7 +2003,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_or.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2089,7 +2040,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -2251,7 +2201,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2259,7 +2208,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_pa.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2267,7 +2215,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_pa.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2275,7 +2222,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_pa.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2313,7 +2259,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -2475,7 +2420,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2483,7 +2427,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_ta.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2491,7 +2434,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_ta.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2499,7 +2441,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_ta.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2537,7 +2478,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",
@@ -2699,7 +2639,6 @@
       "tools": [
         "call_amul_vistaar_network",
         "call_maha_vistaar_network",
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2707,7 +2646,6 @@
     {
       "path": "capabilities/agrinet/schemes/catalog/scheme_catalog_te.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2715,7 +2653,6 @@
     {
       "path": "capabilities/agrinet/schemes/eligibility/scheme_eligibility_te.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2723,7 +2660,6 @@
     {
       "path": "capabilities/agrinet/schemes/related_videos/related_videos_te.md",
       "tools": [
-        "get_scheme_info",
         "search_schemes",
         "search_video"
       ]
@@ -2761,7 +2697,6 @@
         "check_kcc_application_status",
         "check_pmfby_grievance_otp",
         "check_pmfby_status_with_otp",
-        "get_scheme_info",
         "initiate_kcc_otp",
         "initiate_pmfby_grievance_otp",
         "initiate_pmfby_status_check",

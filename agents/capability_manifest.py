@@ -1,6 +1,6 @@
 """Related tools load together, intersected with the session's tool allowlist."""
 CAPABILITIES = {
-    "schemes": {"get_scheme_info", "search_schemes", "search_video"},
+    "schemes": {"search_schemes", "search_video"},
     "amul": {"call_amul_vistaar_network"},
     "maha": {"call_maha_vistaar_network"},
     "pmkisan": {"initiate_pm_kisan_status_check", "check_pm_kisan_status_with_otp",
