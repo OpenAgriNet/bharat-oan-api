@@ -55,6 +55,7 @@ class MemoryCache:
 class Backend:
     def __init__(self):
         self.calls, self.failed, self.fail_path, self.fail_after_write = [], False, None, False
+        self.request_headers = []
         self.stock = {}
         self.land = [{"farmlandPlotRegistryId": 101 + i, "farmlandOwnershipId": 201 + i,
                       "ownershipMappingId": 301 + i, "landAreaHectares": 1.23 if i == 0 else 0.96,
@@ -77,6 +78,7 @@ class Backend:
         if path.startswith(ffs.USER):
             body = json.loads(unpad(AES.new(KEY.encode(), AES.MODE_CBC, IV.encode()).decrypt(base64.b64decode(request.content)), 16))
         self.calls.append((path, deepcopy(body)))
+        self.request_headers.append(dict(request.headers))
         if self.fail_path and path.endswith(self.fail_path) and not self.failed and not self.fail_after_write:
             self.failed = True
             raise httpx.ReadTimeout("test failure", request=request)
@@ -126,13 +128,18 @@ class Backend:
 
 @pytest.fixture
 def setup(monkeypatch):
+    from pydantic_ai import models
+    monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
     memory, backend = MemoryCache(), Backend()
     monkeypatch.setattr(ffs, "cache", memory)
     monkeypatch.setattr(ffs.settings, "ffs_base_url", "http://ffs.test")
     monkeypatch.setattr(ffs.settings, "ffs_esa_key", SecretStr(KEY))
     monkeypatch.setattr(ffs.settings, "ffs_esa_iv", SecretStr(IV))
     original_client = httpx.AsyncClient
-    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: original_client(transport=httpx.MockTransport(backend.respond), **kw))
+    class MockClient(original_client):
+        def __init__(self, **kwargs):
+            super().__init__(transport=httpx.MockTransport(backend.respond), **kwargs)
+    monkeypatch.setattr(httpx, "AsyncClient", MockClient)
     return SimpleNamespace(memory=memory, backend=backend, client_class=original_client)
 
 
@@ -152,6 +159,23 @@ async def login(session="session-1"):
 def selection(view, crop="maize"):
     village = view["data"]["villages"][0]
     return village["village_ref"], [ffs.CropSelection(land_ref=p["land_ref"], crop_name=crop) for p in village["plots"]]
+
+
+@pytest.mark.parametrize("version", ["", "1.0.77"])
+def test_first_otp_headers_preserve_non_mobile_flag_and_configured_version(setup, monkeypatch, version):
+    monkeypatch.setattr(ffs.settings, "ffs_app_version", version)
+    asyncio.run(login())
+    path, body = setup.backend.calls[0]
+    headers = setup.backend.request_headers[0]
+    assert path.endswith("/loginByFarmerId")
+    assert headers["isformobile"] == body["isForMobile"] == "false"
+    assert headers["apptype"] == "APPLICANT"
+    assert headers["platform"] == "ANDROID"
+    assert headers.get("version") == (version or None)
+    assert "authorization" not in headers
+    assert "x-recaptcha-token" not in headers
+    # Only the OTP-send contract changes; verification and setup keep their headers.
+    assert all("isformobile" not in h for h in setup.backend.request_headers[1:])
 
 
 def test_whole_flow_and_repeats_do_not_repeat_writes(setup):

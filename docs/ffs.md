@@ -117,3 +117,12 @@ transport. **Do not point this test at real FFS.** It never calls booking API 12
 No additional live OTP, production model request, or live booking is part of v0
 validation. Fixed GFR and synthetic retailer territories cannot prove real
 multi-plot calculations/geography. Live multilingual Gemma checks remain separate.
+
+## OTP-send request headers
+
+The initial `/authenticate/user/loginByFarmerId` request explicitly sends
+`isForMobile: false`, `appType: APPLICANT`, and `platform: ANDROID`, alongside
+Content-Type and the session ID. The `version` header uses `FFS_APP_VERSION`
+when configured; it is omitted when blank. The encrypted body continues to use
+`"isForMobile": "false"`. Verification and subsequent request headers are unchanged.
+This does not request the mobile CAPTCHA exemption or generate a reCAPTCHA token.

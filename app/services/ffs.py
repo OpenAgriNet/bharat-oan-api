@@ -168,6 +168,8 @@ class FFSService:
 
     async def call(self, method, prefix, path, body=None, *, encrypted=False, params=None):
         headers = {"X-Session-Id": self.session_id, "Content-Type": "application/json"}
+        if path == "/authenticate/user/loginByFarmerId":
+            headers.update({"isForMobile": "false", "appType": "APPLICANT", "platform": "ANDROID"})
         if not encrypted:
             headers["Authorization"] = "Bearer " + self.state["token"]
         if settings.ffs_app_version:
