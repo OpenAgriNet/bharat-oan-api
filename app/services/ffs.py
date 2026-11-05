@@ -636,6 +636,7 @@ class FFSService:
             "requestedDatetime": now.strftime("%Y-%m-%d %H:%M:%S"),
             "applicantUserId": s["user"]["userId"],
             "contactNoForCommunication": mobile,
+            "isReceiverApplicantSame": True,
             "stateLgdCode": int(self.state["state_code"]),
             "districtLgdCode": self.land_map()[s["selection"][0]["land_ref"]]["districtLgdCode"],
             "subDistrictLgdCode": self.land_map()[s["selection"][0]["land_ref"]]["subDistrictLgdCode"],
