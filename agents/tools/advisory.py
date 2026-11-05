@@ -60,29 +60,6 @@ def default_season() -> str:
     return _clean_param(os.getenv("ADVISORY_DEFAULT_SEASON"))
 
 
-def advisory_season_note() -> str:
-    """System-prompt note telling the agent how the season is handled (depends on env)."""
-    season = default_season()
-    ask = (
-        "In the personalised crop advisory flow, ask the farmer for the **season** (Rabi, Kharif or Zaid) "
-        "together with the days since sowing, their location (district or state) and the crop (if not known), all in "
-        "one question. The location is only asked there, never again, and is not used to search. The season is mandatory: pass their answer "
-        "as `season` and ask again until they give one. Do not ask for the season in the generic flow."
-    )
-    if season:
-        return (
-            f"\n\n## Advisory season (fixed: {season})\n{ask} Whatever the farmer answers, the advice is "
-            f"always searched for the **{season}** season: do not pass `season` and do not use their answer. "
-            f"When your answer uses the crop advisory results, say it is for the {season} season and continue "
-            f"the sentence with the advice, for example \"For the {season} season, ...\". Do this in the "
-            f"generic flow too."
-        )
-    return (
-        "\n\n## Advisory season (asked from the farmer)\n" + ask + " The season is mandatory: pass their answer as `season`, and "
-        "if they do not give one of Rabi, Kharif or Zaid, ask again until they do."
-    )
-
-
 def _search_params_tag(crop: str, days_after_sowing: Optional[int], season: str = "") -> List[Dict[str, Any]]:
     """`search_params` tag group the provider reads: crop, days_after_sowing, season (never a location)."""
     entries = []

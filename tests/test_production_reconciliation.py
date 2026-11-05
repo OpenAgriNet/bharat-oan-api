@@ -260,5 +260,5 @@ def test_api_key_cannot_override_jwt_claims(token_module, monkeypatch):
 @pytest.mark.parametrize("language", ["en", "hi", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te"])
 def test_prompt_template_compiles(language):
     from jinja2 import Environment
-    text = (ROOT / "assets/prompts" / f"agrinet_{language}.md").read_text()
+    text = (ROOT / "assets/prompts/chat" / f"agrinet_{language}.md").read_text()
     Environment().parse(text)

@@ -435,7 +435,7 @@ async def agromet_note(
     line. In every other case, including any lookup failure, the note tells the model not to mention it, so the
     model never offers an advisory that does not exist. Empty only when the IMD tool is not enabled.
     """
-    if "imd_agromet_advisory" not in ctx.deps.capabilities.policy.allowed_tools:
+    if "imd_agromet_advisory" not in ctx.deps.skills.allowed_tools:
         return ""
     lat, lon = await _coords(ctx, latitude, longitude)
     if lat is None or lon is None or not resolver_configured() or not IMD_DB_URL:

@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-PROMPT_DIR = Path("assets/prompts")
+PROMPT_DIR = Path("assets/prompts/chat")
 PROMPT_LANGS = sorted(p.stem.removeprefix("agrinet_") for p in PROMPT_DIR.glob("agrinet_*.md"))
 JINJA = re.compile(r"\{\{.*?\}\}|\{%.*?%\}")
 
@@ -20,7 +20,7 @@ def test_translated_prompts_keep_english_template_tokens():
     en_tokens = JINJA.findall((PROMPT_DIR / "agrinet_en.md").read_text(encoding="utf-8"))
     for lang in ("or", "pa", "mai"):
         tokens = JINJA.findall((PROMPT_DIR / f"agrinet_{lang}.md").read_text(encoding="utf-8"))
-        # Capability includes point to each language's own verbatim fragments.
+        # Global templates share date/season variables; skill coverage has its own contract.
         normalized = [token.replace(f'_{lang}.md', '_en.md') for token in tokens]
         assert normalized == en_tokens, lang
 

@@ -407,14 +407,15 @@ def test_tool_is_registered_with_context():
 
 
 def test_season_note_uses_env_default(monkeypatch):
-    from agents.tools.advisory import advisory_season_note
+    from agents.tools.advisory import default_season
+    from agents.skill_catalog import get_catalog
 
     monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
-    note = advisory_season_note()
+    note = get_catalog().render_skill('crop.advice', 'en', {'advisory_default_season': default_season()})
     assert "Rabi" in note and "ask the farmer for the **season**" in note and "do not use their answer" in note
 
     monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
-    note = advisory_season_note()
+    note = get_catalog().render_skill('crop.advice', 'en', {'advisory_default_season': default_season()})
     assert "mandatory" in note and "pass their answer as `season`" in note
 
 

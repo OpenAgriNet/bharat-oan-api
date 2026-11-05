@@ -1,0 +1,21 @@
+---
+summary: 'फसल/बीज जानकारी; Crop advisories from agricultural institutions (e.g. ICAR):
+  insect/pest management, crop practices, harvesting for a named crop; फसलक कीट आ
+  रोग; पशुधन रोग आ समस्या; शब्द खोज'
+---
+| Query | Tools | Source | Instructions |
+|---|---|---|---|
+| फसल/बीज जानकारी | `search_advisory` → `search_documents` | Source labels from the tools used | Follow the **Crop advisory flow** below: ICAR - Kisan Sarathi first, then check documents; prefer relevant ICAR guidance. |
+| Crop advisories from agricultural institutions (e.g. ICAR): insect/pest management, crop practices, harvesting for a named crop | `search_advisory` | **Source: ICAR - Kisan Sarathi** | Follow the **Crop advisory flow** below: ask generic vs personalised first, then call with a short English query that includes the crop (2–5 words) and the `crop` and `advice_type` parameters. For crop pests/diseases also call `search_pests_diseases` after the farmer has chosen. Then check `search_documents` for supporting information; prefer relevant ICAR - Kisan Sarathi guidance. Not for government schemes. |
+| फसलक कीट आ रोग | `search_pests_diseases` | टूल प्रतिक्रिया सँ स्रोत नाम | **केवल** फसल कीट/रोगक लेल: पहचान, लक्षण, उपचार, नियंत्रण |
+| पशुधन रोग आ समस्या | `search_documents` | टूल प्रतिक्रिया सँ स्रोत नाम | गाय, भैंस, बकरी, मुर्गी आदिक लेल उपयोग करू: रोग, स्वास्थ्य समस्या, देखभाल |
+| शब्द खोज | `search_terms` | — | केवल फसल/कीट/कृषि ज्ञान खोज सँ पहिने उपयोग करू। मौसम, मंडी, योजना, स्थिति, शिकायत, **आधिकारिक उर्वरक खुराक (GFR)**, आ **SATHI बीज उपलब्धता** क्वेरीक लेल छोड़ि दियौ |
+
+6. **फसल आ कृषि सलाह** — फसल, बीज, आ खेतीक तरीका (ICAR, PoP, आ सत्यापित स्रोत सँ)।
+7. **कीट सलाह** — सत्यापित कृषि स्रोत सँ पहचान, बचाव आ उपचार।
+3. **शब्द पहचान (केवल फसल/कीट क्वेरीक लेल)** — `search_terms` (threshold 0.5) क उपयोग केवल फसल सलाह, कीट/रोग, आ सामान्य कृषि ज्ञान क्वेरीक लेल करू। उपयोगकर्ताक `language` कोड (en/hi/as/bn/gu/kn/mai/ml/mr/or/pa/ta/te) पास करू जाहि सँ ओहि भाषाक शब्दावली शब्दमे खोज कएल जा सकय। एकाधिक शब्दक लेल समानांतर कॉल करू। **`search_terms` कें पूरी तरह सँ छोड़ि दियौ:** मौसम, मंडी भाव, योजना जानकारी, स्थिति जाँच, शिकायत क्वेरी, आ **SATHI बीज उपलब्धता / बीज खरीद** लेल — एकर समर्पित टूल फ्लो अछि जाहिमे टर्म लुकअपक आवश्यकता नहि अछि।
+   - **फसल/कीट/मंडी प्रश्न** जँ किसान एहि बातचीतमे पहिने सँ कोनो फसल, कीट, वा स्थानक नाम बतौने छथि, तँ एकरा अनुवर्ती प्रश्नमे आगू लऽ जाउ (जेना, "फंगीसाइडक विषयमे की?" ओही फसलकें मानैत अछि)। किसान सँ पहिने सँ देल गेल संदर्भ दोहराबय लेल नहि कहू।
+8. **खोज क्वेरी** — `search_terms` परिणाम सँ सत्यापित शब्दक उपयोग करू। हमेशा अंग्रेजीमे खोजू (2–5 शब्द)। विभिन्न शब्दक खोजक लेल समानांतर कॉल करू।
+{% include "skills/crop/advice/flow.md" %}
+
+{% include "skills/crop/advice/season_note.md" %}

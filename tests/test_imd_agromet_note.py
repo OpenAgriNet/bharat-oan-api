@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from agents.capability_policy import ToolPolicy
+from agents.skill_catalog import get_catalog
 from agents.tools import imd_advisory
 
 BULLETIN = {
@@ -38,10 +38,10 @@ class FakeCache:
 
 
 def context(session_id="s1", allowed=None):
-    policy = ToolPolicy() if allowed is None else ToolPolicy(allowed_tools=frozenset(allowed))
+    tools = get_catalog().tools if allowed is None else set(allowed)
     return SimpleNamespace(deps=SimpleNamespace(
         session_id=session_id, latitude=19.9975, longitude=73.7898, lang_code="en",
-        capabilities=SimpleNamespace(policy=policy),
+        skills=SimpleNamespace(allowed_tools=tools),
     ))
 
 
