@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note records the intended direction for organizing Bharat OAN's model-facing instructions and tools. It is a design document, not a claim that the current checkout already implements this structure. The v2 chat implementation is on `feat/skill_breakdown_v2`, based on `bh-dev` at `e272042`. Its usage guide is [skills.md](skills.md).
+This note records the intended direction for organizing Bharat OAN's model-facing instructions and tools. It is a design document, not a claim that the current checkout already implements this structure. The v2 chat implementation is on `feat/skill_breakdown_v2`, including `bh-dev` at `d8dd247`. Its usage guide is [skills.md](skills.md).
 
 The target is a shared chat/voice implementation with one tool registry and skill catalogue, separate Agrinet agent configuration, and optional voice-specific skill prompts. This note describes the target; it does not assume that the existing repositories already have identical tools or behavior.
 
@@ -270,4 +270,4 @@ Do not assume a smaller prompt automatically improves accuracy or latency. Dynam
 
 ## Current status
 
-The chat implementation now uses the shared manifest format, localized skill documents, and agent-specific global prompts. All 51 business tools remain registered; all 18 skills are enabled and preloaded by default across 13 languages. Agent variants and optional environment selection are implemented in the loader; the separate voice backend and HTTP/UI selection contract have not been migrated. Wording-preservation and offline integration checks pass; see the validation report for the separate behavioral benchmark status. Skill-level wording optimization remains a later phase.
+The chat implementation now uses the shared manifest format, localized skill documents, and agent-specific global prompts. All 50 current business tools remain registered (the latest upstream removes legacy `get_scheme_info`); all 18 skills are enabled and preloaded by default across 13 languages. Agent variants and optional environment selection are implemented in the loader; the separate voice backend and HTTP/UI selection contract have not been migrated. Wording-preservation and offline integration checks pass; see the validation report for the separate behavioral benchmark status. Skill-level wording optimization remains a later phase.
