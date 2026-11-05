@@ -641,7 +641,7 @@ class FFSService:
             "month": now.month,
             "requestedDatetime": now.strftime("%Y-%m-%d %H:%M:%S"),
             "applicantUserId": s["user"]["userId"],
-            "contactNoForCommunication": "9423257140",
+            "contactNoForCommunication": mobile,
             "isReceiverApplicantSame": True,
             "stateLgdCode": int(self.state["state_code"]),
             "districtLgdCode": self.land_map()[s["selection"][0]["land_ref"]]["districtLgdCode"],
@@ -696,6 +696,8 @@ class FFSService:
                         self.client = client
                         return await getattr(self, operation)(**kwargs)
         except FFSError as error:
+            logger.warning("FFS operation failed operation=%s status=%s next_action=%s",
+                           operation, error.status, error.next_action)
             if error.status == "needs_otp" and self.state:
                 self.state.pop("token", None)
                 self.state["stage"] = "login_expired"
@@ -708,7 +710,9 @@ class FFSService:
                 return result("partial_crop_update", "Crop mapping is incomplete. Retry entitlement to reconcile saved plots; no new OTP is needed")
             return result(error.status, error.next_action)
         except (httpx.HTTPError, TimeoutError):
+            logger.exception("FFS operation transport/timeout failure operation=%s", operation)
             status = "booking_uncertain" if self.state.get("uncertain_booking") else "partial_crop_update" if self.state.get("uncertain_plot") else "setup_incomplete" if self.state.get("token") and self.state.get("stage") == "loading" else "unavailable"
             return result(status, "FFS did not complete the request. Resume setup/crop reconciliation without resending OTP or blindly repeating writes")
         except (RedisError, ValueError, KeyError, TypeError, IndexError):
+            logger.exception("FFS operation internal/state failure operation=%s", operation)
             return result("unavailable", "FFS state or response is unavailable; no booking was attempted")
