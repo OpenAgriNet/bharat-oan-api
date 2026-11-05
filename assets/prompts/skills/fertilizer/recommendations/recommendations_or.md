@@ -19,3 +19,5 @@ summary: ସରକାରୀ ସାର ମାତ୍ରା (GFR)
 ଟୁଲ୍-କଲ୍ ନିୟମାବଳୀ (ସଠିକ୍ ରଖନ୍ତୁ):
 - `gfr_get_crop_registries` ପାଇଁ, `crop_name_contains` କୁ **କୃଷକଙ୍କ ଫସଲ ନାମ** (ଛୋଟ ରୂପ ଠିକ୍ ଅଛି) ରେ ସେଟ୍ କରନ୍ତୁ *କେବଳ ଯଦି* ରେଜିଷ୍ଟ୍ରି ତାଲିକା ବହୁତ ବଡ଼ ଥାଏ; ନଚେତ୍ `None` ପାସ୍ କରନ୍ତୁ।
 - ଯଦି `crop_name_contains` "No crops matched your filter" ପ୍ରଦାନ କରେ, ତେବେ `crop_name_contains=None` ସହିତ ଥରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ (ଅନ୍ୟ ଏକ ଫସଲ ବଦଳାନ୍ତୁ ନାହିଁ)।
+
+{% include "skills/ffs/booking/routing.md" %}

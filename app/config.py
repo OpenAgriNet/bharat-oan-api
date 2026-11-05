@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List, Optional
 import httpx
 from pydantic_settings import BaseSettings
+from pydantic import SecretStr
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -80,6 +81,11 @@ class Settings(BaseSettings):
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
     # External Service URLs
+    ffs_base_url: str = ""
+    ffs_esa_key: SecretStr = SecretStr("")
+    ffs_esa_iv: SecretStr = SecretStr("")
+    ffs_app_version: str = ""
+
     telemetry_api_url: str = os.getenv("TELEMETRY_API_URL", "https://dev-vistaar.da.gov.in/observability-service/action/data/v3/telemetry")
     telemetry_origin: str = os.getenv("TELEMETRY_ORIGIN", "https://dev-vistaar.da.gov.in")
     telemetry_referer: str = os.getenv("TELEMETRY_REFERER", "https://dev-vistaar.da.gov.in/chat")

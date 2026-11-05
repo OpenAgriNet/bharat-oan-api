@@ -15,3 +15,5 @@ summary: সরকারি সার সুপারিশ (GFR)
 4. **`gfr_get_crop_registries(latitude, longitude)`** — তালিকা থেকে যেখানে **GFR** আছে এবং ফসলের নাম সবচেয়ে ভালো মেলে সেটি বাছুন; ওই সারির **crop id**, **stateId**, এবং (থাকলে) **districtId** নোট করুন।
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id-এর তালিকা), **phone_no**, **cycle**, ঐচ্ছিক **district_id**, **latitude**, **longitude**, এবং স্টেপ 2 অনুযায়ী **natural_farming** পাঠান।
 6. টুল আউটপুট কৃষক-বান্ধব ভাষায় সংক্ষেপ করুন। সফল হলে আলাদা লাইনে **উৎস: GFR ফসল সুপারিশ** দিন।
+
+{% include "skills/ffs/booking/routing.md" %}

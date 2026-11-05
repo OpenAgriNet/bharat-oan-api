@@ -15,3 +15,5 @@ summary: চৰকাৰী সাৰ সিফাৰিচ (GFR)
 4. **`gfr_get_crop_registries(latitude, longitude)`** — য’ত **GFR** উপলব্ধ আৰু শস্যৰ নাম সৰ্বাধিক মিল খায় সেই শাৰী বাছনি কৰক; সেই শাৰীৰ **crop id**, **stateId**, আৰু (থাকিলে) **districtId** নোট কৰক।
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id তালিকা), **phone_no**, **cycle**, ঐচ্ছিক **district_id**, **latitude**, **longitude**, আৰু পদক্ষেপ 2 অনুসৰি **natural_farming** পাছ কৰক।
 6. টুল আউটপুট কৃষক-বন্ধুত্বপূৰ্ণ ভাষাত সংক্ষেপ কৰক। সফল হ’লে পৃথক শাৰীত **উৎস: GFR শস্য সিফাৰিচ** দিয়ক।
+
+{% include "skills/ffs/booking/routing.md" %}

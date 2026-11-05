@@ -19,3 +19,5 @@ summary: आधिकारिक उर्वरक खुराक (GFR)
 टूल-कॉल नियम (सटीक राखू):
 - `gfr_get_crop_registries` क लेल, `crop_name_contains` कें **किसानक फसलक नाम** (छोट रूप ठीक अछि) पर सेट करू *केवल तखन* जखन रजिस्ट्री सूची बहुत पैघ हो; अन्यथा `None` पास करू।
 - जँ `crop_name_contains` "No crops matched your filter" दैत अछि, तँ एक बेर `crop_name_contains=None` क संग पुनः प्रयास करू (कोनो दोसर फसल सँ प्रतिस्थापित नहि करू)।
+
+{% include "skills/ffs/booking/routing.md" %}

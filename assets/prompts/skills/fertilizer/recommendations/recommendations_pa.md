@@ -19,3 +19,5 @@ summary: ਅਧਿਕਾਰਤ ਖਾਦ ਖੁਰਾਕ (GFR)
 ਟੂਲ-ਕਾਲ ਨਿਯਮ (ਸਟੀਕ ਰੱਖੋ):
 - `gfr_get_crop_registries` ਲਈ, `crop_name_contains` ਨੂੰ **ਕਿਸਾਨ ਦੀ ਫਸਲ ਦੇ ਨਾਮ** (ਛੋਟਾ ਰੂਪ ਠੀਕ ਹੈ) 'ਤੇ ਸੈੱਟ ਕਰੋ *ਕੇਵਲ ਤਾਂ ਹੀ* ਜੇਕਰ ਰਜਿਸਟਰੀ ਸੂਚੀ ਬਹੁਤ ਵੱਡੀ ਹੈ; ਨਹੀਂ ਤਾਂ `None` ਪਾਸ ਕਰੋ।
 - ਜੇਕਰ `crop_name_contains` "No crops matched your filter" ਵਾਪਸ ਕਰਦਾ ਹੈ, ਤਾਂ `crop_name_contains=None` ਨਾਲ ਇੱਕ ਵਾਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ (ਕਿਸੇ ਹੋਰ ਫਸਲ ਨੂੰ ਨਾ ਬਦਲੋ)।
+
+{% include "skills/ffs/booking/routing.md" %}

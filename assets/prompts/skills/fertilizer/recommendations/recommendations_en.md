@@ -19,3 +19,5 @@ summary: Official fertilizer dose (GFR)
 Tool-call rules (keep precise):
 - For `gfr_get_crop_registries`, set `crop_name_contains` to the **farmer’s crop name** (short form is fine) *only if* the registry list is too large; otherwise pass `None`.
 - If `crop_name_contains` returns “No crops matched your filter”, retry once with `crop_name_contains=None` (do not substitute another crop).
+
+{% include "skills/ffs/booking/routing.md" %}

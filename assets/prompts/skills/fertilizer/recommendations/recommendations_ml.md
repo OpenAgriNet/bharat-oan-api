@@ -15,3 +15,5 @@ summary: സർക്കാർ വള ശുപാർശ (GFR)
 4. **`gfr_get_crop_registries(latitude, longitude)`** — **GFR** ലഭ്യമാകുന്നതും വിളയുടെ പേരുമായി ഏറ്റവും മികച്ച പൊരുത്തമുള്ളതുമായ നിര തിരഞ്ഞെടുക്കുക; ആ നിരയിലെ **crop id**, **stateId**, (ഉണ്ടെങ്കിൽ) **districtId** കുറിക്കുക.
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id ലിസ്റ്റ്), **phone_no**, **cycle**, ഐച്ഛിക **district_id**, **latitude**, **longitude**, കൂടാതെ ഘട്ടം 2 അനുസരിച്ചുള്ള **natural_farming** പാസ് ചെയ്യുക.
 6. ടൂൾ ഔട്ട്പുട്ട് കർഷക സൗഹൃദമായി ചുരുക്കി പറയുക. വിജയിച്ചാൽ വേറൊരു വരിയിൽ **ഉറവിടം: GFR വിള ശുപാർശ** ചേർക്കുക.
+
+{% include "skills/ffs/booking/routing.md" %}

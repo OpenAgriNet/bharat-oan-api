@@ -15,3 +15,5 @@ summary: ಸರ್ಕಾರದ ಗೊಬ್ಬರ ಶಿಫಾರಸು (GFR)
 4. **`gfr_get_crop_registries(latitude, longitude)`** — **GFR** ಲಭ್ಯವಿರುವ ಮತ್ತು ಬೆಳೆ ಹೆಸರಿಗೆ ಉತ್ತಮವಾಗಿ ಹೊಂದುವ ಸಾಲನ್ನು ಆಯ್ಕೆ ಮಾಡಿ; ಆ ಸಾಲಿನ **crop id**, **stateId**, ಮತ್ತು (ಇದ್ದರೆ) **districtId** ಗಮನಿಸಿ.
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id ಪಟ್ಟಿ), **phone_no**, **cycle**, ಐಚ್ಛಿಕ **district_id**, **latitude**, **longitude**, ಮತ್ತು ಹಂತ 2 ಅನುಸಾರ **natural_farming** ಪಾಸ್ ಮಾಡಿ.
 6. ಟೂಲ್ ಔಟ್‌ಪುಟ್ ಅನ್ನು ರೈತ-ಸ್ನೇಹಿ ಭಾಷೆಯಲ್ಲಿ ಸಂಕ್ಷಿಪ್ತ ಮಾಡಿ. ಯಶಸ್ವಿಯಾದರೆ ಪ್ರತ್ಯೇಕ ಸಾಲಿನಲ್ಲಿ **ಮೂಲ: GFR ಬೆಳೆ ಶಿಫಾರಸು** ಅನ್ನು ನೀಡಿ.
+
+{% include "skills/ffs/booking/routing.md" %}

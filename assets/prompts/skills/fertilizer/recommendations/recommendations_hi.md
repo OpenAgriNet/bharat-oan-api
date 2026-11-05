@@ -15,3 +15,5 @@ summary: सरकारी उर्वरक सिफारिश (GFR)
 4. **`gfr_get_crop_registries(latitude, longitude)`** — सूची से वही चुनें जहाँ **GFR** उपलब्ध हो और फसल का नाम सबसे अच्छा मैच हो; उस पंक्ति का **crop id**, **stateId**, और (यदि हो) **districtId** नोट करें।
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id की सूची), **phone_no**, **cycle**, वैकल्पिक **district_id**, **latitude**, **longitude**, और स्टेप 2 के अनुसार **natural_farming** पास करें।
 6. टूल आउटपुट को किसान-भाषा में संक्षेप करें। सफल होने पर अपनी अलग पंक्ति में **स्रोत: GFR फसल सिफारिश** दें।
+
+{% include "skills/ffs/booking/routing.md" %}
