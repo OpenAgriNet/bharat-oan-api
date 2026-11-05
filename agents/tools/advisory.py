@@ -338,10 +338,12 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
     example = "Which season is it, and how many days ago did you sow?" if need_season and need_days else (
         "Which season is your crop in?" if need_season else "How many days ago did you sow the crop?"
     )
+    # Name the seasons only when there is a real choice. With a single season, saying so makes the question
+    # read as if that season were expected, and the farmer may well be in another one.
     seasons_note = (
-        f" The advisories found are for the {_join_names(seasons)} season{'s' if len(seasons) > 1 else ''}; "
-        "you may mention that in a plain sentence before the question."
-        if need_season
+        f" The advisories found cover the {_join_names(seasons)} seasons; you may name them in a plain sentence "
+        "as the choices."
+        if need_season and len(seasons) > 1
         else ""
     )
     return (
@@ -350,7 +352,8 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
         "advice yet and do not show a Source line. Ask the farmer ONE short, natural question asking "
         + " and ".join(parts)
         + f". Example (translate it to the farmer's language): \"{example}\"." + seasons_note
-        + " Write it as normal sentences: never put season names in brackets or in a list."
+        + " Do not suggest which season it is or say which season the advice is for: the farmer decides."
+        " Write it as normal sentences: never put season names in brackets or in a list."
         " When they answer, call `search_advisory` again with the same `query` and `crop` plus their "
         + " and ".join(args)
         + ". If they say they do not know or do not want to answer, call it again with `answer_now=true`."
