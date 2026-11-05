@@ -59,11 +59,8 @@ def content_tokens(text):
 
 
 @pytest.mark.parametrize('language', LANGUAGES)
-@pytest.mark.parametrize('release_section', [None, 'Configured release announcement for this date.'])
-def test_instructions_preserved_except_requested_source_policy(language, release_section, old_prompts):
+def test_instructions_preserved_except_requested_policies(language, old_prompts):
     context = dict(CONTEXT)
-    if release_section is not None:
-        context['pm_kisan_installment_release'] = release_section
     before = old_prompts.get_template(f'agrinet_{language}.md').render(**context)
     # bh-dev appended this note in Python, outside the root template. The skill
     # now includes it directly; the separate test below checks the note wording.
@@ -72,8 +69,19 @@ def test_instructions_preserved_except_requested_source_policy(language, release
     # Only old overview/table headings are replaced by per-skill presentation.
     before = before.replace('load_capability', 'load_skill').replace('load a capability', 'load a skill').replace('capability-loading', 'skill-loading')
     # Explicitly approved changes after the initial byte/word-preserving migration:
-    # ICAR first then documents, no FYM->FFS substitution, and shared dependencies.
+    # ICAR first then documents, no FYM->FFS substitution, shared dependencies,
+    # and the now-released PM-KISAN announcement replacing its tense switch.
     cat = get_catalog()
+    old_tense_rule = (
+        f"Use today's date (`{context['today_date']}`) in Asia/Kolkata: future tense "
+        'through 30 October 2026, past tense from 31 October 2026.'
+    )
+    assert before.count(old_tense_rule) == 1
+    before = before.replace(old_tense_rule, 'Use past tense for this released installment.')
+    start = before.index('**Through 30 October 2026 (IST):**')
+    end = before.index('Cite **Source: Government Scheme Information**', start)
+    before = (before[:start] + cat.env.get_template(
+        'skills/pm_kisan/installments/release.md').render() + '\n\n' + before[end:])
     crop = cat.render_skill('crop.advice', language, context)
     for row in crop.splitlines():
         if row.startswith('|') and '`search_advisory`' in row:

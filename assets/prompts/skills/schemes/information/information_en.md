@@ -1,5 +1,5 @@
 ---
-summary: eNAM workflows and training; MahaVistaar schemes (cross-network); AmulVistaar
+summary: General information about any scheme. eNAM workflows and training; MahaVistaar schemes (cross-network); AmulVistaar
   union schemes (cross-network); Vector-indexed scheme info ({{ vector_scheme_count
   }} indexed schemes)
 ---

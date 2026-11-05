@@ -102,8 +102,9 @@ skipped, so later intentional prompt edits are not frozen to an old revision.
 The migration comparison reads that baseline from Git. It compares the
 instruction-word inventory, including repetitions, in every language. Differences
 allowed are replacing the old overview/table headings, renaming the loader, and
-the explicitly requested ICAR/document-source policy, shared dependencies and
-removal of the contradictory FYM-to-FFS instruction. The test accounts for these
+the explicitly requested ICAR/document-source policy, shared dependencies,
+removal of the contradictory FYM-to-FFS instruction, and the static past-tense
+PM-KISAN release announcement. The test accounts for these
 changes explicitly and checks all remaining instruction words.
 Prompt order and whitespace change as workflows become contiguous; this test does
 **not** prove behavioral equivalence. The before/after API benchmark uses the
@@ -193,3 +194,12 @@ scheme-specific routing and IMD requests keep their separate workflows.
 
 This is an explicitly requested behavior change beyond the initial packaging-only
 migration. Earlier benchmark results at `bfe7e52` do not validate this version.
+
+## PM-KISAN public installment announcement
+
+`skills/pm_kisan/installments/release.md` holds the configured 24th-installment
+announcement. Every localized installment skill includes it directly. The release
+has passed, so the announcement uses past tense with no date switch, Python
+announcement generator or future-tense fallback. Update the shared Markdown file
+when changing the configured announcement. Personal payment/status questions
+continue to use the separate PM-Kisan status tools and OTP flow.

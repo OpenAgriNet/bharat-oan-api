@@ -1,6 +1,5 @@
 import asyncio
 import sys
-from datetime import date, datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -9,46 +8,8 @@ import pytest
 
 from agents.skills import render_prompt
 from agents.skill_policy import SkillState
-from helpers import pmkisan_installment_release as release
 from tests.test_production_reconciliation import load_module
 from tests.test_prompt_language_contract import SCRIPT_RANGES, render
-
-
-@pytest.mark.parametrize("today,future", [
-    (date(2026, 10, 28), True),
-    (date(2026, 10, 30), True),
-    (date(2026, 10, 31), False),
-])
-def test_release_messages_and_section(today, future):
-    en, hi = release.get_pm_kisan_24th_installment_release_messages(today)
-    assert en == (
-        "The 24th instalment of PM-KISAN will be released on 30th October 2026."
-        if future else
-        "The 24th instalment of PM-KISAN was released on 30th October 2026."
-    )
-    assert hi == (
-        "पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की जाएगी।"
-        if future else
-        "पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की गई।"
-    )
-    section = release.get_pm_kisan_24th_installment_release_section(today)
-    assert "## PM-KISAN 24th Instalment Release" in section
-    assert "**Instalment number:** 24" in section
-    assert "**Official release date:** 30 October 2026" in section
-    assert f"**Status as of today:** {'upcoming' if future else 'released'}" in section
-    assert en in section and hi in section
-
-
-@pytest.mark.parametrize("minute,future", [(29, True), (30, False)])
-def test_default_date_switches_at_ist_midnight(monkeypatch, minute, future):
-    instant = datetime(2026, 10, 30, 18, minute, tzinfo=timezone.utc)
-    clock = Mock()
-    clock.now.side_effect = lambda tz: instant.astimezone(tz)
-    monkeypatch.setattr(release, "datetime", clock)
-    en, _ = release.get_pm_kisan_24th_installment_release_messages()
-    assert ("will be released" in en) is future
-    assert en in release.get_pm_kisan_24th_installment_release_section()
-    assert str(clock.now.call_args.args[0]) == "Asia/Kolkata"
 
 
 @pytest.fixture
@@ -76,7 +37,6 @@ def search(load_module, monkeypatch):
     schemes = load_module("helpers/scheme_qdrant_search.py")
     monkeypatch.setitem(sys.modules, "helpers.scheme_qdrant_search", schemes)
     monkeypatch.setenv("BAP_ENDPOINT", "https://example.test")
-    monkeypatch.setattr(release, "_today_ist", lambda: date(2026, 10, 28))
     return load_module("agents/tools/search.py")
 
 
@@ -162,7 +122,7 @@ def test_unknown_scheme_is_not_sent_to_network(search, monkeypatch):
 def test_release_announcement_skill_needs_no_business_tools(language):
     state = SkillState(enabled_skills=["pm_kisan.installments"])
     prompt = render_prompt(state, language, {"today_date": "28 October 2026"})
-    assert "The 24th instalment of PM-KISAN will be released on 30th October 2026." in prompt
+    assert "The 24th instalment of PM-KISAN was released on 30th October 2026." in prompt
     assert "Do not call search_schemes, load_skill or any status/OTP tool" in prompt
     assert not state.visible
 
@@ -174,7 +134,7 @@ def test_release_and_status_rules_remain_present_in_default_mode(language):
     assert "A previous status-check offer is not consent" in prompt
     assert "Before any PM-KISAN tool call" not in prompt
     assert "does not apply to scheme information or public release dates" in prompt
-    assert "The 24th instalment of PM-KISAN will be released on 30th October 2026." in prompt
+    assert "The 24th instalment of PM-KISAN was released on 30th October 2026." in prompt
     assert "Do not call search_schemes, load_skill or any status/OTP tool" in prompt
 
 
@@ -188,11 +148,15 @@ def test_removed_legacy_tool_is_not_registered():
 
 
 @pytest.mark.parametrize("language", ["en", *SCRIPT_RANGES])
-@pytest.mark.parametrize("today", [date(2026, 10, 28), date(2026, 10, 31)])
-def test_configured_release_replaces_fallback(language, today):
-    section = release.get_pm_kisan_24th_installment_release_section(today)
-    prompt = render_prompt(SkillState(), language, {"pm_kisan_installment_release": section})
-    assert prompt.count(section) == 1
-    en, hi = release.get_pm_kisan_24th_installment_release_messages(today)
-    assert en in prompt and hi in prompt
-    assert "**Through 30 October 2026 (IST):**" not in prompt
+@pytest.mark.parametrize("today", ["28 October 2026", "31 October 2026", "5 November 2026"])
+def test_release_is_static_and_past_tense(language, today):
+    prompt = render_prompt(SkillState(enabled_skills=["pm_kisan.installments"]), language,
+                           {"today_date": today})
+    assert prompt.count("## PM-KISAN 24th Instalment Release") == 1
+    assert "**Status:** released" in prompt
+    assert "The 24th instalment of PM-KISAN was released on 30th October 2026." in prompt
+    assert "पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की गई।" in prompt
+    assert "will be released on" not in prompt
+    assert "जारी की जाएगी" not in prompt
+    assert "future tense" not in prompt
+    assert "**From 31 October 2026 (IST):**" not in prompt
