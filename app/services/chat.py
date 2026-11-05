@@ -737,7 +737,7 @@ async def _run_agrinet_with_failover_streaming(
         await chunk_queue.put(None)
 
 
-@observe(name=AGENT_VISTAAR, as_type="agent")
+@observe(name=AGENT_VISTAAR, as_type="agent", capture_input=False, capture_output=False)
 async def _run_agrinet_once_streaming(
     user_message: str,
     trimmed_history: list,

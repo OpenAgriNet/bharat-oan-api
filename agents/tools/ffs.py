@@ -4,12 +4,26 @@ from pydantic_ai import RunContext
 
 from agents.deps import FarmerContext
 from app.services.ffs import CropSelection, FFSService, result
+from helpers.ffs_tracing import observation, result_summary
 
 
 async def _run(ctx, operation, **kwargs):
-    if "ffs.booking" not in ctx.deps.skills.active:
-        return result("unavailable", "Load the enabled ffs.booking skill before using FFS tools")
-    return await FFSService(ctx.deps.session_id, ctx.deps.ffs_owner, ctx.deps.question_id).run(operation, **kwargs)
+    name = "ffs_get_entitlement" if operation == "entitlement" else "ffs_" + operation
+    service = FFSService(ctx.deps.session_id, ctx.deps.ffs_owner, ctx.deps.question_id)
+    metadata = {"session_id": ctx.deps.session_id, "question_id": ctx.deps.question_id,
+                "channel": "chat", "operation": operation}
+    with observation("tool:" + name, as_type="tool", metadata=metadata) as diagnostic:
+        try:
+            if "ffs.booking" not in ctx.deps.skills.active:
+                answer = result("unavailable", "Load the enabled ffs.booking skill before using FFS tools")
+                diagnostic["reason"] = "skill_not_loaded"
+            else:
+                answer = await service.run(operation, **kwargs)
+            diagnostic.update(result_summary(answer))
+            return answer
+        finally:
+            diagnostic.update(service.diagnostics)
+            diagnostic["stage_after"] = service.state.get("stage", "not_started")
 
 
 async def ffs_send_otp(ctx: RunContext[FarmerContext], farmer_id: str, state: str, resend: bool = False) -> dict:

@@ -6,7 +6,6 @@ from difflib import SequenceMatcher
 from datetime import datetime
 import hashlib
 import json
-import logging
 import math
 import re
 import time
@@ -21,6 +20,7 @@ from redis.exceptions import RedisError
 from app.config import get_default_httpx_timeout, settings
 from app.core.cache import cache
 from helpers.utils import to_ascii_digits
+from helpers.ffs_tracing import observation, response_summary
 
 USER = "/ufa-user-service/ufa-user/v1/api"
 MASTER = "/ufa-master-service/ufa-master/v1/api"
@@ -30,7 +30,6 @@ APPLICANT_FETCH = "/bharatVistar/applicantFetch"
 NAMESPACE = "ffs-session"
 LEVELS = ("V", "T", "D", "S")
 PRODUCTS = {11: 1089, 12: 1005}
-logger = logging.getLogger(__name__)
 STATE_CODES = {
     "Jammu and Kashmir": "1", "Himachal Pradesh": "2", "Punjab": "3", "Chandigarh": "4",
     "Uttarakhand": "5", "Haryana": "6", "Delhi": "7", "Rajasthan": "8", "Uttar Pradesh": "9",
@@ -77,13 +76,6 @@ def owner_id(user):
 
 def session_key(session_id):
     return hashlib.sha256(session_id.encode()).hexdigest()
-
-
-def _log_value(value):
-    try:
-        return json.dumps(value, ensure_ascii=False, default=str)
-    except (TypeError, ValueError):
-        return str(value)
 
 
 def normalize(text):
@@ -172,12 +164,34 @@ class FFSService:
         self.session_id, self.owner, self.question_id = session_id, owner, question_id
         self.state = {}
         self.client = None
+        self.diagnostics = {"api_calls": 0, "decisions": []}
 
     async def save(self):
         await cache.set(session_key(self.session_id), self.owner, ttl=7200, namespace="ffs-owner")
         await cache.set(session_key(self.session_id), self.state, ttl=1200, namespace=NAMESPACE)
 
+    def note(self, event, **fields):
+        # Decisions contain only local references, counts and fixed labels.
+        events = self.diagnostics["decisions"]
+        if len(events) < 100:
+            events.append({"event": event, **fields})
+        else:
+            self.diagnostics["decisions_omitted"] = self.diagnostics.get("decisions_omitted", 0) + 1
+
     async def call(self, method, prefix, path, body=None, *, encrypted=False, params=None):
+        from urllib.parse import urlsplit
+        metadata = {"session_id": self.session_id, "question_id": self.question_id,
+                    "channel": "chat", "method": method, "host": urlsplit(settings.ffs_base_url).hostname,
+                    "path": prefix + path, "encrypted": encrypted}
+        with observation("ffs.api:" + path, metadata=metadata) as diagnostic:
+            try:
+                return await self._call(method, prefix, path, body, encrypted=encrypted,
+                                        params=params, diagnostic=diagnostic)
+            except FFSError as error:
+                diagnostic["workflow_status"] = error.status
+                raise
+
+    async def _call(self, method, prefix, path, body=None, *, encrypted=False, params=None, diagnostic):
         url = settings.ffs_base_url.rstrip("/") + prefix + path
         headers = {"X-Session-Id": self.session_id, "Content-Type": "application/json"}
         if path == "/authenticate/user/loginByFarmerId":
@@ -195,16 +209,17 @@ class FFSService:
             kwargs["content"] = base64.b64encode(AES.new(key, AES.MODE_CBC, iv).encrypt(pad(payload, 16)))
         elif body is not None:
             kwargs["json"] = body
-        logger.info("FFS API request method=%s url=%s encrypted=%s params=%s payload=%s",
-                    method, url, encrypted, _log_value(params), _log_value(body))
+        diagnostic["headers"] = {key: headers[key] for key in ("isForMobile", "appType", "platform", "version") if key in headers}
+        diagnostic["authorization_present"] = "Authorization" in headers
+        diagnostic["recaptcha_present"] = "X-Recaptcha-Token" in headers
+        self.diagnostics["api_calls"] += 1
         response = await self.client.request(method, url, headers=headers, **kwargs)
         response_data = None
         try:
             response_data = response.json()
         except ValueError:
-            response_data = response.text
-        logger.info("FFS API response method=%s url=%s status=%s body=%s",
-                    method, url, response.status_code, _log_value(response_data))
+            pass
+        diagnostic.update(response_summary(response.status_code, response_data))
         if response.status_code == 401:
             self.state.pop("token", None)
             self.state["stage"] = "login_expired"
@@ -244,19 +259,23 @@ class FFSService:
             return result("needs_clarification", "Ask for an 11-digit farmer ID and a valid state name or LGD code")
         same = self.state.get("farmer_id") == farmer_id and self.state.get("state_code") == state_code
         if self.state.get("otp_turn") == self.question_id:
+            self.note("otp_send_suppressed", reason="same_turn")
             return result("already_started", "An OTP request was already attempted this turn")
         if same and self.state.get("stage") != "not_started":
             if not resend:
+                self.note("otp_send_suppressed", reason="already_started")
                 return result("already_started", "OTP already requested; ask for it, or offer an explicit resend if expired",
                               expires_in=max(0, int(self.state.get("otp_expires", 0) - time.time())))
             if not re.search(r"resend|again|new otp|re-send|फिर|दोबारा|पुनः|पुन्हा|फेर|ફરી|আবার|পুনৰ|دوبارہ|ಮತ್ತೆ|மீண்டும்|మళ్లీ|വീണ്ടും|ପୁଣି|ਦੁਬਾਰਾ", query, re.I):
                 return result("needs_clarification", "Ask the farmer to explicitly request another OTP")
+        self.note("otp_requested", state_code=state_code, resend=bool(resend))
         self.state = {"owner": self.owner, "farmer_id": farmer_id, "state_code": state_code,
                       "stage": "otp_outcome_unknown", "otp_expires": time.time() + 180,
                       "otp_turn": self.question_id, "otp_attempts": 0}
         await self.save()
         await self.call("POST", USER, "/authenticate/user/loginByFarmerId", {
             "userStateLgdCode": state_code, "userFarmerId": farmer_id}, encrypted=True)
+        self.note("otp_send_accepted")
         self.state["stage"] = "otp_pending"
         await self.save()
         return result("otp_sent", "Ask for the six-digit SMS OTP", expires_in=180)
@@ -273,6 +292,7 @@ class FFSService:
                 return result("invalid_otp", "Ask for a new OTP entry; this attempt was already processed")
             self.state["verify_turn"] = self.question_id
             self.state["otp_attempts"] += 1
+            self.note("otp_verification_attempted", attempt=self.state["otp_attempts"])
             await self.save()
             data = await self.call("POST", USER, "/authenticate/user/validateLoginByFarmerId", {
                 "userStateLgdCode": self.state["state_code"], "userFarmerId": self.state["farmer_id"],
@@ -288,6 +308,7 @@ class FFSService:
                 raise FFSError("unavailable", "FFS login returned an invalid token expiry")
             self.state.update(token=data["userToken"], token_expires=expires,
                               user={k: data.get(k) for k in ("userId", "userAadhaarHash", "userFullName")}, stage="loading")
+            self.note("otp_verified")
             self.state.pop("verify_turn", None)
             await self.save()
         self.authenticated()
@@ -299,7 +320,9 @@ class FFSService:
             ("crops", MASTER, "/common/getCropListByState", "GET", None, {"stateLgdCode": s["state_code"]}),
         ]:
             if name in s:
+                self.note("setup_step_reused", step=name)
                 continue
+            self.note("setup_step_fetch", step=name)
             if body == "profile":
                 body = {"stateCode": int(s["state_code"]), "aadhaarHash": s["user"]["userAadhaarHash"],
                         "seasonId": s["season"]["season"]["seasonId"], "yearId": s["season"]["year"]["yearId"]}
@@ -391,6 +414,7 @@ class FFSService:
             selected.append({"land_ref": item.land_ref, "crop_code": code})
         signature = json.dumps([village_ref, selected], sort_keys=True)
         if s.get("selection_signature") == signature and "entitlement" in s:
+            self.note("entitlement_reused")
             return deepcopy(s["entitlement"])
         s.pop("entitlement", None)
         s.pop("shops", None)
@@ -399,6 +423,7 @@ class FFSService:
         s["stage"] = "mapping_crops"
         await self.save()
         if s.get("uncertain_plot"):
+            self.note("crop_mapping_reconciliation")
             fresh = await self.call("POST", APPROVAL, APPLICANT_FETCH, {
                 "stateCode": int(s["state_code"]), "aadhaarHash": s["user"]["userAadhaarHash"],
                 "seasonId": s["season"]["season"]["seasonId"], "yearId": s["season"]["year"]["yearId"]})
@@ -415,7 +440,10 @@ class FFSService:
             land = lands[item["land_ref"]]
             season, year = s["season"]["season"]["seasonId"], s["season"]["year"]["yearId"]
             if any(c.get("cropCode") == item["crop_code"] and c.get("seasonId") == season and c.get("yearId") == year for c in land.get("crops", [])):
+                self.note("crop_mapping_reused", land_ref=item["land_ref"])
                 continue
+            self.note("crop_mapping_write", land_ref=item["land_ref"],
+                      crop_code=item["crop_code"] if re.fullmatch(r"[0-9]{1,12}", item["crop_code"]) else "invalid")
             s["uncertain_plot"] = item["land_ref"]
             await self.save()
             data = await self.call("POST", APPROVAL, "/applicant/land/crop/add", {
@@ -424,6 +452,7 @@ class FFSService:
                 "seasonId": season, "yearId": year, "stateLgdCode": int(s["state_code"])})
             if not isinstance(data, dict) or data.get("cropCode") != item["crop_code"] or data.get("farmlandPlotRegistryId") != land["farmlandPlotRegistryId"]:
                 raise FFSError("partial_crop_update", "FFS crop result did not match this plot; refetch before retrying")
+            self.note("crop_mapping_saved", land_ref=item["land_ref"])
             land["crops"] = [data]
             s.pop("uncertain_plot", None)
             await self.save()
@@ -446,6 +475,8 @@ class FFSService:
             weight = r.get("kgPerBag")
             if type(bags) is not int or bags < 0 or type(weight) not in (int, float) or not math.isfinite(weight) or weight <= 0:
                 raise FFSError("unavailable", "FFS returned invalid fertilizer quantities")
+            self.note("entitlement_quantity", group=r["productGroupId"], bags=bags,
+                      quantity_field="offeredBags" if "offeredBags" in r else "noOfBagsRequired")
             groups.append({"group": r["productGroupId"], "name": "urea" if r["productGroupId"] == 11 else "DAP",
                            "bags": bags, "kg_per_bag": weight, "already_purchased": r.get("alreadyPurchasedBags", 0)})
         if len({g["group"] for g in groups}) != len(groups) or not groups:
@@ -481,8 +512,10 @@ class FFSService:
         search = s.setdefault("shops", {"level": 0, "page": 1, "pool": {}, "shown": [], "complete_levels": [], "turn_results": {}})
         turn_key = self.question_id + ":" + action
         if turn_key in search["turn_results"]:
+            self.note("shop_results_reused", reason="same_turn")
             return deepcopy(search["turn_results"][turn_key])
         if action == "initial" and search["shown"]:
+            self.note("shop_results_reused", reason="already_shown")
             return deepcopy(search["last_result"])
         if action == "widen":
             if search["level"] >= len(LEVELS) - 1:
@@ -504,6 +537,7 @@ class FFSService:
                 search["level"] += 1
                 search["page"] = 1
                 continue
+            self.note("shop_page_requested", territory=LEVELS[level], page=search["page"])
             data = await self.call("POST", MASTER, "/retailer/getRetailersByProductAvailabilityV4", {
                 **geo, "selectedProducts": chosen, "territoryLevel": LEVELS[level],
                 "farmerLatitude": None, "farmerLongitude": None, "pageNo": search["page"], "pageSize": 100})
@@ -530,6 +564,8 @@ class FFSService:
                     "address": row.get("address1", ""), "coverage": ["urea" if pid == 1089 else "DAP" for pid in stocks],
                     "complete_supply": complete, "territory": LEVELS[level], "retailer_id": row["retailerId"],
                     "rank": [level, 0 if complete else 1 if 1089 in stocks else 2, -sum(stocks.values()), row["retailerId"]]}
+            self.note("shop_page_processed", territory=LEVELS[level], page=search["page"],
+                      rows=len(data), eligible_pending=len(pending()))
             search["page"] += 1
             if search["page"] > pages:
                 search["complete_levels"].append(LEVELS[level])
@@ -561,6 +597,7 @@ class FFSService:
             raise FFSError("needs_shops", "Call ffs_find_shops first and ask the farmer to choose a shop")
         if s.get("booking_turn") == self.question_id:
             if s.get("last_booking_result"):
+                self.note("booking_result_reused")
                 return deepcopy(s["last_booking_result"])
             return result("already_started", "Booking has already been attempted this turn")
         wanted = [p for p in s["entitlement"]["data"]["products"] if p["bags"] > 0]
@@ -574,6 +611,7 @@ class FFSService:
         if mobile.startswith("91") and len(mobile) == 12:
             mobile = mobile[2:]
         if not re.fullmatch(r"[6-9]\d{9}", mobile):
+            self.note("booking_blocked", reason="missing_or_invalid_login_mobile")
             return result("needs_clarification", "FFS login did not return a valid 10-digit contact number for booking")
 
         chosen = []
@@ -605,6 +643,7 @@ class FFSService:
         }
         expected_token = hashlib.sha256(json.dumps(summary, sort_keys=True).encode()).hexdigest()[:12]
         if not confirmed:
+            self.note("booking_confirmation_requested")
             s["pending_booking"] = {"shop_ref": shop_ref, "confirmation_token": expected_token, "summary": summary}
             await self.save()
             return result("needs_confirmation",
@@ -613,6 +652,7 @@ class FFSService:
         pending = s.get("pending_booking", {})
         token = (confirmation_token or "").strip()
         if pending.get("shop_ref") != shop_ref or pending.get("confirmation_token") != token or token != expected_token:
+            self.note("booking_confirmation_rejected")
             s["pending_booking"] = {"shop_ref": shop_ref, "confirmation_token": expected_token, "summary": summary}
             await self.save()
             return result("needs_confirmation",
@@ -654,6 +694,7 @@ class FFSService:
         s["booking_turn"] = self.question_id
         s["uncertain_booking"] = {"shop_ref": shop_ref, "summary": summary}
         await self.save()
+        self.note("booking_submitted", products_count=len(lines), plots_count=len(selected_lands))
         data = await self.call("POST", FERT, "/bharatVistar/createMultipleBookingV2", payload)
         if not isinstance(data, dict):
             raise FFSError("unavailable", "FFS booking returned an invalid response")
@@ -677,18 +718,24 @@ class FFSService:
 
     async def run(self, operation, **kwargs):
         if not settings.ffs_base_url or not self.owner or not self.session_id:
+            self.diagnostics["reason"] = "missing_configuration_or_caller_identity"
             return result("unavailable", "FFS is not configured or the caller has no authenticated identity")
         try:
             lock_name = settings.redis_key_prefix + "ffs-lock:" + session_key(self.session_id)
+            lock_started = time.monotonic()
             async with cache.client.lock(lock_name, timeout=50, blocking_timeout=1):
+                self.diagnostics["lock_wait_ms"] = round((time.monotonic() - lock_started) * 1000, 2)
                 async with asyncio.timeout(40):
                     self.state = await get_session(self.session_id)
+                    self.diagnostics["stage_before"] = self.state.get("stage", "not_started")
                     if self.state and self.state.get("owner") != self.owner:
+                        self.diagnostics["reason"] = "session_owner_mismatch"
                         return result("unavailable", "This FFS session belongs to another authenticated caller")
                     async with httpx.AsyncClient(timeout=get_default_httpx_timeout(), follow_redirects=False) as client:
                         self.client = client
                         return await getattr(self, operation)(**kwargs)
         except FFSError as error:
+            self.diagnostics.update(error_type=type(error).__name__, workflow_status=error.status)
             if error.status == "needs_otp" and self.state:
                 self.state.pop("token", None)
                 self.state["stage"] = "login_expired"
@@ -700,8 +747,10 @@ class FFSService:
             if self.state.get("uncertain_plot"):
                 return result("partial_crop_update", "Crop mapping is incomplete. Retry entitlement to reconcile saved plots; no new OTP is needed")
             return result(error.status, error.next_action)
-        except (httpx.HTTPError, TimeoutError):
+        except (httpx.HTTPError, TimeoutError) as error:
+            self.diagnostics["error_type"] = type(error).__name__
             status = "booking_uncertain" if self.state.get("uncertain_booking") else "partial_crop_update" if self.state.get("uncertain_plot") else "setup_incomplete" if self.state.get("token") and self.state.get("stage") == "loading" else "unavailable"
             return result(status, "FFS did not complete the request. Resume setup/crop reconciliation without resending OTP or blindly repeating writes")
-        except (RedisError, ValueError, KeyError, TypeError, IndexError):
+        except (RedisError, ValueError, KeyError, TypeError, IndexError) as error:
+            self.diagnostics["error_type"] = type(error).__name__
             return result("unavailable", "FFS state or response is unavailable; no booking was attempted")
