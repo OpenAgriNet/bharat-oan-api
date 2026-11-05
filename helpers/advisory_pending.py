@@ -89,59 +89,88 @@ _NUMBER_WORDS = re.compile(
     re.IGNORECASE,
 )
 
+# The agent's prompt is "**Conversation**\n\n<last message pairs>\n\n---\n\n<the farmer's message>", so the
+# farmer's own words are only what follows the last separator. Reading the whole prompt would pick up
+# season words and numbers from earlier answers.
+_PROMPT_SEPARATOR = "\n\n---\n\n"
+
+
 def _has_history(ctx) -> bool:
     return bool(getattr(ctx, "messages", None))
 
 
-def _farmer_text(ctx) -> str:
-    parts = []
-    for message in getattr(ctx, "messages", None) or []:
+def _farmer_message(ctx) -> str:
+    """The farmer's message for this turn, without the conversation text added in front of it."""
+    for message in _current_turn(ctx):
         if isinstance(message, ModelRequest):
             for part in message.parts:
                 if isinstance(part, UserPromptPart):
-                    parts.append(str(part.content))
-    return "\n".join(parts)
+                    return str(part.content).rsplit(_PROMPT_SEPARATOR, 1)[-1]
+    return ""
 
 
-def question_asked_earlier(ctx) -> bool:
-    """True when `search_advisory` asked the farmer something in an earlier turn (not this one)."""
+def _is_pending_return(part) -> bool:
+    return (
+        isinstance(part, ToolReturnPart)
+        and part.tool_name == "search_advisory"
+        and PENDING_MARKER in str(part.content)
+    )
+
+
+def _earlier_turns(ctx) -> list:
     messages = list(getattr(ctx, "messages", None) or [])
-    turn = _current_turn(ctx)
-    earlier = messages[: len(messages) - len(turn)]
-    for message in earlier:
-        if not isinstance(message, ModelRequest):
-            continue
-        for part in message.parts:
-            if (
-                isinstance(part, ToolReturnPart)
-                and part.tool_name == "search_advisory"
-                and PENDING_MARKER in str(part.content)
-            ):
-                return True
-    return False
+    return messages[: len(messages) - len(_current_turn(ctx))]
+
+
+def asked_in_previous_turn(ctx) -> bool:
+    """True when the turn right before this one ended with a `search_advisory` question for the farmer.
+
+    Only then is this message the farmer's answer to that question. A question asked further back does
+    not count: a new question later in the chat has to be asked about again."""
+    earlier = _earlier_turns(ctx)
+    start = 0
+    for index, message in enumerate(earlier):
+        if isinstance(message, ModelRequest) and any(isinstance(p, UserPromptPart) for p in message.parts):
+            start = index
+    return any(
+        isinstance(message, ModelRequest) and any(_is_pending_return(p) for p in message.parts)
+        for message in earlier[start:]
+    )
+
+
+def _tool_history_missing(ctx) -> bool:
+    """True when earlier turns exist but none of their tool results were kept, so nothing can be checked."""
+    earlier = _earlier_turns(ctx)
+    has_earlier_turn = any(
+        isinstance(m, ModelRequest) and any(isinstance(p, UserPromptPart) for p in m.parts) for m in earlier
+    )
+    has_tool_part = any(
+        isinstance(m, ModelRequest) and any(isinstance(p, ToolReturnPart) for p in m.parts) for m in earlier
+    )
+    return has_earlier_turn and not has_tool_part
 
 
 def farmer_gave_season(ctx) -> bool:
-    """True when the farmer can have given a season: they were asked earlier, or a season word is in their text."""
+    """True when this message can carry a season: it answers our question, or it names a season itself."""
     if not _has_history(ctx):
         return True
-    return question_asked_earlier(ctx) or bool(_SEASON_WORDS.search(_farmer_text(ctx)))
+    return asked_in_previous_turn(ctx) or bool(_SEASON_WORDS.search(_farmer_message(ctx)))
 
 
 def farmer_gave_days(ctx) -> bool:
-    """True when the farmer can have given the sowing days: asked earlier, or a number or a count word is in their text."""
+    """True when this message can carry the sowing days: it answers our question, or has a number or count word."""
     if not _has_history(ctx):
         return True
-    text = _farmer_text(ctx)
+    text = _farmer_message(ctx)
     return (
-        question_asked_earlier(ctx)
+        asked_in_previous_turn(ctx)
         or any(ch.isdigit() for ch in text)
         or bool(_NUMBER_WORDS.search(text))
     )
 
 
 def may_answer_now(ctx) -> bool:
-    """`answer_now` is honoured only after the farmer was asked in an earlier turn, never in the same turn."""
+    """`answer_now` is honoured only when this message answers our question (never in the turn it was asked)."""
     if not _has_history(ctx):
         return True
-    return question_asked_earlier(ctx)
+    return asked_in_previous_turn(ctx) or _tool_history_missing(ctx)

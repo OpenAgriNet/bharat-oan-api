@@ -162,6 +162,36 @@ class TestHardGuardsOnWhatOnlyTheFarmerCanSay:
     def test_days_in_the_farmers_text_are_accepted(self, text):
         assert farmer_gave_days(_ctx([_user(text)]))
 
+    def test_earlier_answers_in_the_conversation_text_do_not_count(self):
+        prefix = "**Conversation**\n\nUser: rabi, 40 days\nAssistant: At 40 days in Rabi ...\n\n---\n\n"
+        ctx = _ctx([_user(prefix + "When should I harvest an early-maturing wheat variety?")])
+        assert not farmer_gave_season(ctx)
+        assert not farmer_gave_days(ctx)
+        assert not may_answer_now(ctx)
+
+    def test_the_farmers_own_words_after_the_conversation_text_count(self):
+        prefix = "**Conversation**\n\nUser: hi\n\n---\n\n"
+        ctx = _ctx([_user(prefix + "Wheat aphids, Rabi, 40 days")])
+        assert farmer_gave_season(ctx) and farmer_gave_days(ctx)
+
+    def test_a_question_from_two_turns_back_does_not_open_the_guards(self):
+        history = (
+            [_user("wheat aphids")] + _advisory_result(QUESTION)
+            + [ModelResponse(parts=[TextPart(content="Which season?")]), _user("rabi, 40 days")]
+            + _advisory_result(ADVICE)
+            + [ModelResponse(parts=[TextPart(content="Advice")]), _user("When to harvest wheat?")]
+        )
+        ctx = _ctx(history)
+        assert not farmer_gave_season(ctx) and not farmer_gave_days(ctx) and not may_answer_now(ctx)
+
+    def test_answer_now_is_allowed_when_tool_results_of_earlier_turns_were_not_kept(self):
+        history = [
+            _user("wheat aphids"),
+            ModelResponse(parts=[TextPart(content="Which season?")]),
+            _user("I don't know"),
+        ]
+        assert may_answer_now(_ctx(history))
+
     def test_after_the_farmer_was_asked_whatever_they_answer_is_accepted(self):
         ctx = _ctx(self._asked_before("the winter one, since last month"))
         assert farmer_gave_season(ctx) and farmer_gave_days(ctx) and may_answer_now(ctx)
