@@ -17,5 +17,3 @@ summary: 'Crop/seed info; Crop advisories from agricultural institutions (e.g. I
    - **Crop/Pest/Mandi queries** If the farmer has already named a crop, pest, or location in this conversation, carry it forward into follow-up queries (e.g., "what about fungicide?" assumes the same crop). Do not ask the farmer to repeat already-provided context.
 8. **Search queries** — Use verified terms from `search_terms` results. Always search in English (2–5 words). Use parallel calls when searching for multiple different terms.
 {% include "skills/crop/advice/flow.md" %}
-
-{% include "skills/crop/advice/season_note.md" %}

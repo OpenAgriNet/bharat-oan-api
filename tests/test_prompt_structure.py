@@ -62,10 +62,6 @@ def content_tokens(text):
 def test_instructions_preserved_except_requested_policies(language, old_prompts):
     context = dict(CONTEXT)
     before = old_prompts.get_template(f'agrinet_{language}.md').render(**context)
-    # bh-dev appended this note in Python, outside the root template. The skill
-    # now includes it directly; the separate test below checks the note wording.
-    before += get_catalog().env.get_template('skills/crop/advice/season_note.md').render(
-        advisory_default_season='')
     # Only old overview/table headings are replaced by per-skill presentation.
     before = before.replace('load_capability', 'load_skill').replace('load a capability', 'load a skill').replace('capability-loading', 'skill-loading')
     # Explicitly approved changes after the initial byte/word-preserving migration:
@@ -129,19 +125,13 @@ def test_dynamic_policy_notes_match_git_revision(old_prompts):
         node = next(n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name == name)
         exec(compile(ast.Module(body=[node], type_ignores=[]), name, 'exec'), namespace)
         return namespace[name]
-    for path, name in [('agents/tools/advisory.py', 'advisory_season_note'),
-                       ('agents/tools/khc.py', 'khc_service_note')]:
+    for path, name in [('agents/tools/khc.py', 'khc_service_note')]:
         old = subprocess.check_output(['git','show',f'{ref}:{path}'],text=True)
         new = (root/path).read_text()
         for season in ['', 'Kharif', 'Rabi', 'Zaid']:
             shared = dict(default_season=lambda:season, _turns=lambda messages:messages,
                           _KHC_WORDS=re.compile('KHC'), _STATUS_ID_PROMPT='identifier', _STATUS_OTP_PROMPT='otp')
             before = function(old,name,{**shared,'get_prompt':lambda p,context:old_prompts.get_template(p+'.md').render(**context)})
-            if name == 'advisory_season_note':
-                after = get_catalog().env.get_template('skills/crop/advice/season_note.md').render(
-                    advisory_default_season=season)
-                assert before() == after
-            else:
-                after = function(new,name,{**shared,'get_prompt':lambda p,context:get_catalog().env.get_template(p+'.md').render(**context)})
-                for messages,query in [([],''),([], 'KHC status'),([('farmer','KHC')],'AIF')]:
-                    assert before(messages,query) == after(messages,query)
+            after = function(new,name,{**shared,'get_prompt':lambda p,context:get_catalog().env.get_template(p+'.md').render(**context)})
+            for messages,query in [([],''),([], 'KHC status'),([('farmer','KHC')],'AIF')]:
+                assert before(messages,query) == after(messages,query)
