@@ -6,6 +6,7 @@ from difflib import SequenceMatcher
 from datetime import datetime
 import hashlib
 import json
+import logging
 import math
 import re
 import time
@@ -29,6 +30,7 @@ APPLICANT_FETCH = "/bharatVistar/applicantFetch"
 NAMESPACE = "ffs-session"
 LEVELS = ("V", "T", "D", "S")
 PRODUCTS = {11: 1089, 12: 1005}
+logger = logging.getLogger(__name__)
 STATE_CODES = {
     "Jammu and Kashmir": "1", "Himachal Pradesh": "2", "Punjab": "3", "Chandigarh": "4",
     "Uttarakhand": "5", "Haryana": "6", "Delhi": "7", "Rajasthan": "8", "Uttar Pradesh": "9",
@@ -75,6 +77,13 @@ def owner_id(user):
 
 def session_key(session_id):
     return hashlib.sha256(session_id.encode()).hexdigest()
+
+
+def _log_value(value):
+    try:
+        return json.dumps(value, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def normalize(text):
@@ -169,6 +178,7 @@ class FFSService:
         await cache.set(session_key(self.session_id), self.state, ttl=1200, namespace=NAMESPACE)
 
     async def call(self, method, prefix, path, body=None, *, encrypted=False, params=None):
+        url = settings.ffs_base_url.rstrip("/") + prefix + path
         headers = {"X-Session-Id": self.session_id, "Content-Type": "application/json"}
         if path == "/authenticate/user/loginByFarmerId":
             headers.update({"isForMobile": "false", "appType": "APPLICANT", "platform": "ANDROID"})
@@ -185,8 +195,16 @@ class FFSService:
             kwargs["content"] = base64.b64encode(AES.new(key, AES.MODE_CBC, iv).encrypt(pad(payload, 16)))
         elif body is not None:
             kwargs["json"] = body
-        response = await self.client.request(method, settings.ffs_base_url.rstrip("/") + prefix + path,
-                                             headers=headers, **kwargs)
+        logger.info("FFS API request method=%s url=%s encrypted=%s params=%s payload=%s",
+                    method, url, encrypted, _log_value(params), _log_value(body))
+        response = await self.client.request(method, url, headers=headers, **kwargs)
+        response_data = None
+        try:
+            response_data = response.json()
+        except ValueError:
+            response_data = response.text
+        logger.info("FFS API response method=%s url=%s status=%s body=%s",
+                    method, url, response.status_code, _log_value(response_data))
         if response.status_code == 401:
             self.state.pop("token", None)
             self.state["stage"] = "login_expired"
@@ -197,10 +215,9 @@ class FFSService:
                            "Ask for the correct OTP, or offer a resend after three failures")
         if not response.is_success:
             raise FFSError("unavailable", "The FFS request failed; do not repeat a write automatically")
-        try:
-            data = response.json()
-        except ValueError:
+        if not isinstance(response_data, dict):
             raise FFSError("unavailable", "FFS returned an invalid response")
+        data = response_data
         if not isinstance(data, dict) or data.get("code") != 200:
             raise FFSError("invalid_otp" if encrypted and "validate" in path else "unavailable",
                            "Ask for the correct OTP" if encrypted and "validate" in path else "FFS could not complete this request")
