@@ -63,6 +63,9 @@ def response_summary(status, data):
 def _emit(level, fields):
     # A telemetry/export/handler failure must not change a farmer workflow.
     try:
+        # Preserve bh-dev diagnostics when the deployment suppresses INFO.
+        if level == logging.INFO and not logger.isEnabledFor(logging.INFO):
+            level = logging.WARNING
         logger.log(level, 'ffs %s', json.dumps(fields, ensure_ascii=False))
     except Exception:
         pass

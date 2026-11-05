@@ -137,6 +137,10 @@ This does not request the mobile CAPTCHA exemption or generate a reCAPTCHA token
 
 FFS tools emit explicit summaries to Langfuse and structured `ffs` log lines:
 
+Console summaries fall back from INFO to WARNING when INFO is disabled, preserving
+the visibility added on `bh-dev` without printing raw provider payloads. Failures
+are logged at ERROR.
+
 ```text
 agent.vistaar                         final answer, not internal AgentRunResult
   tool:ffs_get_entitlement            status, stages, decisions, quantities

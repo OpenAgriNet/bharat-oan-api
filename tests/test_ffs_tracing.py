@@ -39,6 +39,14 @@ def output(span):
     return json.loads(span.attributes['langfuse.observation.output'])
 
 
+def test_console_diagnostics_remain_visible_when_info_is_disabled(caplog):
+    caplog.set_level(logging.WARNING, logger='helpers.ffs_tracing')
+    ffs_tracing._emit(logging.INFO, {'event': 'test', 'status': 'ok'})
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.WARNING
+    assert json.loads(caplog.records[0].getMessage().removeprefix('ffs '))['status'] == 'ok'
+
+
 def test_real_span_tree_safe_outputs_and_cached_decisions(setup, tracing, caplog):
     client, exporter = tracing
     caplog.set_level(logging.INFO, logger='helpers.ffs_tracing')

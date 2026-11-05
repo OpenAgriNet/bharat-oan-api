@@ -24,7 +24,7 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
 from app.config import DEFAULT_HTTP_TIMEOUT
-from helpers.advisory_pending import PENDING_MARKER
+from helpers.advisory_pending import PENDING_MARKER, farmer_gave_days, farmer_gave_season, may_answer_now
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger
 
@@ -505,6 +505,16 @@ async def search_advisory(
     """
     days = _clean_days(days_after_sowing)
     season_value = normalize_season(season)
+    # Hard guards: details only the farmer can give are ignored when the conversation does not show them.
+    if season_value and not farmer_gave_season(ctx):
+        logger.info("search_advisory: ignoring season %r the farmer did not give", season_value)
+        season_value = None
+    if days is not None and not farmer_gave_days(ctx):
+        logger.info("search_advisory: ignoring days_after_sowing %r the farmer did not give", days)
+        days = None
+    if answer_now and not may_answer_now(ctx):
+        logger.info("search_advisory: ignoring answer_now before the farmer was asked")
+        answer_now = False
     location_value = _clean_param(location)
     crop_hint = _clean_param(crop)
     if not crop_hint:
