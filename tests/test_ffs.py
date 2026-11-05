@@ -28,7 +28,7 @@ import pytest
 from agents.deps import FarmerContext
 from agents.skill_policy import SkillState
 from agents.skills import SKILL_LOADER, prepare_skill_tools, render_prompt
-from agents.tools.ffs import ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, ffs_find_shops
+from agents.tools.ffs import ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, ffs_find_shops, ffs_create_booking
 from app.services import ffs
 
 USER = {"sub": "test-caller", "channel": "test", "auth_token_id": "verified-bearer-digest"}
@@ -56,6 +56,7 @@ class Backend:
     def __init__(self):
         self.calls, self.failed, self.fail_path, self.fail_after_write = [], False, None, False
         self.stock = {}
+        self.booking_payloads = []
         self.land = [{"farmlandPlotRegistryId": 101 + i, "farmlandOwnershipId": 201 + i,
                       "ownershipMappingId": 301 + i, "landAreaHectares": 1.23 if i == 0 else 0.96,
                       "stateLgdCode": 27, "districtLgdCode": 496, "subDistrictLgdCode": 4245,
@@ -94,7 +95,7 @@ class Backend:
             data = [{"stateLgdCode": 27, "retailerListDisplayLevel": "D", "productSelectionMode": "GFR_ONLY"}]
         elif path.endswith("getCurrentSeasonAndYear"):
             data = {"season": {"seasonId": 2, "seasonName": "Rabi"}, "year": {"yearId": 1, "yearValue": "2026"}}
-        elif path.endswith("/applicant/fetch"):
+        elif path.endswith("/bharatVistar/applicantFetch"):
             data = {"landData": deepcopy(self.land)}
         elif path.endswith("getCropListByState"):
             data = self.crops
@@ -119,8 +120,24 @@ class Backend:
                 {"products": [{"productId": 1089, "noBagsAvailable": self.stock.get(i, (10 + i, 10 + i))[0]}]},
                 {"products": [{"productId": 1005, "noBagsAvailable": self.stock.get(i, (10 + i, 10 + i))[1]}]}]} for i in range(limit)]
             meta = {"totalPages": 1, "totalRecords": limit}
+        elif path.endswith("createMultipleBookingV2"):
+            self.booking_payloads.append(deepcopy(body))
+            data = {
+                "isValid": True,
+                "message": "All 1 booking(s) created successfully",
+                "bookingResults": [{
+                    "retailerId": body["bookingRequest"][0]["retailerId"],
+                    "procurementId": 123456,
+                    "procurementApplicationCode": "PRC-TEST-001",
+                    "isWaitlisted": False,
+                }],
+                "totalBookingsRequested": 1,
+                "totalBookingsSuccessful": 1,
+                "totalBookingsFailed": 0,
+                "applicantUserId": body["applicantUserId"],
+            }
         else:
-            raise AssertionError("Unexpected API, including any booking: " + path)
+            raise AssertionError("Unexpected API: " + path)
         return httpx.Response(200, json={"code": 200, "status": "success", "data": data, **meta})
 
 
@@ -165,7 +182,7 @@ def test_whole_flow_and_repeats_do_not_repeat_writes(setup):
         assert setup.backend.count("/land/crop/add") == 2
         shops = await ffs_find_shops(context("turn-5"))
         assert shops["status"] == "ok" and len(shops["data"]["shops"]) == 3
-        assert shops["data"]["booking_enabled"] is False
+        assert shops["data"]["booking_enabled"] is True
         assert await ffs_find_shops(context("turn-5")) == shops
         more = await ffs_find_shops(context("turn-6"), "more")
         assert not ({x["shop_ref"] for x in shops["data"]["shops"]} & {x["shop_ref"] for x in more["data"]["shops"]})
@@ -215,13 +232,13 @@ def test_partial_crop_update_reconciles_without_otp_or_duplicate_write(setup):
         assert setup.backend.count("/land/crop/add") == 2
         assert setup.backend.count("loginByFarmerId") == 1
         assert setup.backend.count("validateLoginByFarmerId") == 1
-        assert setup.backend.count("/applicant/fetch") == 2
+        assert setup.backend.count("/bharatVistar/applicantFetch") == 2
     asyncio.run(run())
 
 
 def test_setup_resume_keeps_token_and_does_not_reverify_otp(setup):
     async def run():
-        setup.backend.fail_path = "/applicant/fetch"
+        setup.backend.fail_path = "/bharatVistar/applicantFetch"
         await ffs_send_otp(context(), "99999999999", "27")
         out = await ffs_verify_otp(context("turn-2", otp="123456"))
         assert out["status"] == "setup_incomplete"
@@ -361,6 +378,29 @@ def test_shop_territory_priority_partial_stock_and_widening_cursor(setup):
     asyncio.run(run())
 
 
+def test_create_booking_requires_confirmation_and_submits_once(setup):
+    async def run():
+        village, crops = selection(await login())
+        await ffs_get_entitlement(context("turn-3"), village, crops)
+        shops = await ffs_find_shops(context("turn-4"))
+        shop_ref = shops["data"]["shops"][0]["shop_ref"]
+
+        preview = await ffs_create_booking(context("turn-5"), shop_ref)
+        assert preview["status"] == "needs_confirmation"
+        token = preview["data"]["confirmation_token"]
+
+        mismatch = await ffs_create_booking(context("turn-6"), shop_ref, True, "wrong-token")
+        assert mismatch["status"] == "needs_confirmation"
+        assert setup.backend.count("createMultipleBookingV2") == 0
+
+        booked = await ffs_create_booking(context("turn-7"), shop_ref, True, token)
+        assert booked["status"] == "ok"
+        assert booked["data"]["booking"]["is_valid"] is True
+        assert booked["data"]["booking"]["bookings"][0]["booking_code"] == "PRC-TEST-001"
+        assert setup.backend.count("createMultipleBookingV2") == 1
+    asyncio.run(run())
+
+
 def test_zero_entitlement_and_alternative_tabs_fail_without_inventing_bags(setup):
     async def run():
         village, crops = selection(await login())
@@ -409,13 +449,13 @@ def agent_flow(setup, check_transport=True):
                 {"land_ref": "land-1", "crop_name": "makkaa"}, {"land_ref": "land-2", "crop_name": "maize"}]}),
             8: ("ffs_find_shops", {}),
         }
-        assert {t.name for t in info.function_tools} == {"ffs_send_otp", "ffs_verify_otp", "ffs_get_entitlement", "ffs_find_shops"}
+        assert {t.name for t in info.function_tools} == {"ffs_send_otp", "ffs_verify_otp", "ffs_get_entitlement", "ffs_find_shops", "ffs_create_booking"}
         if steps in calls:
             name, args = calls[steps]
             return ModelResponse(parts=[ToolCallPart(name, args)])
         return ModelResponse(parts=[TextPart("No booking has been placed.")])
     agent = Agent(FunctionModel(model), deps_type=FarmerContext, tools=[
-        Tool(t, takes_ctx=True, sequential=True) for t in (ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, ffs_find_shops)
+        Tool(t, takes_ctx=True, sequential=True) for t in (ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, ffs_find_shops, ffs_create_booking)
     ] + [SKILL_LOADER], prepare_tools=prepare_skill_tools)
     @agent.system_prompt(dynamic=True)
     def prompt(ctx):
@@ -465,7 +505,7 @@ def test_running_mock_http_flow(setup, monkeypatch):
         assert [p["bags"] for p in out["data"]["products"]] == [6, 2]
         shops = await ffs_find_shops(context("4", session))
         assert shops["status"] == "ok" and len(shops["data"]["shops"]) == 3
-        assert shops["data"]["booking_enabled"] is False
+        assert shops["data"]["booking_enabled"] is True
         saved = await ffs.get_session(session)
         assert saved["token"] and len(saved["selection"]) == 2
         assert (await ffs_find_shops(context("4", session))) == shops

@@ -3,6 +3,7 @@ import asyncio
 import base64
 from copy import deepcopy
 from difflib import SequenceMatcher
+from datetime import datetime
 import hashlib
 import json
 import math
@@ -24,6 +25,7 @@ USER = "/ufa-user-service/ufa-user/v1/api"
 MASTER = "/ufa-master-service/ufa-master/v1/api"
 APPROVAL = "/ufa-approval-service/ufa-approval-service/v1/api"
 FERT = "/ufa-fertilizer-service/ufa-fertilizer/v1/api"
+APPLICANT_FETCH = "/bharatVistar/applicantFetch"
 NAMESPACE = "ffs-session"
 LEVELS = ("V", "T", "D", "S")
 PRODUCTS = {11: 1089, 12: 1005}
@@ -235,7 +237,7 @@ class FFSService:
                       "otp_turn": self.question_id, "otp_attempts": 0}
         await self.save()
         await self.call("POST", USER, "/authenticate/user/loginByFarmerId", {
-            "userStateLgdCode": state_code, "userFarmerId": farmer_id, "isForMobile": "false"}, encrypted=True)
+            "userStateLgdCode": state_code, "userFarmerId": farmer_id}, encrypted=True)
         self.state["stage"] = "otp_pending"
         await self.save()
         return result("otp_sent", "Ask for the six-digit SMS OTP", expires_in=180)
@@ -255,7 +257,7 @@ class FFSService:
             await self.save()
             data = await self.call("POST", USER, "/authenticate/user/validateLoginByFarmerId", {
                 "userStateLgdCode": self.state["state_code"], "userFarmerId": self.state["farmer_id"],
-                "otp": to_ascii_digits(otp), "isForMobile": "false"}, encrypted=True)
+                "otp": to_ascii_digits(otp)}, encrypted=True)
             if not isinstance(data, dict) or not data.get("userToken") or not data.get("userId") or not data.get("userAadhaarHash"):
                 raise FFSError("unavailable", "FFS login returned an incomplete profile")
             try:
@@ -274,7 +276,7 @@ class FFSService:
         for name, prefix, path, method, body, params in [
             ("config", MASTER, "/stateConfiguration/getConfigurationByState", "GET", None, {"stateLgdCode": s["state_code"]}),
             ("season", MASTER, "/common/getCurrentSeasonAndYear", "GET", None, None),
-            ("profile", APPROVAL, "/applicant/fetch", "POST", "profile", None),
+            ("profile", APPROVAL, APPLICANT_FETCH, "POST", "profile", None),
             ("crops", MASTER, "/common/getCropListByState", "GET", None, {"stateLgdCode": s["state_code"]}),
         ]:
             if name in s:
@@ -378,7 +380,7 @@ class FFSService:
         s["stage"] = "mapping_crops"
         await self.save()
         if s.get("uncertain_plot"):
-            fresh = await self.call("POST", APPROVAL, "/applicant/fetch", {
+            fresh = await self.call("POST", APPROVAL, APPLICANT_FETCH, {
                 "stateCode": int(s["state_code"]), "aadhaarHash": s["user"]["userAadhaarHash"],
                 "seasonId": s["season"]["season"]["seasonId"], "yearId": s["season"]["year"]["yearId"]})
             if not isinstance(fresh, dict) or not isinstance(fresh.get("landData"), list):
@@ -524,12 +526,135 @@ class FFSService:
                         shops=public, has_more=bool(pending()) or not exhausted,
                         search_complete=LEVELS[search["level"]] in search["complete_levels"],
                         complete_supply_only=search.get("complete_only", False),
-                        complete_supply_further=None, booking_enabled=False)
+                        complete_supply_further=None, booking_enabled=True)
         search["last_result"] = answer
         search["turn_results"][turn_key] = answer
         s["stage"] = "shops_ready"
         await self.save()
         return deepcopy(answer)
+
+    async def create_booking(self, shop_ref, confirmed=False, confirmation_token=""):
+        self.ready()
+        s = self.state
+        if not s.get("entitlement"):
+            raise FFSError("needs_entitlement", "Collect village/crops and call ffs_get_entitlement first")
+        if not s.get("shops", {}).get("pool"):
+            raise FFSError("needs_shops", "Call ffs_find_shops first and ask the farmer to choose a shop")
+        if s.get("booking_turn") == self.question_id:
+            if s.get("last_booking_result"):
+                return deepcopy(s["last_booking_result"])
+            return result("already_started", "Booking has already been attempted this turn")
+        wanted = [p for p in s["entitlement"]["data"]["products"] if p["bags"] > 0]
+        if not wanted:
+            return result("zero_entitlement", "No urea/DAP bags are offered; do not place a booking")
+        shop = next((row for row in s["shops"]["pool"].values() if row["shop_ref"] == shop_ref), None)
+        if not shop:
+            return result("needs_clarification", "Choose a shop_ref from the latest shop list")
+
+        mobile = re.sub(r"\D", "", str(s["user"].get("userMobileNumber") or ""))
+        if mobile.startswith("91") and len(mobile) == 12:
+            mobile = mobile[2:]
+        if not re.fullmatch(r"[6-9]\d{9}", mobile):
+            return result("needs_clarification", "FFS login did not return a valid 10-digit contact number for booking")
+
+        chosen = []
+        for group in wanted:
+            product = next((p for p in s.get("products", []) if p.get("productId") == PRODUCTS[group["group"]]), None)
+            if not product or product.get("bagWeightKg") != group["kg_per_bag"] or not product.get("plantId"):
+                raise FFSError("unavailable", "The required fertilizer product/plant mapping is unavailable for booking")
+            chosen.append({"group": group["group"], "name": group["name"], "bags": group["bags"],
+                           "kg_per_bag": group["kg_per_bag"], "product_id": product["productId"],
+                           "plant_id": product["plantId"]})
+
+        selected_lands = []
+        for item in s.get("selection", []):
+            land = self.land_map().get(item["land_ref"])
+            if not land:
+                raise FFSError("unavailable", "Selected plot details are missing; refresh entitlement before booking")
+            selected_lands.append({"land_ref": item["land_ref"], "survey": str(land.get("surveyNumber", "")),
+                                   "farmlandPlotRegistryId": str(land["farmlandPlotRegistryId"]),
+                                   "farmLandOwnershipId": str(land["farmlandOwnershipId"]),
+                                   "cropCode": item["crop_code"]})
+        first_plot_id = int(selected_lands[0]["farmlandPlotRegistryId"])
+        first_crop_code = selected_lands[0]["cropCode"]
+
+        summary = {
+            "shop_ref": shop["shop_ref"],
+            "shop_name": shop.get("name", ""),
+            "products": [{"name": x["name"], "bags": x["bags"], "kg_per_bag": x["kg_per_bag"]} for x in chosen],
+            "plots": [{"land_ref": x["land_ref"], "survey": x["survey"]} for x in selected_lands],
+        }
+        expected_token = hashlib.sha256(json.dumps(summary, sort_keys=True).encode()).hexdigest()[:12]
+        if not confirmed:
+            s["pending_booking"] = {"shop_ref": shop_ref, "confirmation_token": expected_token, "summary": summary}
+            await self.save()
+            return result("needs_confirmation",
+                          "Read the summary and ask for explicit confirmation, then call again with confirmed=true",
+                          summary=summary, confirmation_token=expected_token, booking_enabled=True)
+        pending = s.get("pending_booking", {})
+        token = (confirmation_token or "").strip()
+        if pending.get("shop_ref") != shop_ref or pending.get("confirmation_token") != token or token != expected_token:
+            s["pending_booking"] = {"shop_ref": shop_ref, "confirmation_token": expected_token, "summary": summary}
+            await self.save()
+            return result("needs_confirmation",
+                          "Confirmation token did not match this booking summary. Read back and confirm again.",
+                          summary=summary, confirmation_token=expected_token, booking_enabled=True)
+
+        now = datetime.now()
+        lines = [{
+            "productId": x["product_id"],
+            "plantId": int(x["plant_id"]),
+            "productGroupId": x["group"],
+            "noBagsRequested": int(x["bags"]),
+            "quantityOfBagKg": x["kg_per_bag"],
+            "farmlandPlotRegistryId": first_plot_id,
+            "cropCode": first_crop_code,
+        } for x in chosen]
+        payload = {
+            "seasonId": s["season"]["season"]["seasonId"],
+            "year": now.year,
+            "month": now.month,
+            "requestedDatetime": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "applicantUserId": s["user"]["userId"],
+            "contactNoForCommunication": mobile,
+            "stateLgdCode": int(self.state["state_code"]),
+            "districtLgdCode": self.land_map()[s["selection"][0]["land_ref"]]["districtLgdCode"],
+            "subDistrictLgdCode": self.land_map()[s["selection"][0]["land_ref"]]["subDistrictLgdCode"],
+            "villageLgdCode": self.land_map()[s["selection"][0]["land_ref"]]["villageLgdCode"],
+            "selectedLandIds": [{
+                "farmLandOwnershipId": x["farmLandOwnershipId"],
+                "cropCode": x["cropCode"],
+                "farmLandPlotRegistryId": x["farmlandPlotRegistryId"],
+            } for x in selected_lands],
+            "bookingRequest": [{"retailerId": shop["retailer_id"], "productLines": lines}],
+            "GFRRecommendation": s.get("gfr", {}).get("recommendations", []),
+            "gfrType": s.get("gfr", {}).get("gfrType"),
+            "isProceedWithGfr": False,
+        }
+
+        s["booking_turn"] = self.question_id
+        s["uncertain_booking"] = {"shop_ref": shop_ref, "summary": summary}
+        await self.save()
+        data = await self.call("POST", FERT, "/bharatVistar/createMultipleBookingV2", payload)
+        if not isinstance(data, dict):
+            raise FFSError("unavailable", "FFS booking returned an invalid response")
+        results = data.get("bookingResults") or []
+        public = {
+            "is_valid": bool(data.get("isValid")),
+            "message": data.get("message", ""),
+            "bookings": [{
+                "procurement_id": row.get("procurementId"),
+                "booking_code": row.get("procurementApplicationCode"),
+                "is_waitlisted": bool(row.get("isWaitlisted")),
+            } for row in results if isinstance(row, dict)],
+        }
+        s.pop("pending_booking", None)
+        s.pop("uncertain_booking", None)
+        s["stage"] = "booking_done"
+        s["last_booking_result"] = result("ok" if public["is_valid"] else "booking_failed",
+                                          "Share booking result and reference code", booking=public, booking_enabled=True)
+        await self.save()
+        return deepcopy(s["last_booking_result"])
 
     async def run(self, operation, **kwargs):
         if not settings.ffs_base_url or not self.owner or not self.session_id:
@@ -551,11 +676,13 @@ class FFSService:
                 await self.save()
             if self.state.get("token") and self.state.get("stage") == "loading":
                 return result("setup_incomplete", "Call ffs_verify_otp without another OTP to resume setup")
+            if self.state.get("uncertain_booking"):
+                return result("booking_uncertain", "Booking outcome is uncertain. Check booking status before retrying another booking")
             if self.state.get("uncertain_plot"):
                 return result("partial_crop_update", "Crop mapping is incomplete. Retry entitlement to reconcile saved plots; no new OTP is needed")
             return result(error.status, error.next_action)
         except (httpx.HTTPError, TimeoutError):
-            status = "partial_crop_update" if self.state.get("uncertain_plot") else "setup_incomplete" if self.state.get("token") and self.state.get("stage") == "loading" else "unavailable"
+            status = "booking_uncertain" if self.state.get("uncertain_booking") else "partial_crop_update" if self.state.get("uncertain_plot") else "setup_incomplete" if self.state.get("token") and self.state.get("stage") == "loading" else "unavailable"
             return result(status, "FFS did not complete the request. Resume setup/crop reconciliation without resending OTP or blindly repeating writes")
         except (RedisError, ValueError, KeyError, TypeError, IndexError):
             return result("unavailable", "FFS state or response is unavailable; no booking was attempted")

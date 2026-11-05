@@ -48,7 +48,19 @@ async def ffs_find_shops(ctx: RunContext[FarmerContext], action: Literal["initia
     """After the farmer opts in, find up to three FFS shops for their entitlement.
 
     Use more for the next shops, widen to seek full stock in a wider territory.
-    Describe partial stock honestly. A shop choice does not reserve or book
-    anything; booking submission is unavailable in this version.
+    Describe partial stock honestly. A shop choice does not reserve anything;
+    use ffs_create_booking for explicit final submission.
     """
     return await _run(ctx, "find_shops", action=action)
+
+
+async def ffs_create_booking(ctx: RunContext[FarmerContext], shop_ref: str,
+                             confirmed: bool = False, confirmation_token: str = "") -> dict:
+    """Create the final FFS booking for a selected shop, with explicit confirmation.
+
+    First call with confirmed=False to get a booking summary and confirmation_token.
+    After reading that summary to the farmer and receiving explicit consent, call
+    again with confirmed=True and the same confirmation_token.
+    """
+    return await _run(ctx, "create_booking", shop_ref=shop_ref, confirmed=confirmed,
+                      confirmation_token=confirmation_token)
