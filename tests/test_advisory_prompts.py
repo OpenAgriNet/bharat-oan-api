@@ -65,6 +65,8 @@ def test_prompt_has_the_search_first_advisory_flow(path):
     assert "your first reply is only one short question asking which crop" in flow
     assert "`answer_now=true`" in flow and "`crop=\"Wheat\"`, `days_after_sowing=40`" in flow
     assert "never put season names in brackets" in flow
+    assert "the farmer decides" in flow
+    assert "Your whole reply is only that question" in flow
     assert "not when it asked you to put a question to the farmer" in flow
 
 
