@@ -5,7 +5,13 @@ from pathlib import Path
 
 import pytest
 
-PROMPTS = sorted((Path(__file__).resolve().parent.parent / "assets" / "prompts").glob("agrinet_*.md"))
+PROMPTS = sorted((Path(__file__).resolve().parent.parent / "assets" / "prompts" / "skills" / "crop" / "advice").glob("advice_*.md"))
+
+
+def _render(path, context=None):
+    from agents.skill_catalog import get_catalog
+
+    return get_catalog().render_skill("crop.advice", path.stem.removeprefix("advice_"), context or {})
 
 
 def test_all_thirteen_language_prompts_are_covered():
@@ -15,10 +21,10 @@ def test_all_thirteen_language_prompts_are_covered():
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
 def test_prompt_has_a_search_advisory_row_in_the_tool_table(path):
     rows = [line for line in path.read_text(encoding="utf-8").splitlines() if line.startswith("|") and "`search_advisory`" in line]
-    assert len(rows) == 1, f"{path.name}: expected exactly one tool-table row for search_advisory"
+    assert len(rows) == 2, f"{path.name}: crop information and advisory rows must both use ICAR first"
     cells = [c.strip() for c in rows[0].strip().strip("|").split("|")]
     assert len(cells) == 4, f"{path.name}: tool row must have 4 columns"
-    assert "`search_documents`" in cells[3], "row must name search_documents as the fallback"
+    assert "ICAR" in cells[3], "row must explain ICAR first, then document search"
 
 
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
@@ -29,27 +35,49 @@ def test_existing_document_and_pest_rows_are_untouched(path):
 
 
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
+def test_source_order_and_fallback_are_consistent_in_every_language(path):
+    text = _render(path)
+    assert text.count("### Crop advisory flow") == 1
+    assert "Check documents even when ICAR found an advisory" in text
+    assert "do not run these two searches in parallel" in text
+    assert "Prefer relevant **ICAR - Kisan Sarathi** guidance" in text
+    assert "If document search fails but ICAR is relevant, answer from ICAR" in text
+    assert "If ICAR has no relevant result, answer from relevant documents" in text
+    assert "If it finds no advisory, fall back" not in text
+    assert "Nothing found: fall back" not in text
+    assert "### Document search" not in text  # Loaded by the manifest dependency, not copied.
+
+
+@pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
 def test_prompt_has_no_generic_or_personalised_flow(path):
-    text = path.read_text(encoding="utf-8")
+    text = _render(path, {"advisory_default_season": "Rabi"}) + path.read_text(encoding="utf-8")
     for old in ("advice_type", "generic or personalised", "Generic or personalised", "personalised advice", "ask-first"):
         assert old not in text, f"{path.name}: still mentions {old!r}"
 
 
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
 def test_prompt_has_the_search_first_advisory_flow(path):
-    text = path.read_text(encoding="utf-8")
-    flow = text.split("### Crop advisory flow", 1)[1].split("\n## ", 1)[0]
+    flow = _render(path).split("### Crop advisory flow", 1)[1]
     assert "1. **Search first.**" in flow
     assert "Never ask the farmer for their location" in flow
     assert "call `search_advisory` again with the same `query`" in flow
     assert "**Source: ICAR - Kisan Sarathi**" in flow
     assert "your first reply is only one short question asking which crop" in flow
     assert "`answer_now=true`" in flow and "`crop=\"Wheat\"`, `days_after_sowing=40`" in flow
+    assert "never put season names in brackets" in flow
 
 
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
 def test_a_missing_crop_is_asked_first_in_the_tool_rows(path):
-    rows = [l for l in path.read_text(encoding="utf-8").splitlines() if l.startswith("|") and "`search_pests_diseases`" in l]
-    assert any("ask which crop first" in r for r in rows), f"{path.name}: pests row must ask for a missing crop"
-    advisory = [l for l in path.read_text(encoding="utf-8").splitlines() if l.startswith("|") and "`search_advisory`" in l]
-    assert len(advisory) == 1 and "ask which crop first" in advisory[0] and "general knowledge" in advisory[0]
+    lines = path.read_text(encoding="utf-8").splitlines()
+    pests = [l for l in lines if l.startswith("|") and "`search_pests_diseases`" in l and "`search_advisory`" not in l]
+    assert any("ask which crop first" in r and "`crop`" in r for r in pests), f"{path.name}: pests row must ask for a missing crop"
+    advisory = [l for l in lines if l.startswith("|") and "`search_advisory`" in l and "ask which crop first" in l]
+    assert len(advisory) == 1 and "general knowledge" in advisory[0]
+
+
+def test_the_configured_season_note_only_renders_when_a_season_is_set():
+    path = PROMPTS[0]
+    with_season = _render(path, {"advisory_default_season": "Rabi"})
+    assert "Advisory season (fixed: Rabi)" in with_season and "do not pass `season`" in with_season
+    assert "Advisory season" not in _render(path, {"advisory_default_season": ""})

@@ -1,19 +1,18 @@
 from pydantic_ai import RunContext
-from helpers.utils import get_prompt, get_today_date_str, get_crop_season, get_last_weekday_table, get_logger
+from helpers.utils import get_today_date_str, get_crop_season, get_last_weekday_table, get_logger
 from helpers.scheme_qdrant_search import format_vector_schemes_prompt_block
 from agents.models import configured_agent
 from agents.tools import TOOLS
 from agents.tools.khc import khc_service_note
-from agents.tools.advisory import advisory_season_note
+from agents.tools.advisory import default_season
 from pydantic_ai.models.openai import OpenAIChatModelSettings
 from agents.deps import FarmerContext
-from agents.capabilities import (
-    CAPABILITY_LOADER, prepare_capability_tools, validate_manifest,
-    capability_prompt_context, capability_routing,
-)
+from agents.skill_catalog import get_catalog
+from agents.skills import SKILL_LOADER, prepare_skill_tools, render_prompt
+
 
 logger = get_logger(__name__)
-validate_manifest(TOOLS)
+get_catalog().validate_tools(TOOLS)
 
 
 agrinet_agent = configured_agent(
@@ -23,8 +22,8 @@ agrinet_agent = configured_agent(
     output_type=str,
     deps_type=FarmerContext,
     retries=3,
-    tools=[*TOOLS, CAPABILITY_LOADER],
-    prepare_tools=prepare_capability_tools,
+    tools=[*TOOLS, SKILL_LOADER],
+    prepare_tools=prepare_skill_tools,
     end_strategy='exhaustive',
     model_settings=OpenAIChatModelSettings(
         temperature=0.7,
@@ -53,7 +52,7 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
         "System prompt rendered for session=%s lang=%s — %s vector schemes live",
         getattr(deps, "session_id", None), lang_code, scheme_block.get("vector_scheme_count"),
     )
-    deps.capabilities.restore(ctx.messages)
-    prompt_file = f'agrinet_{lang_code}'
-    context = capability_prompt_context(deps, prompt_file, context)
-    return get_prompt(prompt_file, context=context) + capability_routing(deps) + khc_service_note(ctx.messages, current_query=deps.query) + advisory_season_note()
+    deps.skills.restore(ctx.messages)
+    context['khc_service_note'] = khc_service_note(ctx.messages, current_query=deps.query)
+    context['advisory_default_season'] = default_season()
+    return render_prompt(deps.skills, lang_code, context)

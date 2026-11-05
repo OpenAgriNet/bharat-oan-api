@@ -74,20 +74,6 @@ def default_season() -> str:
     return _clean_param(os.getenv("ADVISORY_DEFAULT_SEASON"))
 
 
-def advisory_season_note() -> str:
-    """System-prompt note for the configured season; empty when no season is configured."""
-    season = default_season()
-    if not season:
-        return ""
-    return (
-        f"\n\n## Advisory season (fixed: {season})\n"
-        f"Crop advice is always searched for the **{season}** season. Whatever season the farmer mentions, "
-        f"do not pass `season` to `search_advisory` and do not ask for it. When your answer uses the crop advisory "
-        f"results, say it is for the {season} season and continue the sentence with the advice, for example "
-        f"\"For the {season} season, ...\"."
-    )
-
-
 # ---------------------------------------------------------------------------
 # Season handling (read from the chunk text header)
 # ---------------------------------------------------------------------------

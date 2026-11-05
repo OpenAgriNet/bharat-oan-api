@@ -26,8 +26,23 @@ RUN python3 -m pip install --no-cache-dir --only-binary=:all: --require-hashes -
 RUN python3 -m pip install --no-cache-dir --no-build-isolation \
     --only-binary=:all: --no-binary=marisa-trie,pyyaml \
     --require-hashes -r requirements.lock
-RUN python3 -m pip check && python3 -c \
-    "import marisa_trie, pandas, pydantic, rapidfuzz, zope.interface; from yaml import CLoader; from langcodes import Language; assert Language.get('hi').display_name('en') == 'Hindi'"
+# The workflow selects the branch's existing validation policy; local builds default to production.
+ARG IMAGE_CHECK_PROFILE=production
+RUN python3 -m pip check && \
+    case "$IMAGE_CHECK_PROFILE" in \
+      production) python3 -c "import httptools, marisa_trie, numpy, pandas, \
+        pydantic, rapidfuzz, scipy, torch, zope.interface; \
+        from yaml import CLoader; \
+        from langcodes import Language; \
+        from sentence_transformers import SentenceTransformer; \
+        assert torch.version.cuda is None, 'Expected CPU-only Torch'; \
+        assert Language.get('hi').display_name('en') == 'Hindi'" ;; \
+      development) python3 -c "import marisa_trie, pandas, pydantic, rapidfuzz, zope.interface; \
+        from yaml import CLoader; \
+        from langcodes import Language; \
+        assert Language.get('hi').display_name('en') == 'Hindi'" ;; \
+      *) echo "Unknown image check profile: $IMAGE_CHECK_PROFILE" >&2; exit 1 ;; \
+    esac
 
 # Bake E5 embedding model into the image (avoids HuggingFace download on first search_schemes call)
 ARG HF_TOKEN=

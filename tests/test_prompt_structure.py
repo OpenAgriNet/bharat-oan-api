@@ -1,108 +1,147 @@
-"""Prompt assets and optional byte-exact comparison against a chosen Git revision.
-
-PROMPT_COMPARE_REF=<revision> python -m pytest tests/test_prompt_structure.py -q
-No saved hashes, model calls, or external services are required.
-"""
-import ast
-import asyncio
+"""Multilingual inventory and wording-preservation comparison against Git, never saved hashes."""
+from collections import Counter
 import io
-import json
 import os
 import re
 import subprocess
 import tarfile
-from pathlib import Path
-from types import SimpleNamespace
 
+from jinja2 import DictLoader, Environment
 import pytest
-from jinja2 import DictLoader, Environment, FileSystemLoader
 
-from agents.capabilities import capability_prompt_context, load_capability
-from agents.capability_manifest import CAPABILITIES
-from agents.capability_policy import ALL_TOOLS, CapabilityState, ToolPolicy
-
-ROOT = Path(__file__).resolve().parents[1]
-PROMPTS = ROOT / 'assets/prompts'
-SECTIONS = json.loads((PROMPTS / 'capabilities/sections.json').read_text())
-AGENT = next(iter(SECTIONS)).rsplit('_', 1)[0]
-LANGUAGES = {key.rsplit('_', 1)[1] for key in SECTIONS}
-CONTEXT = dict(today_date='22 October 2026', crop_season='Rabi', last_weekday_table='Wednesday',
-               vector_scheme_count=2, vector_schemes_bullets='- One\n- Two',
-               vector_schemes_identifiers='one, two')
+from agents.skill_catalog import PROMPT_DIR, get_catalog
+from agents.skill_policy import SkillState
+from agents.skills import render_prompt, skill_instructions
+from tests.test_skills import CONTEXT, LANGUAGES
 
 
-def production_prompt(prompt):
-    # Exercise the real renderer without importing unrelated AWS/network dependencies.
-    tree = ast.parse((ROOT / 'helpers/utils.py').read_text())
-    function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'get_prompt')
-    namespace = dict(Environment=Environment, FileSystemLoader=FileSystemLoader, Dict=dict)
-    exec(compile(ast.Module(body=[function], type_ignores=[]), 'helpers/utils.py', 'exec'), namespace)
-    return namespace['get_prompt'](prompt, CONTEXT, str(PROMPTS))
-
-
-def test_prompt_inventory_and_language_coverage():
-    assert set(SECTIONS) == {p.stem for p in PROMPTS.glob(f'{AGENT}_*.md')}
-    base = PROMPTS / 'capabilities' / AGENT
-    groups = {Path(s['path']).parts[2] for sections in SECTIONS.values() for s in sections}
-    assert {p.name for p in base.iterdir() if p.is_dir()} == set(CAPABILITIES) | groups
-    coverage = {}
-    referenced = set()
-    for prompt, sections in SECTIONS.items():
-        lang = prompt.rsplit('_', 1)[1]
-        includes = re.findall(r'{% include "([^"]+)" %}', (PROMPTS / f'{prompt}.md').read_text())
-        assert len(includes) == len(set(includes)) == len(sections)
-        assert set(includes) == {s['path'] for s in sections}
-        for section in sections:
-            path = Path(section['path'])
-            assert path.parts[:2] == ('capabilities', AGENT)
-            assert len(path.parts) == 5
-            assert path.parts[2] in CAPABILITIES or path.parts[2] == '_shared'
-            assert path.name.endswith((f'_{lang}.md', '_common.md'))
-            assert section['tools'] and set(section['tools']) <= ALL_TOOLS
-            text = (PROMPTS / path).read_text()
-            assert text.strip() and 'preserve fragment whitespace' not in text
-            coverage.setdefault(path.parent, set()).add(lang)
-            referenced.add(path)
-    for section, actual in coverage.items():
-        expected = LANGUAGES
-        assert actual == expected, (section, actual, expected)
-    files = {p.relative_to(PROMPTS) for p in base.rglob('*.md') if p.name != 'README.md'}
-    assert files == referenced, 'Unreferenced prompt assets or missing files'
+def test_inventory_and_language_coverage():
+    cat = get_catalog()
+    assert len(LANGUAGES) == 13
+    expected = {}
+    for agent, config in cat.manifest.agents.items():
+        roots = set(cat.manifest.skills) if config.enabled_skills == 'all' else set(config.enabled_skills)
+        names = cat.resolve(roots)
+        for name in names:
+            folder = cat.path(cat.manifest.skills[name].prompt_dir)
+            stem = folder.name
+            variant = config.skill_variants.get(name)
+            if variant:
+                folder /= variant
+            for language in config.languages:
+                expected.setdefault(folder, set()).add(f'{stem}_{language}.md')
+    found = {p for p in (PROMPT_DIR / 'skills').rglob('*.md') if re.search(r'_[a-z]{2,3}\.md$',p.name)}
+    assert found == {folder / filename for folder, files in expected.items() for filename in files}, \
+        'Unregistered skill/variant files or missing translations'
+    for lang in LANGUAGES:
+        root = (PROMPT_DIR / 'chat' / f'agrinet_{lang}.md').read_text()
+        assert 'capability_enabled' not in root and '{% include' not in root
+        assert not any(tool in root for tool in cat.tools), 'Workflow tool instructions leaked into global prompt'
+    assert not (PROMPT_DIR / 'capabilities').exists()
+    assert not list(PROMPT_DIR.glob('agrinet_*.md'))
 
 
 @pytest.fixture(scope='module')
-def previous_revision():
-    revision = os.environ.get('PROMPT_COMPARE_REF')
-    if not revision:
-        pytest.skip('Set PROMPT_COMPARE_REF for a one-off Git revision comparison')
-    archive = subprocess.check_output(['git', 'archive', revision, 'assets/prompts'], cwd=ROOT)
+def old_prompts():
+    ref = os.environ.get('PROMPT_COMPARE_REF')
+    if not ref:
+        pytest.skip('Set PROMPT_COMPARE_REF for a one-off migration wording comparison')
+    # Full baseline is named in the migration report; allow an explicit comparison revision.
+    archive = subprocess.check_output(['git', 'archive', ref, 'assets/prompts'])
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
         sources = {m.name.removeprefix('assets/prompts/'): tar.extractfile(m).read().decode()
                    for m in tar.getmembers() if m.isfile()}
-    return Environment(loader=DictLoader(sources), autoescape=False), json.loads(
-        sources['capabilities/sections.json'])
+    return Environment(loader=DictLoader(sources), autoescape=False)
 
 
-@pytest.mark.parametrize('prompt', sorted(SECTIONS))
-def test_rendering_and_lazy_instructions_match_git_revision(prompt, previous_revision):
-    before, old_sections = previous_revision
-    after = Environment(loader=FileSystemLoader(PROMPTS), autoescape=False)
-    assert [s['tools'] for s in old_sections[prompt]] == [s['tools'] for s in SECTIONS[prompt]]
-    assert production_prompt(prompt) == before.get_template(
-        f'{prompt}.md').render(**CONTEXT)
-    selections = [frozenset(), ALL_TOOLS, *CAPABILITIES.values(),
-                  *({tool} for tool in sorted(ALL_TOOLS))]
-    for visible in selections:
-        deps = SimpleNamespace(capabilities=CapabilityState(policy=ToolPolicy(preloaded_tools=visible)))
-        context = capability_prompt_context(deps, prompt, CONTEXT)
-        actual = after.get_template(f'{prompt}.md').render(**context)
-        expected = before.get_template(f'{prompt}.md').render(
-            **CONTEXT, capability_enabled=lambda names: bool(set(names) & set(visible)))
-        assert actual == expected, (prompt, sorted(visible))
-    deps = SimpleNamespace(capabilities=CapabilityState(policy=ToolPolicy(preloaded_tools=set())))
-    capability_prompt_context(deps, prompt, CONTEXT)
-    for group, tools in CAPABILITIES.items():
-        result = asyncio.run(load_capability(SimpleNamespace(deps=deps), group))
-        expected = '\n'.join(before.get_template(s['path']).render(**CONTEXT)
-                             for s in old_sections[prompt] if tools.intersection(s['tools']))
-        assert result['instructions'] == expected, (prompt, group)
+def content_tokens(text):
+    return Counter(re.findall(r'[^\s|#*]+', text))
+
+
+@pytest.mark.parametrize('language', LANGUAGES)
+def test_instructions_preserved_except_requested_policies(language, old_prompts):
+    context = dict(CONTEXT)
+    before = old_prompts.get_template(f'agrinet_{language}.md').render(**context)
+    # bh-dev appended this note in Python, outside the root template. The skill
+    # now includes it directly; the separate test below checks the note wording.
+    before += get_catalog().env.get_template('skills/crop/advice/season_note.md').render(
+        advisory_default_season='')
+    # Only old overview/table headings are replaced by per-skill presentation.
+    before = before.replace('load_capability', 'load_skill').replace('load a capability', 'load a skill').replace('capability-loading', 'skill-loading')
+    # Explicitly approved changes after the initial byte/word-preserving migration:
+    # ICAR first then documents, no FYM->FFS substitution, shared dependencies,
+    # and the now-released PM-KISAN announcement replacing its tense switch.
+    cat = get_catalog()
+    old_tense_rule = (
+        f"Use today's date (`{context['today_date']}`) in Asia/Kolkata: future tense "
+        'through 30 October 2026, past tense from 31 October 2026.'
+    )
+    assert before.count(old_tense_rule) == 1
+    before = before.replace(old_tense_rule, 'Use past tense for this released installment.')
+    start = before.index('**Through 30 October 2026 (IST):**')
+    end = before.index('Cite **Source: Government Scheme Information**', start)
+    before = (before[:start] + cat.env.get_template(
+        'skills/pm_kisan/installments/release.md').render() + '\n\n' + before[end:])
+    crop = cat.render_skill('crop.advice', language, context)
+    for row in crop.splitlines():
+        if row.startswith('|') and '`search_advisory`' in row:
+            label = row.split('|')[1].strip()
+            prior = [line for line in before.splitlines()
+                     if line.startswith('|') and line.split('|')[1].strip() == label]
+            assert len(prior) == 1
+            before = before.replace(prior[0], row)
+    flow = cat.env.get_template('skills/crop/advice/flow.md').render(**context).strip()
+    before, count = re.subn(
+        r'### Crop advisory flow .*?Do not repeat the per-advisory "Source:" lines that appear inside the tool text\.',
+        lambda match: flow, before, flags=re.S)
+    assert count == 1
+    before = before.replace(
+        ' If the farmer asks about F.Y.M. or Farm Yard Manure, call `search_schemes` with an FFS query (e.g. `"FFS Farm Yard Manure"`).', '')
+    before = before.replace('`search_documents` / `search_pests_diseases`', '`crop.advice`')
+    original = before.splitlines()
+    headings = [line for line in original if line.startswith('## ')]
+    removed = {headings[0], headings[3]}
+    table_start = original.index(headings[3])
+    table_header = next(line for line in original[table_start+1:] if line.startswith('|'))
+    removed.add(table_header)
+    removed.add('|---|---|---|---|')
+    before = '\n'.join(line for line in original if line not in removed)
+    after = render_prompt(SkillState(), language, context)
+    before += '\n' + cat.render_skill('documents.search', language, context)
+    state = SkillState(language=language, context=context)
+    for name, definition in cat.manifest.skills.items():
+        if definition.requires:
+            body = cat.render_skill(name, language, context)
+            before += '\n' + skill_instructions(name, state).removesuffix(body)
+    after = '\n'.join(line for line in after.splitlines()
+                      if line not in {'| Query | Tools | Source | Instructions |', '|---|---|---|---|'})
+    missing = content_tokens(before) - content_tokens(after)
+    added = content_tokens(after) - content_tokens(before)
+    assert not missing and not added, {'missing':missing,'added':added}
+
+
+def test_dynamic_policy_notes_match_git_revision(old_prompts):
+    """Execute the real old/new rendering functions without importing network clients."""
+    import ast
+    root = PROMPT_DIR.parents[1]
+    ref = os.environ['PROMPT_COMPARE_REF']
+    def function(source, name, namespace):
+        node = next(n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name == name)
+        exec(compile(ast.Module(body=[node], type_ignores=[]), name, 'exec'), namespace)
+        return namespace[name]
+    for path, name in [('agents/tools/advisory.py', 'advisory_season_note'),
+                       ('agents/tools/khc.py', 'khc_service_note')]:
+        old = subprocess.check_output(['git','show',f'{ref}:{path}'],text=True)
+        new = (root/path).read_text()
+        for season in ['', 'Kharif', 'Rabi', 'Zaid']:
+            shared = dict(default_season=lambda:season, _turns=lambda messages:messages,
+                          _KHC_WORDS=re.compile('KHC'), _STATUS_ID_PROMPT='identifier', _STATUS_OTP_PROMPT='otp')
+            before = function(old,name,{**shared,'get_prompt':lambda p,context:old_prompts.get_template(p+'.md').render(**context)})
+            if name == 'advisory_season_note':
+                after = get_catalog().env.get_template('skills/crop/advice/season_note.md').render(
+                    advisory_default_season=season)
+                assert before() == after
+            else:
+                after = function(new,name,{**shared,'get_prompt':lambda p,context:get_catalog().env.get_template(p+'.md').render(**context)})
+                for messages,query in [([],''),([], 'KHC status'),([('farmer','KHC')],'AIF')]:
+                    assert before(messages,query) == after(messages,query)

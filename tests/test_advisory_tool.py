@@ -558,15 +558,6 @@ def test_tool_is_registered_with_context():
     assert "search_schemes" in registered  # scheme routing is untouched
 
 
-def test_season_note_only_exists_for_a_configured_season(monkeypatch):
-    from agents.tools.advisory import advisory_season_note
-
-    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "Rabi")
-    note = advisory_season_note()
-    assert "Rabi" in note and "do not pass `season`" in note
-
-    monkeypatch.setenv("ADVISORY_DEFAULT_SEASON", "")
-    assert advisory_season_note() == ""
 
 
 def test_payload_carries_season_tag():
