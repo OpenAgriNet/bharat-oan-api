@@ -20,7 +20,6 @@ def resolve_selection(catalog: SkillCatalog, agent: str, environment: str | None
         raise ValueError(f'Unknown agent: {agent}')
     config = m.agents[agent]
     available = select(config.enabled_skills, set(m.skills), 'agent skills')
-    available &= {name for name, skill in m.skills.items() if skill.enabled}
     available = set(catalog.resolve(available))
     if m.environments:
         if environment not in m.environments:

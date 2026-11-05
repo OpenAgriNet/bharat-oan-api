@@ -87,7 +87,6 @@ Illustrative manifest (tool names must be checked against actual registered impl
 skills:
   pm_kisan.payment_status:
     prompt_dir: skills/pm_kisan/payment_status
-    enabled: true
     tools:
       - check_pmkisan_status
       - send_otp
@@ -107,7 +106,7 @@ agents:
       pm_kisan.payment_status: voice
 ```
 
-`skills` is the shared catalogue. `agents.chat` and `agents.voice` are separate configurations over that catalogue, without duplicating tool bindings. `enabled: false` on a skill excludes it globally. Each agent’s `enabled_skills` sets its available skill set; `preloaded_skills` sets its initial-loading defaults. Both initially use `all` within applicable permissions. `skill_variants` is optional: without an entry, that agent uses the shared skill prompt.
+`skills` is the shared catalogue. `agents.chat` and `agents.voice` are separate configurations over that catalogue, without duplicating tool bindings. Each agent’s `enabled_skills` sets its available skill set; `preloaded_skills` sets its initial-loading defaults. Both initially use `all` within applicable permissions. `skill_variants` is optional: without an entry, that agent uses the shared skill prompt.
 
 A localized prompt file would begin with metadata such as:
 
@@ -270,7 +269,7 @@ Do not assume a smaller prompt automatically improves accuracy or latency. Dynam
 
 ## Current status
 
-The chat implementation now uses the shared manifest format, localized skill documents, and agent-specific global prompts. All 50 current business tools remain registered (the latest upstream removes legacy `get_scheme_info`); all 21 skills are enabled and preloaded by default across 13 languages. Agent variants and optional environment selection are implemented in the loader; the separate voice backend and HTTP/UI selection contract have not been migrated. Wording-preservation and offline integration checks pass; see the validation report for the separate behavioral benchmark status. Skill-level wording optimization remains a later phase.
+The chat implementation now uses the shared manifest format, localized skill documents, and agent-specific global prompts. All 50 current business tools remain registered (the latest upstream removes legacy `get_scheme_info`); all 20 skills are enabled and preloaded by default across 13 languages. Agent variants and optional environment selection are implemented in the loader; the separate voice backend and HTTP/UI selection contract have not been migrated. Wording-preservation and offline integration checks pass; see the validation report for the separate behavioral benchmark status. Skill-level wording optimization remains a later phase.
 
 
 ## Dependency update (2026-11-05)

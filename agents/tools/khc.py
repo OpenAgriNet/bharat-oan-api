@@ -81,7 +81,7 @@ def khc_service_note(messages, current_query: str = "") -> str:
     across follow-up turns without treating them as a permanent choice for the whole chat.
     Dynamic system prompts run before the current user message is appended to history.
     """
-    routing = "\n\n" + get_prompt("skills/grievances/manage/status_routing", context={
+    routing = "\n\n" + get_prompt("skills/khc/grievances/status_routing", context={
         "status_id_prompt": _STATUS_ID_PROMPT,
         "status_otp_prompt": _STATUS_OTP_PROMPT,
     })

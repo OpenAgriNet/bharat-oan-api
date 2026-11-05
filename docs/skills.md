@@ -34,7 +34,7 @@ skills are intentionally preserved for the subsequent prompt review.
 
 1. Implement/register any new business tools in `agents/tools/__init__.py`.
 2. Add a skill directory and one prompt per language supported by its agent.
-3. Add one `skills` entry to the manifest: `prompt_dir`, `tools`, and `enabled`.
+3. Add one `skills` entry to the manifest: `prompt_dir`, `tools`, and optional `requires`.
 4. Run the tests below. They detect unregistered tools, orphan skill folders,
    missing languages, duplicate keys, and tool instructions leaking into Agrinet.
 
@@ -55,7 +55,7 @@ agents:
 
 `all` is the migration default. To experiment, replace `preloaded_skills` with a
 list of skill IDs; `[]` starts with just the summaries. `enabled_skills` limits what
-can ever be loaded. A globally disabled skill is never offered. The index and
+can ever be loaded. The index and
 `load_skill` tool disappear when everything permitted is already loaded.
 
 The model receives the full instructions in the loader result and can call the
@@ -142,8 +142,7 @@ skills:
 Dependencies appear before consumers, are loaded transitively and only once,
 and persist through history. Already-loaded dependencies are not returned again.
 The manifest is the only dependency declaration; language files do not repeat it.
-Unknown dependencies, duplicates, cycles and globally disabled dependencies fail
-validation. Loading does not execute any business tool.
+Unknown dependencies, duplicates and cycles fail validation. Loading does not execute any business tool.
 
 Agent/session `enabled_skills` selections name workflow roots; their dependencies
 are included automatically within the server's permissions. Preloading a workflow
@@ -166,12 +165,11 @@ Grievance workflows live with the scheme that owns them:
 - `skills/pmfby/grievances/`: PMFBY registration, verification and ticket status.
 - `skills/aif/status/`: AIF loan and grievance status share the same authentication
   workflow; the detailed ticket-format rules live here too.
-- `skills/grievances/manage/`: common service selection and other-scheme routing,
-  with `khc.grievances` as its shared fallback dependency.
-- `skills/khc/grievances/`: the reusable KHC registration/status workflow and tools.
+- `skills/khc/grievances/`: common service selection, other-scheme routing, and
+  the reusable KHC registration/status workflow and tools.
 
 The manifest binds PM-Kisan and PMFBY grievance tools only to their own skills.
-Those skills and AIF depend on the common routing/fallback skill, so they can
+Those skills and AIF depend directly on `khc.grievances`, so they can
 honor an explicit KHC request without loading the other schemes' business tools.
 KHC instructions are loaded once even when several schemes are active. New
 schemes that only use KHC need no copied workflow. All 13 translations retain

@@ -311,7 +311,7 @@ def test_status_routing_is_rendered_from_the_prompt_asset(monkeypatch):
     assert khc.khc_service_note([], current_query="Check my KCC grievance status") == (
         "\n\nRouting rules supplied by the prompt asset."
     )
-    assert calls == [("skills/grievances/manage/status_routing", {
+    assert calls == [("skills/khc/grievances/status_routing", {
         "status_id_prompt": khc._STATUS_ID_PROMPT,
         "status_otp_prompt": khc._STATUS_OTP_PROMPT,
     })]

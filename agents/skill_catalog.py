@@ -35,7 +35,6 @@ class Definition(BaseModel):
 
 class Skill(Definition):
     prompt_dir: str
-    enabled: bool = True
     tools: list[str]
     requires: list[str] = Field(default_factory=list)
 
@@ -166,13 +165,10 @@ class SkillCatalog:
                 raise ValueError(f'Duplicate required skill: {name}')
         if len(folders) != len(set(folders)):
             raise ValueError('Each skill needs its own prompt folder')
-        self.resolve(set(m.skills))  # Reject unknown dependencies and cycles, including disabled skills.
+        self.resolve(set(m.skills))  # Validate the entire catalogue, including unused skills.
         for agent, config in m.agents.items():
             roots = select(config.enabled_skills, set(m.skills), 'agent skills')
-            enabled = set(self.resolve({name for name in roots if m.skills[name].enabled}))
-            disabled = {name for name in enabled if not m.skills[name].enabled}
-            if disabled:
-                raise ValueError(f'{agent} requires disabled skills: {sorted(disabled)}')
+            enabled = set(self.resolve(roots))
             if config.preloaded_skills != 'all':
                 select(config.preloaded_skills, enabled, 'preloaded skills')
             if not set(config.skill_variants) <= enabled:

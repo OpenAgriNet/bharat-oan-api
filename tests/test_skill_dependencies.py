@@ -69,13 +69,11 @@ def test_invalid_dependency_rejected(tmp_path, requires, error):
         temporary_catalog(tmp_path, lambda m, root: m['skills']['mandi.prices'].update(requires=requires))
 
 
-def test_cycle_disabled_dependency_and_environment_denials(tmp_path):
+def test_cycle_and_environment_denials(tmp_path):
     def cycle(m, root):
         m['skills']['location.resolve']['requires'] = ['mandi.prices']
     with pytest.raises(ValueError, match='cycle'):
         temporary_catalog(tmp_path / 'cycle', cycle)
-    with pytest.raises(ValueError, match='requires disabled'):
-        temporary_catalog(tmp_path / 'disabled', lambda m, root: m['skills']['location.resolve'].update(enabled=False))
     def denied(m, root):
         m['environments'] = {'prod': {'allowed_skills': ['mandi.prices']}}
     with pytest.raises(ValueError, match='requires denied skills'):
@@ -154,5 +152,11 @@ def test_scheme_grievances_do_not_load_other_schemes(skill, own, other):
     assert own in state.visible
     assert other not in state.visible
     assert 'register_khc_grievance' in state.visible
-    assert 'grievances.manage' in state.active
+    assert 'khc.grievances' in state.active
+    assert 'grievances.manage' not in CAT.manifest.skills
 
+
+def test_per_skill_enabled_flag_is_rejected(tmp_path):
+    # Fail explicitly rather than silently ignoring a retired permission control.
+    with pytest.raises(ValueError, match='Extra inputs are not permitted'):
+        temporary_catalog(tmp_path, lambda m, root: m['skills']['location.resolve'].update(enabled=False))

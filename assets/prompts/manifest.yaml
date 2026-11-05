@@ -2,7 +2,6 @@
 skills:
   schemes.information:
     prompt_dir: skills/schemes/information
-    enabled: true
     tools:
     - call_amul_vistaar_network
     - call_maha_vistaar_network
@@ -13,65 +12,56 @@ skills:
     - documents.search
   pm_kisan.status:
     prompt_dir: skills/pm_kisan/status
-    enabled: true
     tools:
     - check_pm_kisan_status_with_otp
     - initiate_pm_kisan_status_check
   pm_kisan.grievances:
     prompt_dir: skills/pm_kisan/grievances
-    enabled: true
     tools:
     - pmkisan_grievance_send_otp
     - pmkisan_grievance_status
     - pmkisan_submit_grievance
     requires:
-    - grievances.manage
+    - khc.grievances
   pmfby.status:
     prompt_dir: skills/pmfby/status
-    enabled: true
     tools:
     - check_pmfby_status_with_otp
     - initiate_pmfby_status_check
   pmfby.grievances:
     prompt_dir: skills/pmfby/grievances
-    enabled: true
     tools:
     - check_pmfby_grievance_otp
     - initiate_pmfby_grievance_otp
     - pmfby_grievance_status
     - pmfby_submit_grievance
     requires:
-    - grievances.manage
+    - khc.grievances
   soil_health.status:
     prompt_dir: skills/soil_health/status
-    enabled: true
     tools:
     - check_shc_status
   smam.status:
     prompt_dir: skills/smam/status
-    enabled: true
     tools:
     - check_smam_scheme_status
   aif.status:
     prompt_dir: skills/aif/status
-    enabled: true
     tools:
     - check_aif_grievance_status
     - check_aif_loan_status
     - initiate_aif_otp
     - verify_aif_otp
     requires:
-    - grievances.manage
+    - khc.grievances
   kcc.status:
     prompt_dir: skills/kcc/status
-    enabled: true
     tools:
     - check_kcc_application_status
     - initiate_kcc_otp
     - select_kcc_application
   khc.grievances:
     prompt_dir: skills/khc/grievances
-    enabled: true
     tools:
     - check_khc_grievance_status
     - find_khc_location
@@ -82,7 +72,6 @@ skills:
     - verify_khc_otp
   crop.advice:
     prompt_dir: skills/crop/advice
-    enabled: true
     tools:
     - analyze_crop_image
     - search_advisory
@@ -92,20 +81,17 @@ skills:
     - documents.search
   weather.forecast:
     prompt_dir: skills/weather/forecast
-    enabled: true
     tools:
     - weather_forecast
     requires:
     - location.resolve
   location.resolve:
     prompt_dir: skills/location/resolve
-    enabled: true
     tools:
     - forward_geocode
     - reverse_geocode
   mandi.prices:
     prompt_dir: skills/mandi/prices
-    enabled: true
     tools:
     - get_mandi_prices
     - search_commodity
@@ -113,7 +99,6 @@ skills:
     - location.resolve
   fertilizer.recommendations:
     prompt_dir: skills/fertilizer/recommendations
-    enabled: true
     tools:
     - gfr_get_crop_registries
     - gfr_get_recommendations
@@ -121,7 +106,6 @@ skills:
     - location.resolve
   seeds.availability:
     prompt_dir: skills/seeds/availability
-    enabled: true
     tools:
     - get_sathi_crop_groups
     - list_sathi_crops_in_group
@@ -130,29 +114,19 @@ skills:
     - location.resolve
   agristack.profile:
     prompt_dir: skills/agristack/profile
-    enabled: true
     tools:
     - get_agristack_farmer_crops
     - get_agristack_farmer_location
     - get_agristack_farmer_profile
   weather.agromet:
     prompt_dir: skills/weather/agromet
-    enabled: true
     tools:
     - imd_agromet_advisory
-  grievances.manage:
-    prompt_dir: skills/grievances/manage
-    enabled: true
-    tools: []
-    requires:
-    - khc.grievances
   pm_kisan.installments:
     prompt_dir: skills/pm_kisan/installments
-    enabled: true
     tools: []
   documents.search:
     prompt_dir: skills/documents/search
-    enabled: true
     tools:
     - search_documents
 agents:
