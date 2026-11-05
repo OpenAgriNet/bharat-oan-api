@@ -87,10 +87,11 @@ cannot remove a query string already logged by a proxy or ASGI access logger.
   each territory, then urea-only/DAP-only. Page/time budgets report incomplete
   coverage honestly. More/widen preserve a cursor and deduplicate presented shops;
   widening keeps subsequent results restricted to complete supply in wider areas.
-- Booking requires two-step confirmation through `ffs_create_booking`: first a
-  summary/token response, then an explicit confirmed submission with the same
-  token. If submission fails after dispatch, the status is `booking_uncertain`
-  and retries must not be automatic.
+- Booking asks for farmer-selected whole-bag quantities, then previews the exact
+  shop, plots and products. Confirmation must use that token in a later user turn
+  within five minutes. Changed details require a new preview. Only products the
+  chosen shop supports are submitted. A cached completed result is returned again
+  without another write; an uncertain submission blocks further attempts.
 - The supplied land response lacks a verified booked-land signal. It is shown
   as unknown, not inferred from quota. Disputed/unconfirmed approval records are
   restricted; no claim is made that unknown plots are bookable.
@@ -173,7 +174,43 @@ not change a business result.
 Use `tests/test_ffs_tracing.py` for real SDK/in-memory exporter checks: parent-child
 links, safe summaries, HTTP/provider errors, timeouts, cache reuse, booking and
 final-answer capture. No external model, Langfuse export or real FFS request is
-needed. The existing `bh-dev` booking test currently fails because login does not
-retain `userMobileNumber`, while booking requires it. The tracing booking fixture
-supplies that missing field to test telemetry separately; this logging change
-does not repair or conceal the existing business-flow failure.
+needed. Login retains `userMobileNumber` for `contactNoForCommunication`; the
+booking tracing fixture now exercises the normal login path without patching state.
+
+## Booking v4
+
+`ffs_create_booking` accepts optional `quantities`, a list of
+`{"product": "urea" | "DAP", "bags": positive_integer}`. Omitting them on the
+initial call returns `needs_quantities`. Quantities already explicitly supplied
+by the farmer can be used directly. Confirmation may omit quantities to reuse
+the pending preview. The later-turn check enforces ordering; interpreting the
+user's explicit agreement remains the agent's responsibility, not token proof.
+
+The request uses `/bharatVistar/createMultipleBookingV2`, matching the supplied
+Bruno v2 body: receiver equals applicant, receiver/contact details come from
+verified login, `isLooseBuy=false`, bag counts × weights provide quantity totals,
+and `isProceedWithGfr=true`. Existing plot/crop mappings pass through unchanged
+in `selectedLandIds`. Dates use Asia/Kolkata. No first-plot crop is inserted in
+product lines. Only configured urea/DAP products 1089/1005 are supported.
+
+The supplied `code=500`, `status=FAILED`, `data=null` quantity-limit message is
+recognized even with HTTP 200. Its exact Urea/DAP message structure yields a
+`quantity_limit_changed` result with requested, allowed and purchased counts.
+The allowed count supersedes the initial GFR limit for that product; the agent
+must ask for a new quantity and fresh confirmation. No automatic reduction or
+retry occurs. Unknown/mismatched errors do not invent limits and leave the
+outcome uncertain. An HTTP 200 alone does not establish booking success: both
+overall and individual booking results must agree. The supplied nested business
+`statusCode=304` is not interpreted as an HTTP failure. Waitlisting and expiry
+are exposed in the result.
+
+Tests in `tests/test_ffs_booking.py` use sanitized supplied v2 responses and a
+strict payload-checking mock. They cover quantity choice, partial stock,
+changed limits, confirmation ordering/expiry, multiple plots, lost responses,
+cached results and concurrent confirmations. They make no live provider calls.
+
+Retry protection is scoped to retained FFS session state (20-minute sliding TTL),
+including same-farmer re-login while that state exists. It is not a durable
+cross-session booking ledger. The provider's one-active-booking rule remains
+the cross-session backstop. There is no supplied booking-status endpoint:
+uncertain outcomes require verification with FFS, not automatic reconciliation.

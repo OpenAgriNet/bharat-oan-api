@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic_ai import RunContext
 
 from agents.deps import FarmerContext
-from app.services.ffs import CropSelection, FFSService, result
+from app.services.ffs import BookingQuantity, CropSelection, FFSService, result
 from helpers.ffs_tracing import observation, result_summary
 
 
@@ -69,12 +69,18 @@ async def ffs_find_shops(ctx: RunContext[FarmerContext], action: Literal["initia
 
 
 async def ffs_create_booking(ctx: RunContext[FarmerContext], shop_ref: str,
-                             confirmed: bool = False, confirmation_token: str = "") -> dict:
+                             confirmed: bool = False, confirmation_token: str = "",
+                             quantities: list[BookingQuantity] | None = None) -> dict:
     """Create the final FFS booking for a selected shop, with explicit confirmation.
 
-    First call with confirmed=False to get a booking summary and confirmation_token.
-    After reading that summary to the farmer and receiving explicit consent, call
-    again with confirmed=True and the same confirmation_token.
+    Ask how many whole bags of each available product the farmer wants; reuse their
+    explicitly supplied quantities. Pass quantities=[{product: "urea" or "DAP", bags: N}]
+    with confirmed=False for a preview. Do not default to full entitlement.
+    Read the summary and wait for a later user message explicitly confirming it.
+    Then pass confirmed=True and its confirmation_token (quantities can be omitted).
+    A changed quantity or shop requires a new preview. On quantity_limit_changed,
+    explain the provider's new limit and ask again; never silently reduce or retry.
+    On booking_uncertain, do not submit again until the outcome has been verified.
     """
     return await _run(ctx, "create_booking", shop_ref=shop_ref, confirmed=confirmed,
-                      confirmation_token=confirmation_token)
+                      confirmation_token=confirmation_token, quantities=quantities)

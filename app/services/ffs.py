@@ -4,6 +4,9 @@ import base64
 from copy import deepcopy
 from difflib import SequenceMatcher
 from datetime import datetime
+from zoneinfo import ZoneInfo
+from typing import Literal
+import secrets
 import hashlib
 import json
 import math
@@ -60,6 +63,18 @@ class CropSelection(BaseModel):
     model_config = ConfigDict(extra="forbid")
     land_ref: str
     crop_name: str = Field(min_length=1, max_length=100)
+
+
+class BookingQuantity(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    product: Literal["urea", "DAP"]
+    bags: int = Field(strict=True, ge=1)
+
+
+class BookingLimitError(Exception):
+    def __init__(self, product, requested, allowed, purchased):
+        self.details = dict(product=product, requested_bags=requested,
+                            allowed_bags=allowed, already_purchased_bags=purchased)
 
 
 def result(status, next_action, **data):
@@ -220,6 +235,18 @@ class FFSService:
         except ValueError:
             pass
         diagnostic.update(response_summary(response.status_code, response_data))
+        if (path == "/bharatVistar/createMultipleBookingV2" and isinstance(response_data, dict)
+                and response_data.get("code") == 500 and response_data.get("status") == "FAILED"
+                and response_data.get("data") is None):
+            limit = re.fullmatch(
+                r"Error: Requested quantity exceeds the allowed limit for (Urea|DAP)\. "
+                r"Requested: ([0-9]{1,9}) bags \| Allowed now: ([0-9]{1,9}) bags \| "
+                r"Already purchased this month: ([0-9]{1,9}) bags\.",
+                str(response_data.get("message", "")))
+            if limit:
+                product, requested, allowed, purchased = limit.groups()
+                raise BookingLimitError("urea" if product == "Urea" else "DAP",
+                                        int(requested), int(allowed), int(purchased))
         if response.status_code == 401:
             self.state.pop("token", None)
             self.state["stage"] = "login_expired"
@@ -269,7 +296,9 @@ class FFSService:
             if not re.search(r"resend|again|new otp|re-send|फिर|दोबारा|पुनः|पुन्हा|फेर|ફરી|আবার|পুনৰ|دوبارہ|ಮತ್ತೆ|மீண்டும்|మళ్లీ|വീണ്ടും|ପୁଣି|ਦੁਬਾਰਾ", query, re.I):
                 return result("needs_clarification", "Ask the farmer to explicitly request another OTP")
         self.note("otp_requested", state_code=state_code, resend=bool(resend))
-        self.state = {"owner": self.owner, "farmer_id": farmer_id, "state_code": state_code,
+        booking_state = {k: self.state[k] for k in ("uncertain_booking", "last_booking_result")
+                         if same and k in self.state}
+        self.state = {**booking_state, "owner": self.owner, "farmer_id": farmer_id, "state_code": state_code,
                       "stage": "otp_outcome_unknown", "otp_expires": time.time() + 180,
                       "otp_turn": self.question_id, "otp_attempts": 0}
         await self.save()
@@ -307,7 +336,7 @@ class FFSService:
             except (ValueError, KeyError, IndexError, TypeError):
                 raise FFSError("unavailable", "FFS login returned an invalid token expiry")
             self.state.update(token=data["userToken"], token_expires=expires,
-                              user={k: data.get(k) for k in ("userId", "userAadhaarHash", "userFullName")}, stage="loading")
+                              user={k: data.get(k) for k in ("userId", "userAadhaarHash", "userFullName", "userMobileNumber")}, stage="loading")
             self.note("otp_verified")
             self.state.pop("verify_turn", None)
             await self.save()
@@ -509,6 +538,9 @@ class FFSService:
                 raise FFSError("unavailable", "The required fertilizer product/bag size is unavailable; do not substitute")
             chosen.append({"productGroupId": group["group"], "productId": product["productId"],
                            "quantityOfBagKg": group["kg_per_bag"], "noBagsRequested": group["bags"]})
+        if any("stock" not in shop for shop in s.get("shops", {}).get("pool", {}).values()):
+            s.pop("shops")
+            self.note("shop_results_refreshed", reason="missing_stock_snapshot")
         search = s.setdefault("shops", {"level": 0, "page": 1, "pool": {}, "shown": [], "complete_levels": [], "turn_results": {}})
         turn_key = self.question_id + ":" + action
         if turn_key in search["turn_results"]:
@@ -562,7 +594,8 @@ class FFSService:
                 complete = set(stocks) == set(quantities)
                 search["pool"][rid] = {"shop_ref": "shop-" + str(len(search["pool"]) + 1), "name": row.get("retailerName", ""),
                     "address": row.get("address1", ""), "coverage": ["urea" if pid == 1089 else "DAP" for pid in stocks],
-                    "complete_supply": complete, "territory": LEVELS[level], "retailer_id": row["retailerId"],
+                    "complete_supply": complete, "stock": {str(k): v for k, v in stocks.items()},
+                    "territory": LEVELS[level], "retailer_id": row["retailerId"],
                     "rank": [level, 0 if complete else 1 if 1089 in stocks else 2, -sum(stocks.values()), row["retailerId"]]}
             self.note("shop_page_processed", territory=LEVELS[level], page=search["page"],
                       rows=len(data), eligible_pending=len(pending()))
@@ -588,134 +621,165 @@ class FFSService:
         await self.save()
         return deepcopy(answer)
 
-    async def create_booking(self, shop_ref, confirmed=False, confirmation_token=""):
-        self.ready()
+    def booking_choices(self, shop):
+        limits = self.state.get("booking_limits", {})
+        return [{**p, "bags": limits.get(p["name"], p["bags"])}
+                for p in self.state["entitlement"]["data"]["products"]
+                if p["name"] in shop["coverage"]]
+
+    async def create_booking(self, shop_ref, confirmed=False, confirmation_token="", quantities=None):
         s = self.state
+        if s.get("uncertain_booking"):
+            return result("booking_uncertain", "Previous booking outcome is unknown. Verify with FFS before another submission; do not retry automatically")
+        if s.get("last_booking_result", {}).get("status") == "ok":
+            self.note("booking_result_reused")
+            return deepcopy(s["last_booking_result"])
+        self.ready()
         if not s.get("entitlement"):
             raise FFSError("needs_entitlement", "Collect village/crops and call ffs_get_entitlement first")
         if not s.get("shops", {}).get("pool"):
             raise FFSError("needs_shops", "Call ffs_find_shops first and ask the farmer to choose a shop")
         if s.get("booking_turn") == self.question_id:
-            if s.get("last_booking_result"):
-                self.note("booking_result_reused")
-                return deepcopy(s["last_booking_result"])
-            return result("already_started", "Booking has already been attempted this turn")
-        wanted = [p for p in s["entitlement"]["data"]["products"] if p["bags"] > 0]
-        if not wanted:
-            return result("zero_entitlement", "No urea/DAP bags are offered; do not place a booking")
+            return result("already_started", "Booking was already attempted this turn. Wait for the farmer's next response")
         shop = next((row for row in s["shops"]["pool"].values() if row["shop_ref"] == shop_ref), None)
         if not shop:
             return result("needs_clarification", "Choose a shop_ref from the latest shop list")
-
+        choices = self.booking_choices(shop)
+        pending = s.get("pending_booking", {})
+        if quantities is None and confirmed and pending.get("summary", {}).get("shop_ref") == shop_ref:
+            quantities = [BookingQuantity(**q) for q in pending["quantities"]]
+        if not quantities:
+            return result("needs_quantities", "Ask how many bags of each available product the farmer wants; reuse quantities they explicitly supplied", products=choices)
+        names = [q.product for q in quantities]
+        if len(names) != len(set(names)):
+            return result("needs_quantities", "Specify each requested product once", products=choices)
+        chosen = []
+        for q in quantities:
+            group = next((p for p in choices if p["name"] == q.product), None)
+            if not group or q.bags > group["bags"]:
+                return result("needs_quantities", "Use only products this shop covers and ask for quantities within the latest provider limit; never reduce silently", products=choices)
+            product = next((p for p in s.get("products", []) if p.get("productId") == PRODUCTS[group["group"]]), None)
+            if not product or product.get("bagWeightKg") != group["kg_per_bag"] or not product.get("plantId"):
+                raise FFSError("unavailable", "Required fertilizer product/plant mapping is unavailable; refresh shop search")
+            stock = shop.get("stock", {}).get(str(product["productId"]))
+            if stock is None or q.bags > stock:
+                return result("needs_shops", "Refresh shop search: selected product stock is missing or insufficient")
+            chosen.append({"group": group["group"], "name": group["name"], "bags": q.bags,
+                           "kg_per_bag": group["kg_per_bag"], "product_id": product["productId"],
+                           "plant_id": product["plantId"]})
+        chosen.sort(key=lambda p: p["group"])
         mobile = re.sub(r"\D", "", str(s["user"].get("userMobileNumber") or ""))
         if mobile.startswith("91") and len(mobile) == 12:
             mobile = mobile[2:]
-        if not re.fullmatch(r"[6-9]\d{9}", mobile):
-            self.note("booking_blocked", reason="missing_or_invalid_login_mobile")
-            return result("needs_clarification", "FFS login did not return a valid 10-digit contact number for booking")
-
-        chosen = []
-        for group in wanted:
-            product = next((p for p in s.get("products", []) if p.get("productId") == PRODUCTS[group["group"]]), None)
-            if not product or product.get("bagWeightKg") != group["kg_per_bag"] or not product.get("plantId"):
-                raise FFSError("unavailable", "The required fertilizer product/plant mapping is unavailable for booking")
-            chosen.append({"group": group["group"], "name": group["name"], "bags": group["bags"],
-                           "kg_per_bag": group["kg_per_bag"], "product_id": product["productId"],
-                           "plant_id": product["plantId"]})
-
+        if not re.fullmatch(r"[6-9]\d{9}", mobile) or not s["user"].get("userFullName"):
+            return result("needs_clarification", "FFS login did not return a valid contact number or receiver name for booking")
         selected_lands = []
         for item in s.get("selection", []):
             land = self.land_map().get(item["land_ref"])
             if not land:
-                raise FFSError("unavailable", "Selected plot details are missing; refresh entitlement before booking")
+                raise FFSError("unavailable", "Selected plot details are missing; refresh entitlement")
             selected_lands.append({"land_ref": item["land_ref"], "survey": str(land.get("surveyNumber", "")),
-                                   "farmlandPlotRegistryId": str(land["farmlandPlotRegistryId"]),
+                                   "farmLandPlotRegistryId": str(land["farmlandPlotRegistryId"]),
                                    "farmLandOwnershipId": str(land["farmlandOwnershipId"]),
                                    "cropCode": item["crop_code"]})
-        first_plot_id = int(selected_lands[0]["farmlandPlotRegistryId"])
-        first_crop_code = selected_lands[0]["cropCode"]
-
+        if not selected_lands:
+            raise FFSError("needs_entitlement", "Select plots and get entitlement before booking")
         summary = {
-            "shop_ref": shop["shop_ref"],
-            "shop_name": shop.get("name", ""),
+            "shop_ref": shop_ref, "shop_name": shop.get("name", ""),
             "products": [{"name": x["name"], "bags": x["bags"], "kg_per_bag": x["kg_per_bag"]} for x in chosen],
             "plots": [{"land_ref": x["land_ref"], "survey": x["survey"]} for x in selected_lands],
         }
-        expected_token = hashlib.sha256(json.dumps(summary, sort_keys=True).encode()).hexdigest()[:12]
-        if not confirmed:
+        # Bind hidden provider identities as well as the user-visible summary.
+        signature = hashlib.sha256(json.dumps([summary, selected_lands, chosen, shop["retailer_id"],
+                                               s["user"], s["season"], s["gfr"]], sort_keys=True).encode()).hexdigest()
+        valid_preview = (pending.get("signature") == signature and
+                         pending.get("confirmation_token") == confirmation_token and
+                         pending.get("expires", 0) > time.time())
+        if not confirmed or not valid_preview:
+            pending = {"signature": signature, "confirmation_token": secrets.token_urlsafe(18),
+                       "summary": summary, "turn": self.question_id, "expires": time.time() + 300,
+                       "quantities": [q.model_dump() for q in quantities]}
+            s["pending_booking"] = pending
+            await self.save()
             self.note("booking_confirmation_requested")
-            s["pending_booking"] = {"shop_ref": shop_ref, "confirmation_token": expected_token, "summary": summary}
-            await self.save()
-            return result("needs_confirmation",
-                          "Read the summary and ask for explicit confirmation, then call again with confirmed=true",
-                          summary=summary, confirmation_token=expected_token, booking_enabled=True)
-        pending = s.get("pending_booking", {})
-        token = (confirmation_token or "").strip()
-        if pending.get("shop_ref") != shop_ref or pending.get("confirmation_token") != token or token != expected_token:
-            self.note("booking_confirmation_rejected")
-            s["pending_booking"] = {"shop_ref": shop_ref, "confirmation_token": expected_token, "summary": summary}
-            await self.save()
-            return result("needs_confirmation",
-                          "Confirmation token did not match this booking summary. Read back and confirm again.",
-                          summary=summary, confirmation_token=expected_token, booking_enabled=True)
-
-        now = datetime.now()
-        lines = [{
-            "productId": x["product_id"],
-            "plantId": int(x["plant_id"]),
-            "productGroupId": x["group"],
-            "noBagsRequested": int(x["bags"]),
-            "quantityOfBagKg": x["kg_per_bag"],
-            "farmlandPlotRegistryId": first_plot_id,
-            "cropCode": first_crop_code,
-        } for x in chosen]
+            return result("needs_confirmation", "Read the exact summary and wait for explicit confirmation in a later user turn",
+                          summary=summary, confirmation_token=pending["confirmation_token"], booking_enabled=True)
+        if pending["turn"] == self.question_id:
+            return result("needs_confirmation", "Wait for a subsequent user message explicitly confirming this summary; do not submit in this turn",
+                          summary=summary, confirmation_token=pending["confirmation_token"], booking_enabled=True)
+        now = datetime.now(ZoneInfo("Asia/Kolkata"))
+        lines = [{"productId": x["product_id"], "plantId": int(x["plant_id"]),
+                  "productGroupId": x["group"], "noBagsRequested": x["bags"],
+                  "quantityOfBagKg": x["kg_per_bag"], "isLooseBuy": False,
+                  "totalQuantityKgRequested": x["bags"] * x["kg_per_bag"]} for x in chosen]
+        first = self.land_map()[s["selection"][0]["land_ref"]]
         payload = {
-            "seasonId": s["season"]["season"]["seasonId"],
-            "year": now.year,
-            "month": now.month,
+            "seasonId": s["season"]["season"]["seasonId"], "year": now.year, "month": now.month,
             "requestedDatetime": now.strftime("%Y-%m-%d %H:%M:%S"),
-            "applicantUserId": s["user"]["userId"],
-            "contactNoForCommunication": mobile,
-            "isReceiverApplicantSame": True,
-            "stateLgdCode": int(self.state["state_code"]),
-            "districtLgdCode": self.land_map()[s["selection"][0]["land_ref"]]["districtLgdCode"],
-            "subDistrictLgdCode": self.land_map()[s["selection"][0]["land_ref"]]["subDistrictLgdCode"],
-            "villageLgdCode": self.land_map()[s["selection"][0]["land_ref"]]["villageLgdCode"],
-            "selectedLandIds": [{
-                "farmLandOwnershipId": x["farmLandOwnershipId"],
-                "cropCode": x["cropCode"],
-                "farmLandPlotRegistryId": x["farmlandPlotRegistryId"],
-            } for x in selected_lands],
+            "applicantUserId": s["user"]["userId"], "contactNoForCommunication": mobile,
+            "isReceiverApplicantSame": True, "receiverUserId": s["user"]["userId"],
+            "receiverName": s["user"]["userFullName"], "receiverMobileNo": mobile,
+            "receiverAadharHash": s["user"]["userAadhaarHash"],
+            "stateLgdCode": int(s["state_code"]),
+            **{k: first[k] for k in ("districtLgdCode", "subDistrictLgdCode", "villageLgdCode")},
+            "selectedLandIds": [{k: x[k] for k in ("farmLandOwnershipId", "cropCode", "farmLandPlotRegistryId")} for x in selected_lands],
             "bookingRequest": [{"retailerId": shop["retailer_id"], "productLines": lines}],
-            "GFRRecommendation": s.get("gfr", {}).get("recommendations", []),
-            "gfrType": s.get("gfr", {}).get("gfrType"),
-            "isProceedWithGfr": False,
+            "GFRRecommendation": s["gfr"]["recommendations"], "gfrType": s["gfr"]["gfrType"],
+            "isProceedWithGfr": True,
         }
-
         s["booking_turn"] = self.question_id
         s["uncertain_booking"] = {"shop_ref": shop_ref, "summary": summary}
         await self.save()
         self.note("booking_submitted", products_count=len(lines), plots_count=len(selected_lands))
-        data = await self.call("POST", FERT, "/bharatVistar/createMultipleBookingV2", payload)
-        if not isinstance(data, dict):
-            raise FFSError("unavailable", "FFS booking returned an invalid response")
-        results = data.get("bookingResults") or []
-        public = {
-            "is_valid": bool(data.get("isValid")),
-            "message": data.get("message", ""),
-            "bookings": [{
-                "procurement_id": row.get("procurementId"),
-                "booking_code": row.get("procurementApplicationCode"),
-                "is_waitlisted": bool(row.get("isWaitlisted")),
-            } for row in results if isinstance(row, dict)],
-        }
+        self.diagnostics["booking_dispatched"] = True
+        try:
+            data = await self.call("POST", FERT, "/bharatVistar/createMultipleBookingV2", payload)
+        except BookingLimitError as error:
+            detail = error.details
+            if not any(x["name"] == detail["product"] and x["bags"] == detail["requested_bags"] for x in chosen):
+                raise FFSError("booking_uncertain", "Provider rejection did not match this request; check the outcome before retrying")
+            s.setdefault("booking_limits", {})[detail["product"]] = detail["allowed_bags"]
+            s.pop("uncertain_booking", None)
+            s.pop("pending_booking", None)
+            await self.save()
+            self.note("booking_limit_changed", **detail)
+            return result("quantity_limit_changed", "Provider rejected this booking. Explain the updated allowed quantity and ask how many bags the farmer wants, then create a new preview and obtain confirmation", **detail)
+        return await self.finish_booking(data, shop)
+
+    async def finish_booking(self, data, shop):
+        if not isinstance(data, dict) or type(data.get("isValid")) is not bool:
+            raise FFSError("booking_uncertain", "FFS returned an invalid booking result")
+        rows = data.get("bookingResults")
+        if (not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict)
+                or rows[0].get("retailerId") != shop["retailer_id"]):
+            raise FFSError("booking_uncertain", "FFS booking result did not match the selected retailer")
+        row = rows[0]
+        success = data["isValid"] is True and row.get("isValid") is True
+        rejected = (data["isValid"] is False and row.get("isValid") is False
+                    and data.get("totalBookingsSuccessful") == 0 and not row.get("procurementId"))
+        if success:
+            if (not row.get("procurementId") or not row.get("procurementApplicationCode")
+                    or type(row.get("isWaitlisted")) is not bool
+                    or data.get("totalBookingsSuccessful") != 1 or data.get("totalBookingsFailed") != 0):
+                raise FFSError("booking_uncertain", "FFS success response is incomplete; check status before retrying")
+        elif not rejected:
+            raise FFSError("booking_uncertain", "FFS booking results are inconsistent; check status before retrying")
+        public = {"is_valid": success, "bookings": [{
+            "procurement_id": row.get("procurementId"), "booking_code": row.get("procurementApplicationCode"),
+            "is_waitlisted": row.get("isWaitlisted") is True, "expires_at": row.get("expiryDatetime"),
+        }] if success else []}
+        s = self.state
         s.pop("pending_booking", None)
         s.pop("uncertain_booking", None)
-        s["stage"] = "booking_done"
-        s["last_booking_result"] = result("ok" if public["is_valid"] else "booking_failed",
-                                          "Share booking result and reference code", booking=public, booking_enabled=True)
+        s["stage"] = "booking_done" if success else "shops_ready"
+        answer = result("ok" if success else "booking_failed",
+                        "Share the booking reference and expiry; distinguish waitlisting from confirmed allocation" if success else
+                        "FFS rejected the booking. Explain the failure; ask before preparing another request",
+                        booking=public, booking_enabled=True)
+        if success:
+            s["last_booking_result"] = answer
         await self.save()
-        return deepcopy(s["last_booking_result"])
+        return deepcopy(answer)
 
     async def run(self, operation, **kwargs):
         if not settings.ffs_base_url or not self.owner or not self.session_id:
@@ -754,4 +818,6 @@ class FFSService:
             return result(status, "FFS did not complete the request. Resume setup/crop reconciliation without resending OTP or blindly repeating writes")
         except (RedisError, ValueError, KeyError, TypeError, IndexError) as error:
             self.diagnostics["error_type"] = type(error).__name__
+            if self.state.get("uncertain_booking") or self.diagnostics.get("booking_dispatched"):
+                return result("booking_uncertain", "Booking outcome is unknown; verify with FFS before another submission")
             return result("unavailable", "FFS state or response is unavailable; no booking was attempted")
