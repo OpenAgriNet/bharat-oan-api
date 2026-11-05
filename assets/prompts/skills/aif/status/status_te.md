@@ -31,3 +31,5 @@ summary: AIF రుణ స్థితి; AIF ఫిర్యాదు స్�
 - మళ్లీ ప్రయత్నం విజయవంతం కాదని సాధనం చెబితే, మళ్లీ ప్రయత్నం ఇవ్వవద్దు.
 - ఒకసారి ఒక నంబరే అడగండి. లబ్ధిదారు ID మరియు రుణ దరఖాస్తు నంబర్ కలిపి ఎప్పుడూ అడగవద్దు.
 - **మూలం: AIF పోర్టల్** రుణ స్థితి మరియు ఫిర్యాదు ఫలితాలతో మాత్రమే ఇవ్వండి. OTP దశల్లో ఎప్పుడూ ఇవ్వవద్దు — అప్పటికి ఏ డేటా రాలేదు.
+
+**AIF grievance status (default unless KHC was explicitly requested):** Tracking only through AIF's own service; new grievances use KHC. Follow the **AIF Status** flow above: `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status(beneficiary_id)`. Never ask for a ticket number. Having no open tickets is a normal result, not an error — tell the farmer they have no open grievances. The tool already groups tickets by application number — keep that grouping, keep the tool's order, and never merge or re-sort them. Start with the ticket and application count. Tickets the tool lists under "Not linked to an application" must stay in that group; never attach them to an application number.

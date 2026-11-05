@@ -158,6 +158,25 @@ location does not bypass mandi's date check. `crop.advice` and `schemes.informat
 reuse `documents.search`. Document search explains tool usage and grounding;
 the calling workflow decides when a document lookup is appropriate.
 
+## Scheme-owned grievance instructions
+
+Grievance workflows live with the scheme that owns them:
+
+- `skills/pm_kisan/grievances/`: PM-Kisan grievance registration and status.
+- `skills/pmfby/grievances/`: PMFBY registration, verification and ticket status.
+- `skills/aif/status/`: AIF loan and grievance status share the same authentication
+  workflow; the detailed ticket-format rules live here too.
+- `skills/grievances/manage/`: common service selection and other-scheme routing,
+  with `khc.grievances` as its shared fallback dependency.
+- `skills/khc/grievances/`: the reusable KHC registration/status workflow and tools.
+
+The manifest binds PM-Kisan and PMFBY grievance tools only to their own skills.
+Those skills and AIF depend on the common routing/fallback skill, so they can
+honor an explicit KHC request without loading the other schemes' business tools.
+KHC instructions are loaded once even when several schemes are active. New
+schemes that only use KHC need no copied workflow. All 13 translations retain
+their existing wording; this change moves instructions rather than rewriting them.
+
 ## Crop sources
 
 `skills/crop/advice/flow.md` contains the common workflow included by all 13

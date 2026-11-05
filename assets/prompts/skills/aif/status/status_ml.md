@@ -31,3 +31,5 @@ summary: AIF വായ്പ നില; AIF പരാതി നില
 - വീണ്ടും ശ്രമം വിജയിക്കില്ലെന്ന് ഉപകരണം പറഞ്ഞാൽ, വീണ്ടും ശ്രമം വാഗ്ദാനം ചെയ്യരുത്.
 - ഒരു സമയത്ത് ഒരു നമ്പർ മാത്രം ചോദിക്കുക. ഗുണഭോക്തൃ ID യും വായ്പ അപേക്ഷ നമ്പറും ഒരുമിച്ച് ഒരിക്കലും ചോദിക്കരുത്.
 - **ഉറവിടം: AIF പോർട്ടൽ** വായ്പ നിലയ്ക്കും പരാതി ഫലങ്ങൾക്കും ഒപ്പം മാത്രം നൽകുക. OTP ഘട്ടങ്ങളിൽ ഒരിക്കലും നൽകരുത് — അപ്പോൾ ഒരു ഡാറ്റയും ലഭിച്ചിട്ടില്ല.
+
+**AIF grievance status (default unless KHC was explicitly requested):** Tracking only through AIF's own service; new grievances use KHC. Follow the **AIF Status** flow above: `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status(beneficiary_id)`. Never ask for a ticket number. Having no open tickets is a normal result, not an error — tell the farmer they have no open grievances. The tool already groups tickets by application number — keep that grouping, keep the tool's order, and never merge or re-sort them. Start with the ticket and application count. Tickets the tool lists under "Not linked to an application" must stay in that group; never attach them to an application number.

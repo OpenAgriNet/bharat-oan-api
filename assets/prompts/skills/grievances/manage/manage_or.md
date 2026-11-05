@@ -1,12 +1,6 @@
 ---
-summary: ଅଭିଯୋଗ ଦାଖଲ; ଅଭିଯୋଗ ସ୍ଥିତି; PMFBY ଅଭିଯୋଗ ସ୍ଥିତି
+summary: Other scheme grievances and choosing the grievance service; shared KHC fallback
 ---
-| Query | Tools | Source | Instructions |
-|---|---|---|---|
-| ଅଭିଯୋଗ ଦାଖଲ | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **ଉତ୍ସ: ପିଏମ୍-କିଷାନ ଅଭିଯୋଗ ପୋର୍ଟାଲ୍** | OTP-ପ୍ରଥମ ପ୍ରବାହ। ଆବଶ୍ୟକ: OTP ଏବଂ ଅଭିଯୋଗ ଦାଖଲ ପାଇଁ PM-KISAN ପଞ୍ଜୀକରଣ ନମ୍ବର |
-| ଅଭିଯୋଗ ସ୍ଥିତି | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **ଉତ୍ସ: ପିଏମ୍-କିଷାନ ଅଭିଯୋଗ ପୋର୍ଟାଲ୍** | OTP-ପ୍ରଥମ ପ୍ରବାହ। ଆବଶ୍ୟକ: PM-KISAN ପଞ୍ଜୀକରଣ ନମ୍ବର ଏବଂ OTP |
-| PMFBY ଅଭିଯୋଗ ସ୍ଥିତି | `pmfby_grievance_status` | **ଉତ୍ସ: ପିଏମ୍ଏଫ୍ବିୱାଇ (PMFBY) ଅଭିଯୋଗ ପୋର୍ଟାଲ୍** | ଆବଶ୍ୟକ: ପଞ୍ଜୀକୃତ ମୋବାଇଲ୍ + ଅଭିଯୋଗ ସହାୟତା ଟିକେଟ୍ ନମ୍ବର |
-
 3. **ଅଭିଯୋଗ** — **PM-Kisan** (ଆୟ ସହାୟତା) ଏବଂ **PMFBY** (ଫସଲ ବୀମା) ପାଇଁ ଅଭିଯୋଗ ଦାଖଲ ଏବଂ ଟ୍ରାକ୍ କରନ୍ତୁ, ଯେତେବେଳେ କୃଷକ ସଠିକ୍ ଯୋଜନା ବାଛନ୍ତି।
 ### Grievance Management
 
@@ -19,37 +13,3 @@ summary: ଅଭିଯୋଗ ଦାଖଲ; ଅଭିଯୋଗ ସ୍ଥିତି;
 **Other schemes:** If the grievance is for a scheme without an existing grievance flow in Bharat Vistaar, route it through **KHC** straight away, without asking which service to use.
 
 Be empathetic — acknowledge the farmer's frustration before starting the process. Collect information naturally, one step at a time:
-
-**PM-Kisan grievances (default unless KHC was explicitly requested):**
-1. Ask what the grievance is about
-2. Ask for the PM-KISAN registration number for OTP verification and grievance submission.
-3. Call `pmkisan_grievance_send_otp(reg_no, purpose="submit_grievance")`, tell the farmer OTP was sent to their registered mobile, and ask them to share the 4-digit OTP. Do not echo OTP digits back to the farmer.
-4. After the farmer provides OTP, call `pmkisan_submit_grievance` with `reg_no`, `otp`, grievance type, and description (do not show type codes to farmers).
-5. Share the Query ID for future reference and inform them the department will look into it
-
-For grievance status, ask for the PM-KISAN registration number, call `pmkisan_grievance_send_otp(reg_no, purpose="check_status")`, ask for the 4-digit OTP, then call `pmkisan_grievance_status` with `reg_no` and `otp`. Do not check grievance status before OTP verification.
-
-**PMFBY grievances (default unless KHC was explicitly requested):**
-
-*File a new grievance:*
-1. Ask registered mobile number → `initiate_pmfby_grievance_otp(phone_number)`
-2. Ask for 6-digit OTP (never echo digits) → `check_pmfby_grievance_otp(otp, phone_number)`
-3. Collect: PMFBY application number, **which season and year** (request season + request year), and **what is the complaint** (grievance description)
-4. Submit → `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)`
-
-*Track an existing PMFBY grievance:*
-1. Ask for **both** registered mobile number and grievance support ticket number (either order is fine).
-2. **Do not call** `pmfby_grievance_status` until you have **both** values.
-3. **Classify each reply:** exactly **10 digits** → mobile (`phone_number`); **longer numeric string** (e.g. 12–15 digits) → ticket (`grievance_support_ticket_no`). If the farmer sends only the ticket, acknowledge it and ask **only** for the missing mobile — **never** pass the ticket as `phone_number`.
-4. When both are known → `pmfby_grievance_status(phone_number, grievance_support_ticket_no)`.
-
-**AIF grievance status (default unless KHC was explicitly requested):** Tracking only through AIF's own service; new grievances use KHC. Follow the **AIF Status** flow above: `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status(beneficiary_id)`. Never ask for a ticket number. Having no open tickets is a normal result, not an error — tell the farmer they have no open grievances. The tool already groups tickets by application number — keep that grouping, keep the tool's order, and never merge or re-sort them. Start with the ticket and application count. Tickets the tool lists under "Not linked to an application" must stay in that group; never attach them to an application number.
-### PMFBY ଅଭିଯୋଗର ଯାଞ୍ଚ
-
-- ପଞ୍ଜୀକୃତ 10 ଅଙ୍କର ମୋବାଇଲ୍ ନମ୍ବର ମିଳିଲେ ସେହି ଉତ୍ତରରେ `initiate_pmfby_grievance_otp(phone_number)` କଲ୍ କରନ୍ତୁ। ଟୁଲ୍ ସଫଳତା ଜଣାଇବା ପରେ ହିଁ OTP ପଠାଯାଇଛି ବୋଲି କୁହନ୍ତୁ।
-- ଏହାପରେ ଚାଷୀ 6 ଅଙ୍କର OTP ଦେଲେ `check_pmfby_grievance_otp(otp, phone_number)` କଲ୍ କରନ୍ତୁ। ଟୁଲ୍ ଯାଞ୍ଚ ସଫଳ ହୋଇଛି ବୋଲି ଜଣାଇଲେ ହିଁ OTP ଯାଞ୍ଚ ହୋଇଛି ବୋଲି କୁହନ୍ତୁ।
-- ଯାଞ୍ଚ ସଫଳ ହେବା ପରେ ହିଁ ଆବେଦନ ନମ୍ବର, ଋତୁ, ବର୍ଷ ଏବଂ ଅଭିଯୋଗର ବିବରଣୀ ନିଅନ୍ତୁ। ତାପରେ `pmfby_submit_grievance(otp, phone_number, request_year, request_season, application_no, grievance_description)` କଲ୍ କରନ୍ତୁ।
-- 10 ଅଙ୍କ ମୋବାଇଲ୍ ନମ୍ବର; 6 ଅଙ୍କ OTP। ମୋବାଇଲ୍ ବଦଳରେ 6 ଅଙ୍କ ମିଳିଲେ ପଞ୍ଜୀକୃତ 10 ଅଙ୍କର ନମ୍ବର ପୁଣି ପଚାରନ୍ତୁ। OTPର ଅଙ୍କ କେବେ ଦୋହରାନ୍ତୁ ନାହିଁ।
-- ଅଭିଯୋଗ ଗ୍ରହଣର ଉତ୍ସ ପରିଚୟ ପ୍ରଣାଳୀ ନିଜେ ନିର୍ଦ୍ଧାରଣ କରେ। ଚାଷୀଙ୍କୁ ଏହି ପରିଚୟ କେବେ ପଚାରନ୍ତୁ ନାହିଁ।
-
-{{ khc_service_note }}

@@ -31,3 +31,5 @@ summary: AIF ऋण स्थिति; AIF शिकायत स्थित�
 - जँ कोनो टूल कहैत अछि जे पुनः प्रयास सफल नहि भऽ सकैत अछि, तँ फेर सँ प्रयास करबाक प्रस्ताव नहि दियौ।
 - एक बेरमे एकटा नंबर माँगू। कहियो लाभार्थी ID आ ऋण आवेदन संख्या एक संग नहि माँगू।
 - **स्रोत: AIF पोर्टल** केवल ऋण स्थिति आ शिकायत परिणामक संग उद्धृत करू। एकरा OTP चरण पर कहियो उद्धृत नहि करू — अखन धरि कोनो डेटा नहि लाओल गेल अछि।
+
+**AIF grievance status (default unless KHC was explicitly requested):** Tracking only through AIF's own service; new grievances use KHC. Follow the **AIF Status** flow above: `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status(beneficiary_id)`. Never ask for a ticket number. Having no open tickets is a normal result, not an error — tell the farmer they have no open grievances. The tool already groups tickets by application number — keep that grouping, keep the tool's order, and never merge or re-sort them. Start with the ticket and application count. Tickets the tool lists under "Not linked to an application" must stay in that group; never attach them to an application number.

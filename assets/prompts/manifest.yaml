@@ -17,12 +17,31 @@ skills:
     tools:
     - check_pm_kisan_status_with_otp
     - initiate_pm_kisan_status_check
+  pm_kisan.grievances:
+    prompt_dir: skills/pm_kisan/grievances
+    enabled: true
+    tools:
+    - pmkisan_grievance_send_otp
+    - pmkisan_grievance_status
+    - pmkisan_submit_grievance
+    requires:
+    - grievances.manage
   pmfby.status:
     prompt_dir: skills/pmfby/status
     enabled: true
     tools:
     - check_pmfby_status_with_otp
     - initiate_pmfby_status_check
+  pmfby.grievances:
+    prompt_dir: skills/pmfby/grievances
+    enabled: true
+    tools:
+    - check_pmfby_grievance_otp
+    - initiate_pmfby_grievance_otp
+    - pmfby_grievance_status
+    - pmfby_submit_grievance
+    requires:
+    - grievances.manage
   soil_health.status:
     prompt_dir: skills/soil_health/status
     enabled: true
@@ -41,6 +60,8 @@ skills:
     - check_aif_loan_status
     - initiate_aif_otp
     - verify_aif_otp
+    requires:
+    - grievances.manage
   kcc.status:
     prompt_dir: skills/kcc/status
     enabled: true
@@ -122,29 +143,9 @@ skills:
   grievances.manage:
     prompt_dir: skills/grievances/manage
     enabled: true
-    tools:
-    - check_aif_grievance_status
-    - check_aif_loan_status
-    - check_khc_grievance_status
-    - check_pm_kisan_status_with_otp
-    - check_pmfby_grievance_otp
-    - check_pmfby_status_with_otp
-    - find_khc_location
-    - get_khc_grievance_options
-    - initiate_aif_otp
-    - initiate_khc_otp
-    - initiate_pm_kisan_status_check
-    - initiate_pmfby_grievance_otp
-    - initiate_pmfby_status_check
-    - lookup_khc_reference
-    - pmfby_grievance_status
-    - pmfby_submit_grievance
-    - pmkisan_grievance_send_otp
-    - pmkisan_grievance_status
-    - pmkisan_submit_grievance
-    - register_khc_grievance
-    - verify_aif_otp
-    - verify_khc_otp
+    tools: []
+    requires:
+    - khc.grievances
   pm_kisan.installments:
     prompt_dir: skills/pm_kisan/installments
     enabled: true

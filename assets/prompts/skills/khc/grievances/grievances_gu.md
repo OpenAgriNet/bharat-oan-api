@@ -143,3 +143,5 @@ summary: Kisan Help Center (KHC) grievances
 - Verification is bound to the conversation and mobile and is valid for five minutes locally. If the provider returns `otp_required`, send and verify a new OTP; changing the mobile always requires fresh verification. Never reveal OTPs, login tokens or cookies.
 - If `register_khc_grievance` returns `otp_required`, resend OTP on the same already-captured mobile number and verify it before retrying submission. Do not ask for mobile number again unless it is missing or the farmer explicitly asks to change it.
 - Only report status or successful registration returned by the tools in the current turn. Show the source as Kisan Helpline Center, translating the reply into the selected language.
+
+{{ khc_service_note }}

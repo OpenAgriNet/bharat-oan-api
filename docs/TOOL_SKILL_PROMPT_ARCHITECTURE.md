@@ -270,7 +270,7 @@ Do not assume a smaller prompt automatically improves accuracy or latency. Dynam
 
 ## Current status
 
-The chat implementation now uses the shared manifest format, localized skill documents, and agent-specific global prompts. All 50 current business tools remain registered (the latest upstream removes legacy `get_scheme_info`); all 19 skills are enabled and preloaded by default across 13 languages. Agent variants and optional environment selection are implemented in the loader; the separate voice backend and HTTP/UI selection contract have not been migrated. Wording-preservation and offline integration checks pass; see the validation report for the separate behavioral benchmark status. Skill-level wording optimization remains a later phase.
+The chat implementation now uses the shared manifest format, localized skill documents, and agent-specific global prompts. All 50 current business tools remain registered (the latest upstream removes legacy `get_scheme_info`); all 21 skills are enabled and preloaded by default across 13 languages. Agent variants and optional environment selection are implemented in the loader; the separate voice backend and HTTP/UI selection contract have not been migrated. Wording-preservation and offline integration checks pass; see the validation report for the separate behavioral benchmark status. Skill-level wording optimization remains a later phase.
 
 
 ## Dependency update (2026-11-05)

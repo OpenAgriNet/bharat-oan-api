@@ -141,3 +141,18 @@ def test_real_loop_exposes_supporting_tools_on_next_step():
     state = SkillState(enabled_skills=['mandi.prices'], preloaded_skills=[])
     assert agent.run_sync('Wheat prices in Patna today', deps=SimpleNamespace(skills=state)).output == 'Location resolved'
     assert executed == ['Patna'] and len(seen) == 3
+
+
+@pytest.mark.parametrize('skill,own,other', [
+    ('pm_kisan.grievances', 'pmkisan_submit_grievance', 'pmfby_submit_grievance'),
+    ('pmfby.grievances', 'pmfby_submit_grievance', 'pmkisan_submit_grievance'),
+    ('aif.status', 'check_aif_grievance_status', 'pmfby_submit_grievance'),
+])
+def test_scheme_grievances_do_not_load_other_schemes(skill, own, other):
+    """A scheme loads its own tools plus shared KHC fallback, not every scheme."""
+    state = SkillState(enabled_skills=[skill])
+    assert own in state.visible
+    assert other not in state.visible
+    assert 'register_khc_grievance' in state.visible
+    assert 'grievances.manage' in state.active
+

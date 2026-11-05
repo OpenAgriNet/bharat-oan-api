@@ -66,7 +66,7 @@ class PromptLanguageContract(unittest.TestCase):
     def test_pmfby_safeguards_keep_language_and_tool_arguments(self):
         for language in ["en", *SCRIPT_RANGES]:
             with self.subTest(language=language):
-                text = get_catalog().render_skill("grievances.manage", language, {})
+                text = get_catalog().render_skill("pmfby.grievances", language, {})
                 self.assertNotIn("### PMFBY grievance verification rules", text)
                 headings = list(re.finditer(r"^### .*PMFBY.*$", text, re.M))
                 self.assertTrue(headings, "Missing localized PMFBY safeguards")
