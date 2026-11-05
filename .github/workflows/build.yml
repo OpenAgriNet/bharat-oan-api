@@ -9,65 +9,61 @@ on:
         default: true
         type: boolean
   push:
-    branches:
-      - bh-dev
-      - bh-main
+    branches: [bh-dev, bh-main]
   pull_request:
-    branches:
-      - bh-dev
-      - bh-main
+    branches: [bh-dev, bh-main]
 
 env:
   BASE_IMAGE_NAME: bharat-oan-api
 
-# A new push to the same PR cancels its in-flight build; branch builds always finish.
+# Dev PR builds replace earlier runs; production runs always finish independently.
 concurrency:
-  group: build-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ (github.base_ref || github.ref_name) == 'bh-dev' && format('build-{0}', github.event.pull_request.number || github.sha) || format('build-prod-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.base_ref == 'bh-dev' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Manual runs use the selected source branch for credentials and image tags.
     if: github.event_name != 'workflow_dispatch' || github.ref_name == 'bh-dev' || github.ref_name == 'bh-main'
-    environment: ${{ github.base_ref || github.ref_name }}
+    # The profile follows the PR target, never the review branch's name.
+    environment: ${{ (github.base_ref || github.ref_name) == 'bh-main' && 'main' || (github.base_ref || github.ref_name) }}
+    env:
+      BUILD_BRANCH: ${{ github.base_ref || github.ref_name }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # PR images are built from the PR head commit so the tag matches the code.
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # Production tests the PR merge; dev retains its PR-head image policy.
+          ref: ${{ github.event_name == 'pull_request' && github.base_ref == 'bh-dev' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Set image name and tags based on branch
         id: set-tags
+        env:
+          REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ env.BASE_IMAGE_NAME }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          REGISTRY="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/${{ env.BASE_IMAGE_NAME }}"
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            # PR images get only pr-* tags so they never overwrite bh-dev/bh-main tags.
-            # The Artifact Registry cleanup policy deletes pr-* images after 7 days.
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-            TAGS="pr-${PR_NUMBER} pr-${PR_NUMBER}-${HEAD_SHA::7}"
+          if [[ "$BUILD_BRANCH" == "bh-dev" && "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            TAGS="pr-${PR_NUMBER} pr-${PR_NUMBER}-${PR_HEAD_SHA::7}"
           else
-            BRANCH="${{ github.ref_name }}"
-            BUILD_TAG=$(echo "$BRANCH" | sed 's/\//-/g')
-            # Extract simple tag (e.g., bh-dev -> dev, bh-main -> main)
-            SIMPLE_TAG=$(echo "$BRANCH" | sed 's/^.*-//')
-            TAGS="${BUILD_TAG}-latest ${BUILD_TAG} ${SIMPLE_TAG} ${{ github.sha }}"
+            BUILD_TAG=$(echo "$BUILD_BRANCH" | sed 's/\//-/g')
+            SIMPLE_TAG=$(echo "$BUILD_BRANCH" | sed 's/^.*-//')
+            # Production never overwrites the existing main image tag.
+            if [[ "$BUILD_BRANCH" == "bh-main" ]]; then SIMPLE_TAG="$BUILD_TAG"; fi
+            TAGS="${BUILD_TAG}-latest ${BUILD_TAG} ${SIMPLE_TAG} ${GITHUB_SHA}"
           fi
 
           echo "Image tags: $TAGS"
-          echo "IMAGE=${REGISTRY}" >> $GITHUB_OUTPUT
+          echo "IMAGE=${REGISTRY}" >> "$GITHUB_OUTPUT"
           {
             echo "TAGS<<EOF"
             for TAG in $TAGS; do echo "${REGISTRY}:${TAG}"; done
             echo "EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -88,14 +84,24 @@ jobs:
           push: false
           load: true
           tags: ${{ steps.set-tags.outputs.TAGS }}
+          build-args: |
+            IMAGE_CHECK_PROFILE=${{ (github.base_ref || github.ref_name) == 'bh-main' && 'production' || 'development' }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Push Docker image
-        # Fork PRs have no GCP secrets, so they only build.
+        # Production PRs build only; dev keeps publishing same-repository PR tags.
         if: >-
           github.event_name == 'push' ||
           (github.event_name == 'workflow_dispatch' && inputs.push_image) ||
-          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-        run: docker push --all-tags ${{ steps.set-tags.outputs.IMAGE }}
+          (github.event_name == 'pull_request' && github.base_ref == 'bh-dev' && github.event.pull_request.head.repo.full_name == github.repository)
+        env:
+          IMAGE: ${{ steps.set-tags.outputs.IMAGE }}
+          TAGS: ${{ steps.set-tags.outputs.TAGS }}
+        run: |
+          if [[ "$BUILD_BRANCH" == "bh-dev" ]]; then
+            docker push --all-tags "$IMAGE"
+          else
+            while IFS= read -r TAG; do docker push "$TAG"; done <<< "$TAGS"
+          fi
