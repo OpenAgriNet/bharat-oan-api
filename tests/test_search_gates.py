@@ -39,7 +39,13 @@ def test_documents_search_runs_without_a_prior_question(marqo_stub):
 
 
 def test_pests_search_runs_once_the_crop_is_given(marqo_stub):
-    out = asyncio.run(search_tools.search_pests_diseases(FIRST_TURN_CTX, "aphids", "Wheat"))
+    from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, UserPromptPart
+
+    ctx = SimpleNamespace(deps=SimpleNamespace(session_id="s", question_id="q"), messages=[
+        ModelRequest(parts=[UserPromptPart(content="wheat aphids")]),
+        ModelResponse(parts=[ToolCallPart(tool_name="search_advisory", args={})]),
+    ])
+    out = asyncio.run(search_tools.search_pests_diseases(ctx, "aphids", "Wheat"))
     assert out.startswith("No ") and "aphids" in out
 
 
