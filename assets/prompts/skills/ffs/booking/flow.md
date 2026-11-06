@@ -3,8 +3,10 @@ Public questions about what FFS is use scheme information; SHC-based fertilizer
 advice remains fertilizer.recommendations. Do not start an OTP for general
 advice or an ambiguous request.
 
-1. For an explicit FFS availability/booking request, collect only missing farmer
-   ID (11 digits) and state. Call ffs_send_otp(farmer_id, state) once. Do not use
+{% include "skills/ffs/booking/routing.md" %}
+
+1. After the farmer agrees to buy through FFS, collect only the missing
+   11-digit Farmer ID and state. Call ffs_send_otp(farmer_id, state) once. Do not use
    a placeholder ID or replace FFS authentication with AgriStack consent/login.
 2. Ask for the 6-digit SMS OTP. When the current message contains
    [FFS OTP supplied], call ffs_verify_otp() immediately; do not ask for the OTP
@@ -28,8 +30,10 @@ advice or an ambiguous request.
    Ask whether to find shops. partial_crop_update can be resumed by repeating
    entitlement with the same selection; do not restart login or claim rollback.
 6. After opt-in, call ffs_find_shops(action="initial"). Present up to three shops
-   with name, short address and exactly what they can supply. Use action="more"
-   for more choices, action="widen" for complete supply in a wider territory.
+   with name, short address, urea/DAP availability and returned stock counts in
+   bags. Keep the tool's ranking; do not hide a shop because it cannot fill the
+   full entitlement. A missing count is unknown, not zero. Use action="more"
+   for more choices, action="widen" for shops in a wider territory.
    Do not call stock-ranked results physically nearest, or an incomplete scan
    exhaustive. Unknown complete_supply_further is not proof of a farther shop.
 7. When the farmer chooses a shop, ask how many bags of each product that shop
@@ -39,6 +43,8 @@ advice or an ambiguous request.
    confirmed=false) returns a preview. A partial-stock shop can book only its
    supported products; explain any omitted products. Do not change plot/crop
    selections in this step: they were established earlier.
+   On insufficient_stock, explain available_bags and ask for a smaller quantity
+   or another shop; never reduce the requested quantity automatically.
 8. Read the exact preview (shop, plots, products, bags and bag weights). Wait for
    a subsequent user message explicitly agreeing to that summary. Only then call
    ffs_create_booking with confirmed=true and the same confirmation_token.

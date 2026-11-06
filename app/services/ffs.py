@@ -538,10 +538,12 @@ class FFSService:
                 raise FFSError("unavailable", "The required fertilizer product/bag size is unavailable; do not substitute")
             chosen.append({"productGroupId": group["group"], "productId": product["productId"],
                            "quantityOfBagKg": group["kg_per_bag"], "noBagsRequested": group["bags"]})
-        if any("stock" not in shop for shop in s.get("shops", {}).get("pool", {}).values()):
+        # Old searches discarded low-stock shops, so their cached pages cannot be reused.
+        if "shops" in s and (s["shops"].get("stock_visibility") != "all"
+                             or any("stock" not in shop for shop in s["shops"]["pool"].values())):
             s.pop("shops")
-            self.note("shop_results_refreshed", reason="missing_stock_snapshot")
-        search = s.setdefault("shops", {"level": 0, "page": 1, "pool": {}, "shown": [], "complete_levels": [], "turn_results": {}})
+            self.note("shop_results_refreshed", reason="stock_visibility_changed")
+        search = s.setdefault("shops", {"level": 0, "page": 1, "pool": {}, "shown": [], "complete_levels": [], "turn_results": {}, "stock_visibility": "all"})
         turn_key = self.question_id + ":" + action
         if turn_key in search["turn_results"]:
             self.note("shop_results_reused", reason="same_turn")
@@ -555,20 +557,21 @@ class FFSService:
             search["level"] += 1
             search["page"] = 1
             search["minimum_level"] = search["level"]
-            search["complete_only"] = True
         quantities = {p["productId"]: p["noBagsRequested"] for p in chosen}
         pending = lambda: [shop for shop in search["pool"].values() if shop["shop_ref"] not in search["shown"] and
-                          (not search.get("complete_only") or
-                           (shop["complete_supply"] and shop["rank"][0] >= search.get("minimum_level", 0)))]
-        # Bound a tool call; completeness is reported instead of pretending a partial scan is exhaustive.
+                          shop["rank"][0] >= search.get("minimum_level", 0)]
+        # Seek three stocked choices; empty shops must not stop territory expansion.
+        stocked_pending = lambda: [shop for shop in pending() if shop["coverage"]]
+        # Bound actual API calls, while preserving each territory's pagination.
         for _ in range(4):
-            level = search["level"]
-            if LEVELS[level] in search["complete_levels"]:
-                if len(pending()) >= 3 or level == len(LEVELS) - 1:
-                    break
+            if len(stocked_pending()) >= 3:
+                break
+            while LEVELS[search["level"]] in search["complete_levels"] and search["level"] < len(LEVELS) - 1:
                 search["level"] += 1
                 search["page"] = 1
-                continue
+            level = search["level"]
+            if LEVELS[level] in search["complete_levels"]:
+                break
             self.note("shop_page_requested", territory=LEVELS[level], page=search["page"])
             data = await self.call("POST", MASTER, "/retailer/getRetailersByProductAvailabilityV4", {
                 **geo, "selectedProducts": chosen, "territoryLevel": LEVELS[level],
@@ -584,36 +587,41 @@ class FFSService:
                 for group in row.get("availableProducts", []):
                     for product in group.get("products", []):
                         pid, available = product.get("productId"), product.get("noBagsAvailable")
-                        if pid in quantities and type(available) in (int, float) and math.isfinite(available) and available >= quantities[pid]:
+                        if pid in quantities and type(available) in (int, float) and math.isfinite(available) and available >= 0:
                             stocks[pid] = available
-                if not stocks:
-                    continue
                 rid = str(row["retailerId"])
                 if rid in search["pool"]:
                     continue
-                complete = set(stocks) == set(quantities)
+                sufficient = {pid for pid, bags in quantities.items() if stocks.get(pid, 0) >= bags}
+                available = {pid for pid, bags in stocks.items() if bags > 0}
+                complete = sufficient == set(quantities)
+                # Full entitlement coverage ranks first; smaller stocks remain selectable.
+                supply_rank = (0 if complete else 1 if 1089 in sufficient else 2 if 1005 in sufficient
+                               else 3 if 1089 in available else 4 if 1005 in available else 5)
                 search["pool"][rid] = {"shop_ref": "shop-" + str(len(search["pool"]) + 1), "name": row.get("retailerName", ""),
-                    "address": row.get("address1", ""), "coverage": ["urea" if pid == 1089 else "DAP" for pid in stocks],
+                    "address": row.get("address1", ""), "coverage": ["urea" if pid == 1089 else "DAP" for pid in quantities if pid in available],
                     "complete_supply": complete, "stock": {str(k): v for k, v in stocks.items()},
                     "territory": LEVELS[level], "retailer_id": row["retailerId"],
-                    "rank": [level, 0 if complete else 1 if 1089 in stocks else 2, -sum(stocks.values()), row["retailerId"]]}
+                    "rank": [level, supply_rank, -sum(stocks.values()), row["retailerId"]]}
             self.note("shop_page_processed", territory=LEVELS[level], page=search["page"],
                       rows=len(data), eligible_pending=len(pending()))
             search["page"] += 1
             if search["page"] > pages:
                 search["complete_levels"].append(LEVELS[level])
             await self.save()
-            if len(pending()) >= 3:
+            if len(stocked_pending()) >= 3:
                 break
-        batch = sorted(pending(), key=lambda x: x["rank"])[:3]
+        batch = sorted(pending(), key=lambda x: (not bool(x["coverage"]), *x["rank"]))[:3]
         search["shown"].extend(shop["shop_ref"] for shop in batch)
         exhausted = search["level"] == 3 and "S" in search["complete_levels"]
-        public = [{k: v for k, v in shop.items() if k not in {"rank", "retailer_id"}} for shop in batch]
+        public = [{**{k: v for k, v in shop.items() if k not in {"rank", "retailer_id", "stock"}},
+                   "stock": {p["name"]: shop["stock"].get(str(PRODUCTS[p["group"]])) for p in wanted}}
+                  for shop in batch]
         answer = result("ok" if batch else "no_stock" if exhausted else "search_incomplete",
-                        "Present shops and coverage; no booking or reservation has been made",
+                        "Present at most three shop names and urea/DAP availability with stock counts; no booking or reservation has been made",
                         shops=public, has_more=bool(pending()) or not exhausted,
                         search_complete=LEVELS[search["level"]] in search["complete_levels"],
-                        complete_supply_only=search.get("complete_only", False),
+                        complete_supply_only=False,
                         complete_supply_further=None, booking_enabled=True)
         search["last_result"] = answer
         search["turn_results"][turn_key] = answer
@@ -645,6 +653,8 @@ class FFSService:
         if not shop:
             return result("needs_clarification", "Choose a shop_ref from the latest shop list")
         choices = self.booking_choices(shop)
+        if not choices:
+            return result("needs_shops", "No available urea/DAP stock was reported for this shop. Ask the farmer to choose another shop or refresh stock")
         pending = s.get("pending_booking", {})
         if quantities is None and confirmed and pending.get("summary", {}).get("shop_ref") == shop_ref:
             quantities = [BookingQuantity(**q) for q in pending["quantities"]]
@@ -662,8 +672,11 @@ class FFSService:
             if not product or product.get("bagWeightKg") != group["kg_per_bag"] or not product.get("plantId"):
                 raise FFSError("unavailable", "Required fertilizer product/plant mapping is unavailable; refresh shop search")
             stock = shop.get("stock", {}).get(str(product["productId"]))
-            if stock is None or q.bags > stock:
-                return result("needs_shops", "Refresh shop search: selected product stock is missing or insufficient")
+            if stock is None:
+                return result("needs_shops", "Refresh shop search: selected product stock is missing")
+            if q.bags > stock:
+                return result("insufficient_stock", "Explain this shop's available stock and ask for a smaller quantity or another shop; never reduce the quantity automatically",
+                              product=q.product, requested_bags=q.bags, available_bags=stock)
             chosen.append({"group": group["group"], "name": group["name"], "bags": q.bags,
                            "kg_per_bag": group["kg_per_bag"], "product_id": product["productId"],
                            "plant_id": product["plantId"]})

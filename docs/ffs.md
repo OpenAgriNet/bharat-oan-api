@@ -6,6 +6,13 @@ farmer login, land/crop selection, urea/DAP entitlement, shop discovery and
 final booking creation with explicit confirmation.
 The branch starts from `bh-dev b263117` after the skill-breakdown-v2 merge.
 
+Any fertilizer purchase intent first offers buying through FFS, including when
+the farmer names another fertilizer or does not mention FFS. Wait for agreement
+before collecting the 11-digit **Farmer ID** and state or sending an OTP.
+Only urea/DAP booking is supported; explain that before login for other products.
+General dose/advisory questions keep their existing flow. Purchase routing is
+also visible when the FFS skill is enabled but not yet loaded.
+
 ## Configuration and authentication
 
 Use a **server-side** environment file for local development. On this workspace,
@@ -83,10 +90,16 @@ cannot remove a query string already logged by a proxy or ASGI access logger.
 - Quantities come from one GFR result's `offeredBags` (including zero), with the
   documented `noOfBagsRequired` fallback. Never combine GFR tabs or subtract
   purchased quantities twice. The selected products are 1089/1005 only.
-- Shops use V/T/D/S precedence, enough-stock checks, complete supply first within
-  each territory, then urea-only/DAP-only. Page/time budgets report incomplete
-  coverage honestly. More/widen preserve a cursor and deduplicate presented shops;
-  widening keeps subsequent results restricted to complete supply in wider areas.
+- Shops use V/T/D/S precedence, complete supply first within each territory,
+  then sufficient urea/DAP stock, smaller positive stocks, and unavailable stock.
+  Every provider-returned shop remains eligible; at most three are presented
+  per batch with named stock counts. Missing stock is unknown, not zero.
+  Stocked shops take priority over zero/unknown stock; empty shops do not stop
+  expansion through village, tehsil, district and state. Search makes at most
+  four provider calls per turn and finishes a territory's pages before expanding.
+  More/widen preserve a cursor and deduplicate presented shops; widening changes
+  territory without dropping shops with partial stock. Old filtered caches are
+  refreshed. Booking validates the requested bags against stock separately.
 - Booking asks for farmer-selected whole-bag quantities, then previews the exact
   shop, plots and products. Confirmation must use that token in a later user turn
   within five minutes. Changed details require a new preview. Only products the
