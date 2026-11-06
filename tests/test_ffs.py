@@ -253,7 +253,8 @@ def test_whole_flow_and_repeats_do_not_repeat_writes(setup):
         more = await ffs_find_shops(context("turn-6"), "more")
         assert not ({x["shop_ref"] for x in shops["data"]["shops"]} & {x["shop_ref"] for x in more["data"]["shops"]})
         encoded = json.dumps([out, shops, more])
-        for secret in ("userToken", "test-hash", "9999999999", "plantId", "farmlandPlotRegistryId"):
+        # Complete final-step responses intentionally include provider IDs.
+        for secret in ("userToken", "test-hash", "9999999999"):
             assert secret not in encoded
     asyncio.run(run())
 
@@ -454,14 +455,9 @@ def test_create_booking_requires_confirmation_and_submits_once(setup):
 
         preview = await ffs_create_booking(context("turn-5"), shop_ref, quantities=[ffs.BookingQuantity(product="urea", bags=4)])
         assert preview["status"] == "needs_confirmation"
-        token = preview["data"]["confirmation_token"]
-
-        mismatch = await ffs_create_booking(context("turn-6"), shop_ref, True, "wrong-token")
-        assert mismatch["status"] == "needs_confirmation"
+        assert 'confirmation_token' not in preview['data']
         assert setup.backend.count("createMultipleBookingV2") == 0
-
-        token = mismatch["data"]["confirmation_token"]
-        booked = await ffs_create_booking(context("turn-7"), shop_ref, True, token)
+        booked = await ffs_create_booking(context("turn-6"), shop_ref, True)
         assert booked["status"] == "ok"
         assert booked["data"]["booking"]["is_valid"] is True
         assert booked["data"]["booking"]["bookings"][0]["booking_code"] == "PRC-TEST-001"

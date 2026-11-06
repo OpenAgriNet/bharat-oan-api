@@ -1,6 +1,7 @@
 """Booking contracts and failure recovery; synthetic HTTP only, no provider writes."""
 
 import asyncio
+import ast
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -20,7 +21,7 @@ from agents.tools.ffs import (
     ffs_send_otp,
     ffs_verify_otp,
 )
-from tests.test_ffs import setup, context, login, selection, validate_booking_payload
+from tests.test_ffs import setup, context, login, selection, validate_booking_payload, USER
 
 FIXTURES = Path(__file__).parent / "fixtures/ffs_v2"
 
@@ -46,7 +47,123 @@ async def preview(shop, turn="5", q=None):
 
 
 async def confirm(shop, view, turn="6", **kwargs):
-    return await ffs_create_booking(context(turn), shop, True, view["data"]["confirmation_token"], **kwargs)
+    return await ffs_create_booking(context(turn), shop, True, **kwargs)
+
+
+def test_confirmation_restores_complete_exchanges_without_message_history(setup):
+    async def run():
+        shop = await prepare()
+        view = await preview(shop)
+        _, _, _, restored = await ffs.prepare_chat_turn('Yes, go ahead', 'session-1', USER)
+        exchanges = restored['booking_tool_exchanges']
+        assert set(exchanges) == {'find_shops', 'create_booking'}
+        assert exchanges['find_shops']['request'] == {'action': 'initial'}
+        assert exchanges['find_shops']['response']['data']['shops'][0]['shop_ref'] == shop
+        backend = exchanges['find_shops']['backend_exchanges']
+        assert backend and all(x['response']['http_status'] == 200 for x in backend)
+        assert any('retailer' in x['request']['url'] for x in backend)
+        assert exchanges['create_booking']['request'] == {
+            'shop_ref': shop, 'confirmed': False,
+            'quantities': [{'product': 'urea', 'bags': 2}],
+        }
+        assert exchanges['create_booking']['response'] == view
+        assert 'confirmation_token' not in restored['pending_booking']
+        assert restored['pending_booking']['summary'] == view['data']['summary']
+
+        def model(messages, info):
+            if messages[-1].parts[0].part_kind == 'tool-return':
+                received = messages[-1].parts[0].content
+                assert received['status'] == 'ok'
+                envelope = received['data']['backend_exchanges'][0]['response']['body']
+                assert envelope['code'] == 200
+                assert envelope['data']['isValid'] is True
+                assert envelope['data']['bookingResults'][0]['procurementApplicationCode']
+                assert envelope['data']['bookingResults'][0]['statusCode'] == 304
+                return ModelResponse(parts=[TextPart('Booking placed.')])
+            # Recover the preview solely from this turn's restored context.
+            prompt = str(messages[-1].parts[0].content)
+            workflow = ast.literal_eval(prompt.split('**FFS workflow:** ', 1)[1])
+            pending = workflow['pending_booking']
+            arguments = {'shop_ref': pending['summary']['shop_ref'], 'confirmed': True}
+            return ModelResponse(parts=[ToolCallPart('ffs_create_booking', arguments)])
+
+        deps = context('6', query='Yes, go ahead').deps
+        deps.ffs_context = restored
+        agent = Agent(FunctionModel(model), tools=[Tool(ffs_create_booking, takes_ctx=True, sequential=True)])
+        await agent.run(deps.get_user_message(), deps=deps)  # Deliberately no history.
+        assert len(setup.backend.booking_payloads) == 1
+        _, _, _, completed = await ffs.prepare_chat_turn('What happened?', 'session-1', USER)
+        assert 'pending_booking' not in completed
+        assert completed['booking_tool_exchanges']['create_booking']['response']['status'] == 'ok'
+        assert completed['booking_tool_exchanges']['create_booking']['request']['confirmed'] is True
+        raw = completed['booking_tool_exchanges']['create_booking']['backend_exchanges'][0]
+        assert raw['request']['body'] == setup.backend.booking_payloads[0]
+        assert raw['response']['body']['data']['isValid'] is True
+        assert 'userToken' not in json.dumps(restored)
+
+    asyncio.run(run())
+
+
+def test_optional_summary_never_creates_token_or_expiry(setup):
+    async def run():
+        shop = await prepare()
+        first = await preview(shop, '5')
+        repeated = await preview(shop, '6')
+        assert first == repeated
+        state = await ffs.get_session('session-1')
+        assert set(state['pending_booking']) == {'summary', 'quantities'}
+        assert not setup.backend.booking_payloads
+        assert (await confirm(shop, repeated, '6'))['status'] == 'ok'
+        assert len(setup.backend.booking_payloads) == 1
+    asyncio.run(run())
+
+
+def test_repeated_confirmations_without_token_submit_once(setup):
+    """Replay the observed confirmation sequence with the removed token argument omitted."""
+    for i in range(2, 5):
+        setup.backend.land.append(dict(setup.backend.land[0],
+            farmlandPlotRegistryId=101 + i, farmlandOwnershipId=201 + i,
+            ownershipMappingId=301 + i, surveyNumber=str(i + 1)))
+    async def run():
+        shop = await prepare()
+        view = await preview(shop, 'preview-turn', quantities(1))
+        assert view['status'] == 'needs_confirmation'
+        attempts = [
+            {'confirmed': True},
+            {'confirmed': True, 'quantities': quantities(1)},
+            {'confirmed': True, 'quantities': quantities(1)},
+        ]
+        answers = []
+        for index, arguments in enumerate(attempts):
+            # Each tool invocation reloads persisted state, just like different workers.
+            answers.append(await ffs_create_booking(
+                context(f'yes-{index}', query='Yes confirm my booking'), shop, **arguments))
+        assert [a['status'] for a in answers] == ['ok', 'ok', 'ok']
+        assert len(setup.backend.booking_payloads) == 1
+        assert len(setup.backend.booking_payloads[0]['selectedLandIds']) == 5
+        line = setup.backend.booking_payloads[0]['bookingRequest'][0]['productLines'][0]
+        assert line['noBagsRequested'] == 1
+        assert line['quantityOfBagKg'] == 45
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('prior_state', ['none', 'same_turn', 'legacy_expired'])
+def test_confirmed_choice_submits_without_local_preview_gate(setup, prior_state):
+    async def run():
+        shop = await prepare()
+        if prior_state != 'none':
+            await preview(shop, '6', quantities(1))
+        if prior_state == 'legacy_expired':
+            state = await ffs.get_session('session-1')
+            state['pending_booking'].update(confirmation_token='old-unused-token',
+                signature='old-unused-signature', expires=0, turn='6')
+            await setup.memory.set(ffs.session_key('session-1'), state, namespace=ffs.NAMESPACE)
+        answer = await ffs_create_booking(context('6', query='Yes, book one bag here'),
+            shop, confirmed=True, quantities=quantities(1))
+        assert answer['status'] == 'ok'
+        assert len(setup.backend.booking_payloads) == 1
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize("bags", [0, -1, True, 1.5, "2"])
@@ -55,7 +172,7 @@ def test_quantity_schema_rejects_invalid_counts(bags):
         ffs.BookingQuantity(product="urea", bags=bags)
 
 
-def test_farmer_quantity_preview_later_confirmation_and_cached_completion(setup):
+def test_farmer_quantity_single_confirmation_and_cached_completion(setup):
     async def run():
         shop = await prepare()
         state = await ffs.get_session("session-1")
@@ -64,7 +181,6 @@ def test_farmer_quantity_preview_later_confirmation_and_cached_completion(setup)
         assert missing["status"] == "needs_quantities"
         view = await preview(shop)
         assert view["data"]["summary"]["products"][0]["bags"] == 2
-        assert (await confirm(shop, view, "5"))["status"] == "needs_confirmation"
         assert not setup.backend.booking_payloads
         out = await confirm(shop, view)
         assert out["status"] == "ok"
@@ -79,29 +195,14 @@ def test_farmer_quantity_preview_later_confirmation_and_cached_completion(setup)
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("changed", ["quantity", "crop", "expired", "token"])
-def test_changed_or_expired_preview_needs_fresh_confirmation(setup, changed):
+def test_farmer_corrected_quantity_submits_without_another_confirmation(setup):
     async def run():
         shop = await prepare()
-        view = await preview(shop)
-        kw = {}
-        if changed == "quantity":
-            kw["quantities"] = quantities(1)
-        elif changed == "token":
-            view["data"]["confirmation_token"] = "wrong"
-        else:
-            state = await ffs.get_session("session-1")
-            if changed == "crop":
-                state["selection"][0]["crop_code"] = "0101900"
-            else:
-                state["pending_booking"]["expires"] = 0
-            await setup.memory.set(ffs.session_key("session-1"), state, namespace=ffs.NAMESPACE)
-        fresh = await confirm(shop, view, **kw)
-        assert fresh["status"] == "needs_confirmation"
-        assert not setup.backend.booking_payloads
-        assert (await confirm(shop, fresh, "6"))["status"] == "needs_confirmation"
-        assert (await confirm(shop, fresh, "7"))["status"] == "ok"
-
+        await preview(shop, '5', quantities(2))
+        answer = await ffs_create_booking(context('6', query='Make it one bag and book'),
+            shop, confirmed=True, quantities=quantities(1))
+        assert answer['status'] == 'ok'
+        assert setup.backend.booking_payloads[0]['bookingRequest'][0]['productLines'][0]['noBagsRequested'] == 1
     asyncio.run(run())
 
 
@@ -111,7 +212,7 @@ def test_partial_shop_books_only_requested_supported_products(setup):
     async def run():
         shop = await prepare()
         wrong = await preview(shop, q=quantities(2, 1))
-        assert wrong["status"] == "needs_quantities"
+        assert wrong["status"] == "needs_confirmation"
         view = await preview(shop)
         assert [p["name"] for p in view["data"]["summary"]["products"]] == ["urea"]
         assert (await confirm(shop, view))["status"] == "ok"
@@ -123,7 +224,7 @@ def test_partial_shop_books_only_requested_supported_products(setup):
 
 
 @pytest.mark.parametrize("http_status", [200, 500])
-def test_provider_new_limit_requires_new_quantity_and_confirmation(setup, http_status):
+def test_provider_new_limit_then_farmer_correction_submits_directly(setup, http_status):
     setup.backend.booking_error = fixture("over_limit.json")
     setup.backend.booking_http_status = http_status
 
@@ -132,17 +233,18 @@ def test_provider_new_limit_requires_new_quantity_and_confirmation(setup, http_s
         view = await preview(shop)
         rejected = await confirm(shop, view)
         assert rejected["status"] == "quantity_limit_changed"
-        assert rejected["data"] == dict(
+        assert {k: v for k, v in rejected["data"].items() if k != 'backend_exchanges'} == dict(
             product="urea", requested_bags=2, allowed_bags=1, already_purchased_bags=0
         )
-        assert (await confirm(shop, view))["status"] == "already_started"
+        exchange = rejected['data']['backend_exchanges'][0]
+        assert exchange['response']['http_status'] == http_status
+        assert 'Allowed now: 1 bags' in exchange['response']['body']['message']
+        assert exchange['request']['body']['bookingRequest'][0]['productLines'][0]['noBagsRequested'] == 2
         assert len(setup.backend.booking_payloads) == 1
-        assert (await preview(shop, "7"))["status"] == "needs_quantities"
-        fresh = await preview(shop, "7", quantities(1))
-        assert fresh["status"] == "needs_confirmation"
-        assert (await confirm(shop, fresh, "7"))["status"] == "needs_confirmation"
         setup.backend.booking_error = None
-        assert (await confirm(shop, fresh, "8"))["status"] == "ok"
+        corrected = await ffs_create_booking(context('7', query='Then book one bag'),
+            shop, confirmed=True, quantities=quantities(1))
+        assert corrected['status'] == 'ok'
         assert [
             p["bookingRequest"][0]["productLines"][0]["noBagsRequested"]
             for p in setup.backend.booking_payloads
@@ -161,7 +263,7 @@ def test_zero_limit_no_automatic_retry(setup):
         shop = await prepare()
         v = await preview(shop)
         assert (await confirm(shop, v))["data"]["allowed_bags"] == 0
-        assert (await preview(shop, "7", quantities(1)))["status"] == "needs_quantities"
+        assert (await preview(shop, "7", quantities(1)))["status"] == "needs_confirmation"
         assert len(setup.backend.booking_payloads) == 1
 
     asyncio.run(run())
@@ -198,7 +300,9 @@ def test_concurrent_confirmations_send_once(setup):
     async def run():
         shop = await prepare()
         v = await preview(shop)
-        answers = await asyncio.gather(confirm(shop, v, "6"), confirm(shop, v, "7"))
+        answers = await asyncio.gather(
+            ffs_create_booking(context('6'), shop, True),
+            ffs_create_booking(context('7'), shop, True))
         assert all(a["status"] == "ok" for a in answers)
         assert len(setup.backend.booking_payloads) == 1
 
@@ -271,54 +375,24 @@ def test_v2_captured_shapes_with_multiplot_contract(setup, monkeypatch):
     asyncio.run(run())
 
 
-def test_real_pydantic_booking_schema_and_two_user_turns(setup):
+def test_real_pydantic_tool_submits_user_confirmed_shop_without_preview(setup):
     async def run():
         shop = await prepare()
-        token = None
-        step = 0
-
         def model(messages, info):
-            nonlocal token, step
-            step += 1
-            if step == 1:
-                return ModelResponse(
-                    parts=[
-                        ToolCallPart(
-                            "ffs_create_booking",
-                            {"shop_ref": shop, "quantities": [{"product": "urea", "bags": 2}]},
-                        )
-                    ]
-                )
-            if step == 2:
-                token = messages[-1].parts[0].content["data"]["confirmation_token"]
-                return ModelResponse(
-                    parts=[
-                        ToolCallPart(
-                            "ffs_create_booking",
-                            {"shop_ref": shop, "confirmed": True, "confirmation_token": token},
-                        )
-                    ]
-                )
-            if step == 3:
-                assert messages[-1].parts[0].content["status"] == "needs_confirmation"
-                return ModelResponse(parts=[TextPart("Confirm two bags?")])
-            if step == 4:
-                return ModelResponse(
-                    parts=[
-                        ToolCallPart(
-                            "ffs_create_booking",
-                            {"shop_ref": shop, "confirmed": True, "confirmation_token": token},
-                        )
-                    ]
-                )
-            return ModelResponse(parts=[TextPart("Booking confirmed.")])
-
+            schema = next(t.parameters_json_schema for t in info.function_tools if t.name == 'ffs_create_booking')
+            assert 'confirmation_token' not in schema['properties']
+            if messages[-1].parts[0].part_kind == 'tool-return':
+                response = messages[-1].parts[0].content
+                assert response['status'] == 'ok'
+                assert response['data']['backend_exchanges'][0]['response']['body']['data']['isValid'] is True
+                return ModelResponse(parts=[TextPart('Booking created.')])
+            return ModelResponse(parts=[ToolCallPart('ffs_create_booking', {
+                'shop_ref': shop, 'confirmed': True,
+                'quantities': [{'product': 'urea', 'bags': 1}],
+            })])
         agent = Agent(FunctionModel(model), tools=[Tool(ffs_create_booking, takes_ctx=True, sequential=True)])
-        first = await agent.run("I want two urea bags", deps=context("5").deps)
-        assert not setup.backend.booking_payloads
-        await agent.run("Yes, confirm", deps=context("6").deps, message_history=first.all_messages())
+        await agent.run('Yes, book one bag from that shop', deps=context('6').deps)
         assert len(setup.backend.booking_payloads) == 1
-
     asyncio.run(run())
 
 
@@ -389,13 +463,25 @@ def test_same_farmer_relogin_does_not_reset_uncertain_booking(setup):
     asyncio.run(run())
 
 
-def test_duplicate_products_and_above_known_limit_never_submit(setup):
+def test_duplicate_product_lines_require_valid_request_shape(setup):
     async def run():
         shop = await prepare()
-        for q in [quantities(7), quantities() + quantities()]:
-            assert (await preview(shop, q=q))["status"] == "needs_quantities"
+        assert (await preview(shop, q=quantities() + quantities()))['status'] == 'needs_quantities'
         assert not setup.backend.booking_payloads
+    asyncio.run(run())
 
+
+def test_backend_receives_confirmed_quantity_above_cached_limit_and_stock(setup):
+    setup.backend.stock = {i: (1, 0) for i in range(8)}
+    setup.backend.booking_error = fixture('over_limit.json')
+    setup.backend.booking_error['message'] = setup.backend.booking_error['message'].replace('Requested: 2', 'Requested: 7')
+    async def run():
+        shop = await prepare()
+        answer = await ffs_create_booking(context('6'), shop, confirmed=True, quantities=quantities(7))
+        assert answer['status'] == 'quantity_limit_changed'
+        assert len(setup.backend.booking_payloads) == 1
+        assert setup.backend.booking_payloads[0]['bookingRequest'][0]['productLines'][0]['noBagsRequested'] == 7
+        assert answer['data']['backend_exchanges'][0]['response']['body'] == setup.backend.booking_error
     asyncio.run(run())
 
 
@@ -425,7 +511,7 @@ def test_old_shop_cache_can_be_refreshed_for_booking(setup):
         for row in state["shops"]["pool"].values():
             row.pop("stock")
         await setup.memory.set(ffs.session_key("session-1"), state, namespace=ffs.NAMESPACE)
-        assert (await preview(shop))["status"] == "needs_shops"
+        assert (await preview(shop))["status"] == "needs_confirmation"
         refreshed = await ffs_find_shops(context("6"))
         shop = refreshed["data"]["shops"][0]["shop_ref"]
         view = await preview(shop, "7")

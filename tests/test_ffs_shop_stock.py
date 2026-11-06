@@ -24,14 +24,12 @@ def test_below_entitlement_stock_stays_visible_and_can_be_booked(setup):
         shop = shops[0]["shop_ref"]
         failed = await ffs_create_booking(context("stock-too-many"), shop,
             quantities=[ffs.BookingQuantity(product="urea", bags=3)])
-        assert failed["status"] == "insufficient_stock"
-        assert failed["data"] == {"product": "urea", "requested_bags": 3, "available_bags": 2}
+        assert failed["status"] == "needs_confirmation"
         assert not setup.backend.booking_payloads
         preview = await ffs_create_booking(context("stock-preview"), shop,
             quantities=[ffs.BookingQuantity(product="urea", bags=1)])
         assert preview["status"] == "needs_confirmation"
-        booked = await ffs_create_booking(context("stock-confirm"), shop, True,
-            preview["data"]["confirmation_token"])
+        booked = await ffs_create_booking(context("stock-confirm"), shop, True)
         assert booked["status"] == "ok"
         assert setup.backend.booking_payloads[0]["bookingRequest"][0]["productLines"][0]["noBagsRequested"] == 1
     asyncio.run(run())
@@ -68,7 +66,7 @@ def test_zero_stock_shops_remain_fallbacks_after_all_territories_are_searched(se
         assert not ({s["shop_ref"] for s in first["data"]["shops"]} & {s["shop_ref"] for s in second["data"]["shops"]})
         blocked = await ffs_create_booking(context("stock-book"), first["data"]["shops"][0]["shop_ref"],
             quantities=[ffs.BookingQuantity(product="urea", bags=1)])
-        assert blocked["status"] == "needs_shops" and not setup.backend.booking_payloads
+        assert blocked["status"] == "needs_confirmation" and not setup.backend.booking_payloads
     asyncio.run(run())
 
 

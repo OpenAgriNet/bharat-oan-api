@@ -67,23 +67,33 @@ async def ffs_find_shops(ctx: RunContext[FarmerContext], action: Literal["initia
     ranking and show each shop's urea/DAP availability and stock counts; shops
     need not cover the full entitlement. A shop choice does not reserve anything;
     use ffs_create_booking for explicit final submission.
+    Use backend_exchanges and the restored last requests/results to recover from
+    business responses by changing action or clarifying the farmer's choice.
     """
     return await _run(ctx, "find_shops", action=action)
 
 
 async def ffs_create_booking(ctx: RunContext[FarmerContext], shop_ref: str,
-                             confirmed: bool = False, confirmation_token: str = "",
+                             confirmed: bool = False,
                              quantities: list[BookingQuantity] | None = None) -> dict:
-    """Create the final FFS booking for a selected shop, with explicit confirmation.
+    """Book the farmer's selected fertilizer at the chosen shop after one confirmation.
 
-    Ask how many whole bags of each available product the farmer wants; reuse their
-    explicitly supplied quantities. Pass quantities=[{product: "urea" or "DAP", bags: N}]
-    with confirmed=False for a preview. Do not default to full entitlement.
-    Read the summary and wait for a later user message explicitly confirming it.
-    Then pass confirmed=True and its confirmation_token (quantities can be omitted).
-    A changed quantity or shop requires a new preview. On quantity_limit_changed,
-    explain the provider's new limit and ask again; never silently reduce or retry.
-    On booking_uncertain, do not submit again until the outcome has been verified.
+    Ask once whether to book the selected products and whole-bag quantities at
+    this shop. When the farmer agrees (including "book it from this shop"), pass
+    confirmed=True and quantities directly. No local token, preview prerequisite,
+    expiry or extra turn is required. Do not ask for the same agreement again.
+    If agreement is still missing, confirmed=False returns an optional summary.
+    Quantities may be omitted to reuse the saved selection for the same shop.
+    Never invent quantities or default to full entitlement.
+
+    Read the entire backend_exchanges response to determine what succeeded or
+    what must change. FFS decides current stock and quantity eligibility. Recover
+    from explicit business rejections using backend data and the farmer's choices;
+    a replacement quantity/shop supplied by the farmer is an instruction to book
+    that correction, not a reason for another confirmation question. Do not
+    silently change quantity or repeat an identical rejection. Stop on system
+    failure or an uncertain write outcome; verify uncertainty before resubmitting.
+    Do not append an offer for another product to the confirmation question.
     """
     return await _run(ctx, "create_booking", shop_ref=shop_ref, confirmed=confirmed,
-                      confirmation_token=confirmation_token, quantities=quantities)
+                      quantities=quantities)
