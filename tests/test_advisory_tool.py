@@ -309,7 +309,7 @@ class TestSearchNotes:
     def test_a_named_place_that_cannot_be_matched_is_reported(self):
         ctx = {"has_day_range": "true", "days_matched": "true"}
         out = sa.format_search_notes(ctx, days_after_sowing=40, location="Lucknow")
-        assert "Lucknow" in out and "could not be matched to a state or district" in out
+        assert "I could not match Lucknow to a state or district" in out
 
     def test_no_location_note_without_a_location(self):
         ctx = {"has_day_range": "true", "days_matched": "true"}
@@ -352,7 +352,7 @@ class TestSearchFirst:
         )
         assert _params(_sent(bap, 0)) == {"days_after_sowing": "40", "season": "Rabi", "top_k": "5"}
         assert "Scout for aphids (c1)" in out and "days_after_sowing_matched=yes" in out
-        assert "Pune" in out and "could not be matched to a state or district" in out
+        assert "I could not match Pune to a state or district" in out
         assert len(bap.requests) == 1
 
     def test_the_tool_signature(self):
@@ -366,7 +366,7 @@ class TestSearchFirst:
         bap.response = _respond([_item("c1")], **NO_DAYS)
         out = asyncio.run(sa.search_advisory(CTX, "aphids", crop="Sorghum", location="Lucknow"))
         assert "state_lgd_code" not in bap.requests[0].read().decode()
-        assert "Harvest AKJ-1" in out and "could not be matched to a state or district" in out
+        assert "Harvest AKJ-1" in out and "I could not match Lucknow to a state or district" in out
         assert sa.PENDING_MARKER not in out
 
     def test_no_location_means_no_location_text(self, bap):
@@ -627,13 +627,14 @@ class TestLocationQuestion:
         history = [_user("wheat aphids")] + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q") + [_user("I do not know")]
         out = asyncio.run(sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", answer_now=True))
         assert sa.PENDING_MARKER not in out and "Scout for aphids" in out
-        assert "This advice is meant for Agra (Uttar Pradesh), so it may not apply to you." in out
+        assert "This is the general advice found for your crop." in out
+        assert "meant for" not in out
 
     def test_a_place_the_lookup_cannot_match_is_not_asked_for_again(self, bap):
         bap.response = _respond([_located()], **NO_DAYS)
         ctx = _ctx([_user("wheat aphids in Pune, Rabi")])
         out = asyncio.run(sa.search_advisory(ctx, "aphids in wheat", crop="Wheat", season="Rabi", location="Pune"))
-        assert sa.PENDING_MARKER not in out and "could not be matched" in out
+        assert sa.PENDING_MARKER not in out and "I could not match Pune to a state or district" in out
 
 
 class TestPlaceIsSentAsCodes:
@@ -662,7 +663,7 @@ class TestPlaceIsSentAsCodes:
         )
         assert _params(_sent(bap, 0))["district_lgd_code"] == "118"
         assert "Scout for aphids" in out
-        assert "This advice is for Agra (Uttar Pradesh), which covers your Agra." in out
+        assert "This advice is for your district, Agra, in Uttar Pradesh." in out
 
     def test_a_place_the_model_made_up_is_ignored_and_the_farmer_is_asked(self, bap):
         bap.response = _respond([_located()], **NO_DAYS)
@@ -707,38 +708,35 @@ class TestLocationNotes:
         from helpers.locations import resolve_place
 
         opening = sa.location_opening([self._result(location_match="matched")], resolve_place("Agra"))
-        assert opening == "This advice is for Agra (Uttar Pradesh), which covers your Agra."
+        assert opening == "This advice is for your district, Agra, in Uttar Pradesh."
 
     def test_matched_on_a_statewide_record_names_the_state(self):
         from helpers.locations import resolve_place
 
         statewide = self._result(location_match="matched", location_states=["Tamil Nadu"], location_districts=[])
         opening = sa.location_opening([statewide], resolve_place("Tamil Nadu"))
-        assert opening == "This advice is for Tamil Nadu, which covers your Tamil Nadu."
+        assert opening == "This advice covers all of Tamil Nadu."
 
     def test_partial_names_the_districts(self):
         from helpers.locations import resolve_place
 
         opening = sa.location_opening([self._result(location_match="state_partial")], resolve_place("Uttar Pradesh"))
-        assert opening == "This advice is for Agra (Uttar Pradesh), which are some districts of your state."
+        assert opening == "This advice is for some districts of Uttar Pradesh: Agra."
 
-    def test_other_places_say_none_is_available_for_the_farmers_place_then_where_it_is_meant_for(self):
+    def test_advice_for_other_places_is_offered_as_general_advice_without_naming_those_places(self):
         from helpers.locations import resolve_place
 
         maize = self._result(location_match="other", location_states=["West Bengal"], location_districts=["Bankura", "Birbhum"])
         opening = sa.location_opening([maize], resolve_place("Tamil Nadu"))
-        assert opening == (
-            "No advisory is available for Tamil Nadu. This advice is meant for Bankura, Birbhum (West Bengal), "
-            "so it may not apply to you."
-        )
+        assert opening == "There is no advisory specific to Tamil Nadu. This is the general advice found for your crop."
+        assert "Bankura" not in "\n".join(sa.format_location_notes([maize], resolve_place("Tamil Nadu")))
 
     def test_other_places_next_to_general_advice(self):
         from helpers.locations import resolve_place
 
         results = [self._result(location_match="other"), {"title": "Gen", "location_national": True}]
         opening = sa.location_opening(results, resolve_place("Punjab"))
-        assert opening.startswith("There is no advisory specific to Punjab.")
-        assert "general advice for your crop" in opening and "meant for Agra (Uttar Pradesh)" in opening
+        assert opening == "There is no advisory specific to Punjab. This is the general advice found for your crop."
 
     def test_general_advice_is_not_specific_to_the_place(self):
         from helpers.locations import resolve_place
@@ -754,7 +752,7 @@ class TestLocationNotes:
 
         results = [self._result(location_match="matched"), {"title": "Other", "location_national": True}]
         out = self._notes(results, resolve_place("Agra"))
-        assert "'Other' applies everywhere" in out and "This advice is for Agra (Uttar Pradesh)" in out
+        assert "'Other' applies everywhere" in out and "This advice is for your district, Agra, in Uttar Pradesh." in out
 
     def test_the_other_places_case_reaches_the_agent_through_the_tool(self, bap):
         bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
@@ -766,5 +764,113 @@ class TestLocationNotes:
         out = asyncio.run(
             sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", state="Tamil Nadu")
         )
-        assert "No advisory is available for Tamil Nadu. This advice is meant for Agra (Uttar Pradesh)" in out
+        assert "There is no advisory specific to Tamil Nadu. This is the general advice found for your crop." in out
+        assert "Agra" not in out.split("Open your answer")[1]
         assert "Scout for aphids" in out
+
+
+class TestPlaceComesFromTheFarmersWords:
+    def test_a_place_carried_over_by_the_model_does_not_replace_the_farmers_answer(self, bap):
+        bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
+        history = (
+            [_user("maize nursery bed, Rabi")]
+            + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q")
+            + [_user("Bareilly, Uttar Pradesh")]
+        )
+        out = asyncio.run(
+            sa.search_advisory(_ctx(history), "maize nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
+        )
+        assert _params(_sent(bap, 0))["district_lgd_code"] == "130"
+        assert "Tamil Nadu" not in out
+
+    def test_an_answer_the_lookup_does_not_know_is_named_not_replaced_by_an_earlier_place(self, bap):
+        bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
+        history = (
+            [_user("maize nursery bed, Rabi")]
+            + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q")
+            + [_user("dharwad")]
+        )
+        out = asyncio.run(
+            sa.search_advisory(_ctx(history), "maize nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
+        )
+        assert "state_lgd_code" not in bap.requests[0].read().decode()
+        assert "I could not match dharwad to a state or district. This is the general advice found for your crop." in out
+        assert "Tamil Nadu" not in out and sa.PENDING_MARKER not in out
+
+
+class TestPlaceIsNotAskedTwice:
+    """The place the farmer gave while a question was being worked on still counts in later turns of that question."""
+
+    def test_a_place_given_before_the_season_and_days_answer_is_not_asked_for_again(self, bap):
+        bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
+        history = (
+            [_user("seed treatment for wheat")]
+            + _asked(f"{sa.PENDING_MARKER} season and days question")
+            + [_user("Yadgir, Karnataka")]
+            + _asked(f"{sa.PENDING_MARKER} season and days question again")
+            + [_user("Rabi, 60 days")]
+        )
+        out = asyncio.run(
+            sa.search_advisory(
+                _ctx(history), "seed treatment", crop="Wheat", season="Rabi", days_after_sowing=60,
+                state="Karnataka", district="Yadgir",
+            )
+        )
+        assert sa.LOCATION_MARKER not in out and "Scout for aphids" in out
+        assert _params(_sent(bap, 0))["district_lgd_code"] == "635"
+
+    def test_the_model_passing_nothing_still_finds_the_place_the_farmer_gave_earlier_in_the_question(self, bap):
+        bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
+        history = (
+            [_user("seed treatment for wheat")]
+            + _asked(f"{sa.PENDING_MARKER} season and days question")
+            + [_user("Yadgir, Karnataka")]
+            + _asked(f"{sa.PENDING_MARKER} season and days question again")
+            + [_user("Rabi, 60 days")]
+        )
+        out = asyncio.run(
+            sa.search_advisory(_ctx(history), "seed treatment", crop="Wheat", season="Rabi", days_after_sowing=60)
+        )
+        assert sa.LOCATION_MARKER not in out
+        assert _params(_sent(bap, 0))["district_lgd_code"] == "635"
+
+    def test_a_place_from_an_earlier_finished_question_does_not_carry_over(self, bap):
+        bap.response = _respond([_located()], **NO_DAYS)
+        history = (
+            [_user("seed treatment for wheat in Yadgir, Karnataka")]
+            + [ModelResponse(parts=[TextPart(content="Advice")])]
+            + [_user("seed treatment for wheat, Rabi")]
+        )
+        out = asyncio.run(
+            sa.search_advisory(_ctx(history), "seed treatment", crop="Wheat", season="Rabi", district="Yadgir")
+        )
+        assert sa.LOCATION_MARKER in out
+
+
+class TestPlaceSentenceWording:
+    def _result(self, districts, states=("Karnataka",), match="matched"):
+        return {"title": "T", "location_national": False, "location_match": match,
+                "location_states": list(states), "location_districts": list(districts)}
+
+    def test_a_long_district_list_is_not_read_out_for_a_matched_district(self):
+        from helpers.locations import resolve_place
+
+        many = ["Ernakulam", "Idukki", "Kannur", "Kasaragod", "Vijayapura", "Yadgir"]
+        opening = sa.location_opening([self._result(many)], resolve_place("Yadgir, Karnataka"))
+        assert opening == "This advice is for your district, Yadgir, in Karnataka."
+        assert "Ernakulam" not in opening
+
+    def test_a_long_partial_list_is_shortened(self):
+        from helpers.locations import resolve_place
+
+        many = ["Ernakulam", "Idukki", "Kannur", "Kasaragod", "Vijayapura", "Yadgir"]
+        opening = sa.location_opening([self._result(many, match="state_partial")], resolve_place("Karnataka"))
+        assert opening == "This advice is for some districts of Karnataka: Ernakulam, Idukki, Kannur, Kasaragod and 2 more."
+
+    def test_a_few_partial_districts_are_all_named(self):
+        from helpers.locations import resolve_place
+
+        opening = sa.location_opening(
+            [self._result(["Agra", "Aligarh", "Azamgarh"], ("Uttar Pradesh",), "state_partial")], resolve_place("Uttar Pradesh")
+        )
+        assert opening == "This advice is for some districts of Uttar Pradesh: Agra, Aligarh and Azamgarh."

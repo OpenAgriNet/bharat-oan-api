@@ -272,12 +272,40 @@ class TestPlaceGuards:
 
         assert not farmer_gave_place(_ctx([_user("my wheat is growing up well")]))
 
-    def test_the_answer_to_the_place_question_counts_whatever_it_says(self):
+    def test_the_answer_to_the_place_question_counts_but_only_what_it_literally_says(self):
         from helpers.advisory_pending import asked_location_in_previous_turn, farmer_gave_place, farmer_wrote
 
         ctx = _ctx(self._location_asked("our village near the river"))
         assert asked_location_in_previous_turn(ctx)
-        assert farmer_gave_place(ctx) and farmer_wrote(ctx, "Uttar Pradesh")
+        assert farmer_gave_place(ctx)
+        assert farmer_wrote(ctx, "village near the river")
+        assert not farmer_wrote(ctx, "Uttar Pradesh")  # a place the model carried over is not the farmer's
+
+    def test_a_place_given_earlier_in_the_same_question_counts_in_later_turns(self):
+        from helpers.advisory_pending import answer_chain, farmer_gave_place, farmer_wrote
+
+        history = (
+            [_user("seed treatment")]
+            + _advisory_result(QUESTION)
+            + [ModelResponse(parts=[TextPart(content="q")]), _user("Yadgir, Karnataka")]
+            + _advisory_result(QUESTION)
+            + [ModelResponse(parts=[TextPart(content="q")]), _user("Zaid, 60 days")]
+        )
+        ctx = _ctx(history)
+        assert [text for text, _ in answer_chain(ctx)] == ["seed treatment", "Yadgir, Karnataka", "Zaid, 60 days"]
+        assert farmer_gave_place(ctx) and farmer_wrote(ctx, "Yadgir")
+
+    def test_a_finished_question_ends_the_chain(self):
+        from helpers.advisory_pending import answer_chain, farmer_gave_place
+
+        history = (
+            [_user("seed treatment in Agra")]
+            + _advisory_result(ADVICE)
+            + [ModelResponse(parts=[TextPart(content="advice")]), _user("harvest time?")]
+        )
+        ctx = _ctx(history)
+        assert [text for text, _ in answer_chain(ctx)] == ["harvest time?"]
+        assert not farmer_gave_place(ctx)
 
     def test_a_season_question_does_not_open_the_place_guard(self):
         from helpers.advisory_pending import asked_location_in_previous_turn, farmer_gave_place

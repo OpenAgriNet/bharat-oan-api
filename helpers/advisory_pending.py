@@ -112,6 +112,11 @@ def _farmer_message(ctx) -> str:
     return ""
 
 
+def farmer_message(ctx) -> str:
+    """The farmer's own words for this turn (public name of `_farmer_message`)."""
+    return _farmer_message(ctx)
+
+
 def _is_pending_return(part) -> bool:
     return (
         isinstance(part, ToolReturnPart)
@@ -167,23 +172,76 @@ def asked_location_in_previous_turn(ctx) -> bool:
     )
 
 
+def _split_turns(ctx) -> list:
+    """The conversation as a list of turns; a turn is the messages from one farmer message up to the next."""
+    messages = list(getattr(ctx, "messages", None) or [])
+    starts = [
+        index
+        for index, message in enumerate(messages)
+        if isinstance(message, ModelRequest) and any(isinstance(p, UserPromptPart) for p in message.parts)
+    ]
+    if not starts:
+        return []
+    return [messages[a:b] for a, b in zip(starts, starts[1:] + [len(messages)])]
+
+
+def _turn_text(turn: list) -> str:
+    for message in turn:
+        if isinstance(message, ModelRequest):
+            for part in message.parts:
+                if isinstance(part, UserPromptPart):
+                    return str(part.content).rsplit(_PROMPT_SEPARATOR, 1)[-1]
+    return ""
+
+
+def _turn_asked(turn: list, marker: str = "") -> bool:
+    """True when `search_advisory` ended this turn with a question for the farmer (with `marker` when given)."""
+    return any(
+        isinstance(message, ModelRequest) and any(_is_pending_return(p) and marker in str(p.content) for p in message.parts)
+        for message in turn
+    )
+
+
+def answer_chain(ctx) -> list:
+    """The farmer's messages that belong to the question being worked on, oldest first.
+
+    A question can take several turns (the season and days, then the place...). The chain is this turn plus the
+    turns before it, as long as each turn before ended with a question from `search_advisory`. Each item is
+    (the farmer's own words, whether it answers a place question). What the farmer said anywhere in the chain
+    still counts, so an answer given earlier is never asked for again."""
+    turns = _split_turns(ctx)
+    if not turns:
+        return []
+    index = len(turns) - 1
+    chain = [index]
+    while index > 0 and _turn_asked(turns[index - 1]):
+        index -= 1
+        chain.insert(0, index)
+    return [
+        (_turn_text(turns[i]), i > 0 and _turn_asked(turns[i - 1], LOCATION_MARKER))
+        for i in chain
+    ]
+
+
 def farmer_gave_place(ctx) -> bool:
-    """True when this message can carry the farmer's place: it answers our place question, or names a place.
+    """True when the farmer named a place in this question's chain of messages, or answered our place question.
 
     Two-letter abbreviations are ignored when scanning ordinary prose ("up" is a word)."""
     if not _has_history(ctx):
         return True
-    return asked_location_in_previous_turn(ctx) or resolve_place(_farmer_message(ctx), allow_short=False).known
+    return any(
+        answers_place or resolve_place(text, allow_short=False).known for text, answers_place in answer_chain(ctx)
+    )
 
 
 def farmer_wrote(ctx, text: str) -> bool:
-    """True when `text` (a place the model passed) is in the farmer's message, or answers our place question."""
+    """True when `text` (a place the model passed) is literally in the farmer's messages of this question."""
     if not _has_history(ctx):
         return True
     wanted = " ".join(str(text or "").lower().split())
     if not wanted:
         return False
-    return asked_location_in_previous_turn(ctx) or wanted in " ".join(_farmer_message(ctx).lower().split())
+    return any(wanted in " ".join(message.lower().split()) for message, _ in answer_chain(ctx))
 
 
 def farmer_gave_season(ctx) -> bool:

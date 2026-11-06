@@ -28,8 +28,8 @@ from helpers.advisory_pending import (
     LOCATION_MARKER,
     PENDING_MARKER,
     asked_location_in_previous_turn,
+    answer_chain,
     farmer_gave_days,
-    farmer_gave_place,
     farmer_gave_season,
     farmer_wrote,
     may_answer_now,
@@ -346,45 +346,61 @@ def _join_places(results: List[Dict[str, Any]]) -> str:
     return _join_names(seen) if seen else ""
 
 
+def _district_list(results: List[Dict[str, Any]], limit: int = 4) -> str:
+    """District names of the given advisories for a sentence: all of them when few, else the first few and a count."""
+    names: List[str] = []
+    for result in results:
+        for name in result.get("location_districts") or []:
+            if name not in names:
+                names.append(name)
+    if len(names) > limit:
+        return f"{', '.join(names[:limit])} and {len(names) - limit} more"
+    return _join_names(names)
+
+
 def location_opening(
     results: List[Dict[str, Any]],
     place: Optional[Place] = None,
     named_place: str = "",
+    unmatched: bool = False,
 ) -> str:
-    """The first sentence of the answer about how the advice relates to the farmer's place ('' when no place matters)."""
+    """The first sentence of the answer about how the advice relates to the farmer's place ('' when no place matters).
+
+    Advice that is not for the farmer's place is offered as general advice: the places it was written for are not
+    named."""
     place = place or Place()
     label = place.label or named_place
     where = place.district_name or place.state_name or "place"
     specific = [r for r in results if not r.get("location_national", True)]
     matched = [r for r in specific if r.get("location_match") == "matched"]
     partial = [r for r in specific if r.get("location_match") == "state_partial"]
-    other = [r for r in specific if r.get("location_match") not in ("matched", "state_partial")]
-    has_general = len(specific) < len(results)
 
-    if not specific:
-        return f"There is no advisory specific to {label}. This is the general advice found for your crop." if label else ""
+    if unmatched and named_place and not place.known:
+        return f"I could not match {named_place} to a state or district. This is the general advice found for your crop."
     if matched:
-        return f"This advice is for {_join_places(matched)}, which covers your {where}."
+        listed = [r for r in matched if r.get("location_districts")]
+        if listed and place.district_name:
+            state = place.state_name or (listed[0].get("location_states") or [""])[0]
+            return f"This advice is for your district, {place.district_name}" + (f", in {state}." if state else ".")
+        state = place.state_name or (matched[0].get("location_states") or [""])[0]
+        return f"This advice covers all of {state}." if state else "This advice covers your area."
     if partial:
-        return f"This advice is for {_join_places(partial)}, which are some districts of your state."
-    if not label:
-        return f"This advice is meant for {_join_places(other)}, so it may not apply to you."
-    if has_general:
-        return (
-            f"There is no advisory specific to {label}. Below is general advice for your crop, and an advisory meant "
-            f"for {_join_places(other)}, which may not apply to you."
-        )
-    return f"No advisory is available for {label}. This advice is meant for {_join_places(other)}, so it may not apply to you."
+        state = place.state_name or (partial[0].get("location_states") or [""])[0]
+        return f"This advice is for some districts of {state}: {_district_list(partial)}."
+    if label:
+        return f"There is no advisory specific to {label}. This is the general advice found for your crop."
+    return "This is the general advice found for your crop." if specific else ""
 
 
 def format_location_notes(
     results: List[Dict[str, Any]],
     place: Optional[Place] = None,
     named_place: str = "",
+    unmatched: bool = False,
 ) -> List[str]:
     """Lines telling the agent how each advisory relates to the farmer's place, and what to say about it."""
     place = place or Place()
-    opening = location_opening(results, place, named_place)
+    opening = location_opening(results, place, named_place, unmatched)
     if not opening:
         return []
     lines = [
@@ -404,7 +420,7 @@ def format_location_notes(
         elif match == "state_partial":
             lines.append(f"> '{title}' is for {_places_of(result)}: only some districts of the farmer's state.")
         else:
-            lines.append(f"> '{title}' is meant for {_places_of(result)}.")
+            lines.append(f"> '{title}' is not for the farmer's place: present it as general advice.")
     return lines
 
 
@@ -423,14 +439,10 @@ def format_search_notes(
         facts.append(f"days_after_sowing_matched={'yes' if days_matched else 'no'}")
     lines = ["> Search notes: " + "; ".join(facts)]
     place = place or Place()
-    if location and not place.known:
-        lines.append(
-            f"> The farmer named a place ({location}) that could not be matched to a state or district, so the "
-            "advisories were not narrowed by place. Open your answer with this one sentence as the very first line "
-            f"(translate it to the farmer's language): \"I could not match {location} to a state or district. This is "
-            "the advice found for your crop.\" Then give the advice."
-        )
-    lines.extend(format_location_notes(results or [], place, location if not place.known else ""))
+    unmatched = bool(location) and not place.known
+    lines.extend(
+        format_location_notes(results or [], place, location if unmatched else "", unmatched=unmatched)
+    )
     if days_after_sowing is not None and (not day_range or not days_matched):
         lines.append(
             f"> The farmer did give the days since sowing ({days_after_sowing}), but this advisory has no guidance "
@@ -605,6 +617,41 @@ async def _run_search(
     return results, search_ctx, status, message
 
 
+def _farmer_place(
+    ctx: RunContext[FarmerContext],
+    state: Optional[str],
+    district: Optional[str],
+    location: Optional[str],
+) -> tuple[Place, str]:
+    """(place, named place we could not match) from what the farmer said while this question was being worked on.
+
+    The farmer's own words win over what the model passes. The model may not carry a place over from an earlier
+    question in the chat, but a place the farmer gave in an earlier turn of this same question still counts."""
+    passed = [_clean_param(state), _clean_param(district), _clean_param(location)]
+    from_args = resolve_place(*passed)
+    if not getattr(ctx, "messages", None):  # nothing to check against (direct calls, tests)
+        return from_args, "" if from_args.known else passed[2]
+
+    chain = answer_chain(ctx)
+    for text, answers_place in reversed(chain):  # newest first
+        from_message = resolve_place(text, allow_short=answers_place)
+        if from_message.known:
+            if from_args.known and from_args != from_message:
+                logger.info("search_advisory: using the place the farmer said, not %r", from_args.label)
+            return from_message, ""
+    if from_args.known and any(farmer_wrote(ctx, value) for value in passed if value):
+        return from_args, ""
+    if from_args.known:
+        logger.info("search_advisory: ignoring place %r the farmer did not give", from_args.label)
+    # A place the farmer typed (as the answer to our question, or in their message) that the lookup does not know.
+    for text, answers_place in reversed(chain):
+        if answers_place and text.strip():
+            return Place(), " ".join(text.split())[:60]
+    if passed[2] and farmer_wrote(ctx, passed[2]):
+        return Place(), passed[2]
+    return Place(), ""
+
+
 @observe(name="tool:search_advisory", as_type="tool")
 async def search_advisory(
     ctx: RunContext[FarmerContext],
@@ -660,20 +707,10 @@ async def search_advisory(
     if answer_now and not may_answer_now(ctx):
         logger.info("search_advisory: ignoring answer_now before the farmer was asked")
         answer_now = False
-    # The farmer's place: only what they said (or answered when asked) counts; the model may not fill it in.
-    place = resolve_place(_clean_param(state), _clean_param(district), _clean_param(location))
-    if place.known and not farmer_gave_place(ctx):
-        logger.info("search_advisory: ignoring place %r the farmer did not give", place.label)
-        place = Place()
-    location_value = _clean_param(location)
-    if location_value and not farmer_wrote(ctx, location_value):
-        logger.info("search_advisory: ignoring location %r the farmer did not give", location_value)
-        location_value = ""
-    # A place the farmer named that we could not match to a state or district (any of the three fields).
-    typed_place = ", ".join(v for v in (_clean_param(district), _clean_param(state), location_value) if v)
-    named_place = "" if place.known else typed_place
-    if named_place and not farmer_wrote(ctx, named_place.split(", ")[0]):
-        named_place = ""
+    # The farmer's place comes only from the farmer. Their own words win over what the model passes, and the
+    # model may not carry a place over from earlier in the chat.
+    place, named_place = _farmer_place(ctx, state, district, location)
+    location_value = named_place
     crop_hint = _clean_param(crop)
     if not crop_hint:
         raise ModelRetry(
