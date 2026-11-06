@@ -358,9 +358,16 @@ class TestSearchFirst:
     def test_the_tool_signature(self):
         params = inspect.signature(sa.search_advisory).parameters
         assert list(params)[1:] == [
-            "query", "crop", "days_after_sowing", "season", "location", "top_k", "answer_now", "state", "district",
+            "query", "crop", "days_after_sowing", "season", "location", "top_k", "answer_now", "state", "district", "coffee",
         ]
         assert "advice_type" not in params
+
+    def test_coffee_skips_the_crop_season_and_place_guards(self, bap):
+        pdf = _item("c1")
+        bap.response = _respond([pdf], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "leaf rust", crop="Coffee", coffee=True))
+        assert sa.PENDING_MARKER not in out
+        assert len(bap.requests) == 1
 
     def test_a_place_that_cannot_be_matched_is_mentioned_but_not_sent_or_asked(self, bap):
         bap.response = _respond([_item("c1")], **NO_DAYS)

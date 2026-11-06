@@ -664,6 +664,7 @@ async def search_advisory(
     answer_now: bool = False,
     state: Optional[str] = None,
     district: Optional[str] = None,
+    coffee: bool = False,
 ) -> str:
     """
     Search crop advisories for a farming problem: pests, diseases, symptoms, crop practices
@@ -690,6 +691,8 @@ async def search_advisory(
             (or do not want to say): the tool then answers without asking again.
         state: The farmer's state in English (for example "Uttar Pradesh"), only if the farmer said it.
         district: The farmer's district in English (for example "Agra"), only if the farmer said it.
+        coffee: Set true only when the farmer's question is about coffee (growing, pests, diseases, harvest or
+            any coffee practice). The tool then answers straight away and never asks for season, days or place.
 
     Returns:
         Advisory text with a "Search notes" line; or an instruction to ask the farmer one question; or an
@@ -726,6 +729,14 @@ async def search_advisory(
         return message  # transport error text for the agent
     if not results:
         return _no_results_message(query, status, message)
+
+    if coffee:
+        # Coffee advisories come from uploaded PDFs: no crop/season/place on the chunks, so skip those guards.
+        # Webhook chunks always carry a crop, so keep empty-crop (PDF) chunks and coffee chunks only.
+        matches = [r for r in results if not r.get("crop") or "coffee" in (r.get("crop") or "").lower()]
+        if not matches:
+            return f"No advisory found for `{query}`."
+        return _answer(matches, search_ctx, query, limit, days, named_place, place)
 
     chunks, crop_name = relevant_for_crop(results, crop_hint, query)
     seen = list(results)  # every chunk looked at, for the seasons offered later
