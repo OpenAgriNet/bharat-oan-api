@@ -88,7 +88,7 @@ class FarmerContext(BaseModel):
                 "**Browser Location Coordinates:** "
                 f"Latitude={self.latitude}, Longitude={self.longitude} "
                 "(the device location; never use it, or a place worked out from it, for a crop advisory question: "
-                "locations are not used for crop advice)"
+                "for crop advice the farmer's state and district come only from the farmer)"
             )
         return None
     

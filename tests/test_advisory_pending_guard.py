@@ -162,6 +162,36 @@ class TestHardGuardsOnWhatOnlyTheFarmerCanSay:
     def test_days_in_the_farmers_text_are_accepted(self, text):
         assert farmer_gave_days(_ctx([_user(text)]))
 
+    def test_earlier_answers_in_the_conversation_text_do_not_count(self):
+        prefix = "**Conversation**\n\nUser: rabi, 40 days\nAssistant: At 40 days in Rabi ...\n\n---\n\n"
+        ctx = _ctx([_user(prefix + "When should I harvest an early-maturing wheat variety?")])
+        assert not farmer_gave_season(ctx)
+        assert not farmer_gave_days(ctx)
+        assert not may_answer_now(ctx)
+
+    def test_the_farmers_own_words_after_the_conversation_text_count(self):
+        prefix = "**Conversation**\n\nUser: hi\n\n---\n\n"
+        ctx = _ctx([_user(prefix + "Wheat aphids, Rabi, 40 days")])
+        assert farmer_gave_season(ctx) and farmer_gave_days(ctx)
+
+    def test_a_question_from_two_turns_back_does_not_open_the_guards(self):
+        history = (
+            [_user("wheat aphids")] + _advisory_result(QUESTION)
+            + [ModelResponse(parts=[TextPart(content="Which season?")]), _user("rabi, 40 days")]
+            + _advisory_result(ADVICE)
+            + [ModelResponse(parts=[TextPart(content="Advice")]), _user("When to harvest wheat?")]
+        )
+        ctx = _ctx(history)
+        assert not farmer_gave_season(ctx) and not farmer_gave_days(ctx) and not may_answer_now(ctx)
+
+    def test_answer_now_is_allowed_when_tool_results_of_earlier_turns_were_not_kept(self):
+        history = [
+            _user("wheat aphids"),
+            ModelResponse(parts=[TextPart(content="Which season?")]),
+            _user("I don't know"),
+        ]
+        assert may_answer_now(_ctx(history))
+
     def test_after_the_farmer_was_asked_whatever_they_answer_is_accepted(self):
         ctx = _ctx(self._asked_before("the winter one, since last month"))
         assert farmer_gave_season(ctx) and farmer_gave_days(ctx) and may_answer_now(ctx)
@@ -214,3 +244,82 @@ class TestToolIgnoresInventedDetails:
         ]
         out, _ = self._run(monkeypatch, _ctx(history), answer_now=True)
         assert PENDING_MARKER not in out
+
+
+class TestPlaceGuards:
+    from helpers.advisory_pending import LOCATION_MARKER  # noqa: E402
+
+    def _location_asked(self, reply):
+        return [_user("wheat aphids, Rabi")] + _advisory_result(f"{PENDING_MARKER}{self.LOCATION_MARKER} q") + [
+            ModelResponse(parts=[TextPart(content="Which state and district?")]),
+            _user(reply),
+        ]
+
+    def test_no_history_means_the_place_guards_stay_out_of_the_way(self):
+        from helpers.advisory_pending import farmer_gave_place, farmer_wrote
+
+        ctx = _ctx(None)
+        assert farmer_gave_place(ctx) and farmer_wrote(ctx, "Agra")
+
+    def test_a_place_in_the_farmers_message_counts(self):
+        from helpers.advisory_pending import farmer_gave_place
+
+        assert farmer_gave_place(_ctx([_user("wheat aphids in Agra")]))
+        assert not farmer_gave_place(_ctx([_user("wheat aphids")]))
+
+    def test_up_inside_ordinary_words_is_not_a_state(self):
+        from helpers.advisory_pending import farmer_gave_place
+
+        assert not farmer_gave_place(_ctx([_user("my wheat is growing up well")]))
+
+    def test_the_answer_to_the_place_question_counts_but_only_what_it_literally_says(self):
+        from helpers.advisory_pending import asked_location_in_previous_turn, farmer_gave_place, farmer_wrote
+
+        ctx = _ctx(self._location_asked("our village near the river"))
+        assert asked_location_in_previous_turn(ctx)
+        assert farmer_gave_place(ctx)
+        assert farmer_wrote(ctx, "village near the river")
+        assert not farmer_wrote(ctx, "Uttar Pradesh")  # a place the model carried over is not the farmer's
+
+    def test_a_place_given_earlier_in_the_same_question_counts_in_later_turns(self):
+        from helpers.advisory_pending import answer_chain, farmer_gave_place, farmer_wrote
+
+        history = (
+            [_user("seed treatment")]
+            + _advisory_result(QUESTION)
+            + [ModelResponse(parts=[TextPart(content="q")]), _user("Yadgir, Karnataka")]
+            + _advisory_result(QUESTION)
+            + [ModelResponse(parts=[TextPart(content="q")]), _user("Zaid, 60 days")]
+        )
+        ctx = _ctx(history)
+        assert [text for text, _ in answer_chain(ctx)] == ["seed treatment", "Yadgir, Karnataka", "Zaid, 60 days"]
+        assert farmer_gave_place(ctx) and farmer_wrote(ctx, "Yadgir")
+
+    def test_a_finished_question_ends_the_chain(self):
+        from helpers.advisory_pending import answer_chain, farmer_gave_place
+
+        history = (
+            [_user("seed treatment in Agra")]
+            + _advisory_result(ADVICE)
+            + [ModelResponse(parts=[TextPart(content="advice")]), _user("harvest time?")]
+        )
+        ctx = _ctx(history)
+        assert [text for text, _ in answer_chain(ctx)] == ["harvest time?"]
+        assert not farmer_gave_place(ctx)
+
+    def test_a_season_question_does_not_open_the_place_guard(self):
+        from helpers.advisory_pending import asked_location_in_previous_turn, farmer_gave_place
+
+        history = [_user("wheat aphids")] + _advisory_result(QUESTION) + [
+            ModelResponse(parts=[TextPart(content="Which season?")]),
+            _user("rabi, 40 days"),
+        ]
+        ctx = _ctx(history)
+        assert not asked_location_in_previous_turn(ctx)
+        assert not farmer_gave_place(ctx)
+
+    def test_text_the_farmer_wrote_is_found_case_insensitively(self):
+        from helpers.advisory_pending import farmer_wrote
+
+        assert farmer_wrote(_ctx([_user("wheat aphids in PUNE")]), "Pune")
+        assert not farmer_wrote(_ctx([_user("wheat aphids")]), "Pune")

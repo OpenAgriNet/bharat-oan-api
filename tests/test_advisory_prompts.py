@@ -59,7 +59,11 @@ def test_prompt_has_no_generic_or_personalised_flow(path):
 def test_prompt_has_the_search_first_advisory_flow(path):
     flow = _render(path).split("### Crop advisory flow", 1)[1]
     assert "1. **Search first.**" in flow
-    assert "Never ask the farmer for their location" in flow
+    assert "The farmer's place comes only from the farmer" in flow
+    assert "Never take it from the browser coordinates" in flow
+    assert "A request to ask for the farmer's place" in flow
+    assert "the very first line of your answer" in flow and "add nothing from your own knowledge" in flow
+    assert "pass it as `location` so the tool can note it" not in flow
     assert "call `search_advisory` again with the same `query`" in flow
     assert "**Source: ICAR - Kisan Sarathi**" in flow
     assert "your first reply is only one short question asking which crop" in flow
