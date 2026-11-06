@@ -1,5 +1,6 @@
 import os
 import base64
+import threading
 import httpx
 import json
 from dotenv import load_dotenv
@@ -32,6 +33,7 @@ INDO_ARYAN_LANGS = frozenset({"hi", "bn", "mr", "ur", "or", "pa", "gu", "sa"})
 DRAVIDIAN_LANGS = frozenset({"kn", "ml", "ta", "te"})
 
 _bhashini_client = None
+_bhashini_client_lock = threading.Lock()
 
 BHASHINI_PIPELINE_URL = os.getenv(
     "BHASHINI_API_URL",
@@ -77,12 +79,11 @@ def get_bhashini_request_timeout(audio_base64_len: int) -> httpx.Timeout:
 
 
 def reset_bhashini_client() -> None:
+    # Calls run in worker threads, so another request may still be using the
+    # old client. Drop it instead of closing it: the next call creates a new
+    # one, and the old one's sockets close when it is garbage collected.
     global _bhashini_client
-    if _bhashini_client is not None:
-        try:
-            _bhashini_client.close()
-        except Exception:
-            pass
+    with _bhashini_client_lock:
         _bhashini_client = None
 
 
@@ -127,15 +128,16 @@ def get_bhashini_asr_service_id(source_lang: str) -> tuple[str, str]:
 
 def get_bhashini_client():
     global _bhashini_client
-    if _bhashini_client is None:
-        _bhashini_client = httpx.Client(
-            timeout=get_bhashini_timeout(),
-            limits=httpx.Limits(
-                max_connections=20,
-                max_keepalive_connections=10,
-            ),
-        )
-    return _bhashini_client
+    with _bhashini_client_lock:
+        if _bhashini_client is None:
+            _bhashini_client = httpx.Client(
+                timeout=get_bhashini_timeout(),
+                limits=httpx.Limits(
+                    max_connections=20,
+                    max_keepalive_connections=10,
+                ),
+            )
+        return _bhashini_client
 
 
 def base64_to_audio_file(base64_string: str, filename: str = "audio.wav") -> BytesIO:

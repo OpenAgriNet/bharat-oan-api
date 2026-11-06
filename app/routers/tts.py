@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Body, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from app.models.requests import TTSRequest
@@ -42,8 +44,10 @@ async def tts(
     uid = str(authenticated_user) if authenticated_user is not None else "system"
 
     try:
-        audio_bytes = text_to_speech_bhashini(
-            request.text, request.target_lang, gender='female', sampling_rate=8000
+        # Bhashini is a blocking HTTP call with retries; keep it off the event loop.
+        audio_bytes = await asyncio.to_thread(
+            text_to_speech_bhashini,
+            request.text, request.target_lang, gender='female', sampling_rate=8000,
         )
         audio_data = base64.b64encode(audio_bytes).decode('utf-8')
         success, status_code = True, 200
