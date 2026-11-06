@@ -6,7 +6,6 @@ Tools for the BharatVistaar AI Agent.
 
 from pydantic_ai import Tool
 
-from agents.tools.scheme_info import get_scheme_info
 from agents.tools.amul_vistaar import call_amul_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
 from agents.tools.pmkisan_scheme_status import (
@@ -63,19 +62,8 @@ from agents.tools.sathi_seed import (
     search_sathi_seed_availability,
 )
 from agents.tools.npss import analyze_crop_image
-from agents.tools.agristack import (
-    get_agristack_farmer_location,
-    get_agristack_farmer_crops,
-    get_agristack_farmer_profile,
-    only_with_agristack_consent,
-)
 
 TOOLS = [
-    Tool(
-        get_scheme_info,
-        takes_ctx=True,
-        strict=False,
-    ),
     Tool(
         call_amul_vistaar_network,
         takes_ctx=True,
@@ -217,6 +205,11 @@ TOOLS = [
         strict=False,
     ),
     Tool(
+        imd_agromet_advisory,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
         get_mandi_prices,
         takes_ctx=True,
         strict=False,
@@ -266,28 +259,5 @@ TOOLS = [
         takes_ctx=True,
         strict=False,
     ),
-    # Hidden from the model unless the farmer logged in with AgriStack and gave consent.
-    Tool(
-        get_agristack_farmer_location,
-        takes_ctx=True,
-        strict=False,
-        prepare=only_with_agristack_consent,
-    ),
-    Tool(
-        get_agristack_farmer_crops,
-        takes_ctx=True,
-        strict=False,
-        prepare=only_with_agristack_consent,
-    ),
-    Tool(
-        get_agristack_farmer_profile,
-        takes_ctx=True,
-        strict=False,
-        prepare=only_with_agristack_consent,
-    ),
-    Tool(
-        imd_agromet_advisory,
-        takes_ctx=True,
-        strict=False,
-    ),
+
 ]
