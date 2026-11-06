@@ -8,10 +8,13 @@ so it works the same for every model.
 """
 import re
 
+from helpers.locations import resolve_place
 from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart, UserPromptPart
 
 # Kept as an HTML comment: it is not meant to be shown to the farmer.
 PENDING_MARKER = "<!-- advisory-question-pending -->"
+# Added to the pending question that asks for the farmer's place (state / district).
+LOCATION_MARKER = "<!-- advisory-location-question -->"
 
 PENDING_RETRY = (
     "Do not search yet. The crop advisory search asked you to put a question to the farmer first. "
@@ -148,6 +151,39 @@ def _tool_history_missing(ctx) -> bool:
         isinstance(m, ModelRequest) and any(isinstance(p, ToolReturnPart) for p in m.parts) for m in earlier
     )
     return has_earlier_turn and not has_tool_part
+
+
+def asked_location_in_previous_turn(ctx) -> bool:
+    """True when the turn right before this one asked the farmer for their place (state / district)."""
+    earlier = _earlier_turns(ctx)
+    start = 0
+    for index, message in enumerate(earlier):
+        if isinstance(message, ModelRequest) and any(isinstance(p, UserPromptPart) for p in message.parts):
+            start = index
+    return any(
+        isinstance(message, ModelRequest)
+        and any(_is_pending_return(p) and LOCATION_MARKER in str(p.content) for p in message.parts)
+        for message in earlier[start:]
+    )
+
+
+def farmer_gave_place(ctx) -> bool:
+    """True when this message can carry the farmer's place: it answers our place question, or names a place.
+
+    Two-letter abbreviations are ignored when scanning ordinary prose ("up" is a word)."""
+    if not _has_history(ctx):
+        return True
+    return asked_location_in_previous_turn(ctx) or resolve_place(_farmer_message(ctx), allow_short=False).known
+
+
+def farmer_wrote(ctx, text: str) -> bool:
+    """True when `text` (a place the model passed) is in the farmer's message, or answers our place question."""
+    if not _has_history(ctx):
+        return True
+    wanted = " ".join(str(text or "").lower().split())
+    if not wanted:
+        return False
+    return asked_location_in_previous_turn(ctx) or wanted in " ".join(_farmer_message(ctx).lower().split())
 
 
 def farmer_gave_season(ctx) -> bool:

@@ -244,3 +244,54 @@ class TestToolIgnoresInventedDetails:
         ]
         out, _ = self._run(monkeypatch, _ctx(history), answer_now=True)
         assert PENDING_MARKER not in out
+
+
+class TestPlaceGuards:
+    from helpers.advisory_pending import LOCATION_MARKER  # noqa: E402
+
+    def _location_asked(self, reply):
+        return [_user("wheat aphids, Rabi")] + _advisory_result(f"{PENDING_MARKER}{self.LOCATION_MARKER} q") + [
+            ModelResponse(parts=[TextPart(content="Which state and district?")]),
+            _user(reply),
+        ]
+
+    def test_no_history_means_the_place_guards_stay_out_of_the_way(self):
+        from helpers.advisory_pending import farmer_gave_place, farmer_wrote
+
+        ctx = _ctx(None)
+        assert farmer_gave_place(ctx) and farmer_wrote(ctx, "Agra")
+
+    def test_a_place_in_the_farmers_message_counts(self):
+        from helpers.advisory_pending import farmer_gave_place
+
+        assert farmer_gave_place(_ctx([_user("wheat aphids in Agra")]))
+        assert not farmer_gave_place(_ctx([_user("wheat aphids")]))
+
+    def test_up_inside_ordinary_words_is_not_a_state(self):
+        from helpers.advisory_pending import farmer_gave_place
+
+        assert not farmer_gave_place(_ctx([_user("my wheat is growing up well")]))
+
+    def test_the_answer_to_the_place_question_counts_whatever_it_says(self):
+        from helpers.advisory_pending import asked_location_in_previous_turn, farmer_gave_place, farmer_wrote
+
+        ctx = _ctx(self._location_asked("our village near the river"))
+        assert asked_location_in_previous_turn(ctx)
+        assert farmer_gave_place(ctx) and farmer_wrote(ctx, "Uttar Pradesh")
+
+    def test_a_season_question_does_not_open_the_place_guard(self):
+        from helpers.advisory_pending import asked_location_in_previous_turn, farmer_gave_place
+
+        history = [_user("wheat aphids")] + _advisory_result(QUESTION) + [
+            ModelResponse(parts=[TextPart(content="Which season?")]),
+            _user("rabi, 40 days"),
+        ]
+        ctx = _ctx(history)
+        assert not asked_location_in_previous_turn(ctx)
+        assert not farmer_gave_place(ctx)
+
+    def test_text_the_farmer_wrote_is_found_case_insensitively(self):
+        from helpers.advisory_pending import farmer_wrote
+
+        assert farmer_wrote(_ctx([_user("wheat aphids in PUNE")]), "Pune")
+        assert not farmer_wrote(_ctx([_user("wheat aphids")]), "Pune")
