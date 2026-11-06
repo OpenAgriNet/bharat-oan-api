@@ -67,6 +67,8 @@ async def ffs_find_shops(ctx: RunContext[FarmerContext], action: Literal["initia
     ranking and show each shop's urea/DAP availability and stock counts; shops
     need not cover the full entitlement. A shop choice does not reserve anything;
     use ffs_create_booking for explicit final submission.
+    Use backend_exchanges and the restored last requests/results to recover from
+    business responses by changing action or clarifying the farmer's choice.
     """
     return await _run(ctx, "find_shops", action=action)
 
@@ -84,6 +86,12 @@ async def ffs_create_booking(ctx: RunContext[FarmerContext], shop_ref: str,
     A changed quantity or shop requires a new preview. On quantity_limit_changed,
     explain the provider's new limit and ask again; never silently reduce or retry.
     On booking_uncertain, do not submit again until the outcome has been verified.
+    The current FFS context restores pending_booking and complete latest shop and
+    booking tool requests/results. Use its token on an unchanged confirmed summary;
+    do not create another preview just because conversation history is missing.
+    Use backend_exchanges to understand business rejections and choose corrected
+    tool arguments. Continue recoverable flows; stop on system failure or uncertain
+    write outcome. Changed shop/quantity still needs a new summary and consent.
     """
     return await _run(ctx, "create_booking", shop_ref=shop_ref, confirmed=confirmed,
                       confirmation_token=confirmation_token, quantities=quantities)

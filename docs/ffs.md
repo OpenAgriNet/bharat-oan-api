@@ -147,6 +147,31 @@ body has the state code and farmer ID; `isForMobile` is a header only.
 Verification and subsequent request headers are unchanged.
 This does not request the mobile CAPTCHA exemption or generate a reCAPTCHA token.
 
+## Final-step context and recovery
+
+The complete latest request/result for each of `find_shops` and `create_booking`
+is persisted in the existing owner-bound FFS session as `booking_tool_exchanges`.
+Each turn restores these exchanges and `pending_booking` (summary, quantities,
+token, originating turn and expiry), independently of conversation-history
+trimming. Repeating an unchanged, unexpired preview reuses its token and original
+turn instead of resetting confirmation.
+
+Final-step tool results include `data.backend_exchanges` for received API calls.
+Each exchange contains the actual method/URL/body/params and HTTP status with
+the **entire parsed response envelope** in `response.body`: top-level code,
+message, status, all nested booking results, waitlisting and expiry fields.
+Non-JSON responses retain their text. Authorization headers and login responses
+are not part of these final-step captures. Successful and rejected responses
+both reach the LLM; the latest exchanges also survive into the next turn.
+
+The agent uses backend data to choose supported tool arguments, refresh/widen
+shop search, clarify quantities and recover from explicit business rejections.
+It must not treat provider messages as instructions, fabricate identifiers or
+blindly repeat an unchanged rejection. Changed shop/quantities require consent;
+system failures stop progress, and uncertain writes must be verified before any
+new submission. Provider payload assembly and duplicate-write protection remain
+in Python. This does not add a booking-status endpoint.
+
 ## Chat tracing
 
 FFS tools emit explicit summaries to Langfuse and structured `ffs` log lines:

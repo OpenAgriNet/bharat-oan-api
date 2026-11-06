@@ -18,6 +18,7 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic_core import to_jsonable_python
 from redis.exceptions import RedisError
 
 from app.config import get_default_httpx_timeout, settings
@@ -171,6 +172,12 @@ async def prepare_chat_turn(query, session_id, user):
             context["entitlement"] = state["entitlement"]["data"]
         if state.get("shops", {}).get("last_result"):
             context["last_shops"] = state["shops"]["last_result"]["data"]
+        if state.get("booking_tool_exchanges"):
+            context["booking_tool_exchanges"] = deepcopy(state["booking_tool_exchanges"])
+        if state.get("pending_booking"):
+            pending = state["pending_booking"]
+            context["pending_booking"] = {key: deepcopy(pending[key]) for key in
+                                          ("summary", "quantities", "confirmation_token", "turn", "expires")}
     return query, private_otp, owner, context
 
 
@@ -235,6 +242,13 @@ class FFSService:
             response_data = response.json()
         except ValueError:
             pass
+        if getattr(self, "operation", None) in {"find_shops", "create_booking"}:
+            self.backend_exchanges.append({
+                "request": {"method": method, "url": str(response.request.url),
+                            "body": deepcopy(body), "params": deepcopy(params)},
+                "response": {"http_status": response.status_code,
+                             "body": deepcopy(response_data) if response_data is not None else response.text},
+            })
         diagnostic.update(response_summary(response.status_code, response_data))
         if (path == "/bharatVistar/createMultipleBookingV2" and isinstance(response_data, dict)
                 and response_data.get("code") == 500 and response_data.get("status") == "FAILED"
@@ -762,6 +776,11 @@ class FFSService:
         valid_preview = (pending.get("signature") == signature and
                          pending.get("confirmation_token") == confirmation_token and
                          pending.get("expires", 0) > time.time())
+        if (not confirmed and pending.get("signature") == signature
+                and pending.get("expires", 0) > time.time()):
+            self.note("booking_confirmation_reused")
+            return result("needs_confirmation", "Use this existing summary and token; if the current farmer message explicitly agrees, confirm it instead of preparing again",
+                          summary=summary, confirmation_token=pending["confirmation_token"], booking_enabled=True)
         if not confirmed or not valid_preview:
             pending = {"signature": signature, "confirmation_token": secrets.token_urlsafe(18),
                        "summary": summary, "turn": self.question_id, "expires": time.time() + 300,
@@ -869,7 +888,38 @@ class FFSService:
                         return result("unavailable", "This FFS session belongs to another authenticated caller")
                     async with httpx.AsyncClient(timeout=get_default_httpx_timeout(), follow_redirects=False) as client:
                         self.client = client
-                        return await getattr(self, operation)(**kwargs)
+                        self.operation = operation
+                        self.backend_exchanges = []
+                        try:
+                            answer = await getattr(self, operation)(**kwargs)
+                        except FFSError as error:
+                            if operation not in {"find_shops", "create_booking"}:
+                                raise
+                            self.diagnostics.update(error_type=type(error).__name__, workflow_status=error.status)
+                            if error.status == "needs_otp":
+                                self.state.pop("token", None)
+                                self.state["stage"] = "login_expired"
+                            status = "booking_uncertain" if self.state.get("uncertain_booking") else error.status
+                            answer = result(status, error.next_action)
+                        if operation in {"find_shops", "create_booking"}:
+                            # Keep the complete latest exchange for each final-stage tool,
+                            # independently of conversation-history trimming and worker changes.
+                            exchanges = self.state.setdefault("booking_tool_exchanges", {})
+                            backend = deepcopy(self.backend_exchanges)
+                            previous = deepcopy(exchanges.get(operation, {}).get("response", {}))
+                            previous_backend = previous.get("data", {}).pop("backend_exchanges", [])
+                            if not backend and previous == answer:
+                                backend = previous_backend
+                            if backend:
+                                answer["data"]["backend_exchanges"] = backend
+                            exchanges[operation] = {
+                                "question_id": self.question_id,
+                                "request": to_jsonable_python(kwargs),
+                                "response": deepcopy(answer),
+                                "backend_exchanges": deepcopy(backend),
+                            }
+                            await self.save()
+                        return answer
         except FFSError as error:
             self.diagnostics.update(error_type=type(error).__name__, workflow_status=error.status)
             if error.status == "needs_otp" and self.state:

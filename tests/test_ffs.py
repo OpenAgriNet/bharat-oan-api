@@ -253,7 +253,8 @@ def test_whole_flow_and_repeats_do_not_repeat_writes(setup):
         more = await ffs_find_shops(context("turn-6"), "more")
         assert not ({x["shop_ref"] for x in shops["data"]["shops"]} & {x["shop_ref"] for x in more["data"]["shops"]})
         encoded = json.dumps([out, shops, more])
-        for secret in ("userToken", "test-hash", "9999999999", "plantId", "farmlandPlotRegistryId"):
+        # Complete final-step responses intentionally include provider IDs.
+        for secret in ("userToken", "test-hash", "9999999999"):
             assert secret not in encoded
     asyncio.run(run())
 
