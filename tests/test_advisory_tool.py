@@ -627,7 +627,7 @@ class TestLocationQuestion:
         history = [_user("wheat aphids")] + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q") + [_user("I do not know")]
         out = asyncio.run(sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", answer_now=True))
         assert sa.PENDING_MARKER not in out and "Scout for aphids" in out
-        assert "Say which places it is meant for" in out
+        assert "This advice is meant for Agra (Uttar Pradesh), so it may not apply to you." in out
 
     def test_a_place_the_lookup_cannot_match_is_not_asked_for_again(self, bap):
         bap.response = _respond([_located()], **NO_DAYS)
@@ -661,7 +661,8 @@ class TestPlaceIsSentAsCodes:
             sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", state="Uttar Pradesh", district="Agra")
         )
         assert _params(_sent(bap, 0))["district_lgd_code"] == "118"
-        assert "Scout for aphids" in out and "which covers the farmer's Agra" in out
+        assert "Scout for aphids" in out
+        assert "This advice is for Agra (Uttar Pradesh), which covers your Agra." in out
 
     def test_a_place_the_model_made_up_is_ignored_and_the_farmer_is_asked(self, bap):
         bap.response = _respond([_located()], **NO_DAYS)
@@ -696,29 +697,54 @@ class TestLocationNotes:
                 "location_states": ["Uttar Pradesh"], "location_districts": ["Agra"]}
         return {**base, **kw}
 
-    def test_matched(self):
+    def test_the_sentence_is_the_very_first_line_and_no_outside_advice_is_allowed(self):
         from helpers.locations import resolve_place
 
         out = self._notes([self._result(location_match="matched")], resolve_place("Agra"))
-        assert "is for Agra (Uttar Pradesh), which covers the farmer's Agra" in out
+        assert "very first line" in out and "do not add steps or details from your own knowledge" in out
+
+    def test_matched(self):
+        from helpers.locations import resolve_place
+
+        opening = sa.location_opening([self._result(location_match="matched")], resolve_place("Agra"))
+        assert opening == "This advice is for Agra (Uttar Pradesh), which covers your Agra."
+
+    def test_matched_on_a_statewide_record_names_the_state(self):
+        from helpers.locations import resolve_place
+
+        statewide = self._result(location_match="matched", location_states=["Tamil Nadu"], location_districts=[])
+        opening = sa.location_opening([statewide], resolve_place("Tamil Nadu"))
+        assert opening == "This advice is for Tamil Nadu, which covers your Tamil Nadu."
 
     def test_partial_names_the_districts(self):
         from helpers.locations import resolve_place
 
-        out = self._notes([self._result(location_match="state_partial")], resolve_place("Uttar Pradesh"))
-        assert "only some districts of the farmer's state" in out and "Agra" in out
+        opening = sa.location_opening([self._result(location_match="state_partial")], resolve_place("Uttar Pradesh"))
+        assert opening == "This advice is for Agra (Uttar Pradesh), which are some districts of your state."
 
-    def test_other_places(self):
+    def test_other_places_say_none_is_available_for_the_farmers_place_then_where_it_is_meant_for(self):
         from helpers.locations import resolve_place
 
-        out = self._notes([self._result(location_match="other")], resolve_place("Bareilly"))
-        assert "not the farmer's place" in out and "may not apply to Bareilly, Uttar Pradesh" in out
+        maize = self._result(location_match="other", location_states=["West Bengal"], location_districts=["Bankura", "Birbhum"])
+        opening = sa.location_opening([maize], resolve_place("Tamil Nadu"))
+        assert opening == (
+            "No advisory is available for Tamil Nadu. This advice is meant for Bankura, Birbhum (West Bengal), "
+            "so it may not apply to you."
+        )
+
+    def test_other_places_next_to_general_advice(self):
+        from helpers.locations import resolve_place
+
+        results = [self._result(location_match="other"), {"title": "Gen", "location_national": True}]
+        opening = sa.location_opening(results, resolve_place("Punjab"))
+        assert opening.startswith("There is no advisory specific to Punjab.")
+        assert "general advice for your crop" in opening and "meant for Agra (Uttar Pradesh)" in opening
 
     def test_general_advice_is_not_specific_to_the_place(self):
         from helpers.locations import resolve_place
 
-        out = self._notes([{"title": "T", "location_national": True}], resolve_place("Agra"))
-        assert "not specific to Agra, Uttar Pradesh" in out
+        opening = sa.location_opening([{"title": "T", "location_national": True}], resolve_place("Agra"))
+        assert opening == "There is no advisory specific to Agra, Uttar Pradesh. This is the general advice found for your crop."
 
     def test_general_advice_without_a_place_says_nothing_about_location(self):
         assert self._notes([{"title": "T", "location_national": True}]) == ""
@@ -728,4 +754,17 @@ class TestLocationNotes:
 
         results = [self._result(location_match="matched"), {"title": "Other", "location_national": True}]
         out = self._notes(results, resolve_place("Agra"))
-        assert "'Other' applies everywhere" in out and "covers the farmer's Agra" in out
+        assert "'Other' applies everywhere" in out and "This advice is for Agra (Uttar Pradesh)" in out
+
+    def test_the_other_places_case_reaches_the_agent_through_the_tool(self, bap):
+        bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
+        history = (
+            [_user("wheat aphids, Rabi")]
+            + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q")
+            + [_user("Tamil Nadu")]
+        )
+        out = asyncio.run(
+            sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", state="Tamil Nadu")
+        )
+        assert "No advisory is available for Tamil Nadu. This advice is meant for Agra (Uttar Pradesh)" in out
+        assert "Scout for aphids" in out

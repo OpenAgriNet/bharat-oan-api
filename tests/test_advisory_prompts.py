@@ -62,6 +62,7 @@ def test_prompt_has_the_search_first_advisory_flow(path):
     assert "The farmer's place comes only from the farmer" in flow
     assert "Never take it from the browser coordinates" in flow
     assert "A request to ask for the farmer's place" in flow
+    assert "the very first line of your answer" in flow and "add nothing from your own knowledge" in flow
     assert "pass it as `location` so the tool can note it" not in flow
     assert "call `search_advisory` again with the same `query`" in flow
     assert "**Source: ICAR - Kisan Sarathi**" in flow
