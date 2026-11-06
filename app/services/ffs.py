@@ -23,7 +23,7 @@ from redis.exceptions import RedisError
 from app.config import get_default_httpx_timeout, settings
 from app.core.cache import cache
 from helpers.utils import to_ascii_digits
-from helpers.ffs_tracing import observation, response_summary
+from helpers.ffs_tracing import log_http_response, observation, response_summary
 
 USER = "/ufa-user-service/ufa-user/v1/api"
 MASTER = "/ufa-master-service/ufa-master/v1/api"
@@ -229,6 +229,7 @@ class FFSService:
         diagnostic["recaptcha_present"] = "X-Recaptcha-Token" in headers
         self.diagnostics["api_calls"] += 1
         response = await self.client.request(method, url, headers=headers, **kwargs)
+        log_http_response(response, session_id=self.session_id, question_id=self.question_id)
         response_data = None
         try:
             response_data = response.json()

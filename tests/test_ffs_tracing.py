@@ -35,6 +35,10 @@ def tracing(monkeypatch):
     provider.shutdown()
 
 
+def summary_logs(caplog):
+    return '\n'.join(r.getMessage() for r in caplog.records if r.name == 'helpers.ffs_tracing')
+
+
 def output(span):
     return json.loads(span.attributes['langfuse.observation.output'])
 
@@ -73,7 +77,7 @@ def test_real_span_tree_safe_outputs_and_cached_decisions(setup, tracing, caplog
     assert output(quantity)['products'][0]['bags'] == 6
     assert output(quantity)['stage_after'] == 'entitlement_ready'
     assert all(output(s)['duration_ms'] >= 0 for s in tools + apis)
-    serialized = json.dumps([dict(s.attributes) for s in spans]) + caplog.text
+    serialized = json.dumps([dict(s.attributes) for s in spans]) + summary_logs(caplog)
     for secret in ['123456', '99999999999', '9999999999', 'test-hash', 'Mock Farmer', KEY, IV, '.signature']:
         assert secret not in serialized
     assert '_state' not in serialized and 'Authorization' not in serialized
@@ -104,7 +108,7 @@ def test_api_failures_keep_safe_provider_reason(setup, tracing, caplog, status, 
     assert output(span)['http_status'] == status
     assert output(span)['provider_reason'] == reason
     assert span.attributes['langfuse.observation.level'] == 'ERROR'
-    assert 'secret-value' not in json.dumps(dict(span.attributes)) + caplog.text
+    assert 'secret-value' not in json.dumps(dict(span.attributes)) + summary_logs(caplog)
 
 
 def test_timeout_keeps_error_class_without_sensitive_message(setup, tracing, caplog):
@@ -116,7 +120,7 @@ def test_timeout_keeps_error_class_without_sensitive_message(setup, tracing, cap
     api = next(s for s in exporter.get_finished_spans() if s.name.startswith('ffs.api:'))
     tool = next(s for s in exporter.get_finished_spans() if s.name == 'tool:ffs_send_otp')
     assert output(api)['error_type'] == output(tool)['error_type'] == 'ReadTimeout'
-    assert 'test failure' not in json.dumps([dict(s.attributes) for s in exporter.get_finished_spans()]) + caplog.text
+    assert 'test failure' not in json.dumps([dict(s.attributes) for s in exporter.get_finished_spans()]) + summary_logs(caplog)
 
 
 def test_tracing_failure_does_not_break_workflow(setup, monkeypatch):
@@ -155,7 +159,7 @@ def test_booking_logging_omits_confirmation_and_reference_codes(setup, tracing, 
     assert len(booking) == 2
     assert output(booking[-1])['booking_valid'] is True
     assert output(booking[-1])['bookings_count'] == 1
-    serialized = json.dumps([dict(s.attributes) for s in spans]) + caplog.text
+    serialized = json.dumps([dict(s.attributes) for s in spans]) + summary_logs(caplog)
     assert token not in serialized and 'PRC-TEST-001' not in serialized
 
 

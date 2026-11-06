@@ -1,4 +1,4 @@
-"""FFS diagnostics: explicit summaries only, never request/response bodies or credentials."""
+"""FFS summary tracing and separate full HTTP response console logs."""
 from contextlib import contextmanager
 import json
 import logging
@@ -7,9 +7,29 @@ import time
 
 from langfuse import get_client
 from opentelemetry import trace
+from helpers.utils import get_logger
 
 logger = logging.getLogger(__name__)
+http_logger = get_logger('ffs.http')
 FAILURES = {'unavailable', 'setup_incomplete', 'partial_crop_update', 'booking_uncertain', 'booking_failed'}
+
+
+def log_http_response(response, *, session_id, question_id):
+    """Capture received bodies before validation, without adding them to Langfuse."""
+    try:
+        fields = {
+            'event': 'ffs.http_response', 'channel': 'chat',
+            'session_id': session_id, 'question_id': question_id,
+            'method': response.request.method, 'url': str(response.request.url),
+            'http_status': response.status_code, 'response_body': response.text,
+        }
+        context = trace.get_current_span().get_span_context()
+        if context.is_valid:
+            fields.update(trace_id=f'{context.trace_id:032x}', span_id=f'{context.span_id:016x}')
+        http_logger.info('FFS_HTTP_RESPONSE %s', json.dumps(fields, ensure_ascii=False))
+    except Exception:
+        # A failed debug-log handler must not change a booking outcome or trigger a retry.
+        pass
 
 
 def numeric_fields(data, fields):

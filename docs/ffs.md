@@ -174,9 +174,23 @@ failures. A cached result has no new API spans and includes a reuse decision.
 
 Request/response bodies, OTPs, tokens, farmer identifiers, names, phone numbers,
 land registry IDs and booking confirmation/reference codes are excluded from
-these new summaries. Do not restore raw body logging for debugging. This is not
-a claim that the existing conversation input/output is redacted: those fields
-retain the application's existing chat behavior.
+these summaries. Full received response bodies are separately logged to the
+`ffs.http` console logger with prefix `FFS_HTTP_RESPONSE`, before JSON parsing or
+HTTP/provider validation. Each event is one JSON line containing `response_body`
+(the original response text, including JSON whitespace), HTTP status, method,
+URL, session/question IDs and trace/span IDs when available. These console logs
+include any sensitive values returned by FFS; raw bodies are not added to
+Langfuse summaries. Transport failures without a response have no body to log.
+Logging errors do not change workflow results or repeat a request.
+
+Continuously save actual responses on chat dev:
+
+```bash
+sudo docker logs --since 10m --timestamps --follow sva_app 2>&1 | \
+  grep --line-buffered 'FFS_HTTP_RESPONSE ' | tee -a /tmp/chat-dev-ffs-responses.log
+```
+
+The existing conversation input/output retains its existing chat behavior.
 
 `prompt:master_catalog_redis_check` is a preparation span with catalogue metadata
 and counts, not a tool call dumping the full multilingual prompt. The chat agent
