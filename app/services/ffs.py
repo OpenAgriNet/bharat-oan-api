@@ -433,7 +433,7 @@ class FFSService:
                                   c.get("yearId") == s["season"]["year"]["yearId"]]})
             villages.append({"village_ref": ref, "name": next(l.get("villageName", "") for l in self.land_map().values()
                              if str(l["villageLgdCode"]) == code), "plots": plots})
-        return result("ok" if villages else "no_lands", "Ask only for missing village and crops" if villages else
+        return result("ok" if villages else "no_lands", "Ask only for missing village and crops; once known, call ffs_get_entitlement immediately without asking permission to check entitlement" if villages else
                       "Explain that FFS returned no land records", farmer_name=s["user"].get("userFullName"), villages=villages)
 
     async def entitlement(self, village_ref, crop_selections):
