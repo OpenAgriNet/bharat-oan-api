@@ -27,8 +27,10 @@ async def _run(ctx, operation, **kwargs):
 
 
 async def ffs_send_otp(ctx: RunContext[FarmerContext], farmer_id: str, state: str, resend: bool = False) -> dict:
-    """Request one FFS SMS OTP for the farmer-provided 11-digit ID and state.
+    """After FFS opt-in, request one SMS OTP using the 11-digit Farmer ID and state.
 
+    For any fertilizer purchase intent, first ask whether they want to buy through
+    FFS and wait for agreement. Call this identifier Farmer ID, never FFS ID.
     FFS login is separate from AgriStack. Do not invent an ID. Use resend only
     after the farmer explicitly asks. Repeated calls do not send another OTP.
     """
@@ -61,8 +63,9 @@ async def ffs_get_entitlement(ctx: RunContext[FarmerContext], village_ref: str,
 async def ffs_find_shops(ctx: RunContext[FarmerContext], action: Literal["initial", "more", "widen"] = "initial") -> dict:
     """After the farmer opts in, find up to three FFS shops for their entitlement.
 
-    Use more for the next shops, widen to seek full stock in a wider territory.
-    Describe partial stock honestly. A shop choice does not reserve anything;
+    Use more for the next shops, widen for a wider territory. Keep the returned
+    ranking and show each shop's urea/DAP availability and stock counts; shops
+    need not cover the full entitlement. A shop choice does not reserve anything;
     use ffs_create_booking for explicit final submission.
     """
     return await _run(ctx, "find_shops", action=action)

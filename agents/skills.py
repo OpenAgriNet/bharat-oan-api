@@ -26,6 +26,8 @@ def render_prompt(state: SkillState, language: str, context: dict) -> str:
     active = state.active
     chunks.extend(skill_instructions(name, state) for name in catalog.resolve(active))
     pending = state.permitted - active
+    if 'ffs.booking' in pending:
+        chunks.append(catalog.env.get_template('skills/ffs/booking/routing.md').render(**context))
     if pending:
         summaries = [f'- {name}: {catalog.render_summary(name, language, context, state.agent)}'
                      for name in catalog.manifest.skills if name in pending]

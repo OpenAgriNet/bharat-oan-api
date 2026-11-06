@@ -1,5 +1,5 @@
 ---
-summary: "FFS farmer-ID/OTP login, urea/DAP entitlement, shops and farmer-confirmed fertilizer booking."
+summary: "Any fertilizer purchase intent: offer FFS first, then Farmer ID/OTP login, urea/DAP entitlement, shops and confirmed booking."
 ---
 ## FFS fertilizer availability
 

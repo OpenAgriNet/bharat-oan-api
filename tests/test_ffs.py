@@ -436,7 +436,8 @@ def test_shop_territory_priority_partial_stock_and_widening_cursor(setup):
         initial = await ffs_find_shops(context("4"))
         shops = initial["data"]["shops"]
         assert [p["name"] for p in shops] == ["Shop 0", "Shop 1", "Shop 4"]
-        assert shops[0]["coverage"] == ["urea"] and shops[1]["coverage"] == ["DAP"]
+        assert shops[0]["coverage"] == shops[1]["coverage"] == ["urea", "DAP"]
+        assert not shops[0]["complete_supply"] and not shops[1]["complete_supply"]
         widened = await ffs_find_shops(context("5"), "widen")
         assert {p["name"] for p in widened["data"]["shops"]} == {"Shop 6", "Shop 7"}
         assert all(p["complete_supply"] and p["territory"] == "D" for p in widened["data"]["shops"])
