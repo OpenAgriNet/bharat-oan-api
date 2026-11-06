@@ -13,6 +13,11 @@ Only urea/DAP booking is supported; explain that before login for other products
 General dose/advisory questions keep their existing flow. Purchase routing is
 also visible when the FFS skill is enabled but not yet loaded.
 
+After the farmer opts into FFS, check entitlement as soon as login and the
+selected village/plots and farmer-stated crops are available. Do not add a
+permission question for entitlement or saving those supplied crop mappings;
+ask only for missing or ambiguous crop/plot details.
+
 ## Configuration and authentication
 
 Use a **server-side** environment file for local development. On this workspace,

@@ -52,6 +52,11 @@ async def ffs_get_entitlement(ctx: RunContext[FarmerContext], village_ref: str,
                               crop_selections: list[CropSelection]) -> dict:
     """Save farmer-selected crops on FFS plots and return urea/DAP bag entitlement.
 
+    Once FFS login and the selected village/plots and farmer-stated crops are
+    known, call immediately in the same turn. Do not ask permission to check
+    entitlement or save these supplied crop mappings. Ask only for missing or
+    ambiguous crop/plot details.
+
     This WRITES crop mappings. Use only returned land/village refs and crops the
     farmer supplied or confirmed. One {land_ref, crop_name} entry per chosen
     plot, all in one village. Unknown crops ask for clarification before any

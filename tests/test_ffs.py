@@ -531,6 +531,8 @@ def agent_flow(setup, check_transport=True):
         deps = context(str(turn), session=session, otp=otp, query=query, selective=True).deps
         response = agent.run_sync(query, deps=deps, message_history=history)
         history = response.all_messages()
+        if check_transport and query == "maize on both plots":
+            assert setup.backend.count("getRecommendationsByGFRV4") == 1
     if check_transport:
         assert setup.backend.count("loginByFarmerId") == 1
         assert setup.backend.count("/land/crop/add") == 2
