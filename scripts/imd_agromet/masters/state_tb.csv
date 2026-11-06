@@ -1,0 +1,38 @@
+state_id,state_name,latitude,longitude,state_reg_name,state_lg_code
+1,Jammu & Kashmir,34.63,76.33,जम्मू एण्ड कश्मीर,1
+2,Himachal Pradesh,31.92,77.25,हिमाचल प्रदेश,2
+3,Punjab,30.84,75.42,ਪੰਜਾਬ,3
+4,Chandigarh,30.73,76.78,चंडीगढ़,4
+5,Uttarakhand,30.15,79.21,उत्तराखंड,5
+6,Haryana,29.2,76.34,हरियाणा,6
+7,NCT of Delhi,28.64,77.12,दिल्ली का एन.सी.टी.,7
+8,Rajasthan,26.58,73.85,राजस्थान,8
+9,Uttar Pradesh,26.92,80.57,उत्तर प्रदेश,9
+10,Bihar,25.68,85.61,बिहार,10
+11,Sikkim,27.57,88.48,सिक्किम,11
+12,Arunachal Pradesh,28.04,94.68,अरुणाचल प्रदेश,12
+13,Nagaland,26.06,94.47,Nagaland,13
+14,Manipur,24.73,93.88,Manipur,14
+15,Mizoram,23.31,92.84,Mizoram,15
+16,Tripura,23.75,91.74,Tripura,16
+17,Meghalaya,25.54,91.28,Meghalaya,17
+18,Assam,26.35,92.83,অসম,18
+19,West Bengal,23.82,87.99,পশ্চিম বঙ্গ,19
+20,Jharkhand,23.66,85.56,झारखण्ड,20
+21,Odisha,20.51,84.43,ଓଡିଶା,21
+22,Chhattisgarh,21.27,82.04,छत्तीसगढ़,22
+23,Madhya Pradesh,23.54,78.29,मध्य प्रदेश,23
+24,Gujarat,22.69,71.58,ગુજરાત,24
+25,Daman & Diu,20.51,72.23,Daman & Diu,38
+26,Dadara & Nagar Havelli,20.2,73.07,Dadara & Nagar Havelli,38
+27,Maharashtra,19.45,76.11,महाराष्ट्र,27
+28,Andhra Pradesh,15.72,79.94,ఆంధ్రప్రదేశ్,28
+29,Karnataka,14.71,76.17,ಕರ್ನಾಟಕ,29
+30,Goa,15.36,74.05,Goa,30
+31,Lakshadweep,11.09,72.74,Lakshadweep,31
+32,Kerala,10.45,76.41,കേരളം,32
+33,Tamil Nadu,11.01,78.41,தமிழ்நாடு,33
+34,Puducherry,11.98,79.87,பாண்டிச்சேரி,34
+35,Andaman & Nicobar Island,11.22,92.96,अंदमान तथा निकोबार द्वीप समूह,35
+36,Telangana,17.8,79.07,తెలంగాణ,36
+37,LADAKH,33.77,76.57,लद्दाख,37

@@ -63,7 +63,7 @@ def test_kcc_tools_are_registered_without_development_features():
     }
     assert TOOLS <= registered
     assert not any(name.startswith(("get_agristack_", "initiate_khc_")) for name in registered)
-    assert "imd_agromet_advisory" not in registered
+    assert "imd_agromet_advisory" in registered
 
 
 def test_kcc_status_service_route():
