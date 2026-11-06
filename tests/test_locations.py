@@ -62,3 +62,18 @@ def test_data_file_is_consistent():
     assert all(d["state"] in state_codes for d in data["districts"])
     # codes seen in the advisory webhook
     assert {5, 9, 13, 19, 23, 28, 29, 32, 33, 35} <= set(state_codes)
+
+
+@pytest.mark.parametrize(
+    "text, state, district",
+    [
+        ("Amethi, Uttar Pradesh", 9, 640),
+        ("Ambedkar Nagar", 9, 121),
+        ("Amroha", 9, 154),
+        ("Chamba, Himachal Pradesh", 2, 16),
+        ("Bilaspur, Himachal Pradesh", 2, 15),
+    ],
+)
+def test_districts_seen_in_the_dev_records_resolve(text, state, district):
+    place = resolve_place(text)
+    assert (place.state_code, place.district_code) == (state, district)

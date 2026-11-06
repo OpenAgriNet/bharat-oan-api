@@ -1,5 +1,5 @@
 {
- "_note": "Seed list of Indian states/UTs and districts with LGD codes, used to turn the place a farmer types into the codes the advisory data uses. States are complete. Districts are only those seen in the advisory webhook so far: replace or extend this list with the full official LGD district directory (code, name, state code) without changing the format.",
+ "_note": "Seed list of Indian states/UTs and districts with LGD codes, used to turn the place a farmer types into the codes the advisory data uses. States are complete. Districts are only those seen in the advisory webhook so far (34 from the dev records): replace or extend this list with the full official LGD district directory (code, name, state code) without changing the format.",
  "states": [
   {
    "code": 1,
@@ -282,6 +282,24 @@
  ],
  "districts": [
   {
+   "code": 15,
+   "name": "Bilaspur",
+   "state": 2,
+   "aliases": []
+  },
+  {
+   "code": 16,
+   "name": "Chamba",
+   "state": 2,
+   "aliases": []
+  },
+  {
+   "code": 17,
+   "name": "Hamirpur",
+   "state": 2,
+   "aliases": []
+  },
+  {
    "code": 118,
    "name": "Agra",
    "state": 9,
@@ -290,6 +308,12 @@
   {
    "code": 119,
    "name": "Aligarh",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 121,
+   "name": "Ambedkar Nagar",
    "state": 9,
    "aliases": []
   },
@@ -382,6 +406,12 @@
    "aliases": []
   },
   {
+   "code": 154,
+   "name": "Amroha",
+   "state": 9,
+   "aliases": []
+  },
+  {
    "code": 179,
    "name": "Bhadohi",
    "state": 9,
@@ -458,6 +488,12 @@
    "aliases": [
     "Yadagiri"
    ]
+  },
+  {
+   "code": 640,
+   "name": "Amethi",
+   "state": 9,
+   "aliases": []
   },
   {
    "code": 745,
