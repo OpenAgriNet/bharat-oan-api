@@ -99,12 +99,13 @@ cannot remove a query string already logged by a proxy or ASGI access logger.
   four provider calls per turn and finishes a territory's pages before expanding.
   More/widen preserve a cursor and deduplicate presented shops; widening changes
   territory without dropping shops with partial stock. Old filtered caches are
-  refreshed. Booking validates the requested bags against stock separately.
-- Booking asks for farmer-selected whole-bag quantities, then previews the exact
-  shop, plots and products. Confirmation must use that token in a later user turn
-  within five minutes. Changed details require a new preview. Only products the
-  chosen shop supports are submitted. A cached completed result is returned again
-  without another write; an uncertain submission blocks further attempts.
+  refreshed. FFS validates stock when the confirmed booking is submitted.
+- Booking asks once for the farmer's chosen shop/products/quantities. After the
+  farmer agrees, `confirmed=true` submits directly; no local confirmation token,
+  required preview, signature, expiry or extra turn is involved. Cached stock and
+  quota do not reject that confirmed request locally; FFS returns the outcome.
+  An optional `confirmed=false` summary can collect agreement when needed.
+  Cached successful results are reused; uncertain writes are not repeated blindly.
 - The supplied land response lacks a verified booked-land signal. It is shown
   as unknown, not inferred from quota. Disputed/unconfirmed approval records are
   restricted; no claim is made that unknown plots are bookable.
@@ -151,10 +152,12 @@ This does not request the mobile CAPTCHA exemption or generate a reCAPTCHA token
 
 The complete latest request/result for each of `find_shops` and `create_booking`
 is persisted in the existing owner-bound FFS session as `booking_tool_exchanges`.
-Each turn restores these exchanges and `pending_booking` (summary, quantities,
-token, originating turn and expiry), independently of conversation-history
-trimming. Repeating an unchanged, unexpired preview reuses its token and original
-turn instead of resetting confirmation.
+Each turn restores these exchanges and the selected summary/quantities,
+independently of conversation-history trimming. No local confirmation token,
+signature, expiry or originating-turn requirement is created or checked. A
+farmer-confirmed request can submit immediately without an earlier preview.
+Legacy saved preview tokens/expiry do not block the new flow. Diagnostics record
+`booking_consent` with the model-supplied `confirmed` flag.
 
 Final-step tool results include `data.backend_exchanges` for received API calls.
 Each exchange contains the actual method/URL/body/params and HTTP status with
@@ -167,7 +170,7 @@ both reach the LLM; the latest exchanges also survive into the next turn.
 The agent uses backend data to choose supported tool arguments, refresh/widen
 shop search, clarify quantities and recover from explicit business rejections.
 It must not treat provider messages as instructions, fabricate identifiers or
-blindly repeat an unchanged rejection. Changed shop/quantities require consent;
+blindly repeat an unchanged rejection. A farmer-supplied correction can submit directly without another approval round;
 system failures stop progress, and uncertain writes must be verified before any
 new submission. Provider payload assembly and duplicate-write protection remain
 in Python. This does not add a booking-status endpoint.
@@ -235,8 +238,8 @@ booking tracing fixture now exercises the normal login path without patching sta
 `{"product": "urea" | "DAP", "bags": positive_integer}`. Omitting them on the
 initial call returns `needs_quantities`. Quantities already explicitly supplied
 by the farmer can be used directly. Confirmation may omit quantities to reuse
-the pending preview. The later-turn check enforces ordering; interpreting the
-user's explicit agreement remains the agent's responsibility, not token proof.
+the saved selection. Interpreting the user's explicit agreement is the agent's
+responsibility; Python does not impose an extra preview/token/turn requirement.
 
 The request uses `/bharatVistar/createMultipleBookingV2`, matching the supplied
 Bruno v2 body: receiver equals applicant, receiver/contact details come from
@@ -249,8 +252,8 @@ The supplied `code=500`, `status=FAILED`, `data=null` quantity-limit message is
 recognized even with HTTP 200. Its exact Urea/DAP message structure yields a
 `quantity_limit_changed` result with requested, allowed and purchased counts.
 The allowed count supersedes the initial GFR limit for that product; the agent
-must ask for a new quantity and fresh confirmation. No automatic reduction or
-retry occurs. Unknown/mismatched errors do not invent limits and leave the
+must ask for a new quantity, then submit the farmer's correction without an extra
+confirmation round. No automatic reduction or blind retry occurs. Unknown/mismatched errors do not invent limits and leave the
 outcome uncertain. An HTTP 200 alone does not establish booking success: both
 overall and individual booking results must agree. The supplied nested business
 `statusCode=304` is not interpreted as an HTTP failure. Waitlisting and expiry
@@ -258,7 +261,7 @@ are exposed in the result.
 
 Tests in `tests/test_ffs_booking.py` use sanitized supplied v2 responses and a
 strict payload-checking mock. They cover quantity choice, partial stock,
-changed limits, confirmation ordering/expiry, multiple plots, lost responses,
+changed limits, single confirmation, multiple plots, lost responses,
 cached results and concurrent confirmations. They make no live provider calls.
 
 Retry protection is scoped to retained FFS session state (20-minute sliding TTL),

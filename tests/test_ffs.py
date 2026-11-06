@@ -455,14 +455,9 @@ def test_create_booking_requires_confirmation_and_submits_once(setup):
 
         preview = await ffs_create_booking(context("turn-5"), shop_ref, quantities=[ffs.BookingQuantity(product="urea", bags=4)])
         assert preview["status"] == "needs_confirmation"
-        token = preview["data"]["confirmation_token"]
-
-        mismatch = await ffs_create_booking(context("turn-6"), shop_ref, True, "wrong-token")
-        assert mismatch["status"] == "needs_confirmation"
+        assert 'confirmation_token' not in preview['data']
         assert setup.backend.count("createMultipleBookingV2") == 0
-
-        token = mismatch["data"]["confirmation_token"]
-        booked = await ffs_create_booking(context("turn-7"), shop_ref, True, token)
+        booked = await ffs_create_booking(context("turn-6"), shop_ref, True)
         assert booked["status"] == "ok"
         assert booked["data"]["booking"]["is_valid"] is True
         assert booked["data"]["booking"]["bookings"][0]["booking_code"] == "PRC-TEST-001"

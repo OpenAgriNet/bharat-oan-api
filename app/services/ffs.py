@@ -6,7 +6,6 @@ from difflib import SequenceMatcher
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Literal
-import secrets
 import hashlib
 import json
 import math
@@ -177,7 +176,7 @@ async def prepare_chat_turn(query, session_id, user):
         if state.get("pending_booking"):
             pending = state["pending_booking"]
             context["pending_booking"] = {key: deepcopy(pending[key]) for key in
-                                          ("summary", "quantities", "confirmation_token", "turn", "expires")}
+                                          ("summary", "quantities")}
     return query, private_otp, owner, context
 
 
@@ -683,10 +682,9 @@ class FFSService:
     def booking_choices(self, shop):
         limits = self.state.get("booking_limits", {})
         return [{**p, "bags": limits.get(p["name"], p["bags"])}
-                for p in self.state["entitlement"]["data"]["products"]
-                if p["name"] in shop["coverage"]]
+                for p in self.state["entitlement"]["data"]["products"]]
 
-    async def create_booking(self, shop_ref, confirmed=False, confirmation_token="", quantities=None):
+    async def create_booking(self, shop_ref, confirmed=False, quantities=None):
         s = self.state
         if s.get("uncertain_booking"):
             return result("booking_uncertain", "Previous booking outcome is unknown. Verify with FFS before another submission; do not retry automatically")
@@ -698,8 +696,6 @@ class FFSService:
             raise FFSError("needs_entitlement", "Collect village/crops and call ffs_get_entitlement first")
         if not s.get("shops", {}).get("pool"):
             raise FFSError("needs_shops", "Call ffs_find_shops first and ask the farmer to choose a shop")
-        if s.get("booking_turn") == self.question_id:
-            return result("already_started", "Booking was already attempted this turn. Wait for the farmer's next response")
         shop = next((row for row in s["shops"]["pool"].values() if row["shop_ref"] == shop_ref), None)
         if not shop:
             return result("needs_clarification", "Choose a shop_ref from the latest shop list")
@@ -712,7 +708,7 @@ class FFSService:
         chosen, error = self._booking_products(shop, choices, quantities)
         if error:
             return error
-        return await self._confirm_booking(shop, chosen, quantities, confirmed, confirmation_token)
+        return await self._book_or_preview(shop, chosen, quantities, confirmed)
 
     def _booking_products(self, shop, choices, quantities):
         """Return validated product lines or the existing farmer-facing correction."""
@@ -724,17 +720,11 @@ class FFSService:
         chosen = []
         for q in quantities:
             group = next((p for p in choices if p["name"] == q.product), None)
-            if not group or q.bags > group["bags"]:
-                return None, result("needs_quantities", "Use only products this shop covers and ask for quantities within the latest provider limit; never reduce silently", products=choices)
+            if not group:
+                return None, result("needs_quantities", "Select a supported product from the returned products", products=choices)
             product = next((p for p in self.state.get("products", []) if p.get("productId") == PRODUCTS[group["group"]]), None)
             if not product or product.get("bagWeightKg") != group["kg_per_bag"] or not product.get("plantId"):
                 raise FFSError("unavailable", "Required fertilizer product/plant mapping is unavailable; refresh shop search")
-            stock = shop.get("stock", {}).get(str(product["productId"]))
-            if stock is None:
-                return None, result("needs_shops", "Refresh shop search: selected product stock is missing")
-            if q.bags > stock:
-                return None, result("insufficient_stock", "Explain this shop's available stock and ask for a smaller quantity or another shop; never reduce the quantity automatically",
-                              product=q.product, requested_bags=q.bags, available_bags=stock)
             chosen.append({"group": group["group"], "name": group["name"], "bags": q.bags,
                            "kg_per_bag": group["kg_per_bag"], "product_id": product["productId"],
                            "plant_id": product["plantId"]})
@@ -755,10 +745,9 @@ class FFSService:
             raise FFSError("needs_entitlement", "Select plots and get entitlement before booking")
         return selected_lands
 
-    async def _confirm_booking(self, shop, chosen, quantities, confirmed, confirmation_token):
+    async def _book_or_preview(self, shop, chosen, quantities, confirmed):
         s = self.state
         shop_ref = shop["shop_ref"]
-        pending = s.get("pending_booking", {})
         mobile = re.sub(r"\D", "", str(s["user"].get("userMobileNumber") or ""))
         if mobile.startswith("91") and len(mobile) == 12:
             mobile = mobile[2:]
@@ -770,29 +759,14 @@ class FFSService:
             "products": [{"name": x["name"], "bags": x["bags"], "kg_per_bag": x["kg_per_bag"]} for x in chosen],
             "plots": [{"land_ref": x["land_ref"], "survey": x["survey"]} for x in selected_lands],
         }
-        # Bind hidden provider identities as well as the user-visible summary.
-        signature = hashlib.sha256(json.dumps([summary, selected_lands, chosen, shop["retailer_id"],
-                                               s["user"], s["season"], s["gfr"]], sort_keys=True).encode()).hexdigest()
-        valid_preview = (pending.get("signature") == signature and
-                         pending.get("confirmation_token") == confirmation_token and
-                         pending.get("expires", 0) > time.time())
-        if (not confirmed and pending.get("signature") == signature
-                and pending.get("expires", 0) > time.time()):
-            self.note("booking_confirmation_reused")
-            return result("needs_confirmation", "Use this existing summary and token; if the current farmer message explicitly agrees, confirm it instead of preparing again",
-                          summary=summary, confirmation_token=pending["confirmation_token"], booking_enabled=True)
-        if not confirmed or not valid_preview:
-            pending = {"signature": signature, "confirmation_token": secrets.token_urlsafe(18),
-                       "summary": summary, "turn": self.question_id, "expires": time.time() + 300,
-                       "quantities": [q.model_dump() for q in quantities]}
-            s["pending_booking"] = pending
+        self.note("booking_consent", confirmed=bool(confirmed))
+        if not confirmed:
+            s["pending_booking"] = {"summary": summary,
+                                    "quantities": [q.model_dump() for q in quantities]}
             await self.save()
             self.note("booking_confirmation_requested")
-            return result("needs_confirmation", "Read the exact summary and wait for explicit confirmation in a later user turn",
-                          summary=summary, confirmation_token=pending["confirmation_token"], booking_enabled=True)
-        if pending["turn"] == self.question_id:
-            return result("needs_confirmation", "Wait for a subsequent user message explicitly confirming this summary; do not submit in this turn",
-                          summary=summary, confirmation_token=pending["confirmation_token"], booking_enabled=True)
+            return result("needs_confirmation", "Ask once whether to book these products and quantities at this shop. If the farmer has already confirmed, call with confirmed=true now; no token or extra turn is required",
+                          summary=summary, booking_enabled=True)
         return await self._submit_booking(shop, summary, chosen, selected_lands, mobile)
 
     async def _submit_booking(self, shop, summary, chosen, selected_lands, mobile):
@@ -817,7 +791,6 @@ class FFSService:
             "GFRRecommendation": s["gfr"]["recommendations"], "gfrType": s["gfr"]["gfrType"],
             "isProceedWithGfr": True,
         }
-        s["booking_turn"] = self.question_id
         s["uncertain_booking"] = {"shop_ref": shop["shop_ref"], "summary": summary}
         await self.save()
         self.note("booking_submitted", products_count=len(lines), plots_count=len(selected_lands))
@@ -830,10 +803,9 @@ class FFSService:
                 raise FFSError("booking_uncertain", "Provider rejection did not match this request; check the outcome before retrying")
             s.setdefault("booking_limits", {})[detail["product"]] = detail["allowed_bags"]
             s.pop("uncertain_booking", None)
-            s.pop("pending_booking", None)
             await self.save()
             self.note("booking_limit_changed", **detail)
-            return result("quantity_limit_changed", "Provider rejected this booking. Explain the updated allowed quantity and ask how many bags the farmer wants, then create a new preview and obtain confirmation", **detail)
+            return result("quantity_limit_changed", "Provider rejected this booking. Explain the updated allowed quantity and ask how many bags the farmer wants. Use their answer directly for the corrected booking; do not ask for confirmation again", **detail)
         return await self.finish_booking(data, shop)
 
     async def finish_booking(self, data, shop):

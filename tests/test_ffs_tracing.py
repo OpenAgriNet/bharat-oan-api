@@ -139,7 +139,7 @@ def test_unloaded_skill_is_traced_without_api_calls(setup, tracing):
     assert output(exporter.get_finished_spans()[-1])['reason'] == 'skill_not_loaded'
 
 
-def test_booking_logging_omits_confirmation_and_reference_codes(setup, tracing, caplog):
+def test_booking_summary_logging_omits_reference_codes(setup, tracing, caplog):
     client, exporter = tracing
     caplog.set_level(logging.INFO, logger='helpers.ffs_tracing')
     async def run():
@@ -148,11 +148,9 @@ def test_booking_logging_omits_confirmation_and_reference_codes(setup, tracing, 
         shops = await ffs_find_shops(context('4'))
         shop = shops['data']['shops'][0]['shop_ref']
         preview = await ffs_create_booking(context('5'), shop, quantities=[ffs.BookingQuantity(product='urea', bags=4)])
-        token = preview['data']['confirmation_token']
-        result = await ffs_create_booking(context('6'), shop, True, token)
+        result = await ffs_create_booking(context('6'), shop, True)
         assert result['status'] == 'ok'
-        return token
-    token = asyncio.run(run())
+    asyncio.run(run())
     client.flush()
     spans = exporter.get_finished_spans()
     booking = [s for s in spans if s.name == 'tool:ffs_create_booking']
@@ -160,7 +158,7 @@ def test_booking_logging_omits_confirmation_and_reference_codes(setup, tracing, 
     assert output(booking[-1])['booking_valid'] is True
     assert output(booking[-1])['bookings_count'] == 1
     serialized = json.dumps([dict(s.attributes) for s in spans]) + summary_logs(caplog)
-    assert token not in serialized and 'PRC-TEST-001' not in serialized
+    assert 'PRC-TEST-001' not in serialized
 
 
 def test_catalogue_span_keeps_summary_instead_of_returned_prompt(monkeypatch, tracing):
