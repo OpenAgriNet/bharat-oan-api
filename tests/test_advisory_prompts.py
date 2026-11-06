@@ -90,3 +90,11 @@ def test_global_prompt_lets_a_tool_question_stand_alone():
     prompt = (Path(__file__).resolve().parents[1] / "assets/prompts/chat/agrinet_en.md").read_text()
     assert "Exception — asking the farmer" in prompt
     assert "no source citation and no extra follow-up question" in prompt
+
+
+@pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
+def test_source_column_excludes_questions_to_the_farmer(path):
+    rows = [line for line in path.read_text(encoding="utf-8").splitlines() if line.startswith("|") and "`search_advisory`" in line]
+    source_cell = [c.strip() for c in rows[1].strip().strip("|").split("|")][2]
+    assert "Source: ICAR - Kisan Sarathi" in source_cell
+    assert "never on a question to the farmer" in source_cell
