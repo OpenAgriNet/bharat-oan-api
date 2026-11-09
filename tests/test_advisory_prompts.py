@@ -25,6 +25,8 @@ def test_prompt_has_a_search_advisory_row_in_the_tool_table(path):
     cells = [c.strip() for c in rows[0].strip().strip("|").split("|")]
     assert len(cells) == 4, f"{path.name}: tool row must have 4 columns"
     assert "ICAR" in cells[3], "row must explain ICAR first, then document search"
+    advisory_cells = [c.strip() for c in rows[1].strip().strip("|").split("|")]
+    assert advisory_cells[2] == "Source label from the tool response"
 
 
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
@@ -66,6 +68,7 @@ def test_prompt_has_the_search_first_advisory_flow(path):
     assert "pass it as `location` so the tool can note it" not in flow
     assert "call `search_advisory` again with the same `query`" in flow
     assert "**Source: ICAR - Kisan Sarathi**" in flow
+    assert "end it with the Source line from the tool's `Cite as` line" in flow
     assert "your first reply is only one short question asking which crop" in flow
     assert "`answer_now=true`" in flow and "`crop=\"Wheat\"`, `days_after_sowing=40`" in flow
     assert "never put season names in brackets" in flow

@@ -42,8 +42,10 @@ logger = get_logger(__name__)
 
 KNOWLEDGE_ADVISORY_CATEGORY = "knowledge-advisory"
 
-# Source shown to the farmer for every advisory answer.
+# Source shown to the farmer for advisories from Kisan Sarathi.
 ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
+# The provider's `origin` for an advisory PDF uploaded in docs-pipeline; those cite the PDF's name.
+PDF_ADVISORY_ORIGIN = "docs-pipeline"
 
 # Longest value forwarded for crop / season, and the accepted range for days after sowing.
 _MAX_PARAM_LENGTH = 100
@@ -267,6 +269,7 @@ def _advisory_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]
         "doc_id": (details.get("doc_id") or "").strip(),
         "chunk_id": (details.get("chunk_id") or item.get("id") or "").strip(),
         "source": (details.get("source") or "").strip(),
+        "origin": (details.get("origin") or "").strip().lower(),
         "text": text,
         "seasons": parse_chunk_seasons(text),
         # Where the advisory applies. Chunks from a provider without location read as "applies everywhere".
@@ -311,20 +314,28 @@ def parse_advisory_response(data: Dict[str, Any]) -> tuple[List[Dict[str, Any]],
 _TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
 
 
+def advisory_source(result: Dict[str, Any]) -> str:
+    """Source to cite for one advisory: the PDF's name for an uploaded PDF, else ADVISORY_SOURCE."""
+    if result.get("origin") == PDF_ADVISORY_ORIGIN and result.get("title"):
+        return result["title"]
+    return ADVISORY_SOURCE
+
+
 def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
     """Readable block per advisory for the agent.
 
     The provider appends "Source: institute, creator" to each text. That line names the
-    institute and a user name, so it is removed here; the answer cites ADVISORY_SOURCE instead.
+    institute and a user name, so it is removed here; the answer cites advisory_source instead.
     """
     blocks = []
     for r in results:
         text = _TRAILING_SOURCE.sub("", r["text"]).rstrip()
         blocks.append(f"**{r.get('title') or 'Advisory'}**\n```\n{text}\n```")
+    sources = list(dict.fromkeys(advisory_source(r) for r in results))
     return (
         "> Advisory Search Results for `" + query + "`\n\n"
         + "\n\n----\n\n".join(blocks)
-        + f"\n\n> Cite as (in bold): **Source: {ADVISORY_SOURCE}**"
+        + f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
     )
 
 

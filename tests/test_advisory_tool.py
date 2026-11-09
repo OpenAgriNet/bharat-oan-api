@@ -24,7 +24,7 @@ def _tag(code, value):
 
 
 def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.8321",
-          source="ICAR–DKMA, jak", section="full", crop="Sorghum", doc_id="row-1", location=None):
+          source="ICAR–DKMA, jak", section="full", crop="Sorghum", doc_id="row-1", location=None, origin=None):
     """`location` is an optional dict: match, national, states, districts (provider's per-chunk location tags)."""
     location = location or {}
     location_tags = [] if not location else [
@@ -33,6 +33,7 @@ def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.
         _tag("location-states", ", ".join(location.get("states", []))),
         _tag("location-districts", ", ".join(location.get("districts", []))),
     ]
+    origin_tags = [] if origin is None else [_tag("origin", origin)]
     return {
         "id": chunk_id,
         "descriptor": {"name": title, "code": section, "long_desc": text},
@@ -42,7 +43,7 @@ def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.
                 "list": [
                     _tag("title", title), _tag("crop", crop), _tag("section", section),
                     _tag("score", score), _tag("doc_id", doc_id), _tag("chunk_id", chunk_id),
-                    _tag("source", source), _tag("text", text), *location_tags,
+                    _tag("source", source), _tag("text", text), *location_tags, *origin_tags,
                 ],
             }
         ],
@@ -192,6 +193,12 @@ class TestParse:
         results, _ = sa.parse_advisory_response(_on_search([_item("c1", text="")]))
         assert results == []
 
+    def test_reads_where_each_chunk_came_from(self):
+        results, _ = sa.parse_advisory_response(
+            _on_search([_item("c1", origin="docs-pipeline"), _item("c2", origin="webhook"), _item("c3")])
+        )
+        assert [r["origin"] for r in results] == ["docs-pipeline", "webhook", ""]
+
 
 class TestFormat:
     def test_formats_title_and_text(self):
@@ -213,6 +220,32 @@ class TestSourceLine:
         )
         assert "jak" not in out and "DKMA" not in out
         assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
+
+    def test_cites_the_pdf_name_for_an_advisory_uploaded_as_a_pdf(self):
+        out = sa.format_advisory_results(
+            [{"title": "coffee_guide_2023_mini", "text": "Spray Bordeaux mixture.", "section": "full",
+              "origin": "docs-pipeline"}],
+            "q",
+        )
+        assert out.rstrip().endswith("**Source: coffee_guide_2023_mini**")
+        assert "Kisan Sarathi" not in out
+
+    def test_cites_kisan_sarathi_for_a_webhook_advisory(self):
+        out = sa.format_advisory_results(
+            [{"title": "T", "text": TEXT, "section": "full", "origin": "webhook"}], "q"
+        )
+        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
+
+    def test_cites_both_when_pdf_and_kisan_sarathi_advisories_are_returned(self):
+        out = sa.format_advisory_results(
+            [
+                {"title": "Wheat Insect Management", "text": TEXT, "section": "full", "origin": "webhook"},
+                {"title": "coffee_guide_2023_mini", "text": "Spray.", "section": "full", "origin": "docs-pipeline"},
+                {"title": "Package of Practices for Wheat", "text": TEXT, "section": "full", "origin": "webhook"},
+            ],
+            "q",
+        )
+        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi; coffee_guide_2023_mini**")
 
     def test_leaves_text_without_a_source_line_alone(self):
         out = sa.format_advisory_results([{"title": "T", "text": "Advisory: Harvest.", "section": "full"}], "q")
