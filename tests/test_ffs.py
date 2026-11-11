@@ -89,6 +89,8 @@ class Backend:
         self.booking_http_status = 200
         self.booking_timeout = False
         self.booking_data_override = None
+        self.expected_otp = "123456"
+        self.token_lifetime = 900
         self.land = [{"farmlandPlotRegistryId": 101 + i, "farmlandOwnershipId": 201 + i,
                       "ownershipMappingId": 301 + i, "landAreaHectares": 1.23 if i == 0 else 0.96,
                       "stateLgdCode": 27, "districtLgdCode": 496, "subDistrictLgdCode": 4245,
@@ -118,14 +120,12 @@ class Backend:
         if path.endswith("/loginByFarmerId"):
             data = None
         elif path.endswith("/validateLoginByFarmerId"):
-            if body["otp"] != "123456":
+            if body["otp"] != self.expected_otp:
                 return httpx.Response(400, json={"code": 400, "data": None})
-            claims = base64.urlsafe_b64encode(json.dumps({"exp": time.time() + 900}).encode()).decode().rstrip("=")
+            claims = base64.urlsafe_b64encode(json.dumps({"exp": time.time() + self.token_lifetime}).encode()).decode().rstrip("=")
             data = {"userToken": "test." + claims + ".signature", "userId": 42, "userAadhaarHash": "test-hash",
                     "userFullName": "Mock Farmer", "userFarmerId": "99999999999", "userStateLGDCode": 27,
                     "userMobileNumber": "9999999999"}
-        elif path.endswith("getConfigurationByState"):
-            data = [{"stateLgdCode": 27, "retailerListDisplayLevel": "D", "productSelectionMode": "GFR_ONLY"}]
         elif path.endswith("getCurrentSeasonAndYear"):
             data = {"season": {"seasonId": 2, "seasonName": "Rabi"}, "year": {"yearId": 1, "yearValue": "2026"}}
         elif path.endswith("/bharatVistar/applicantFetch"):
@@ -145,8 +145,8 @@ class Backend:
         elif path.endswith("getRecommendationsByGFRV4"):
             data = self.gfr
         elif path.endswith("getProductsByAvailability"):
-            data = [{"productId": 1089, "productGroupId": 11, "plantId": 99, "bagWeightKg": 45},
-                    {"productId": 1005, "productGroupId": 12, "plantId": 99, "bagWeightKg": 50}]
+            data = [{"productId": 1089, "productName": "Neem Coated Urea", "productGroupId": 11, "plantId": 99, "bagWeightKg": 45},
+                    {"productId": 1005, "productName": "DAP", "productGroupId": 12, "plantId": 99, "bagWeightKg": 50}]
         elif path.endswith("getRetailersByProductAvailabilityV4"):
             limit = {"V": 2, "T": 6, "D": 8, "S": 8}[body["territoryLevel"]]
             data = [{"retailerId": i, "retailerName": f"Shop {i}", "address1": "Mock address", "availableProducts": [
@@ -188,6 +188,13 @@ class Backend:
 def setup(monkeypatch):
     from pydantic_ai import models
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
+    from agents.ffs_crop_resolver import CropMatch
+    async def mocked_crop_resolver(names, crops, **kwargs):
+        # Scripted specialist output for workflow tests, not language interpretation coverage.
+        expected = {"maize": "0101000", "makkaa": "0101000", "wheat": "0101900"}
+        return [CropMatch(index=i, status="matched", crop_code=expected[name]) if name in expected
+                else CropMatch(index=i, status="not_found") for i, name in enumerate(names)]
+    monkeypatch.setattr(ffs, "resolve_crops", mocked_crop_resolver)
     memory, backend = MemoryCache(), Backend()
     monkeypatch.setattr(ffs, "cache", memory)
     monkeypatch.setattr(ffs.settings, "ffs_base_url", "http://ffs.test")
@@ -201,16 +208,16 @@ def setup(monkeypatch):
     return SimpleNamespace(memory=memory, backend=backend, client_class=original_client)
 
 
-def context(turn="turn-1", session="session-1", otp=None, query="book fertilizer", owner=None, selective=False):
+def context(turn="turn-1", session="session-1", query="book fertilizer", selective=False):
     return SimpleNamespace(deps=FarmerContext(query=query, session_id=session, question_id=turn,
-        ffs_owner=owner if owner is not None else ffs.owner_id(USER), ffs_otp=SecretStr(otp) if otp else None,
         skills=SkillState(enabled_skills=["ffs.booking"], preloaded_skills=[] if selective else ["ffs.booking"])))
 
 
 async def login(session="session-1"):
-    assert (await ffs_send_otp(context(session=session), "99999999999", "Maharashtra"))["status"] == "otp_sent"
-    out = await ffs_verify_otp(context("turn-2", session, "123456"))
+    assert (await ffs_send_otp(context(session=session), "99999999999", "27"))["status"] == "otp_sent"
+    out = await ffs_verify_otp(context("turn-2", session), otp="123456")
     assert out["status"] == "ok"
+    assert "config" not in await ffs.get_session(session)
     return out
 
 
@@ -246,9 +253,8 @@ def test_whole_flow_and_repeats_do_not_repeat_writes(setup):
         assert setup.backend.count("/land/crop/add") == 2
         assert await ffs_get_entitlement(context("turn-4"), village, crops) == out
         assert setup.backend.count("/land/crop/add") == 2
-        shops = await ffs_find_shops(context("turn-5"))
+        shops = await ffs_find_shops(context("turn-5"), order=[ffs.OrderItem(product="urea", product_id=1089, bags=1)])
         assert shops["status"] == "ok" and len(shops["data"]["shops"]) == 3
-        assert shops["data"]["booking_enabled"] is True
         assert await ffs_find_shops(context("turn-5")) == shops
         more = await ffs_find_shops(context("turn-6"), "more")
         assert not ({x["shop_ref"] for x in shops["data"]["shops"]} & {x["shop_ref"] for x in more["data"]["shops"]})
@@ -257,25 +263,6 @@ def test_whole_flow_and_repeats_do_not_repeat_writes(setup):
         for secret in ("userToken", "test-hash", "9999999999"):
             assert secret not in encoded
     asyncio.run(run())
-
-
-@pytest.mark.parametrize("name", ["maize", "MAIZE", "makka", "makki", "मक्का", "मका", "મકાઈ", "ਮੱਕੀ", "মকাই", "மக்காச்சோளம்", "మొక్కజొన్న", "ചോളം", "ମକା"])
-def test_maize_aliases(setup, name):
-    assert ffs.resolve_crop(name, setup.backend.crops) == ffs.MAIZE
-
-
-@pytest.mark.parametrize("name", ["maiz", "maizee", "makkaa", "makkai"])
-def test_maize_near_matches(setup, name):
-    assert ffs.resolve_crop(name, setup.backend.crops) == ffs.MAIZE
-
-
-def test_clear_other_crop_and_unrelated_input(setup):
-    assert ffs.resolve_crop("wheat", setup.backend.crops) == "0101900"
-    assert ffs.resolve_crop("गहू", setup.backend.crops) == "0101900"
-    assert ffs.resolve_crop("banana spaceship", setup.backend.crops) is None
-    assert ffs.resolve_crop("", setup.backend.crops) is None
-    duplicates = [{"cropCode": "1000200", "cropName": "गवार"}, {"cropCode": "0701300", "cropName": "गवार"}]
-    assert ffs.resolve_crop("गवार", duplicates) is None
 
 
 def test_validate_all_plots_before_first_crop_write(setup):
@@ -307,7 +294,7 @@ def test_setup_resume_keeps_token_and_does_not_reverify_otp(setup):
     async def run():
         setup.backend.fail_path = "/bharatVistar/applicantFetch"
         await ffs_send_otp(context(), "99999999999", "27")
-        out = await ffs_verify_otp(context("turn-2", otp="123456"))
+        out = await ffs_verify_otp(context("turn-2"), otp="123456")
         assert out["status"] == "setup_incomplete"
         out = await ffs_verify_otp(context("turn-3"))
         assert out["status"] == "ok"
@@ -324,26 +311,23 @@ def test_otp_send_uncertainty_and_concurrency_deduplicate(setup):
         repeats = await asyncio.gather(*(ffs_send_otp(context("new"), "99999999999", "27") for _ in range(3)))
         assert all(x["status"] == "already_started" for x in repeats)
         assert setup.backend.count("loginByFarmerId") == 1
-        assert (await ffs_send_otp(context("resend", query="hello"), "99999999999", "27", True))["status"] == "needs_clarification"
-        assert (await ffs_send_otp(context("resend", query="resend the OTP"), "99999999999", "27", True))["status"] == "otp_sent"
+        assert (await ffs_send_otp(context("resend", query="send another code"), "99999999999", "27", True))["status"] == "otp_sent"
+        assert (await ffs_send_otp(context("resend", query="send another code"), "99999999999", "27", True))["status"] == "already_started"
+        assert setup.backend.count("loginByFarmerId") == 2
     asyncio.run(run())
 
 
-def test_native_digits_masked_before_model_and_wrong_owner_cannot_load_history(setup):
+def test_session_context_has_no_private_otp_or_owner_binding(setup):
     async def run():
-        await ffs_send_otp(context(), "९९९९९९९९९९९", "महाराष्ट्र")
-        safe, otp, owner, state = await ffs.prepare_chat_turn("My OTP is १२३४५६", "session-1", USER)
-        assert safe == "My OTP is [FFS OTP supplied]"
-        assert otp.get_secret_value() == "123456" and state["otp_supplied"]
-        deps = context(otp=otp.get_secret_value()).deps
-        assert "123456" not in repr(deps) + deps.model_dump_json()
-        assert "123456" not in json.dumps({"otp": otp}, default=str)
-        with pytest.raises(HTTPException) as error:
-            await ffs.prepare_chat_turn("show plots", "session-1", {"sub": "other"})
-        assert error.value.status_code == 403
+        assert (await ffs_send_otp(context(), "९९९९९९९९९९९", "२७"))["status"] == "otp_sent"
+        state = await ffs.prepare_chat_turn("session-1")
+        assert state == {"stage": "otp_pending", "authenticated": False,
+                         "village_scope": {"mode": "single_village"}}
+        assert all(namespace == ffs.NAMESPACE for namespace, _ in setup.memory.values)
+        assert "owner" not in await ffs.get_session("session-1")
+        assert await ffs.prepare_chat_turn("another-session") == {}
         setup.memory.values.pop((ffs.NAMESPACE, ffs.session_key("session-1")))
-        with pytest.raises(HTTPException):
-            await ffs.prepare_chat_turn("show old history", "session-1", {"sub": "other"})
+        assert await ffs.prepare_chat_turn("session-1") == {}
     asyncio.run(run())
 
 
@@ -351,12 +335,13 @@ def test_wrong_otp_limit_and_expired_token(setup):
     async def run():
         await ffs_send_otp(context(), "99999999999", "27")
         for i in range(3):
-            out = await ffs_verify_otp(context(str(i), otp="000000"))
+            out = await ffs_verify_otp(context(str(i)), otp="000000")
             assert out["status"] == "invalid_otp"
-        assert (await ffs_verify_otp(context("fourth", otp="123456")))["status"] == "needs_otp"
-        assert setup.backend.count("validateLoginByFarmerId") == 3
+        assert "offer a resend" in out["next_action"]
+        assert (await ffs_verify_otp(context("fourth"), otp="123456"))["status"] == "ok"
+        assert setup.backend.count("validateLoginByFarmerId") == 4
         await ffs_send_otp(context("new", query="resend OTP"), "99999999999", "27", True)
-        await ffs_verify_otp(context("verify-new", otp="123456"))
+        await ffs_verify_otp(context("verify-new"), otp="123456")
         state = setup.memory.values[(ffs.NAMESPACE, ffs.session_key("session-1"))]
         state["token_expires"] = time.time() - 1
         assert (await ffs_find_shops(context("expired")))["status"] == "needs_otp"
@@ -364,7 +349,7 @@ def test_wrong_otp_limit_and_expired_token(setup):
     asyncio.run(run())
 
 
-def test_chat_ingress_masks_otp_and_checks_owner_before_history(setup, monkeypatch, caplog):
+def test_chat_ingress_keeps_spoken_otp_and_allows_refreshed_token(setup, monkeypatch):
     """Load the actual router with offline auth/model construction, without external services."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
@@ -402,30 +387,34 @@ def test_chat_ingress_masks_otp_and_checks_owner_before_history(setup, monkeypat
     app = FastAPI()
     app.include_router(module.router, prefix="/api")
     with TestClient(app) as client:
-        response = client.get("/api/chat/", params={"query": "१२३४५६", "session_id": "session-1", "qid": "otp-turn"})
+        query = "double zero one two three four"
+        response = client.get("/api/chat/", params={"query": query, "session_id": "session-1", "qid": "otp-turn"})
         assert response.status_code == 200
-        assert forwarded[0]["query"] == "[FFS OTP supplied]"
-        assert forwarded[0]["ffs_otp"].get_secret_value() == "123456"
-        assert "123456" not in caplog.text and "१२३४५६" not in caplog.text
+        assert forwarded[0]["query"] == query
+        assert "ffs_otp" not in forwarded[0] and "ffs_owner" not in forwarded[0]
+        assert forwarded[0]["ffs_context"]["stage"] == "otp_pending"
         image = client.post("/api/chat/analyze-image", data={"query": "१२३४५६", "session_id": "session-1"},
                             files={"image": ("test.png", b"image", "image/png")})
         assert image.status_code == 200
         assert image.headers["X-QID"] == forwarded[1]["qid"]
-        assert forwarded[1]["query"] == "[FFS OTP supplied]"
+        assert forwarded[1]["query"] == "१२३४५६"
+        user["auth_token_id"] = "refreshed-bearer-digest"
+        assert client.get("/api/chat/", params={"query": query, "session_id": "session-1"}).status_code == 200
+        # Explicitly document session-ID-only access, not a claim of caller isolation.
         user["sub"] = "different-caller"
-        assert client.get("/api/chat/", params={"query": "show plots", "session_id": "session-1"}).status_code == 403
+        assert client.get("/api/chat/", params={"query": "show plots", "session_id": "session-1"}).status_code == 200
         monkeypatch.setattr(ffs.settings, "ffs_base_url", "")
-        assert client.get("/api/chat/", params={"query": "show plots", "session_id": "session-1"}).status_code == 403
-        assert history_reads == ["session-1"]
+        assert client.get("/api/chat/", params={"query": "show plots", "session_id": "session-1"}).status_code == 200
+        assert forwarded[-1]["ffs_context"] == {}
+        assert history_reads == ["session-1"] * 4
 
 
-def test_zero_offered_bags_and_gfr_fallback(setup):
+def test_zero_offered_bags_are_preserved(setup):
     async def run():
         village, crops = selection(await login())
         setup.backend.gfr[0]["recommendations"][0]["offeredBags"] = 0
-        del setup.backend.gfr[0]["recommendations"][1]["offeredBags"]
         out = await ffs_get_entitlement(context("turn-3"), village, crops)
-        assert [p["bags"] for p in out["data"]["products"]] == [0, 3]
+        assert [p["bags"] for p in out["data"]["products"]] == [0, 2]
     asyncio.run(run())
 
 
@@ -434,14 +423,14 @@ def test_shop_territory_priority_partial_stock_and_widening_cursor(setup):
         village, crops = selection(await login())
         await ffs_get_entitlement(context("3"), village, crops)
         setup.backend.stock = {0: (20, 1), 1: (5, 30), 2: (30, 0), 3: (3, 6), 4: (10, 10), 5: (9, 9)}
-        initial = await ffs_find_shops(context("4"))
+        initial = await ffs_find_shops(context("4"), order=[ffs.OrderItem(product="urea", product_id=1089, bags=6), ffs.OrderItem(product="DAP", product_id=1005, bags=2)])
         shops = initial["data"]["shops"]
-        assert [p["name"] for p in shops] == ["Shop 0", "Shop 1", "Shop 4"]
-        assert shops[0]["coverage"] == shops[1]["coverage"] == ["urea", "DAP"]
-        assert not shops[0]["complete_supply"] and not shops[1]["complete_supply"]
+        assert [p["name"] for p in shops] == ["Shop 1", "Shop 0", "Shop 4"]
+        assert {p["product_id"] for p in shops[0]["coverage"]} == {1089, 1005}
+        assert shops[0]["supply"] == shops[1]["supply"] == "partial"
         widened = await ffs_find_shops(context("5"), "widen")
         assert {p["name"] for p in widened["data"]["shops"]} == {"Shop 6", "Shop 7"}
-        assert all(p["complete_supply"] and p["territory"] == "D" for p in widened["data"]["shops"])
+        assert all(p["supply"] == "full" and p["territory"] == "D" for p in widened["data"]["shops"])
         assert (await ffs_find_shops(context("6"), "more"))["data"]["shops"] == []
     asyncio.run(run())
 
@@ -450,10 +439,10 @@ def test_create_booking_requires_confirmation_and_submits_once(setup):
     async def run():
         village, crops = selection(await login())
         await ffs_get_entitlement(context("turn-3"), village, crops)
-        shops = await ffs_find_shops(context("turn-4"))
+        shops = await ffs_find_shops(context("turn-4"), order=[ffs.OrderItem(product="urea", product_id=1089, bags=4)])
         shop_ref = shops["data"]["shops"][0]["shop_ref"]
 
-        preview = await ffs_create_booking(context("turn-5"), shop_ref, quantities=[ffs.BookingQuantity(product="urea", bags=4)])
+        preview = await ffs_create_booking(context("turn-5"), shop_ref)
         assert preview["status"] == "needs_confirmation"
         assert 'confirmation_token' not in preview['data']
         assert setup.backend.count("createMultipleBookingV2") == 0
@@ -473,7 +462,7 @@ def test_zero_entitlement_and_alternative_tabs_fail_without_inventing_bags(setup
             row["offeredBags"] = 0
         out = await ffs_get_entitlement(context("3"), village, crops)
         assert out["status"] == "zero_entitlement"
-        assert (await ffs_find_shops(context("4")))["status"] == "zero_entitlement"
+        assert (await ffs_find_shops(context("4"), order=[ffs.OrderItem(product="urea", product_id=1089, bags=1)]))["status"] == "needs_order"
         assert setup.backend.count("getRetailersByProductAvailabilityV4") == 0
         setup.backend.gfr.append(deepcopy(setup.backend.gfr[0]))
         crops[0].crop_name = "wheat"
@@ -481,20 +470,14 @@ def test_zero_entitlement_and_alternative_tabs_fail_without_inventing_bags(setup
     asyncio.run(run())
 
 
-def test_invalid_key_missing_identity_and_unloaded_skill_make_no_request(setup, monkeypatch):
+def test_invalid_key_missing_session_and_unloaded_skill_make_no_request(setup, monkeypatch):
     async def run():
         monkeypatch.setattr(ffs.settings, "ffs_esa_key", SecretStr("bad-key"))
         assert (await ffs_send_otp(context(), "99999999999", "27"))["status"] == "unavailable"
-        assert (await ffs_send_otp(context(owner=""), "99999999999", "27"))["status"] == "unavailable"
+        assert (await ffs_send_otp(context(session=""), "99999999999", "27"))["status"] == "unavailable"
         assert (await ffs_send_otp(context(selective=True), "99999999999", "27"))["status"] == "unavailable"
         assert setup.backend.calls == []
     asyncio.run(run())
-
-
-def test_owner_is_bound_to_bearer_not_public_subject():
-    same_subject_other_token = {**USER, "auth_token_id": "another-verified-token"}
-    assert ffs.owner_id(USER) != ffs.owner_id(same_subject_other_token)
-    assert ffs.owner_id({"sub": USER["sub"]}) == ""
 
 
 def agent_flow(setup, check_transport=True):
@@ -508,11 +491,11 @@ def agent_flow(setup, check_transport=True):
             assert {t.name for t in info.function_tools} == {"load_skill"}
             return ModelResponse(parts=[ToolCallPart("load_skill", {"skill": "ffs.booking"})])
         calls = {
-            2: ("ffs_send_otp", {"farmer_id": "99999999999", "state": "Maharashtra"}),
-            4: ("ffs_verify_otp", {}),
+            2: ("ffs_send_otp", {"farmer_id": "99999999999", "state_lgd_code": "27"}),
+            4: ("ffs_verify_otp", {"otp": "123456"}),
             6: ("ffs_get_entitlement", {"village_ref": "village-1", "crop_selections": [
                 {"land_ref": "land-1", "crop_name": "makkaa"}, {"land_ref": "land-2", "crop_name": "maize"}]}),
-            8: ("ffs_find_shops", {}),
+            8: ("ffs_find_shops", {"order": [{"product": "urea", "product_id": 1089, "bags": 1}]}),
         }
         assert {t.name for t in info.function_tools} == {"ffs_send_otp", "ffs_verify_otp", "ffs_get_entitlement", "ffs_find_shops", "ffs_create_booking"}
         if steps in calls:
@@ -526,16 +509,16 @@ def agent_flow(setup, check_transport=True):
     def prompt(ctx):
         ctx.deps.skills.restore(ctx.messages)
         return render_prompt(ctx.deps.skills, "en", {})
-    for turn, (query, otp) in enumerate([("book fertilizer", None), ("[FFS OTP supplied]", "123456"),
-                                       ("maize on both plots", None), ("yes, find shops", None)], 1):
-        deps = context(str(turn), session=session, otp=otp, query=query, selective=True).deps
+    for turn, query in enumerate(["book fertilizer", "123456",
+                                  "maize on both plots", "I want one bag of urea, find shops"], 1):
+        deps = context(str(turn), session=session, query=query, selective=True).deps
         response = agent.run_sync(query, deps=deps, message_history=history)
         history = response.all_messages()
     if check_transport:
         assert setup.backend.count("loginByFarmerId") == 1
         assert setup.backend.count("/land/crop/add") == 2
         assert setup.backend.count("getRetailersByProductAvailabilityV4") >= 2
-    assert re.search(r"(?<!\d)123456(?!\d)", str(history)) is None
+    assert "123456" in str(history)  # OTP is now a model-visible tool argument.
     return session
 
 
@@ -568,14 +551,12 @@ def test_running_mock_http_flow(setup, monkeypatch):
         out = await ffs_get_entitlement(context("3", session), village, crops)
         assert out["status"] == "ok", out
         assert [p["bags"] for p in out["data"]["products"]] == [6, 2]
-        shops = await ffs_find_shops(context("4", session))
+        shops = await ffs_find_shops(context("4", session), order=[ffs.OrderItem(product="urea", product_id=1089, bags=1)])
         assert shops["status"] == "ok" and len(shops["data"]["shops"]) == 3
-        assert shops["data"]["booking_enabled"] is True
         saved = await ffs.get_session(session)
         assert saved["token"] and len(saved["selection"]) == 2
         assert (await ffs_find_shops(context("4", session))) == shops
-        with pytest.raises(HTTPException):
-            await ffs.prepare_chat_turn("old plots", session, {"sub": "another-caller"})
+        assert (await ffs.prepare_chat_turn(session))["authenticated"] is True
         if real_cache:
             assert 0 < await real_cache.client.ttl(real_cache._build_key(ffs.session_key(session), namespace=ffs.NAMESPACE)) <= 1200
             await real_cache.close()

@@ -2,6 +2,7 @@ from typing import List
 from app.core.cache import cache  # Import cache instance from core
 from helpers.utils import get_logger
 from copy import deepcopy
+from helpers.ffs_model_view import compact_ffs_result
 from pydantic_ai.messages import (
     ModelMessagesTypeAdapter,
     ModelMessage,
@@ -48,7 +49,7 @@ async def _get_message_history(session_id: str) -> List[ModelMessage]:
     """Get or initialize message history."""
     message_history = await get_cache(f"{session_id}_{HISTORY_SUFFIX}")
     if message_history:
-        return ModelMessagesTypeAdapter.validate_python(message_history)
+        return clean_chat_history(ModelMessagesTypeAdapter.validate_python(message_history))
     return []
 
 async def _get_moderation_history(session_id: str) -> List[ModelMessage]:
@@ -60,7 +61,56 @@ async def _get_moderation_history(session_id: str) -> List[ModelMessage]:
 
 async def update_message_history(session_id: str, all_messages: List[ModelMessage]):
     """Update message history."""
-    await set_cache(f"{session_id}_{HISTORY_SUFFIX}", to_jsonable_python(all_messages), ttl=DEFAULT_CACHE_TTL)
+    await set_cache(f"{session_id}_{HISTORY_SUFFIX}", to_jsonable_python(clean_chat_history(all_messages)), ttl=DEFAULT_CACHE_TTL)
+
+
+def _strip_saved_chat_context(text: str) -> str:
+    """Remove our legacy conversation wrapper and generated one-line FFS snapshot."""
+    if text.startswith("**Conversation**\n\n"):
+        _, separator, current = text.partition("\n\n---\n\n")
+        if separator:
+            text = current
+    # The snapshot is appended after our language metadata, not inside user text.
+    before, language, after = text.rpartition("\n**Selected Language:** ")
+    if language:
+        after = "".join(line for line in after.splitlines(keepends=True)
+                        if not line.startswith("**FFS workflow:** "))
+        text = before + language + after
+    return text
+
+
+def clean_chat_history(messages: List[ModelMessage]) -> List[ModelMessage]:
+    """Keep conversation/tool evidence, without saved copies of injected context.
+
+    Apply on load for existing sessions and on save for new turns. Only user-prompt
+    strings change; tool parts, images and assistant output remain intact.
+    """
+    cleaned = []
+    for message in messages:
+        copy = message
+        for index, part in enumerate(message.parts):
+            if getattr(part, "part_kind", "") == "tool-return" and getattr(part, "tool_name", "") in {"ffs_find_shops", "ffs_create_booking"}:
+                compact = compact_ffs_result(part.content)
+                if compact != part.content:
+                    if copy is message:
+                        copy = deepcopy(message)
+                    copy.parts[index].content = compact
+                continue
+            if getattr(part, "part_kind", "") != "user-prompt":
+                continue
+            content = part.content
+            if isinstance(content, str):
+                stripped = _strip_saved_chat_context(content)
+            elif isinstance(content, list):
+                stripped = [_strip_saved_chat_context(item) if isinstance(item, str) else item for item in content]
+            else:
+                continue
+            if stripped != content:
+                if copy is message:
+                    copy = deepcopy(message)
+                copy.parts[index].content = stripped
+        cleaned.append(copy)
+    return cleaned
 
 async def update_moderation_history(session_id: str, moderation_messages: List[ModelMessage]):
     """Update moderation history."""
