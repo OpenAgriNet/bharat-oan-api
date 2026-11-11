@@ -746,11 +746,13 @@ async def search_advisory(
         )
     if not farmer_named_crop(ctx, crop_hint, _clean_param(crop_words)):
         logger.info("search_advisory: crop %r is not in the farmer's words for this question", crop_hint)
+        said = (answer_chain(ctx) or [("", False)])[-1][0].strip()
         raise ModelRetry(
-            "The farmer has not named a crop in this question; do not take it from earlier in the chat. "
-            "If they did name it in their message, call search_advisory again with `crop_words` set to their "
-            "exact words for the crop. Otherwise do not search: ask which crop in one short question, with no "
-            "advice and no Source line, and search when they answer."
+            f"The crop `{crop_hint}` is not in the farmer's words for this question. Their message is: \"{said}\". "
+            "Read it again. If it names a crop (in any language), call search_advisory again with that crop as "
+            "`crop` and the farmer's exact words for it as `crop_words`; do not ask which crop. Only if it names "
+            "no crop at all, do not search: ask which crop in one short question, with no advice and no Source "
+            "line, and search when they answer."
         )
     # The farmer answered the crop question with only the crop: search the crop's general advisory.
     if _same_words(query, crop_hint):

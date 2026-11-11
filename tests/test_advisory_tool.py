@@ -959,9 +959,16 @@ class TestCropGuard:
     def test_a_crop_taken_from_an_earlier_question_is_refused(self, bap):
         bap.response = _respond([_item("c1")], **NO_DAYS)
         history = self._earlier_answer() + [_user("how to manage mealybugs")]
-        with pytest.raises(ModelRetry, match="not named a crop"):
+        with pytest.raises(ModelRetry, match="not in the farmer's words"):
             asyncio.run(sa.search_advisory(_ctx(history), "mealybug management", crop="Wheat"))
         assert bap.requests == []
+
+    def test_the_refusal_quotes_the_farmers_message_so_the_model_can_retry_with_the_right_crop(self, bap):
+        history = self._earlier_answer() + [_user("How do I monitor aphids in my sorghum crop?")]
+        with pytest.raises(ModelRetry) as err:
+            asyncio.run(sa.search_advisory(_ctx(history), "aphids", crop="Coffee"))
+        text = str(err.value)
+        assert "How do I monitor aphids in my sorghum crop?" in text and "do not ask which crop" in text
 
     def test_the_crop_in_the_farmers_message_is_accepted(self, bap):
         bap.response = _respond([_item("c1", crop="Wheat")], **NO_DAYS)
@@ -991,6 +998,26 @@ class TestCropGuard:
         history = [_user("aphids"), ModelResponse(parts=[TextPart(content="Which crop?")]), _user("Sorghum")]
         asyncio.run(sa.search_advisory(_ctx(history), "Sorghum", crop="Sorghum"))
         assert "Sorghum crop advisory" in bap.requests[0].read().decode()
+
+    def test_the_standard_name_of_a_crop_the_farmer_called_by_another_name_is_accepted(self, bap):
+        # "paddy" in the first question, then only "Kharif, 145 days"; the model passes the standard name Rice
+        bap.response = _respond([_chunk("c1", "Kharif", crop="Rice")], **NO_DAYS)
+        history = (
+            [_user("At what stage should I harvest my paddy crop?")]
+            + _asked(f"{sa.PENDING_MARKER} q")
+            + [_user("Kharif, 145 days")]
+        )
+        out = asyncio.run(
+            sa.search_advisory(_ctx(history), "paddy harvest stage", crop="Rice", season="Kharif", days_after_sowing=145)
+        )
+        assert "Search notes" in out
+
+    def test_a_synonym_does_not_let_another_crop_through(self, bap):
+        history = [_user("At what stage should I harvest my paddy crop?")] + _asked("answer") + [_user("how to control aphids")]
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx(history), "aphids", crop="Rice"))
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx([_user("paddy harvest")]), "harvest", crop="Wheat"))
 
     def test_arabica_counts_as_naming_coffee(self, bap):
         bap.response = _respond(

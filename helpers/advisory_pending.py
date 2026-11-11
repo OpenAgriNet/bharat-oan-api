@@ -281,6 +281,30 @@ _COFFEE_WORDS = re.compile(
 )
 
 
+# Other names a farmer uses for the same crop; the model often passes the standard English name (paddy -> Rice).
+_CROP_SYNONYMS = [
+    {"rice", "paddy", "dhan", "dhaan", "धान", "ધાન", "நெல்", "వరి", "ধান", "ଧାନ", "ಭತ್ತ", "നെല്ല്"},
+    {"wheat", "gehun", "gehu", "गेहूं", "गेहू", "ઘઉં", "গম", "ଗହମ", "ಗೋಧಿ", "கோதுமை", "గోధుమ", "ਕਣਕ"},
+    {"sorghum", "jowar", "ज्वार", "jwari", "jawar"},
+    {"maize", "corn", "makka", "makai", "मक्का", "मकई"},
+    {"kodo millet", "kodo"},
+    {"pearl millet", "bajra", "बाजरा"},
+    {"chickpea", "gram", "chana", "चना"},
+    {"pigeon pea", "pigeonpea", "tur", "toor", "arhar", "अरहर", "तूर"},
+    {"sugarcane", "ganna", "गन्ना"},
+    {"cotton", "kapas", "कपास"},
+    {"soybean", "soyabean", "soya", "सोयाबीन"},
+    {"groundnut", "peanut", "mungfali", "मूंगफली"},
+]
+
+
+def _in_text(word: str, text: str) -> bool:
+    """`word` in `text`: whole word for Latin words (so "tur" is not found in "nature"), plain match otherwise."""
+    if word.isascii():
+        return re.search(rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9])", text) is not None
+    return word in text
+
+
 def _chain_text(ctx) -> str:
     return " ".join(" ".join(text.lower().split()) for text, _ in answer_chain(ctx))
 
@@ -299,4 +323,7 @@ def farmer_named_crop(ctx, crop: str, crop_words: str = "") -> bool:
         wanted = " ".join(str(candidate or "").lower().split())
         if wanted and wanted in text:
             return True
+        for group in _CROP_SYNONYMS:
+            if wanted in group and any(_in_text(name, text) for name in group):
+                return True
     return False
