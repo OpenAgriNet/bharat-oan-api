@@ -31,6 +31,7 @@ from helpers.advisory_pending import (
     answer_chain,
     farmer_gave_days,
     farmer_gave_season,
+    farmer_named_crop,
     farmer_wrote,
     may_answer_now,
 )
@@ -316,6 +317,10 @@ def parse_advisory_response(data: Dict[str, Any]) -> tuple[List[Dict[str, Any]],
         if not fallback_ctx:
             fallback_ctx = ctx
     return [], fallback_ctx
+
+
+def _same_words(a: str, b: str) -> bool:
+    return " ".join(re.findall(r"\w+", a.lower())) == " ".join(re.findall(r"\w+", b.lower()))
 
 
 _TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
@@ -682,6 +687,7 @@ async def search_advisory(
     answer_now: bool = False,
     state: Optional[str] = None,
     district: Optional[str] = None,
+    crop_words: Optional[str] = None,
 ) -> str:
     """
     Search crop advisories for a farming problem: pests, diseases, symptoms, crop practices
@@ -708,6 +714,9 @@ async def search_advisory(
             (or do not want to say): the tool then answers without asking again.
         state: The farmer's state in English (for example "Uttar Pradesh"), only if the farmer said it.
         district: The farmer's district in English (for example "Agra"), only if the farmer said it.
+        crop_words: The farmer's own words naming the crop, exactly as written in their message for this
+            question (any language), for example "गेहूं". The crop must come from the farmer's current
+            question, never from an earlier question in the chat.
 
     Returns:
         Advisory text with a "Search notes" line; or an instruction to ask the farmer one question; or an
@@ -735,6 +744,17 @@ async def search_advisory(
             "The crop is required. If the farmer named a crop, call search_advisory again with `crop`. "
             "If they did not, ask them which crop in one short question, wait for the answer, then search."
         )
+    if not farmer_named_crop(ctx, crop_hint, _clean_param(crop_words)):
+        logger.info("search_advisory: crop %r is not in the farmer's words for this question", crop_hint)
+        raise ModelRetry(
+            "The farmer has not named a crop in this question; do not take it from earlier in the chat. "
+            "If they did name it in their message, call search_advisory again with `crop_words` set to their "
+            "exact words for the crop. Otherwise do not search: ask which crop in one short question, with no "
+            "advice and no Source line, and search when they answer."
+        )
+    # The farmer answered the crop question with only the crop: search the crop's general advisory.
+    if _same_words(query, crop_hint):
+        query = f"{crop_hint} crop advisory"
     limit = _clean_top_k(top_k) or 5
 
     results, search_ctx, status, message = await _run_search(

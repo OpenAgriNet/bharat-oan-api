@@ -268,3 +268,35 @@ def may_answer_now(ctx) -> bool:
     if not _has_history(ctx):
         return True
     return asked_in_previous_turn(ctx) or _tool_history_missing(ctx)
+
+
+# --- Crop check ---------------------------------------------------------------------------------
+# A model that sees earlier turns of the chat sometimes reuses their crop for a new question. The crop has to be
+# in the farmer's own words for this question (the current message, plus the answers that belong to it).
+
+# Coffee in English and in the supported scripts; arabica and robusta are coffee varieties, so they name the crop too.
+_COFFEE_WORDS = re.compile(
+    r"coffee|coffe\b|kaffee|arabica|robusta|कॉफी|कॉफ़ी|कोफी|কফি|કોફી|ಕಾಫಿ|കാപ്പി|କଫି|ਕੌਫੀ|காபி|కాఫీ",
+    re.IGNORECASE,
+)
+
+
+def _chain_text(ctx) -> str:
+    return " ".join(" ".join(text.lower().split()) for text, _ in answer_chain(ctx))
+
+
+def farmer_named_crop(ctx, crop: str, crop_words: str = "") -> bool:
+    """True when the crop is in the farmer's own words for this question.
+
+    `crop` is the English name the model passed; `crop_words` are the farmer's exact words for it (any script).
+    Either one found in the farmer's messages is enough. Coffee also counts when only arabica or robusta is named."""
+    if not _has_history(ctx):
+        return True
+    text = _chain_text(ctx)
+    if _COFFEE_WORDS.search(str(crop or "")) and _COFFEE_WORDS.search(text):
+        return True
+    for candidate in (crop, crop_words):
+        wanted = " ".join(str(candidate or "").lower().split())
+        if wanted and wanted in text:
+            return True
+    return False

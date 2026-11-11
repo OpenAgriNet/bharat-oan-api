@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from pydantic_ai import ModelRetry
 
 from agents.tools import advisory as sa
 
@@ -392,6 +393,7 @@ class TestSearchFirst:
         params = inspect.signature(sa.search_advisory).parameters
         assert list(params)[1:] == [
             "query", "crop", "days_after_sowing", "season", "location", "top_k", "answer_now", "state", "district",
+            "crop_words",
         ]
         assert "advice_type" not in params
 
@@ -806,12 +808,12 @@ class TestPlaceComesFromTheFarmersWords:
     def test_a_place_carried_over_by_the_model_does_not_replace_the_farmers_answer(self, bap):
         bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
         history = (
-            [_user("maize nursery bed, Rabi")]
+            [_user("wheat nursery bed, Rabi")]
             + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q")
             + [_user("Bareilly, Uttar Pradesh")]
         )
         out = asyncio.run(
-            sa.search_advisory(_ctx(history), "maize nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
+            sa.search_advisory(_ctx(history), "wheat nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
         )
         assert _params(_sent(bap, 0))["district_lgd_code"] == "130"
         assert "Tamil Nadu" not in out
@@ -819,12 +821,12 @@ class TestPlaceComesFromTheFarmersWords:
     def test_an_answer_the_lookup_does_not_know_is_named_not_replaced_by_an_earlier_place(self, bap):
         bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
         history = (
-            [_user("maize nursery bed, Rabi")]
+            [_user("wheat nursery bed, Rabi")]
             + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q")
             + [_user("dharwad")]
         )
         out = asyncio.run(
-            sa.search_advisory(_ctx(history), "maize nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
+            sa.search_advisory(_ctx(history), "wheat nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
         )
         assert "state_lgd_code" not in bap.requests[0].read().decode()
         assert "I could not match dharwad to a state or district. This is the general advice found for your crop." in out
@@ -928,7 +930,7 @@ class TestCoffeePdfAnswersGenerically:
 
     def test_a_season_the_farmer_gave_does_not_trigger_a_requery_or_suggestion(self, bap):
         bap.response = _respond([self._pdf("p1", "Rabi")], has_day_range="true")
-        out = asyncio.run(sa.search_advisory(_ctx([_user("it is kharif season")]), "leaf rust", crop="Coffee", season="Kharif"))
+        out = asyncio.run(sa.search_advisory(_ctx([_user("coffee leaf rust, it is kharif season")]), "leaf rust", crop="Coffee", season="Kharif"))
         assert "Scout for aphids (p1)" in out and len(bap.requests) == 1
 
     def test_a_coffee_chunk_from_kisan_sarathi_still_asks(self, bap):
@@ -945,3 +947,59 @@ class TestCoffeePdfAnswersGenerically:
         bap.response = _respond([_chunk("w1", "Rabi", crop="Coffee", origin="webhook"), self._pdf("p1")], **NO_DAYS)
         out = asyncio.run(sa.search_advisory(CTX, "leaf rust", crop="Coffee"))
         assert "(p1)" in out and "(w1)" not in out
+
+
+class TestCropGuard:
+    """The crop must come from the farmer's words for this question."""
+
+    @staticmethod
+    def _earlier_answer():
+        return [_user("wheat aphids"), ModelResponse(parts=[TextPart(content="answer")])]
+
+    def test_a_crop_taken_from_an_earlier_question_is_refused(self, bap):
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        history = self._earlier_answer() + [_user("how to manage mealybugs")]
+        with pytest.raises(ModelRetry, match="not named a crop"):
+            asyncio.run(sa.search_advisory(_ctx(history), "mealybug management", crop="Wheat"))
+        assert bap.requests == []
+
+    def test_the_crop_in_the_farmers_message_is_accepted(self, bap):
+        bap.response = _respond([_item("c1", crop="Wheat")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(_ctx([_user("wheat aphids")]), "wheat aphids", crop="Wheat"))
+        assert "Search notes" in out
+
+    def test_the_crop_answer_to_a_crop_question_is_accepted(self, bap):
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        history = [_user("aphids"), ModelResponse(parts=[TextPart(content="Which crop?")]), _user("Sorghum")]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids", crop="Sorghum"))
+        assert "Search notes" in out
+
+    def test_crop_words_in_another_script_are_accepted(self, bap):
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        out = asyncio.run(
+            sa.search_advisory(_ctx([_user("गेहूं में माहू")]), "wheat aphids", crop="Sorghum", crop_words="गेहूं")
+        )
+        assert "Search notes" in out
+
+    def test_crop_words_the_farmer_never_wrote_are_refused(self, bap):
+        history = self._earlier_answer() + [_user("stem borer")]
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx(history), "stem borer", crop="Wheat", crop_words="wheat"))
+
+    def test_a_crop_only_query_becomes_a_general_crop_search(self, bap):
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        history = [_user("aphids"), ModelResponse(parts=[TextPart(content="Which crop?")]), _user("Sorghum")]
+        asyncio.run(sa.search_advisory(_ctx(history), "Sorghum", crop="Sorghum"))
+        assert "Sorghum crop advisory" in bap.requests[0].read().decode()
+
+    def test_arabica_counts_as_naming_coffee(self, bap):
+        bap.response = _respond(
+            [_chunk("p1", "Rabi", crop="Coffee", title="coffee_guide_2023_mini", origin="docs-pipeline")], **NO_DAYS
+        )
+        out = asyncio.run(sa.search_advisory(_ctx([_user("beetle on arabica stems")]), "stem borer", crop="Coffee"))
+        assert "Source: coffee_guide_2023_mini" in out
+
+    def test_coffee_is_refused_when_the_farmer_never_named_it(self, bap):
+        history = self._earlier_answer() + [_user("how to manage mealybugs")]
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx(history), "mealybug management", crop="Coffee"))
