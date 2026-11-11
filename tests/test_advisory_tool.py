@@ -981,6 +981,37 @@ class TestCropGuard:
         out = asyncio.run(sa.search_advisory(_ctx(history), "aphids", crop="Sorghum"))
         assert "Search notes" in out
 
+    def test_a_season_question_the_model_wrote_itself_keeps_the_crop_of_the_question(self, bap):
+        bap.response = _respond([_item("c1", crop="Japanese mint")], **NO_DAYS)
+        history = self._earlier_answer() + [
+            _user("How should I do seed treatment for Japanese mint?"),
+            ModelResponse(parts=[TextPart(content="Could you please tell me which season you are growing it in?")]),
+            _user("Zaid, 60 days"),
+        ]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "seed treatment", crop="Japanese mint"))
+        assert "Search notes" in out
+
+    def test_questions_the_model_wrote_itself_keep_the_whole_chain(self):
+        from helpers import advisory_pending as ap
+
+        history = [
+            _user("How do I manage brown rust in my wheat crop?"),
+            ModelResponse(parts=[TextPart(content="Could you please tell me which season you are growing your wheat in, and how many days ago you sowed it?")]),
+            _user("Rabi, 20 days"),
+            ModelResponse(parts=[TextPart(content="Could you please tell me which state and district you are farming in?")]),
+            _user("Nagaland"),
+        ]
+        ctx = _ctx(history)
+        assert ap.asked_in_previous_turn(ctx) and ap.asked_location_in_previous_turn(ctx)
+        assert ap.farmer_gave_season(ctx) and ap.farmer_gave_days(ctx) and ap.farmer_gave_place(ctx)
+        assert ap.farmer_named_crop(ctx, "Wheat")
+
+    def test_an_answer_with_a_source_line_does_not_continue_the_question(self, bap):
+        answer = "Advice.\n\n**Source: ICAR - Kisan Sarathi**\n\nWould you like pest advice for wheat?"
+        history = [_user("wheat aphids"), ModelResponse(parts=[TextPart(content=answer)]), _user("yes")]
+        with pytest.raises(ModelRetry, match="not in the farmer's words"):
+            asyncio.run(sa.search_advisory(_ctx(history), "pest advice", crop="Wheat"))
+
     def test_crop_words_in_another_script_are_accepted(self, bap):
         bap.response = _respond([_item("c1")], **NO_DAYS)
         out = asyncio.run(

@@ -31,6 +31,7 @@ from helpers.advisory_pending import (
     answer_chain,
     farmer_gave_days,
     farmer_gave_season,
+    describe_turns,
     farmer_named_crop,
     farmer_wrote,
     may_answer_now,
@@ -477,6 +478,13 @@ def format_search_notes(
     return "\n".join(lines)
 
 
+POLITE_ASK = (
+    "Be polite and warm: start the question with \"Could you please tell me\" (in the farmer's language). Never "
+    "say \"I can only answer after you tell me\", \"I need\", \"you must\", \"before I can answer\" or any "
+    "wording that sounds like a condition or an order; do not open with the crop or the topic."
+)
+
+
 def _join_names(names: List[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
@@ -505,7 +513,7 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
         f"{PENDING_MARKER}\n> Advisory Search Results for `{query}`\n\n"
         "> Advisories were found, but the right one depends on details the farmer has not given. Do not give any "
         "advice yet. Your whole reply is only that one question: no introduction or explanation of why you are "
-        "asking, no repeated sentence, and no Source line. Ask the farmer ONE short, natural question asking "
+        "asking, no repeated sentence, and no Source line. " + POLITE_ASK + " Ask the farmer ONE short, natural question asking "
         + " and ".join(parts)
         + f". Example (use the farmer's crop name instead of \"your crop\" and translate it to the farmer's language): \"{example}\"." + seasons_note
         + " Do not suggest which season it is or say which season the advice is for: the farmer decides."
@@ -533,7 +541,7 @@ def format_location_question(query: str, restate: str = "") -> str:
         f"{PENDING_MARKER}{LOCATION_MARKER}\n> Advisory Search Results for `{query}`\n\n"
         "> These advisories are meant for particular places, and the farmer has not said where they farm. Do not give "
         "any advice yet. Your whole reply is only that one question: no introduction or explanation of why you are "
-        "asking, no repeated sentence, and no Source line. Ask the farmer ONE short, natural question asking their "
+        "asking, no repeated sentence, and no Source line. " + POLITE_ASK + " Ask the farmer ONE short, natural question asking their "
         "state and district. Example (translate it to the farmer's language): \"Could you please tell me which state "
         "and district you are farming in?\" Write it as a normal sentence. When they answer, call `search_advisory` "
         f"again with the same `query` and `crop`{restate} plus `state` and `district` (the names they gave, in English). "
@@ -745,7 +753,11 @@ async def search_advisory(
             "If they did not, ask them which crop in one short question, wait for the answer, then search."
         )
     if not farmer_named_crop(ctx, crop_hint, _clean_param(crop_words)):
-        logger.info("search_advisory: crop %r is not in the farmer's words for this question", crop_hint)
+        logger.info(
+            "search_advisory: crop %r is not in the farmer's words for this question; turns (* = ended with a "
+            "search_advisory question): %s",
+            crop_hint, describe_turns(ctx, crop_hint),
+        )
         said = (answer_chain(ctx) or [("", False)])[-1][0].strip()
         raise ModelRetry(
             f"The crop `{crop_hint}` is not in the farmer's words for this question. Their message is: \"{said}\". "

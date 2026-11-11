@@ -95,13 +95,14 @@ class TestOtherCropSearchesWait:
         assert asyncio.run(search_tools.search_documents(ctx, "aphids in wheat")).startswith("No ")
         assert asyncio.run(search_tools.search_pests_diseases(ctx, "aphids", "Wheat")).startswith("No ")
 
-    def test_both_run_in_the_turn_after_the_farmer_answered(self, marqo_stub):
+    def test_documents_wait_for_search_advisory_in_the_turn_after_the_farmer_answered(self, marqo_stub):
         history = [_user()] + _advisory_result(QUESTION) + [
             ModelResponse(parts=[TextPart(content="Which season?")]),
             _user("Rabi, 40 days"),
         ]
         ctx = _ctx(history)
-        assert asyncio.run(search_tools.search_documents(ctx, "aphids in wheat")).startswith("No ")
+        with pytest.raises(ModelRetry, match="Call `search_advisory` first"):
+            asyncio.run(search_tools.search_documents(ctx, "aphids in wheat"))
 
 
 class TestAdvisoryResultsCarryTheMarker:
@@ -323,3 +324,22 @@ class TestPlaceGuards:
 
         assert farmer_wrote(_ctx([_user("wheat aphids in PUNE")]), "Pune")
         assert not farmer_wrote(_ctx([_user("wheat aphids")]), "Pune")
+
+
+class TestDocumentsSearchWaitsForCropQuestions:
+    def test_a_coffee_question_must_call_search_advisory_first(self, marqo_stub):
+        ctx = _ctx([_user("How do I manage root rot in my coffee plants?")])
+        with pytest.raises(ModelRetry, match="Call `search_advisory` first"):
+            asyncio.run(search_tools.search_documents(ctx, "root rot management in coffee"))
+
+    def test_a_crop_question_after_a_finished_chat_must_call_search_advisory_first(self, marqo_stub):
+        history = [_user("How should I prepare the nursery bed for my maize crop?")] + _advisory_result(ADVICE) + [
+            ModelResponse(parts=[TextPart(content="Done. Source: ICAR")]),
+            _user("Which nutrients are low in coffee soils?"),
+        ]
+        with pytest.raises(ModelRetry, match="Call `search_advisory` first"):
+            asyncio.run(search_tools.search_documents(_ctx(history), "coffee soil nutrients"))
+
+    def test_a_livestock_question_still_uses_documents(self, marqo_stub):
+        ctx = _ctx([_user("My cow has fever, what should I do?")])
+        assert asyncio.run(search_tools.search_documents(ctx, "cow fever")).startswith("No ")
