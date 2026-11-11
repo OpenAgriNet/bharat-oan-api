@@ -46,6 +46,8 @@ KNOWLEDGE_ADVISORY_CATEGORY = "knowledge-advisory"
 ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
 # The provider's `origin` for an advisory PDF uploaded in docs-pipeline; those cite the PDF's name.
 PDF_ADVISORY_ORIGIN = "docs-pipeline"
+# Crop of the coffee PDF advisories. They carry no season, sowing stage or place, so they are answered at once.
+COFFEE_CROP = "coffee"
 
 # Longest value forwarded for crop / season, and the accepted range for days after sowing.
 _MAX_PARAM_LENGTH = 100
@@ -128,6 +130,11 @@ def explicit_seasons(results: List[Dict[str, Any]]) -> List[str]:
 def _crop_eq(chunk_crop: str, crop: str) -> bool:
     a, b = chunk_crop.strip().lower(), crop.strip().lower()
     return bool(a) and bool(b) and (a == b or a in b or b in a)
+
+
+def is_coffee_pdf(result: Dict[str, Any]) -> bool:
+    """True for a coffee chunk from an uploaded PDF (provider `origin` docs-pipeline, crop Coffee)."""
+    return result.get("origin") == PDF_ADVISORY_ORIGIN and _crop_eq(result.get("crop") or "", COFFEE_CROP)
 
 
 def relevant_for_crop(results: List[Dict[str, Any]], crop_hint: str, query: str) -> tuple[List[Dict[str, Any]], str]:
@@ -739,6 +746,12 @@ async def search_advisory(
         return _no_results_message(query, status, message)
 
     chunks, crop_name = relevant_for_crop(results, crop_hint, query)
+    coffee_pdf = [r for r in chunks if is_coffee_pdf(r)]
+    if coffee_pdf:
+        # Generic answer: a coffee PDF is not tied to a season, sowing stage or place, so ask the farmer nothing.
+        # Chunk-level season/place are blanked so no re-query, suggestion or place sentence is triggered.
+        generic = [{**r, "seasons": [], "location_national": True} for r in coffee_pdf]
+        return _answer(generic, {**search_ctx, "has_day_range": "false"}, query, limit, None, "")
     seen = list(results)  # every chunk looked at, for the seasons offered later
     season_ok = [r for r in chunks if season_matches(r, season_value)] if season_value else chunks
 

@@ -907,3 +907,41 @@ class TestPlaceSentenceWording:
             [self._result(["Agra", "Aligarh", "Azamgarh"], ("Uttar Pradesh",), "state_partial")], resolve_place("Uttar Pradesh")
         )
         assert opening == "This advice is for some districts of Uttar Pradesh: Agra, Aligarh and Azamgarh."
+
+
+class TestCoffeePdfAnswersGenerically:
+    """An uploaded coffee PDF (origin docs-pipeline, crop Coffee) is answered at once: no season, days or place question."""
+
+    @staticmethod
+    def _pdf(chunk_id="p1", season="Rabi", **kw):
+        return _chunk(chunk_id, season, crop="Coffee", title="coffee_guide_2023_mini", origin="docs-pipeline", **kw)
+
+    def test_no_season_days_or_place_question(self, bap):
+        located = {"match": "not_requested", "national": False, "states": ["Karnataka"], "districts": ["Kodagu"]}
+        bap.response = _respond([self._pdf("p1", "Rabi", location=located), self._pdf("p2", "Kharif")], has_day_range="true")
+        out = asyncio.run(sa.search_advisory(CTX, "leaf rust", crop="Coffee"))
+        assert "Scout for aphids (p1)" in out and "Source: coffee_guide_2023_mini" in out
+        assert sa.PENDING_MARKER not in out and "ask" not in out.lower().split("search notes")[0]
+        assert "advisory_has_day_range=no" in out
+        assert "applies everywhere" not in out and "This advice is for" not in out
+        assert len(bap.requests) == 1
+
+    def test_a_season_the_farmer_gave_does_not_trigger_a_requery_or_suggestion(self, bap):
+        bap.response = _respond([self._pdf("p1", "Rabi")], has_day_range="true")
+        out = asyncio.run(sa.search_advisory(_ctx([_user("it is kharif season")]), "leaf rust", crop="Coffee", season="Kharif"))
+        assert "Scout for aphids (p1)" in out and len(bap.requests) == 1
+
+    def test_a_coffee_chunk_from_kisan_sarathi_still_asks(self, bap):
+        bap.response = _respond([_chunk("w1", "Rabi", crop="Coffee", origin="webhook")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "leaf rust", crop="Coffee"))
+        assert "Scout for aphids (w1)" not in out
+
+    def test_a_pdf_of_another_crop_still_asks(self, bap):
+        bap.response = _respond([_chunk("w1", "Rabi", crop="Wheat", origin="docs-pipeline")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", crop="Wheat"))
+        assert "Scout for aphids (w1)" not in out
+
+    def test_coffee_pdf_chunks_win_over_other_coffee_chunks(self, bap):
+        bap.response = _respond([_chunk("w1", "Rabi", crop="Coffee", origin="webhook"), self._pdf("p1")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "leaf rust", crop="Coffee"))
+        assert "(p1)" in out and "(w1)" not in out
