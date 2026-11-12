@@ -245,8 +245,6 @@ async def _finalize_chat_turn(
     )
     await update_message_history(ctx.session_id, messages)
 
-    get_client().flush()
-
 
 async def _finalize_after_client_disconnect(
     ctx: _ChatTurnContext,
