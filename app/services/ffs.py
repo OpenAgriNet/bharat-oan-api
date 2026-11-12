@@ -726,14 +726,14 @@ class FFSService:
         complete = all(stocks.get(p["product_id"], -1) >= p["bags"] for p in order)
         unknown = any(p["product_id"] not in stocks for p in order)
         supply = "full" if complete else "unknown" if unknown else "partial"
-        # User policy within each territory: both urea/DAP, then urea, then
-        # DAP, then other shops; descending reported volumes within each bucket.
+        # Within a supply class: both urea/DAP, then urea, then DAP,
+        # then other shops; descending reported volumes within each bucket.
         bucket = 0 if {11, 12} <= groups_with_stock else 1 if 11 in groups_with_stock else 2 if 12 in groups_with_stock else 3
         search["pool"][rid] = {"shop_ref": "retailer-" + rid,
             "name": row.get("retailerName", ""), "territory": LEVELS[search["level"]],
             "coverage": [{"product_id": p["product_id"], "name": p["name"]} for p in order if stocks.get(p["product_id"], 0) > 0],
             "supply": supply, "retailer_id": row["retailerId"], "stock": {str(k): v for k, v in stocks.items()},
-            "rank": [search["level"], bucket, -sum(stocks.values()), 0 if complete else 1, row["retailerId"]]}
+            "rank": [search["level"], bucket, -sum(stocks.values()), row["retailerId"]]}
         selected = self.state.get("selected_shop")
         if selected and selected["retailer_id"] == row["retailerId"]:
             search["pool"][rid]["shop_ref"] = selected["shop_ref"]
@@ -752,7 +752,10 @@ class FFSService:
                      if shop["shop_ref"] == shop_ref), None)
 
     def _shop_result(self, search):
-        batch = sorted(self._pending_shops(search), key=lambda x: x["rank"])[:3]
+        # Apply full-order supply before product buckets, including cached v8 pools.
+        # Territory remains first; do not renumber shops already shown.
+        batch = sorted(self._pending_shops(search),
+                       key=lambda x: (x["rank"][0], x["supply"] != "full", *x["rank"][1:]))[:3]
         search["shown"].extend(shop["shop_ref"] for shop in batch)
         exhausted = LEVELS[-1] in search["complete_levels"]
         shops = [{"number": i + 1, **{k: shop[k] for k in ("shop_ref", "name", "territory", "coverage", "supply")}}
@@ -875,7 +878,7 @@ class FFSService:
         s = self.state
         s["stage"] = "booking_done" if success else "shops_ready" if s.get("token") else "login_expired"
         answer = result("ok" if success else "booking_failed",
-                        "Share the booking reference and expiry; distinguish waitlisting from confirmed allocation" if success else
+                        "Share the booking reference and expiry; distinguish waitlisting from confirmed allocation. Mention SMS confirmation or a registered-mobile update for a waitlist. Close only with a neutral Can I help with anything else? in the farmer's language; do not offer another fertilizer, extra bags, another shop or another booking" if success else
                         "FFS rejected this attempt; it did not create a new booking. Explain its message without shop stock volumes. If an existing booking prevents this attempt, explain that and stop; do not infer its products or reference. Ask for a correction only when the provider response supports changing the choice; use the farmer's instruction without another confirmation",
                         booking=public, order=[{k: p[k] for k in ("product_id", "name", "bags", "kg_per_bag")} for p in s.get("order", [])], booking_enabled=True,
                         **({"provider_error": feedback} if rejected else {}))

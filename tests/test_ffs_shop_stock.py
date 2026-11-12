@@ -171,3 +171,61 @@ def test_offered_bags_does_not_depend_on_gfr_weights(setup):
         rejected = await ffs_find_shops(context("too-many"), order=order(urea=7))
         assert rejected["data"]["allowed_bags"] == 6
     asyncio.run(run())
+
+
+def test_full_order_supply_precedes_product_buckets_and_volume(setup, monkeypatch):
+    # The reported failure: both products, but only 2 urea, versus 50 urea only.
+    install_pages(setup, monkeypatch, {"V": [[
+        retailer(1, urea=2, dap=1000), retailer(2, urea=50), retailer(3, urea=5, dap=1),
+    ]]})
+    async def run():
+        await prepare()
+        answer = await ffs_find_shops(context("full-first"), order=order(urea=5))
+        shops = answer["data"]["shops"]
+        assert [s["name"] for s in shops] == ["Shop 3", "Shop 2", "Shop 1"]
+        assert [s["supply"] for s in shops] == ["full", "full", "partial"]
+        assert [s["number"] for s in shops] == [1, 2, 3]
+        assert all("stock" not in s for s in shops)
+        assert (await ffs.get_session("session-1"))["order"][0]["bags"] == 5
+    asyncio.run(run())
+
+
+def test_full_supply_requires_every_ordered_product(setup, monkeypatch):
+    install_pages(setup, monkeypatch, {"V": [[
+        retailer(1, urea=50, dap=1), retailer(2, urea=5, dap=2), retailer(3, urea=100),
+    ]]})
+    async def run():
+        await prepare()
+        answer = await ffs_find_shops(context("both-ordered"), order=order(urea=5, dap=2))
+        shops = answer["data"]["shops"]
+        assert [s["name"] for s in shops] == ["Shop 2", "Shop 1", "Shop 3"]
+        assert [s["supply"] for s in shops] == ["full", "partial", "partial"]
+    asyncio.run(run())
+
+
+def test_full_supply_priority_stays_within_territory(setup, monkeypatch):
+    install_pages(setup, monkeypatch, {"V": [[retailer(1, urea=2, dap=1000), retailer(2, urea=5)]],
+                                      "T": [[retailer(3, urea=50, dap=1000)]]})
+    async def run():
+        await prepare()
+        answer = await ffs_find_shops(context("territory-first"), order=order(urea=5))
+        shops = answer["data"]["shops"]
+        assert [s["name"] for s in shops] == ["Shop 2", "Shop 1", "Shop 3"]
+        assert [s["territory"] for s in shops] == ["V", "V", "T"]
+    asyncio.run(run())
+
+
+def test_cached_old_rank_arrays_also_use_full_supply_first():
+    # Old sessions stored [territory, bucket, -stock, completeness, retailer].
+    service = ffs.FFSService("cached-session", "next-page")
+    search = {"shown": ["retailer-99"], "complete_levels": list(ffs.LEVELS), "pool": {
+        "1": {"shop_ref":"retailer-1", "name":"Partial both", "territory":"V", "coverage":["urea"],
+              "supply":"partial", "rank":[0,0,-1002,1,1]},
+        "2": {"shop_ref":"retailer-2", "name":"Full urea", "territory":"V", "coverage":["urea"],
+              "supply":"full", "rank":[0,1,-50,0,2]},
+        "3": {"shop_ref":"retailer-3", "name":"Unknown both", "territory":"V", "coverage":["urea"],
+              "supply":"unknown", "rank":[0,0,-2000,1,3]},
+    }}
+    answer = service._shop_result(search)
+    assert answer["data"]["shops"][0]["name"] == "Full urea"
+    assert search["shown"][0] == "retailer-99"

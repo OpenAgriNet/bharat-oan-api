@@ -116,8 +116,9 @@ membership check consume this single file.
   product, or V/T/D/S are exhausted. Finish each territory's pages before widening;
   duplicate, unrelated and zero/unknown-stock rows do not satisfy the stop count.
   A smaller positive stock still qualifies as partial supply. Within each territory,
-  rank both urea/DAP first, then urea-only, then DAP-only, then other products, with
-  descending reported volumes inside each bucket. This ranks fetched candidates,
+  rank full-order supply first. Within each supply class, rank both urea/DAP,
+  then urea-only, then DAP-only, then other products, with descending reported
+  volumes inside each bucket. This ranks fetched candidates,
   not all shops globally. Return at most three; more resumes the saved cursor.
   Each page saves progress and the service timeout bounds the operation. There is
   no four-page cutoff that prematurely stops discovery. Only compact shop views
@@ -441,3 +442,24 @@ An unchanged normalized order preserves `action="more"` or `action="widen"`,
 even if the model repeats the order or a shop is already selected. Only an actual
 order change restarts discovery. An explicit empty order invalidates the previous
 order and asks for missing choices; omitting order still reuses it for paging.
+
+## 12 November follow-up fixes
+
+Full-order supply now precedes product buckets and stock volume within each
+territory, including cached v8 shop pools. For five urea bags, a urea-only shop
+with 50 bags ranks ahead of a both-product shop with only two urea bags.
+Village/tehsil/district/state priority and the three-shop discovery stop remain.
+
+After confirmed or waitlisted booking, FFS explicitly overrides general
+follow-up/scheme suggestions with a neutral “Can I help with anything else?”
+in the farmer's language. No extra fertilizer, bag, shop or booking offer.
+This is response guidance; provider-owned booking enforcement remains unchanged.
+
+Real Gemma checks cover English/Hindi, both outcomes, using the complete chat
+prompt and synthetic FFS. Run `FFS_LIVE_CLOSING_TEST=1 pytest
+tests/test_ffs_live_closing.py` with the loopback recording proxy on port 18167.
+Captures are outside Git in `/mnt/raid/gautam/adhoc/ffs-v8-followups-20261112/`.
+
+The separate chat suggested-question prompt also avoids another purchase after
+a confirmed/waitlisted result. Recorded suggestions covered collection, SMS,
+receipt questions and general crop advice in English and Hindi.

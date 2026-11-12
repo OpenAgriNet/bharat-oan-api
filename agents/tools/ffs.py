@@ -132,8 +132,8 @@ async def ffs_find_shops(ctx: RunContext[FarmerContext], action: Literal["initia
     explain the returned limit and ask for a lower choice; never cap it yourself.
 
     Keep the returned ranking within village, tehsil, district, then state:
-    both urea/DAP shops first, then single-product shops, then stock volumes
-    internally. Discovery pages until three distinct shops carry an ordered
+    full-order supply first; within each supply class, both urea/DAP shops,
+    then single-product shops, then stock volumes internally. Discovery pages until three distinct shops carry an ordered
     product, or every territory is exhausted. Lower-stock shops still count;
     unrelated, zero-stock or unknown-stock rows do not fill the three choices.
     More continues from the saved cursor, finishing a territory before widening.
@@ -163,7 +163,10 @@ async def ffs_create_booking(ctx: RunContext[FarmerContext], shop_ref: str,
     an identical rejection or reveal shop stock volumes. Clear rejections allow
     a farmer-selected correction. FFS enforces existing and parallel bookings;
     every confirmed attempt reaches FFS, including a retry after an unknown outcome.
-    Do not automatically offer another booking after success. If the farmer asks
+    After confirmed or waitlisted success, replace general follow-up suggestions
+    with a neutral "Can I help with anything else?" in the farmer's language.
+    Never suggest another fertilizer, extra bags, another shop or another booking.
+    If the farmer asks
     for another product/order, submit their actual choice and explain FFS's fresh
     response. Never describe an earlier receipt as a new booking. A timeout does
     not prove failure; a retry uses the same approved order, without another
