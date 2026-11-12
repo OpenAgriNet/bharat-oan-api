@@ -40,8 +40,15 @@ def _current_turn(ctx) -> list:
     return messages[turn_start:]
 
 
+def _advisory_enabled(ctx) -> bool:
+    skills = getattr(getattr(ctx, "deps", None), "skills", None)
+    return skills is None or "search_advisory" in skills.allowed_tools
+
+
 def advisory_not_searched(ctx) -> bool:
     """True when `search_advisory` has not been called yet in the current turn."""
+    if not _advisory_enabled(ctx):
+        return False
     for message in _current_turn(ctx):
         if isinstance(message, ModelResponse) and any(
             isinstance(p, ToolCallPart) and p.tool_name == "search_advisory" for p in message.parts
@@ -52,6 +59,8 @@ def advisory_not_searched(ctx) -> bool:
 
 def advisory_question_pending(ctx) -> bool:
     """True when `search_advisory` returned a question for the farmer earlier in the current turn."""
+    if not _advisory_enabled(ctx):
+        return False
     messages = getattr(ctx, "messages", None)
     if not messages:
         return False

@@ -21,22 +21,25 @@ def resolve_selection(catalog: SkillCatalog, agent: str, environment: str | None
     config = m.agents[agent]
     available = select(config.enabled_skills, set(m.skills), 'agent skills')
     available = set(catalog.resolve(available))
+    disabled = {name.strip() for name in os.environ.get('DISABLED_SKILLS', '').split(',') if name.strip()}
+    select(sorted(disabled), set(m.skills), 'disabled skills')
     if m.environments:
         if environment not in m.environments:
             raise ValueError('Select a known SKILL_ENVIRONMENT when environment restrictions are configured')
         env = m.environments[environment]
         available &= select(env.allowed_skills, set(m.skills), 'environment skills')
         tools = select(env.allowed_tools, catalog.tools, 'environment tools')
-        omitted = {name for name in available
-                   if not set(catalog.resolve({name})) <= available
-                   or not catalog.tools_for({name}) <= tools}
-        if omitted:
-            logger.warning('Skills unavailable because dependencies or tools are denied: %s', sorted(omitted))
-        available -= omitted
+        available = {name for name in available if set(m.skills[name].tools) <= tools}
     elif environment:
         raise ValueError(f'No environments configured; unknown selection {environment}')
+    available -= disabled
+    omitted = {name for name in available
+               if not set(catalog.resolve({name}, available)) <= available}
+    if omitted:
+        logger.warning('Skills unavailable because dependencies are disabled: %s', sorted(omitted))
+        available -= omitted
     selected = available if enabled is None else select(enabled, available, 'session skills')
-    selected = set(catalog.resolve(selected))
+    selected = set(catalog.resolve(selected, available))
     if not selected <= available:
         raise ValueError(f'Session requires denied skills: {sorted(selected - available)}')
     if preloaded is None:
@@ -44,7 +47,7 @@ def resolve_selection(catalog: SkillCatalog, agent: str, environment: str | None
         initial = defaults & selected
     else:
         initial = select(preloaded, selected, 'session preloaded skills')
-    return selected, set(catalog.resolve(initial))
+    return selected, set(catalog.resolve(initial, selected))
 
 
 class SkillState(BaseModel):
@@ -73,7 +76,7 @@ class SkillState(BaseModel):
     @property
     def active(self) -> set[str]:
         permitted, initial = self.selection()
-        return set(get_catalog().resolve((initial | self.loaded_skills) & permitted))
+        return set(get_catalog().resolve((initial | self.loaded_skills) & permitted, permitted))
 
     @property
     def allowed_tools(self) -> set[str]:

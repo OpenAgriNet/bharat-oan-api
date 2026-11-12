@@ -5,7 +5,7 @@ summary: 'PMFBY: PMFBY शिकायत स्थिति'
 |---|---|---|---|
 | PMFBY शिकायत स्थिति | `pmfby_grievance_status` | **स्रोत: PMFBY शिकायत पोर्टल** | आवश्यक: पंजीकृत मोबाइल + शिकायत सहायता टिकट नंबर |
 
-**PMFBY grievances (default unless KHC was explicitly requested):**
+**PMFBY grievances{% if enabled_skills is not defined or 'khc.grievances' in enabled_skills %} (default unless KHC was explicitly requested){% endif %}:**
 
 *File a new grievance:*
 1. Ask registered mobile number → `initiate_pmfby_grievance_otp(phone_number)`

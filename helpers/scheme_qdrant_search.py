@@ -882,11 +882,14 @@ SCHEME_STATUS_SERVICES: dict[str, tuple[tuple[str, str], ...]] = {
 }
 
 
-def format_status_check_offer(scheme_code: Optional[str]) -> str:
+def format_status_check_offer(scheme_code: Optional[str], allowed_tools: set[str] | None = None) -> str:
     """Offer block appended to search_schemes output; empty when the scheme has no status flow."""
     code = (scheme_code or "").strip().lower()
     code = {"pk": "pmkisan", "af": "aif", "aea": "aif"}.get(code, code)
-    services = SCHEME_STATUS_SERVICES.get(code)
+    services = SCHEME_STATUS_SERVICES.get(code, ())
+    if allowed_tools is not None:
+        services = [(label, flow) for label, flow in services
+                    if set(flow.split(" → ")) <= allowed_tools]
     if not services:
         return ""
     lines = "\n".join(f"- {label} (tools: {flow})" for label, flow in services)

@@ -36,7 +36,7 @@ skills are intentionally preserved for the subsequent prompt review.
 
 1. Implement/register any new business tools in `agents/tools/__init__.py`.
 2. Add a skill directory and one prompt per language supported by its agent.
-3. Add one `skills` entry to the manifest: `prompt_dir`, `tools`, and optional `requires`.
+3. Add one `skills` entry to the manifest: `prompt_dir`, `tools`, and optional `requires` / `optional_requires`.
 4. Run the tests below. They detect unregistered tools, orphan skill folders,
    missing languages, duplicate keys, and tool instructions leaking into Agrinet.
 
@@ -164,7 +164,7 @@ the calling workflow decides when a document lookup is appropriate.
 
 Grievance workflows live with the scheme that owns them:
 
-- `skills/pm_kisan/grievances/`: PM-Kisan grievance registration and status.
+- `skills/pm_kisan/grievances/`: PM-Kisan grievance status and the production submission-unavailable message.
 - `skills/pmfby/grievances/`: PMFBY registration, verification and ticket status.
 - `skills/aif/status/`: AIF loan and grievance status share the same authentication
   workflow; the detailed ticket-format rules live here too.
@@ -172,15 +172,16 @@ Grievance workflows live with the scheme that owns them:
   the reusable KHC registration/status workflow and tools.
 
 The manifest binds PM-Kisan and PMFBY grievance tools only to their own skills.
-Those skills and AIF depend directly on `khc.grievances`, so they can
+Those skills and AIF optionally load `khc.grievances` when permitted, so they can
 honor an explicit KHC request without loading the other schemes' business tools.
+Disabling KHC leaves each scheme's own service available.
 KHC instructions are loaded once even when several schemes are active. New
 schemes that only use KHC need no copied workflow. All 13 translations retain
 their existing wording; this change moves instructions rather than rewriting them.
 
 ## Crop sources
 
-Each `advice_<language>.md` explicitly includes `flow.md`. The season is never
+Each `advice_<language>.md` includes `flow.md` when `crop.icar` is enabled. The season is never
 configured: the farmer's own season is used (see the flow's season question).
 
 `skills/crop/advice/flow.md` contains the common workflow included by all 13
@@ -203,3 +204,41 @@ has passed, so the announcement uses past tense with no date switch, Python
 announcement generator or future-tense fallback. Update the shared Markdown file
 when changing the configured announcement. Personal payment/status questions
 continue to use the separate PM-Kisan status tools and OTP flow.
+
+## Switching dev-only skills off for production
+
+Set one server-side environment variable (empty/unset preserves the dev default):
+
+```dotenv
+DISABLED_SKILLS=ffs.booking,khc.grievances,agristack.profile,crop.icar
+```
+
+Remove a name to enable that feature; use `DISABLED_SKILLS=` to enable everything.
+Restart/redeploy the API after changing the environment. Unknown skill names fail
+validation. The setting is a deny-list: lazy loading, old conversation history and
+session selections cannot enable a denied skill.
+
+| Skill | Production baseline | Overlap / effect of disabling |
+|---|---|---|
+| `ffs.booking` | Disable until released | Removes purchase/booking routing and skips restoring FFS chat context. GFR recommendations remain available. |
+| `khc.grievances` | Disable until released | Optional fallback for PM-KISAN, PMFBY and AIF; their own status/grievance services remain. |
+| `agristack.profile` | Disable until released | No profile lookup or profile instructions in chat. Browser coordinates and normal place/crop questions remain available. |
+| `crop.icar` | Disable until released | Owns `search_advisory`. Removes its workflow and question/order guards; existing crop/pest, document search and NPSS tools remain. |
+| `weather.agromet` | Already present in `bh-main`; keep enabled | Can be disabled separately; weather/document helpers then omit IMD advisory offers. |
+
+`crop.advice` is the existing crop/pest workflow. `crop.icar` requires it, but
+`crop.advice` does not require ICAR. The ICAR instructions stay in the existing
+localized crop files and are rendered only when ICAR is permitted. This keeps
+the translations and existing dev flow intact.
+
+KHC is an `optional_requires` dependency: load it alongside a scheme service when
+permitted, skip it when disabled. Real `requires` dependencies remain mandatory.
+For example, disabling `location.resolve` also removes weather, mandi, GFR and
+seed workflows that need location. Disabling `documents.search` removes crop and
+scheme-information workflows that need it. Shared `search_terms` remains visible
+while at least one enabled skill owns it.
+
+These switches control chat skills and their shared-helper behavior. They do not
+remove Python modules, delete saved state or unregister existing HTTP callback
+routes. AgriStack consent and normal API authentication still apply. No actual
+production environment file is edited by this PR.

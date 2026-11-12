@@ -37,6 +37,7 @@ class Skill(Definition):
     prompt_dir: str
     tools: list[str]
     requires: list[str] = Field(default_factory=list)
+    optional_requires: list[str] = Field(default_factory=list)
 
 
 class AgentConfig(Definition):
@@ -81,7 +82,7 @@ class SkillCatalog:
     def tools(self) -> set[str]:
         return {name for skill in self.manifest.skills.values() for name in skill.tools}
 
-    def resolve(self, skills: set[str]) -> list[str]:
+    def resolve(self, skills: set[str], allowed: set[str] | None = None) -> list[str]:
         """Expand dependencies in stable order, once each, before their consumers."""
         result, visiting, visited = [], [], set()
 
@@ -95,6 +96,9 @@ class SkillCatalog:
             visiting.append(name)
             for dependency in self.manifest.skills[name].requires:
                 visit(dependency)
+            for dependency in self.manifest.skills[name].optional_requires:
+                if allowed is None or dependency in allowed:
+                    visit(dependency)
             visiting.pop()
             visited.add(name)
             result.append(name)
@@ -107,8 +111,8 @@ class SkillCatalog:
                 visit(name)
         return result
 
-    def tools_for(self, skills: set[str]) -> set[str]:
-        return {tool for name in self.resolve(skills) for tool in self.manifest.skills[name].tools}
+    def tools_for(self, skills: set[str], allowed: set[str] | None = None) -> set[str]:
+        return {tool for name in self.resolve(skills, allowed) for tool in self.manifest.skills[name].tools}
 
     def path(self, relative: str) -> Path:
         path = (self.root / relative).resolve()
@@ -169,7 +173,8 @@ class SkillCatalog:
             if not folder.is_dir() or len(skill.tools) != len(set(skill.tools)):
                 raise ValueError(f'Missing folder or duplicate tool binding: {name}')
             folders.append(folder)
-            if len(skill.requires) != len(set(skill.requires)):
+            dependencies = skill.requires + skill.optional_requires
+            if len(dependencies) != len(set(dependencies)):
                 raise ValueError(f'Duplicate required skill: {name}')
         if len(folders) != len(set(folders)):
             raise ValueError('Each skill needs its own prompt folder')
@@ -202,11 +207,11 @@ class SkillCatalog:
         tools = select(config.allowed_tools, self.tools, 'environment tools')
         if config.allowed_skills == 'all':
             return
-        denied = set(self.resolve(allowed)) - allowed
+        denied = set(self.resolve(allowed, allowed)) - allowed
         if denied:
             raise ValueError(f'{name} requires denied skills: {sorted(denied)}')
         for skill_id in allowed:
-            missing = self.tools_for({skill_id}) - tools
+            missing = self.tools_for({skill_id}, allowed) - tools
             if missing:
                 raise ValueError(f'{name}/{skill_id} requires denied tools: {sorted(missing)}')
 

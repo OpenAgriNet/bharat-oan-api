@@ -20,6 +20,7 @@ from redis.exceptions import RedisError
 
 from app.config import get_default_httpx_timeout, settings
 from app.core.cache import cache
+from agents.skill_policy import SkillState
 from agents.ffs_crop_resolver import resolve_crops
 from agents.ffs_product_resolver import resolve_products
 from helpers.ffs_model_view import compact_ffs_result
@@ -82,7 +83,7 @@ async def get_session(session_id):
 
 async def prepare_chat_turn(session_id):
     """Restore FFS workflow context; user text and API authentication stay unchanged."""
-    if not settings.ffs_base_url:
+    if not settings.ffs_base_url or "ffs.booking" not in SkillState().permitted:
         return {}
     state = await get_session(session_id)
     context = {"stage": state.get("stage", "not_started"),

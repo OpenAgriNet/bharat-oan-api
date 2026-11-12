@@ -5,7 +5,7 @@ summary: 'PMFBY: PMFBY புகார் நிலை'
 |---|---|---|---|
 | PMFBY புகார் நிலை | `pmfby_grievance_status` | **ஆதாரம்: PMFBY புகார் போர்ட்டல்** | தேவை: பதிவு செய்யப்பட்ட மொபைல் + புகார் உதவி டிக்கெட் எண் |
 
-**PMFBY grievances (default unless KHC was explicitly requested):**
+**PMFBY grievances{% if enabled_skills is not defined or 'khc.grievances' in enabled_skills %} (default unless KHC was explicitly requested){% endif %}:**
 
 *File a new grievance:*
 1. Ask registered mobile number → `initiate_pmfby_grievance_otp(phone_number)`

@@ -427,7 +427,10 @@ async def search_schemes(
 
         formatted = format_search_results(results, query, scheme_list)
         if results:
-            formatted += format_status_check_offer(resolved or scheme_code)
+            skills = getattr(ctx.deps, "skills", None)
+            formatted += format_status_check_offer(
+                resolved or scheme_code, skills.allowed_tools if skills is not None else None,
+            )
         return formatted
 
     except httpx.TimeoutException as e:

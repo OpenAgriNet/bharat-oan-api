@@ -52,5 +52,8 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
         getattr(deps, "session_id", None), lang_code, scheme_block.get("vector_scheme_count"),
     )
     deps.skills.restore(ctx.messages)
-    context['khc_service_note'] = khc_service_note(ctx.messages, current_query=deps.query)
+    context['khc_service_note'] = (
+        khc_service_note(ctx.messages, current_query=deps.query)
+        if 'khc.grievances' in deps.skills.permitted else ''
+    )
     return render_prompt(deps.skills, lang_code, context)

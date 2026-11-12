@@ -9,8 +9,10 @@ from agents.skill_policy import SkillState
 
 def skill_instructions(name: str, state: SkillState) -> str:
     catalog = get_catalog()
-    body = catalog.render_skill(name, state.language, state.context, state.agent)
-    required = catalog.manifest.skills[name].requires
+    context = {**state.context, 'enabled_skills': state.permitted}
+    body = catalog.render_skill(name, state.language, context, state.agent)
+    definition = catalog.manifest.skills[name]
+    required = definition.requires + [s for s in definition.optional_requires if s in state.permitted]
     if required:
         body = ('Supporting skills (already loaded): ' + ', '.join(required) + '. '
                 'Apply this workflow\'s prerequisites and clarification rules before using '
@@ -20,11 +22,12 @@ def skill_instructions(name: str, state: SkillState) -> str:
 
 def render_prompt(state: SkillState, language: str, context: dict) -> str:
     catalog = get_catalog()
+    context = {**context, 'enabled_skills': state.permitted}
     state.language = language
     state.context = context
     chunks = [catalog.render_global(language, context, state.agent)]
     active = state.active
-    chunks.extend(skill_instructions(name, state) for name in catalog.resolve(active))
+    chunks.extend(skill_instructions(name, state) for name in catalog.resolve(active, state.permitted))
     pending = state.permitted - active
     if 'ffs.booking' in pending:
         chunks.append(catalog.env.get_template('skills/ffs/booking/routing.md').render(**context))
@@ -54,7 +57,7 @@ async def load_skill(ctx: RunContext[Any], skill: str) -> dict:
     if skill in state.active:
         raise ModelRetry('This skill is already loaded. Use its available tools or choose another pending skill.')
     catalog = get_catalog()
-    required = catalog.resolve({skill})
+    required = catalog.resolve({skill}, state.permitted)
     if not set(required) <= state.permitted:
         raise ModelRetry('A required skill is unavailable for this session.')
     newly_loaded = [name for name in required if name not in state.active]
@@ -62,7 +65,7 @@ async def load_skill(ctx: RunContext[Any], skill: str) -> dict:
     instructions = '\n\n'.join(skill_instructions(name, state) for name in newly_loaded)
     state.loaded_skills.update(newly_loaded)
     return {'skill': skill, 'loaded': True, 'instructions': instructions,
-            'loaded_skills': newly_loaded, 'loaded_tools': sorted(catalog.tools_for({skill}))}
+            'loaded_skills': newly_loaded, 'loaded_tools': sorted(catalog.tools_for({skill}, state.permitted))}
 
 
 SKILL_LOADER = Tool(load_skill, takes_ctx=True, sequential=True, strict=False)

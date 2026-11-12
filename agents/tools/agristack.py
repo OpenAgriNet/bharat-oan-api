@@ -25,6 +25,7 @@ from langfuse import observe
 from pydantic_ai.tools import RunContext, ToolDefinition
 
 from agents.deps import FarmerContext
+from agents.skill_policy import SkillState
 from app.config import get_default_httpx_timeout
 from app.core.cache import cache
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -61,7 +62,7 @@ async def get_agristack_link(session_id: str) -> Optional[dict[str, Any]]:
     Returns farmer_id, has_consent and state_lgd_code, or None when the session has no
     AgriStack login (or Redis is unavailable).
     """
-    if not session_id:
+    if not session_id or "agristack.profile" not in SkillState().permitted:
         return None
     try:
         state = await cache.get(session_id, namespace=CALLBACK_STATUS_NAMESPACE)

@@ -92,6 +92,8 @@ class FarmerContext(BaseModel):
     
     def _agristack_context_string(self):
         """AgriStack status line read by the prompt's AgriStack rules; absent when not logged in."""
+        if "agristack.profile" not in self.skills.permitted:
+            return None
         if self.agristack_status == "consent":
             return (
                 "**AgriStack status:** logged in with consent. If this question needs the farmer's place, crop, or "
@@ -117,6 +119,6 @@ class FarmerContext(BaseModel):
             self._moderation_string(),
             self._location_context_string(),
             self._agristack_context_string(),
-            ("**FFS workflow:** " + str(self.ffs_context)) if self.ffs_context else None,
+            ("**FFS workflow:** " + str(self.ffs_context)) if self.ffs_context and "ffs.booking" in self.skills.permitted else None,
         ]
         return "\n".join([x for x in strings if x])
