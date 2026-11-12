@@ -1,6 +1,5 @@
 import jwt
 import os
-import hashlib
 from typing import Any
 
 from dotenv import load_dotenv
@@ -65,7 +64,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict[str, Any
         metadata = decoded_token.get("metadata") or {}
 
         return {
-            "auth_token_id": hashlib.sha256(token.encode()).hexdigest(),
             "sub": decoded_token.get("sub"),
             "mobile": mobile,
             "name": decoded_token.get("name"),

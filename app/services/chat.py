@@ -9,7 +9,6 @@ from fastapi import BackgroundTasks
 from langfuse import get_client, observe, propagate_attributes
 from pydantic_ai import AgentRunResultEvent, FinalResultEvent, PartDeltaEvent, PartStartEvent, TextPartDelta
 from pydantic_ai.messages import TextPart
-from pydantic import SecretStr
 
 from agents.agrinet import agrinet_agent
 from agents.deps import FarmerContext
@@ -25,6 +24,7 @@ from app.services.npss_response import post_process_npss_response
 from app.services.stream_dedupe import ToolBoundaryDeduper
 from app.tasks.telemetry import send_telemetry
 from app.utils import (
+    clean_chat_history,
     filter_thinking_from_history,
     format_message_pairs,
     trim_history,
@@ -451,11 +451,10 @@ async def stream_chat_messages(
     longitude: Optional[float] = None,
     qid: str = "",
     current_user: Optional[dict] = None,
-    ffs_otp: Optional[SecretStr] = None,
-    ffs_owner: str = "",
     ffs_context: Optional[dict] = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
+    history = clean_chat_history(history)
     telemetry_user = current_user or {"channel": channel}
     telemetry_qid = qid or f"chat_{session_id}"
     question_event = create_chat_question_event(
@@ -525,8 +524,6 @@ async def stream_chat_messages(
                 latitude is not None and longitude is not None,
             )
             deps = FarmerContext(
-                ffs_otp=ffs_otp,
-                ffs_owner=ffs_owner,
                 ffs_context=ffs_context or {},
                 query=query,
                 lang_code=target_lang,
@@ -563,7 +560,7 @@ async def stream_chat_messages(
             deps.update_moderation_str(str(moderation_data))
             user_message = _build_user_message(
                 deps,
-                last_response,
+                "",  # Agrinet receives native history; only moderation needs the text recap.
                 is_image_analysis=is_image_analysis,
                 latitude=latitude,
                 longitude=longitude,

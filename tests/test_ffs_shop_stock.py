@@ -1,139 +1,231 @@
-"""Stock discovery keeps partial shops and limits each response to three choices."""
+"""Discovery counts relevant shops, pages before widening, and never changes orders."""
 import asyncio
+from copy import deepcopy
+import json
+
+import httpx
 
 from app.services import ffs
 from agents.tools.ffs import ffs_get_entitlement, ffs_find_shops, ffs_create_booking
 from tests.test_ffs import setup, context, login, selection
 
 
-async def prepare():
-    village, crops = selection(await login())
-    await ffs_get_entitlement(context("stock-entitlement"), village, crops)
+def order(urea=1, dap=0):
+    return [ffs.OrderItem(product=name, product_id=pid, bags=bags)
+            for name, pid, bags in [("urea", 1089, urea), ("DAP", 1005, dap)] if bags]
 
 
-def test_below_entitlement_stock_stays_visible_and_can_be_booked(setup):
-    setup.backend.stock = {i: (2, 0) for i in range(8)}
-
-    async def run():
-        await prepare()
-        result = await ffs_find_shops(context("stock-search"))
-        shops = result["data"]["shops"]
-        assert result["status"] == "ok" and len(shops) == 3
-        assert all(s["coverage"] == ["urea"] and not s["complete_supply"] for s in shops)
-        assert all(s["stock"] == {"urea": 2, "DAP": 0} for s in shops)
-        shop = shops[0]["shop_ref"]
-        failed = await ffs_create_booking(context("stock-too-many"), shop,
-            quantities=[ffs.BookingQuantity(product="urea", bags=3)])
-        assert failed["status"] == "needs_confirmation"
-        assert not setup.backend.booking_payloads
-        preview = await ffs_create_booking(context("stock-preview"), shop,
-            quantities=[ffs.BookingQuantity(product="urea", bags=1)])
-        assert preview["status"] == "needs_confirmation"
-        booked = await ffs_create_booking(context("stock-confirm"), shop, True)
-        assert booked["status"] == "ok"
-        assert setup.backend.booking_payloads[0]["bookingRequest"][0]["productLines"][0]["noBagsRequested"] == 1
-    asyncio.run(run())
+def retailer(rid, urea=0, dap=0):
+    return {"retailerId": rid, "retailerName": f"Shop {rid}", "availableProducts": [
+        {"productGroupId": 11, "products": [{"productId": 1089, "noBagsAvailable": urea}]},
+        {"productGroupId": 12, "products": [{"productId": 1005, "noBagsAvailable": dap}]}]}
 
 
-def test_search_expands_past_empty_village_and_ranks_stocked_shops_first(setup):
-    setup.backend.stock = {0: (0, 0), 1: (0, 0), 2: (2, 0), 3: (0, 1),
-                           4: (0, 0), 5: (0, 0), 6: (0, 4), 7: (3, 0)}
-
-    async def run():
-        await prepare()
-        result = await ffs_find_shops(context("stock-search"))
-        shops = result["data"]["shops"]
-        assert [s["name"] for s in shops] == ["Shop 2", "Shop 3", "Shop 6"]
-        assert [s["territory"] for s in shops] == ["T", "T", "D"]
-        searches = [body for path, body in setup.backend.calls if path.endswith("getRetailersByProductAvailabilityV4")]
-        assert [body["territoryLevel"] for body in searches] == ["V", "T", "D"]
-    asyncio.run(run())
-
-
-def test_zero_stock_shops_remain_fallbacks_after_all_territories_are_searched(setup):
-    setup.backend.stock = {i: (0, 0) for i in range(8)}
-
-    async def run():
-        await prepare()
-        first = await ffs_find_shops(context("stock-search"))
-        assert len(first["data"]["shops"]) == 3
-        assert all(not s["coverage"] for s in first["data"]["shops"])
-        searches = [body for path, body in setup.backend.calls if path.endswith("getRetailersByProductAvailabilityV4")]
-        assert [body["territoryLevel"] for body in searches] == ["V", "T", "D", "S"]
-        assert await ffs_find_shops(context("stock-search")) == first
-        second = await ffs_find_shops(context("stock-more"), "more")
-        assert len(second["data"]["shops"]) == 3
-        assert not ({s["shop_ref"] for s in first["data"]["shops"]} & {s["shop_ref"] for s in second["data"]["shops"]})
-        blocked = await ffs_create_booking(context("stock-book"), first["data"]["shops"][0]["shop_ref"],
-            quantities=[ffs.BookingQuantity(product="urea", bags=1)])
-        assert blocked["status"] == "needs_confirmation" and not setup.backend.booking_payloads
-    asyncio.run(run())
-
-
-def test_widen_keeps_partial_stock_and_more_preserves_territory(setup):
-    setup.backend.stock = {i: (2, 0) for i in range(8)}
-
-    async def run():
-        await prepare()
-        initial = await ffs_find_shops(context("stock-initial"))
-        wider = await ffs_find_shops(context("stock-widen"), "widen")
-        assert [s["name"] for s in wider["data"]["shops"]] == ["Shop 6", "Shop 7"]
-        assert all(s["territory"] == "D" and not s["complete_supply"] for s in wider["data"]["shops"])
-        assert wider["data"]["complete_supply_only"] is False
-        more = await ffs_find_shops(context("stock-more"), "more")
-        assert more["data"]["shops"] == []
-        assert len(initial["data"]["shops"]) == 3
-    asyncio.run(run())
-
-
-def test_pre_change_search_cache_is_rebuilt(setup):
-    async def run():
-        await prepare()
-        await ffs_find_shops(context("stock-old"))
-        state = await ffs.get_session("session-1")
-        state["shops"].pop("stock_visibility")
-        await setup.memory.set(ffs.session_key("session-1"), state, namespace=ffs.NAMESPACE)
-        setup.backend.stock = {i: (2, 0) for i in range(8)}
-        result = await ffs_find_shops(context("stock-new"))
-        assert all(s["coverage"] == ["urea"] for s in result["data"]["shops"])
-        state = await ffs.get_session("session-1")
-        assert state["shops"]["stock_visibility"] == "all"
-    asyncio.run(run())
-
-
-def test_village_pages_are_exhausted_before_expanding_to_tehsil(setup, monkeypatch):
-    import httpx
-    import json
-
-    setup.backend.stock = {0: (0, 0), 1: (0, 0)}
+def install_pages(setup, monkeypatch, pages):
     original = setup.backend.respond
 
     async def respond(request):
-        response = await original(request)
-        if request.url.path.endswith("getRetailersByProductAvailabilityV4"):
-            body = json.loads(request.content)
-            if body["territoryLevel"] == "V":
-                envelope = response.json()
-                envelope["totalPages"] = 2
-                if body["pageNo"] == 2:
-                    row = envelope["data"][0]
-                    row["retailerId"] = 100
-                    row["retailerName"] = "Village second-page shop"
-                    row["availableProducts"][0]["products"][0]["noBagsAvailable"] = 2
-                    envelope["data"] = [row]
-                return httpx.Response(200, json=envelope)
-        return response
+        if not request.url.path.endswith("getRetailersByProductAvailabilityV4"):
+            return await original(request)
+        body = json.loads(request.content)
+        setup.backend.calls.append((request.url.path, body))
+        territory = pages.get(body["territoryLevel"], [[]])
+        assert body["pageSize"] == 3
+        assert 1 <= body["pageNo"] <= len(territory)
+        return httpx.Response(200, json={"code": 200, "status": "success",
+            "data": deepcopy(territory[body["pageNo"] - 1]), "totalPages": len(territory)})
 
     class Client(setup.client_class):
         def __init__(self, **kwargs):
             super().__init__(transport=httpx.MockTransport(respond), **kwargs)
     monkeypatch.setattr(httpx, "AsyncClient", Client)
 
+
+async def prepare():
+    village, crops = selection(await login())
+    await ffs_get_entitlement(context("entitlement"), village, crops)
+
+
+def searches(setup):
+    return [body for path, body in setup.backend.calls if path.endswith("getRetailersByProductAvailabilityV4")]
+
+
+def test_discovery_counts_matching_shops_then_ranks_and_stops(setup, monkeypatch):
+    install_pages(setup, monkeypatch, {"V": [
+        [retailer(1, dap=100), retailer(2, urea=1), retailer(3)],
+        [retailer(4, urea=1, dap=2), retailer(5, urea=100)],
+        [retailer(6, urea=1000, dap=1000)],
+    ]})
+
     async def run():
         await prepare()
-        result = await ffs_find_shops(context("stock-search"))
-        assert result["data"]["shops"][0]["name"] == "Village second-page shop"
-        assert len(result["data"]["shops"]) == 3
-        searches = [body for path, body in setup.backend.calls if path.endswith("getRetailersByProductAvailabilityV4")]
-        assert [(b["territoryLevel"], b["pageNo"]) for b in searches] == [("V", 1), ("V", 2), ("T", 1)]
+        answer = await ffs_find_shops(context("search"), order=order())
+        assert [s["name"] for s in answer["data"]["shops"]] == ["Shop 4", "Shop 5", "Shop 2"]
+        assert [(b["territoryLevel"], b["pageNo"]) for b in searches(setup)] == [("V", 1), ("V", 2)]
+        assert answer["data"]["has_more"]
+        assert all("stock" not in s and "noBagsAvailable" not in s for s in answer["data"]["shops"])
+        assert "backend_exchanges" not in json.dumps(answer)
+        assert {p["productId"]: p["noBagsRequested"] for p in searches(setup)[0]["selectedProducts"]} == {1089: 1, 1005: 1}
+        state = await ffs.get_session("session-1")
+        assert [(p["product_id"], p["bags"]) for p in state["order"]] == [(1089, 1)]
+        booked = await ffs_create_booking(context("book"), answer["data"]["shops"][0]["shop_ref"], True)
+        assert booked["status"] == "ok"
+        lines = setup.backend.booking_payloads[0]["bookingRequest"][0]["productLines"]
+        assert [(p["productId"], p["noBagsRequested"]) for p in lines] == [(1089, 1)]
     asyncio.run(run())
+
+
+def test_pages_continue_past_four_before_widening_and_more_resumes(setup, monkeypatch):
+    install_pages(setup, monkeypatch, {"V": [
+        [retailer(1, urea=1)], [retailer(1, urea=1)], [retailer(2, dap=50)],
+        [retailer(3)], [retailer(4, urea=2)], [retailer(5, urea=3)],
+        [retailer(6, urea=4)],
+    ], "T": [[retailer(1, urea=1), retailer(7, urea=5), retailer(8, urea=6)]],
+        "D": [[retailer(9, urea=500)]]})
+
+    async def run():
+        await prepare()
+        first = await ffs_find_shops(context("search"), order=order())
+        assert len(first["data"]["shops"]) == 3
+        assert [(b["territoryLevel"], b["pageNo"]) for b in searches(setup)] == [("V", n) for n in range(1, 7)]
+        assert await ffs_find_shops(context("search")) == first
+        more = await ffs_find_shops(context("more"), "more")
+        assert [s["name"] for s in more["data"]["shops"]] == ["Shop 6", "Shop 8", "Shop 7"]
+        assert [(b["territoryLevel"], b["pageNo"]) for b in searches(setup)][-2:] == [("V", 7), ("T", 1)]
+        assert not ({s["shop_ref"] for s in first["data"]["shops"]} & {s["shop_ref"] for s in more["data"]["shops"]})
+    asyncio.run(run())
+
+
+def test_fewer_than_three_expands_through_state_and_keeps_partial_stock(setup, monkeypatch):
+    install_pages(setup, monkeypatch, {"V": [[retailer(1, dap=99)]],
+        "T": [[retailer(2, urea=1)]], "D": [[retailer(3)]], "S": [[retailer(4, urea=2)]]})
+
+    async def run():
+        await prepare()
+        answer = await ffs_find_shops(context("search"), order=order(urea=3))
+        shops = answer["data"]["shops"]
+        assert [s["name"] for s in shops] == ["Shop 2", "Shop 4"]
+        assert [s["territory"] for s in shops] == ["T", "S"]
+        assert all(s["supply"] == "partial" for s in shops)
+        assert all(p["noBagsRequested"] == 1 for b in searches(setup) for p in b["selectedProducts"])
+        assert (await ffs.get_session("session-1"))["order"][0]["bags"] == 3
+        assert not answer["data"]["has_more"]
+        assert [b["territoryLevel"] for b in searches(setup)] == ["V", "T", "D", "S"]
+        assert (await ffs_find_shops(context("more"), "more"))["status"] == "no_more_shops"
+    asyncio.run(run())
+
+
+def test_multiple_products_one_shop_order_is_unchanged(setup, monkeypatch):
+    install_pages(setup, monkeypatch, {"V": [[retailer(1, 2, 1), retailer(2, 50, 0), retailer(3, 0, 50)]]})
+
+    async def run():
+        await prepare()
+        answer = await ffs_find_shops(context("search"), order=order(urea=2, dap=1))
+        assert [s["name"] for s in answer["data"]["shops"]] == ["Shop 1", "Shop 2", "Shop 3"]
+        assert [s["supply"] for s in answer["data"]["shops"]] == ["full", "partial", "partial"]
+        booked = await ffs_create_booking(context("book"), answer["data"]["shops"][0]["shop_ref"], True)
+        assert booked["status"] == "ok"
+        requests = setup.backend.booking_payloads[0]["bookingRequest"]
+        assert len(requests) == 1
+        assert {p["productId"]: p["noBagsRequested"] for p in requests[0]["productLines"]} == {1089: 2, 1005: 1}
+    asyncio.run(run())
+
+
+def test_empty_unknown_and_unrelated_shops_do_not_fill_batch(setup, monkeypatch):
+    unknown = retailer(2)
+    del unknown["availableProducts"][0]["products"][0]["noBagsAvailable"]
+    install_pages(setup, monkeypatch, {"V": [[retailer(1), unknown, retailer(3, dap=500)]]})
+
+    async def run():
+        await prepare()
+        answer = await ffs_find_shops(context("search"), order=order())
+        assert answer["status"] == "no_more_shops"
+        assert answer["data"]["shops"] == []
+        assert not answer["data"]["has_more"]
+        assert [b["territoryLevel"] for b in searches(setup)] == ["V", "T", "D", "S"]
+    asyncio.run(run())
+
+
+def test_no_order_or_over_allowance_does_not_start_discovery(setup):
+    async def run():
+        await prepare()
+        assert (await ffs_find_shops(context("no-order")))["status"] == "needs_order"
+        assert (await ffs_find_shops(context("too-many"), order=order(urea=7)))["status"] == "needs_order"
+        assert searches(setup) == []
+        assert not (await ffs.get_session("session-1")).get("order")
+    asyncio.run(run())
+
+
+def test_offered_bags_does_not_depend_on_gfr_weights(setup):
+    for row in setup.backend.gfr[0]["recommendations"]:
+        row.pop("kgPerBag", None)
+        row["noOfBagsRequired"] = 999
+
+    async def run():
+        await prepare()
+        answer = await ffs_find_shops(context("search"), order=order(urea=3))
+        assert answer["status"] == "ok"
+        state = await ffs.get_session("session-1")
+        assert state["order"][0]["bags"] == 3
+        assert state["order"][0]["kg_per_bag"] == 45
+        rejected = await ffs_find_shops(context("too-many"), order=order(urea=7))
+        assert rejected["data"]["allowed_bags"] == 6
+    asyncio.run(run())
+
+
+def test_full_order_supply_precedes_product_buckets_and_volume(setup, monkeypatch):
+    # The reported failure: both products, but only 2 urea, versus 50 urea only.
+    install_pages(setup, monkeypatch, {"V": [[
+        retailer(1, urea=2, dap=1000), retailer(2, urea=50), retailer(3, urea=5, dap=1),
+    ]]})
+    async def run():
+        await prepare()
+        answer = await ffs_find_shops(context("full-first"), order=order(urea=5))
+        shops = answer["data"]["shops"]
+        assert [s["name"] for s in shops] == ["Shop 3", "Shop 2", "Shop 1"]
+        assert [s["supply"] for s in shops] == ["full", "full", "partial"]
+        assert [s["number"] for s in shops] == [1, 2, 3]
+        assert all("stock" not in s for s in shops)
+        assert (await ffs.get_session("session-1"))["order"][0]["bags"] == 5
+    asyncio.run(run())
+
+
+def test_full_supply_requires_every_ordered_product(setup, monkeypatch):
+    install_pages(setup, monkeypatch, {"V": [[
+        retailer(1, urea=50, dap=1), retailer(2, urea=5, dap=2), retailer(3, urea=100),
+    ]]})
+    async def run():
+        await prepare()
+        answer = await ffs_find_shops(context("both-ordered"), order=order(urea=5, dap=2))
+        shops = answer["data"]["shops"]
+        assert [s["name"] for s in shops] == ["Shop 2", "Shop 1", "Shop 3"]
+        assert [s["supply"] for s in shops] == ["full", "partial", "partial"]
+    asyncio.run(run())
+
+
+def test_full_supply_priority_stays_within_territory(setup, monkeypatch):
+    install_pages(setup, monkeypatch, {"V": [[retailer(1, urea=2, dap=1000), retailer(2, urea=5)]],
+                                      "T": [[retailer(3, urea=50, dap=1000)]]})
+    async def run():
+        await prepare()
+        answer = await ffs_find_shops(context("territory-first"), order=order(urea=5))
+        shops = answer["data"]["shops"]
+        assert [s["name"] for s in shops] == ["Shop 2", "Shop 1", "Shop 3"]
+        assert [s["territory"] for s in shops] == ["V", "V", "T"]
+    asyncio.run(run())
+
+
+def test_cached_old_rank_arrays_also_use_full_supply_first():
+    # Old sessions stored [territory, bucket, -stock, completeness, retailer].
+    service = ffs.FFSService("cached-session", "next-page")
+    search = {"shown": ["retailer-99"], "complete_levels": list(ffs.LEVELS), "pool": {
+        "1": {"shop_ref":"retailer-1", "name":"Partial both", "territory":"V", "coverage":["urea"],
+              "supply":"partial", "rank":[0,0,-1002,1,1]},
+        "2": {"shop_ref":"retailer-2", "name":"Full urea", "territory":"V", "coverage":["urea"],
+              "supply":"full", "rank":[0,1,-50,0,2]},
+        "3": {"shop_ref":"retailer-3", "name":"Unknown both", "territory":"V", "coverage":["urea"],
+              "supply":"unknown", "rank":[0,0,-2000,1,3]},
+    }}
+    answer = service._shop_result(search)
+    assert answer["data"]["shops"][0]["name"] == "Full urea"
+    assert search["shown"][0] == "retailer-99"
