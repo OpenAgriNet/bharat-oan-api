@@ -68,6 +68,12 @@ GrievanceTypeLiteral = Literal[tuple(GRIEVANCE_TYPES)] if GRIEVANCE_TYPES else s
 _REGISTRATION_NUMBER_LABEL = "Registration Number"
 _BAP_ENDPOINT_NOT_CONFIGURED_MSG = "BAP_ENDPOINT is not configured in environment."
 
+# Temporary production stop; re-enable only after the submission service is restored.
+_PMKISAN_GRIEVANCE_SUBMISSION_ENABLED = False
+_PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG = (
+    "PM-KISAN grievance submission is temporarily unavailable. Please try again later."
+)
+
 # -----------------------
 # Response formatting
 # -----------------------
@@ -785,10 +791,13 @@ async def pmkisan_grievance_send_otp(
     purpose: Literal["submit_grievance", "check_status"] = "submit_grievance",
 ) -> str:
     """
-    Send OTP to the mobile registered with a PM-KISAN registration number.
+    Send OTP for an existing PM-KISAN grievance status check.
 
-    Use before submitting a grievance or checking grievance status. After the user shares
-    the OTP, call pmkisan_submit_grievance or pmkisan_grievance_status with that OTP.
+    New grievance submission and its OTP are temporarily unavailable.
+    Use purpose="check_status" for existing grievance status checks.
+
+    Use purpose="check_status" before checking an existing grievance. After the user
+    shares the OTP, call pmkisan_grievance_status with that OTP.
 
     Args:
         reg_no: PM-KISAN registration number used for OTP.
@@ -798,6 +807,9 @@ async def pmkisan_grievance_send_otp(
     Returns:
         OTP send confirmation or service error.
     """
+    if purpose == "submit_grievance" and not _PMKISAN_GRIEVANCE_SUBMISSION_ENABLED:
+        return _PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG
+
     try:
         reg_no_clean = _validate_pmkisan_registration_number(reg_no)
         purpose_text = "submit the grievance" if purpose == "submit_grievance" else "check grievance status"
@@ -827,10 +839,13 @@ async def pmkisan_submit_grievance(
     raw: bool = False,
 ) -> str:
     """
-    Submit a PM-KISAN grievance only after OTP verification.
+    New PM-KISAN grievance submission is temporarily unavailable.
 
-    Call pmkisan_grievance_send_otp first. Use this tool only after the user shares
-    the OTP; it verifies the OTP before calling the grievance submit API.
+    Return the availability message without verifying an OTP or submitting a grievance.
+
+    Do not collect a registration number or OTP for new submissions. Existing
+    grievance-status checks use pmkisan_grievance_send_otp with purpose="check_status"
+    followed by pmkisan_grievance_status.
 
     Args:
         reg_no: PM-KISAN registration number used for OTP verification and grievance submission.
@@ -856,6 +871,9 @@ async def pmkisan_submit_grievance(
     Returns:
         Grievance submission result or OTP verification error.
     """
+    if not _PMKISAN_GRIEVANCE_SUBMISSION_ENABLED:
+        return _PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG
+
     try:
         identifier_value, reg_no_clean = _validate_submit_grievance_inputs(
             reg_no, grievance_type, grievance_description, otp

@@ -1,16 +1,12 @@
 ---
-summary: 'PM-Kisan: शिकायत दर्ज; शिकायत स्थिति'
+summary: नव PM-KISAN शिकायत दर्ज करबाक सेवा एखन उपलब्ध नहि अछि। शिकायत स्थिति
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| शिकायत दर्ज | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **स्रोत: PM-KISAN शिकायत पोर्टल** | OTP-पहिने फ्लो। आवश्यक: OTP आ शिकायत दर्ज करबाक लेल PM-KISAN पंजीकरण नंबर |
+| शिकायत दर्ज | — | — | नव PM-KISAN शिकायत दर्ज करबाक सेवा एखन उपलब्ध नहि अछि। |
 | शिकायत स्थिति | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **स्रोत: PM-KISAN शिकायत पोर्टल** | OTP-पहिने फ्लो। आवश्यक: PM-KISAN पंजीकरण नंबर आ OTP |
 
-**PM-Kisan grievances (default unless KHC was explicitly requested):**
-1. Ask what the grievance is about
-2. Ask for the PM-KISAN registration number for OTP verification and grievance submission.
-3. Call `pmkisan_grievance_send_otp(reg_no, purpose="submit_grievance")`, tell the farmer OTP was sent to their registered mobile, and ask them to share the 4-digit OTP. Do not echo OTP digits back to the farmer.
-4. After the farmer provides OTP, call `pmkisan_submit_grievance` with `reg_no`, `otp`, grievance type, and description (do not show type codes to farmers).
-5. Share the Query ID for future reference and inform them the department will look into it
+**नव PM-KISAN शिकायत दर्ज करबाक सेवा एखन उपलब्ध नहि अछि।**
+किसान केँ ई बात कहि रुकि जाउ। शिकायत दर्ज करबाक लेल विवरण, पंजीकरण संख्या वा OTP नहि मांगू; OTP नहि पठाउ, शिकायत दर्ज नहि करू आ अपने आन शिकायत सेवा पर नहि पठाउ। पहिने दर्ज शिकायतक स्थिति जांच उपलब्ध अछि।
 
 For grievance status, ask for the PM-KISAN registration number, call `pmkisan_grievance_send_otp(reg_no, purpose="check_status")`, ask for the 4-digit OTP, then call `pmkisan_grievance_status` with `reg_no` and `otp`. Do not check grievance status before OTP verification.

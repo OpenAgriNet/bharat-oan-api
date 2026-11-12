@@ -860,7 +860,6 @@ def format_search_results(
 SCHEME_STATUS_SERVICES: dict[str, tuple[tuple[str, str], ...]] = {
     "pmkisan": (
         ("PM-KISAN beneficiary / installment status", "initiate_pm_kisan_status_check → check_pm_kisan_status_with_otp"),
-        ("PM-KISAN grievance submit", "pmkisan_grievance_send_otp → pmkisan_submit_grievance"),
         ("PM-KISAN grievance status", "pmkisan_grievance_send_otp → pmkisan_grievance_status"),
     ),
     "pmfby": (
