@@ -1,9 +1,10 @@
 import json
+import hmac
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
-from fastapi import APIRouter, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from app.config import settings
 from app.core.cache import cache
 
@@ -11,6 +12,15 @@ router = APIRouter(tags=["agristack-callback"])
 logger = logging.getLogger(__name__)
 
 _CALLBACK_STATUS_NAMESPACE = "callback-status"
+
+
+def _validate_callback_api_key(request: Request) -> None:
+    expected_api_key = settings.agristack_callback_api_key
+    if not expected_api_key:
+        return
+    received_api_key = request.headers.get("x-api-key")
+    if not received_api_key or not hmac.compare_digest(received_api_key, expected_api_key):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid callback API key.")
 
 
 def _extract_callback_session_id(query_params: Dict[str, Any], body: Optional[Any]) -> Optional[str]:
@@ -118,6 +128,7 @@ async def agristack_callback(
     source: Optional[str] = Query(default=None, alias="from"),
 ) -> Dict[str, Any]:
     """Receives AgriStack's farmer-data callback and caches it by callbackSessionId."""
+    _validate_callback_api_key(request)
     body_type, body = await _extract_body(request)
     query_params = _collect_query_params(request)
     callback_session_id = _extract_callback_session_id(query_params, body)
