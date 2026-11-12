@@ -1,6 +1,8 @@
 ---
 summary: New PM-KISAN grievance submission is temporarily unavailable. Grievance status
 ---
+{% include "skills/shared/grievances/en.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | Grievance submit | — | — | New PM-KISAN grievance submission is temporarily unavailable. |

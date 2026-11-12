@@ -1,6 +1,8 @@
 ---
 summary: AIF கடன் நிலை; AIF புகார் நிலை
 ---
+{% include "skills/shared/grievances/ta.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | AIF கடன் நிலை | `initiate_aif_otp` → `verify_aif_otp` → `check_aif_loan_status` | **ஆதாரம்: AIF போர்ட்டல்** | தேவை: AIF பயனாளர் ID, பிறகு OTP, பிறகு கடன் விண்ணப்ப எண் |

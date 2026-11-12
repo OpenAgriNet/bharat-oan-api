@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY ದೂರು ಸ್ಥಿತಿ'
 ---
+{% include "skills/shared/grievances/kn.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY ದೂರು ಸ್ಥಿತಿ | `pmfby_grievance_status` | **ಮೂಲ: PMFBY ದೂರು ಪೋರ್ಟಲ್** | ಅಗತ್ಯ: ನೋಂದಾಯಿತ ಮೊಬೈಲ್ + ದೂರು ಸಹಾಯ ಟಿಕೆಟ್ ಸಂಖ್ಯೆ |

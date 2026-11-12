@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY शिकायत स्थिति'
 ---
+{% include "skills/shared/grievances/mai.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY शिकायत स्थिति | `pmfby_grievance_status` | **स्रोत: PMFBY शिकायत पोर्टल** | आवश्यक: पंजीकृत मोबाइल + शिकायत सहायता टिकट नंबर |

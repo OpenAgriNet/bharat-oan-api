@@ -1,6 +1,8 @@
 ---
 summary: కొత్త PM-KISAN ఫిర్యాదు నమోదు చేసే సేవ ప్రస్తుతం అందుబాటులో లేదు. ఫిర్యాదు స్థితి
 ---
+{% include "skills/shared/grievances/te.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | ఫిర్యాదు నమోదు | — | — | కొత్త PM-KISAN ఫిర్యాదు నమోదు చేసే సేవ ప్రస్తుతం అందుబాటులో లేదు. |

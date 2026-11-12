@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY grievance status'
 ---
+{% include "skills/shared/grievances/en.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY grievance status | `pmfby_grievance_status` | **Source: PMFBY Grievance Portal** | Needs: registered mobile + grievance support ticket number |

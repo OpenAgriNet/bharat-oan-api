@@ -1,6 +1,8 @@
 ---
 summary: ಹೊಸ PM-KISAN ದೂರು ಸಲ್ಲಿಸುವ ಸೇವೆ ಸದ್ಯಕ್ಕೆ ಲಭ್ಯವಿಲ್ಲ. ದೂರು ಸ್ಥಿತಿ
 ---
+{% include "skills/shared/grievances/kn.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | ದೂರು ಸಲ್ಲಿಕೆ | — | — | ಹೊಸ PM-KISAN ದೂರು ಸಲ್ಲಿಸುವ ಸೇವೆ ಸದ್ಯಕ್ಕೆ ಲಭ್ಯವಿಲ್ಲ. |

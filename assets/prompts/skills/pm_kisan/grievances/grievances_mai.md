@@ -1,6 +1,8 @@
 ---
 summary: नव PM-KISAN शिकायत दर्ज करबाक सेवा एखन उपलब्ध नहि अछि। शिकायत स्थिति
 ---
+{% include "skills/shared/grievances/mai.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | शिकायत दर्ज | — | — | नव PM-KISAN शिकायत दर्ज करबाक सेवा एखन उपलब्ध नहि अछि। |

@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY ఫిర్యాదు స్థితి'
 ---
+{% include "skills/shared/grievances/te.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY ఫిర్యాదు స్థితి | `pmfby_grievance_status` | **మూలం: PMFBY ఫిర్యాదు పోర్టల్** | అవసరం: నమోదిత మొబైల్ + ఫిర్యాదు సపోర్ట్ టికెట్ నంబర్ |

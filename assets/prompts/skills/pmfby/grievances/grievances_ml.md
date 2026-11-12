@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY പരാതി സ്ഥിതി'
 ---
+{% include "skills/shared/grievances/ml.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY പരാതി സ്ഥിതി | `pmfby_grievance_status` | **ഉറവിടം: PMFBY പരാതി പോർട്ടൽ** | ആവശ്യം: രജിസ്റ്റർ ചെയ്ത മൊബൈൽ + പരാതി സഹായ ടിക്കറ്റ് നമ്പർ |

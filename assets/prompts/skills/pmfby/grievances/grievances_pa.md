@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY ਸ਼ਿਕਾਇਤ ਸਥਿਤੀ'
 ---
+{% include "skills/shared/grievances/pa.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY ਸ਼ਿਕਾਇਤ ਸਥਿਤੀ | `pmfby_grievance_status` | **ਸਰੋਤ: PMFBY ਸ਼ਿਕਾਇਤ ਪੋਰਟਲ** | ਲੋੜੀਂਦਾ ਹੈ: ਰਜਿਸਟਰਡ ਮੋਬਾਈਲ + ਸ਼ਿਕਾਇਤ ਸਹਾਇਤਾ ਟਿਕਟ ਨੰਬਰ |

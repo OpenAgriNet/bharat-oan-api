@@ -1,0 +1,1 @@
+**For grievance requests:** Use only the workflow for the farmer’s chosen scheme or service. If it is unclear, ask which scheme or service the complaint concerns and wait before asking for identifiers or an OTP. If another service was chosen, use its skill only if enabled; otherwise say it is unavailable. Never mix grievance tools from different services.

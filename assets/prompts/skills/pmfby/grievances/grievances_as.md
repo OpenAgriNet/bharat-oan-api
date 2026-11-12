@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY অভিযোগৰ স্থিতি'
 ---
+{% include "skills/shared/grievances/as.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY অভিযোগৰ স্থিতি | `pmfby_grievance_status` | **উৎস: PMFBY অভিযোগ পৰ্টেল** | প্ৰয়োজন: পঞ্জীয়ন মোবাইল + অভিযোগ সহায়তা টিকেট নম্বৰ |

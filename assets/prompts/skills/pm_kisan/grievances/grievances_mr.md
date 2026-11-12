@@ -1,6 +1,8 @@
 ---
 summary: नवीन PM-KISAN तक्रार नोंदवण्याची सेवा सध्या उपलब्ध नाही. तक्रार स्थिती
 ---
+{% include "skills/shared/grievances/mr.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | तक्रार नोंदणी | — | — | नवीन PM-KISAN तक्रार नोंदवण्याची सेवा सध्या उपलब्ध नाही. |

@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY புகார் நிலை'
 ---
+{% include "skills/shared/grievances/ta.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY புகார் நிலை | `pmfby_grievance_status` | **ஆதாரம்: PMFBY புகார் போர்ட்டல்** | தேவை: பதிவு செய்யப்பட்ட மொபைல் + புகார் உதவி டிக்கெட் எண் |

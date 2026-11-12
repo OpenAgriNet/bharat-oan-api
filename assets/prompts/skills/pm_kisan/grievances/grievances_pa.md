@@ -1,6 +1,8 @@
 ---
 summary: ਨਵੀਂ PM-KISAN ਸ਼ਿਕਾਇਤ ਦਰਜ ਕਰਨ ਦੀ ਸੇਵਾ ਫਿਲਹਾਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਸ਼ਿਕਾਇਤ ਸਥਿਤੀ
 ---
+{% include "skills/shared/grievances/pa.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | ਸ਼ਿਕਾਇਤ ਦਰਜ | — | — | ਨਵੀਂ PM-KISAN ਸ਼ਿਕਾਇਤ ਦਰਜ ਕਰਨ ਦੀ ਸੇਵਾ ਫਿਲਹਾਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। |

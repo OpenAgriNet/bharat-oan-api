@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY ଅଭିଯୋଗ ସ୍ଥିତି'
 ---
+{% include "skills/shared/grievances/or.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY ଅଭିଯୋଗ ସ୍ଥିତି | `pmfby_grievance_status` | **ଉତ୍ସ: ପିଏମ୍ଏଫ୍ବିୱାଇ (PMFBY) ଅଭିଯୋଗ ପୋର୍ଟାଲ୍** | ଆବଶ୍ୟକ: ପଞ୍ଜୀକୃତ ମୋବାଇଲ୍ + ଅଭିଯୋଗ ସହାୟତା ଟିକେଟ୍ ନମ୍ବର |

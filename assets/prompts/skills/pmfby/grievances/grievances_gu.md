@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY ફરિયાદ સ્થિતિ'
 ---
+{% include "skills/shared/grievances/gu.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY ફરિયાદ સ્થિતિ | `pmfby_grievance_status` | **સ્રોત: PMFBY ફરિયાદ પોર્ટલ** | જરૂરી: નોંધાયેલ મોબાઇલ + ફરિયાદ સહાય ટિકિટ નંબર |

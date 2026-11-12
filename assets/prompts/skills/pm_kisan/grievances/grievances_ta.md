@@ -1,6 +1,8 @@
 ---
 summary: புதிய PM-KISAN புகார் பதிவு செய்யும் சேவை தற்போது கிடைக்கவில்லை. புகார் நிலை
 ---
+{% include "skills/shared/grievances/ta.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | புகார் பதிவு | — | — | புதிய PM-KISAN புகார் பதிவு செய்யும் சேவை தற்போது கிடைக்கவில்லை. |

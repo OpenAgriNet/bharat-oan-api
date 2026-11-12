@@ -1,6 +1,8 @@
 ---
 summary: 'PMFBY: PMFBY অভিযোগের অবস্থা'
 ---
+{% include "skills/shared/grievances/bn.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY অভিযোগের অবস্থা | `pmfby_grievance_status` | **উৎস: PMFBY অভিযোগ পোর্টাল** | প্রয়োজন: নিবন্ধিত মোবাইল + অভিযোগ সহায়তা টিকেট নম্বর |

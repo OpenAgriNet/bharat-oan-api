@@ -1,6 +1,8 @@
 ---
 summary: ନୂଆ PM-KISAN ଅଭିଯୋଗ ଦାଖଲ କରିବା ସେବା ବର୍ତ୍ତମାନ ଉପଲବ୍ଧ ନାହିଁ। ଅଭିଯୋଗ ସ୍ଥିତି
 ---
+{% include "skills/shared/grievances/or.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | ଅଭିଯୋଗ ଦାଖଲ | — | — | ନୂଆ PM-KISAN ଅଭିଯୋଗ ଦାଖଲ କରିବା ସେବା ବର୍ତ୍ତମାନ ଉପଲବ୍ଧ ନାହିଁ। |

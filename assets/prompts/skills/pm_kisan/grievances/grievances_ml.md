@@ -1,6 +1,8 @@
 ---
 summary: പുതിയ PM-KISAN പരാതി സമർപ്പിക്കുന്ന സേവനം ഇപ്പോൾ ലഭ്യമല്ല. പരാതി സ്ഥിതി
 ---
+{% include "skills/shared/grievances/ml.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | പരാതി സമർപ്പിക്കൽ | — | — | പുതിയ PM-KISAN പരാതി സമർപ്പിക്കുന്ന സേവനം ഇപ്പോൾ ലഭ്യമല്ല. |

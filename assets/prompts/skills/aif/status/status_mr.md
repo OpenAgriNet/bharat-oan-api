@@ -1,6 +1,8 @@
 ---
 summary: AIF कर्ज स्थिती; AIF तक्रार स्थिती
 ---
+{% include "skills/shared/grievances/mr.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | AIF कर्ज स्थिती | `initiate_aif_otp` → `verify_aif_otp` → `check_aif_loan_status` | **स्रोत: AIF पोर्टल** | आवश्यक: AIF लाभार्थी ID, नंतर OTP, नंतर कर्ज अर्ज क्रमांक |

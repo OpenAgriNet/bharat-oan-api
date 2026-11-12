@@ -250,11 +250,17 @@ only when FFS is enabled. The handoff text is omitted from GFR and discovery whe
 FFS is disabled. Its enabled wording and booking implementation are unchanged.
 ICAR's browser-location restriction is also omitted when ICAR is disabled.
 
-With KHC disabled and all three original scheme grievance skills enabled, the
-global clarification rule reuses production's native scheme-selection text before
-any identifiers/OTP are collected. Scheme information retains production's
-other-scheme redressal fallback without its obsolete filing-availability claim.
-Neither rule adds a dependency between the individual scheme services. Status
+PM-KISAN grievances, PMFBY grievances and AIF status each include the localized
+scope rule from `skills/shared/grievances/`: identify the complaint's scheme or
+service before collecting identifiers/OTP, use only its enabled workflow and
+never mix services' tools. This contains no skill inventory or flow count and
+works when any of those services is disabled. It belongs to the skills; Agrinet
+contains no scheme-specific routing or multi-skill feature condition. The shared
+snippet adds no skill or dependency between the individual services. AIF's rule
+applies to grievance requests, leaving its loan-status flow unchanged.
+
+Scheme information retains production's other-scheme redressal fallback without
+its obsolete filing-availability claim. Status
 offers use the enabled services listed by the search result, then require the
 farmer's agreement; direct status requests go straight to the matching service.
 

@@ -1,6 +1,8 @@
 ---
 summary: नई PM-KISAN शिकायत दर्ज करना फिलहाल उपलब्ध नहीं है। शिकायत स्थिति
 ---
+{% include "skills/shared/grievances/hi.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | शिकायत दर्ज | — | — | नई PM-KISAN शिकायत दर्ज करना फिलहाल उपलब्ध नहीं है। |

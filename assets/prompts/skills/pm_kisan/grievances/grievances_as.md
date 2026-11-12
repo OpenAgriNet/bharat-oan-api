@@ -1,6 +1,8 @@
 ---
 summary: নতুন PM-KISAN অভিযোগ দাখিল কৰাৰ সেৱা বৰ্তমান উপলব্ধ নহয়। অভিযোগৰ স্থিতি
 ---
+{% include "skills/shared/grievances/as.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | অভিযোগ দাখিল | — | — | নতুন PM-KISAN অভিযোগ দাখিল কৰাৰ সেৱা বৰ্তমান উপলব্ধ নহয়। |

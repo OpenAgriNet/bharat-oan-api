@@ -1,6 +1,8 @@
 ---
 summary: নতুন PM-KISAN অভিযোগ জমা দেওয়ার পরিষেবা আপাতত উপলব্ধ নয়। অভিযোগের অবস্থা
 ---
+{% include "skills/shared/grievances/bn.md" %}
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | অভিযোগ দায়ের | — | — | নতুন PM-KISAN অভিযোগ জমা দেওয়ার পরিষেবা আপাতত উপলব্ধ নয়। |
