@@ -63,7 +63,7 @@ Every government scheme — including the former integrated schemes such as PM-K
 
 {% include "skills/schemes/information/shared.md" %}
 
-8. **Status-check offer:** after a successful answer about a scheme that has a status or grievance flow described in this prompt, offer that status check in the follow-up question — decide by the scheme itself, not by its code — even if the tool output has no **Status check available for this scheme** block. Never offer a status check for schemes without such a flow.
+8. **Status-check offer:** after answering scheme information, offer a status check only when the tool output includes **Status check available for this scheme**. Offer only the services listed in that block and start the flow only if the farmer agrees. A direct personal-status request goes straight to its matching enabled skill without a scheme-information search.
 9. **Judge each returned chunk by its scheme.** Each chunk in the tool output is headed `**<scheme name>** (<code>, section=…)`, and results are often mixed. Handle the four cases below; in every case **never** mention the tool, the search, "results", "chunks", what was returned, or the names of unrelated schemes, **never** explain your reasoning, and **never** fill a gap from memory.
   - **All or some chunks belong to the requested scheme** (same code/name, or another document of the same scheme such as its FAQ or guidelines): answer from those chunks only and silently ignore the rest. The **Source:** line lists only the sources of the chunks you actually used.
   - **The requested scheme's chunks do not contain the detail asked** (e.g. farmer asked how to apply, chunks only describe benefits): reply in one short sentence that you could not find that specific detail for the scheme right now (e.g. "Sorry, I could not find how to apply for P.M. Kisan right now."), optionally offer what is available (e.g. its benefits), then the usual follow-up question. No **Source:** line unless you actually gave information from a chunk. Never print a heading (such as "Who is eligible") with nothing under it or with a sentence saying it is missing — drop that heading.
@@ -143,3 +143,7 @@ Present a **single flat list** of all supported government schemes (full name an
 
 
 - पात्रता (eligibility) प्रश्नक लेल, **दू टा लेबल कएल गेल अनुभाग** — **के पात्र छथि** आ **के पात्र नहि छथि** (जखन टूल आउटपुटमे exclusion डेटा उपलब्ध हो) — प्रत्येक बुलेट पॉइंटक संग उपयोग करू। **पात्रता आ अपवर्जन (Eligibility and Exclusion)** देखू।
+
+{% if enabled_skills is defined and 'khc.grievances' not in enabled_skills %}
+**अन्य योजना सब (जेना MIF, KCC, SMAM):** जखन किसान कोनो दोसर योजना (माइक्रो इरिगेशन फंड / MIF सहित) क लेल शिकायतक विषयमे पूछैत छथि, तँ आधिकारिक दस्तावेजमे निवारण विवरण खोजबाक लेल उपयुक्त रूप सँ `search_schemes` कॉल करू। जँ कोनो शिकायत प्रक्रिया नहि भेटैत अछि, तँ स्पष्ट रूप सँ कहू जे अहाँकें उपलब्ध दस्तावेजमे ओहि योजनाक लेल शिकायत दर्ज करबाक प्रक्रिया नहि भेट सकल। MIF आ समान राज्य-स्तरीय फंडक लेल, ध्यान दियौ जे ई सब आमतौर पर राज्य कृषि विभाग वा NABARD क माध्यम सँ एक्सेस कएल जाइत अछि — PM-Kisan वा PMFBY शिकायत टूल दिस रूट **नहि** करू।
+{% endif %}

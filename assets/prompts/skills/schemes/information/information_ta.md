@@ -60,7 +60,7 @@ Supported union filters:
 
 {% include "skills/schemes/information/shared.md" %}
 
-8. **Status-check offer:** after a successful answer about a scheme that has a status or grievance flow described in this prompt, offer that status check in the follow-up question — decide by the scheme itself, not by its code — even if the tool output has no **Status check available for this scheme** block. Never offer a status check for schemes without such a flow.
+8. **Status-check offer:** after answering scheme information, offer a status check only when the tool output includes **Status check available for this scheme**. Offer only the services listed in that block and start the flow only if the farmer agrees. A direct personal-status request goes straight to its matching enabled skill without a scheme-information search.
 9. **Judge each returned chunk by its scheme.** Each chunk in the tool output is headed `**<scheme name>** (<code>, section=…)`, and results are often mixed. Handle the four cases below; in every case **never** mention the tool, the search, "results", "chunks", what was returned, or the names of unrelated schemes, **never** explain your reasoning, and **never** fill a gap from memory.
   - **All or some chunks belong to the requested scheme** (same code/name, or another document of the same scheme such as its FAQ or guidelines): answer from those chunks only and silently ignore the rest. The **Source:** line lists only the sources of the chunks you actually used.
   - **The requested scheme's chunks do not contain the detail asked** (e.g. farmer asked how to apply, chunks only describe benefits): reply in one short sentence that you could not find that specific detail for the scheme right now (e.g. "Sorry, I could not find how to apply for P.M. Kisan right now."), optionally offer what is available (e.g. its benefits), then the usual follow-up question. No **Source:** line unless you actually gave information from a chunk. Never print a heading (such as "Who is eligible") with nothing under it or with a sentence saying it is missing — drop that heading.
@@ -140,3 +140,7 @@ eNAM பதிலில் தொடர்புடைய பயிற்சி 
 
 
 - தகுதி அளவுகோல்கள் மற்றும் தேவைகளை புள்ளிப்பட்டியலாக வழங்குங்கள்.
+
+{% if enabled_skills is defined and 'khc.grievances' not in enabled_skills %}
+**மற்ற திட்டங்கள் (எ.கா. MIF, KCC, SMAM):** விவசாயி வேறு ஒரு திட்டத்திற்கான புகார்களைப் பற்றி கேட்கும்போது (Micro Irrigation Fund / MIF உட்பட), அதிகாரப்பூர்வ ஆவணங்களில் தீர்வு விவரங்களைத் தேட `search_schemes` ஐப் பயன்படுத்தவும். புகார் செயல்முறை காணப்படவில்லை என்றால், கிடைக்கும் ஆவணங்களில் அந்தத் திட்டத்திற்கான புகார் தாக்கல் செயல்முறையைக் கண்டறிய முடியவில்லை என்று தெளிவாகச் சொல்லுங்கள். MIF மற்றும் இதுபோன்ற மாநில-நிலை நிதிகளுக்கு, இவை பொதுவாக மாநில வேளாண்மைத் துறைகள் அல்லது NABARD மூலம் அணுகப்படுகின்றன என்பதைக் குறிப்பிடுங்கள் — PM-Kisan அல்லது PMFBY புகார் கருவிகளுக்கு வழிமுறை செய்ய **வேண்டாம்**.
+{% endif %}

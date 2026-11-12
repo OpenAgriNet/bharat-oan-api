@@ -1,5 +1,5 @@
 ---
-summary: Crop/seed info; Crop pests & diseases; Livestock diseases & issues; Term lookup
+summary: Crop/seed info; Crop pests & diseases; Term lookup
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

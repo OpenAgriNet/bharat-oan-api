@@ -82,12 +82,16 @@ class FarmerContext(BaseModel):
     def _location_context_string(self):
         """Give the agent explicit access to browser coordinates when available."""
         if self.latitude is not None and self.longitude is not None:
-            return (
+            location = (
                 "**Browser Location Coordinates:** "
-                f"Latitude={self.latitude}, Longitude={self.longitude} "
-                "(the device location; never use it, or a place worked out from it, for a crop advisory question: "
-                "for crop advice the farmer's state and district come only from the farmer)"
+                f"Latitude={self.latitude}, Longitude={self.longitude}"
             )
+            if "crop.icar" in self.skills.permitted:
+                location += (
+                    " (the device location; never use it, or a place worked out from it, for a crop advisory question: "
+                    "for crop advice the farmer's state and district come only from the farmer)"
+                )
+            return location
         return None
     
     def _agristack_context_string(self):

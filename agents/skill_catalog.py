@@ -39,6 +39,9 @@ class Skill(Definition):
     requires: list[str] = Field(default_factory=list)
     optional_requires: list[str] = Field(default_factory=list)
 
+    def dependencies(self, allowed: set[str] | None = None) -> list[str]:
+        return self.requires + [name for name in self.optional_requires if allowed is None or name in allowed]
+
 
 class AgentConfig(Definition):
     prompt_dir: str
@@ -94,11 +97,8 @@ class SkillCatalog:
             if name in visited:
                 return
             visiting.append(name)
-            for dependency in self.manifest.skills[name].requires:
+            for dependency in self.manifest.skills[name].dependencies(allowed):
                 visit(dependency)
-            for dependency in self.manifest.skills[name].optional_requires:
-                if allowed is None or dependency in allowed:
-                    visit(dependency)
             visiting.pop()
             visited.add(name)
             result.append(name)

@@ -242,3 +242,23 @@ These switches control chat skills and their shared-helper behavior. They do not
 remove Python modules, delete saved state or unregister existing HTTP callback
 routes. AgriStack consent and normal API authentication still apply. No actual
 production environment file is edited by this PR.
+
+Keep discovery descriptions distinct: crop advice owns crop/pest requests;
+document search is a supporting lookup with direct livestock coverage. GFR owns
+fertilizer-dose recommendations; buying fertilizer explicitly hands off to FFS
+only when FFS is enabled. The handoff text is omitted from GFR and discovery when
+FFS is disabled. Its enabled wording and booking implementation are unchanged.
+ICAR's browser-location restriction is also omitted when ICAR is disabled.
+
+With KHC disabled and all three original scheme grievance skills enabled, the
+global clarification rule reuses production's native scheme-selection text before
+any identifiers/OTP are collected. Scheme information retains production's
+other-scheme redressal fallback without its obsolete filing-availability claim.
+Neither rule adds a dependency between the individual scheme services. Status
+offers use the enabled services listed by the search result, then require the
+farmer's agreement; direct status requests go straight to the matching service.
+
+The switches do not roll back dev's shared behavior improvements: named-crop pest
+search validation, public-announcement versus personal-status routing, contextual
+moderation, native conversation history, stream deduplication and vLLM language
+constraints remain. Tool-name parity alone is not production behavior equivalence.

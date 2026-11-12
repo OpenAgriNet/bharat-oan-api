@@ -1,1 +1,1 @@
-Supporting document lookup. For crop advice, load crop.advice for its ICAR-first workflow; for schemes, load schemes.information for routing. Direct document lookup also covers livestock information.
+Supporting document lookup for other skills; it does not select their workflows. Crop questions use crop.advice, scheme questions use schemes.information. Direct document lookup handles livestock information.

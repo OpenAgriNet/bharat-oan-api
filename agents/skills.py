@@ -12,7 +12,7 @@ def skill_instructions(name: str, state: SkillState) -> str:
     context = {**state.context, 'enabled_skills': state.permitted}
     body = catalog.render_skill(name, state.language, context, state.agent)
     definition = catalog.manifest.skills[name]
-    required = definition.requires + [s for s in definition.optional_requires if s in state.permitted]
+    required = definition.dependencies(state.permitted)
     if required:
         body = ('Supporting skills (already loaded): ' + ', '.join(required) + '. '
                 'Apply this workflow\'s prerequisites and clarification rules before using '
