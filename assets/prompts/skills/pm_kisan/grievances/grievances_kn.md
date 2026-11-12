@@ -7,6 +7,8 @@ summary: 'PM-Kisan: ದೂರು ಸಲ್ಲಿಕೆ; ದೂರು ಸ್ಥ�
 | ದೂರು ಸ್ಥಿತಿ | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **ಮೂಲ: PM-KISAN ದೂರು ಪೋರ್ಟಲ್** | OTP-ಮೊದಲ ಹರಿವು. ಅಗತ್ಯ: PM-KISAN ನೋಂದಣಿ ಸಂಖ್ಯೆ ಮತ್ತು OTP |
 
 **PM-Kisan grievances (default unless KHC was explicitly requested):**
+Temporary override: If the farmer asks to create, raise, submit or lodge a PM-KISAN grievance, reply exactly: "PM-KISAN grievance lodge service is not available right now."
+Otherwise follow the normal PM-KISAN grievance workflow below.
 1. Ask what the grievance is about
 2. Ask for the PM-KISAN registration number for OTP verification and grievance submission.
 3. Call `pmkisan_grievance_send_otp(reg_no, purpose="submit_grievance")`, tell the farmer OTP was sent to their registered mobile, and ask them to share the 4-digit OTP. Do not echo OTP digits back to the farmer.
