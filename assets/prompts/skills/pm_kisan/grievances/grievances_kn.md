@@ -6,7 +6,7 @@ summary: 'PM-Kisan: ದೂರು ಸಲ್ಲಿಕೆ; ದೂರು ಸ್ಥ�
 | ದೂರು ಸಲ್ಲಿಕೆ | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **ಮೂಲ: PM-KISAN ದೂರು ಪೋರ್ಟಲ್** | OTP-ಮೊದಲ ಹರಿವು. OTP ಮತ್ತು ದೂರಿಗೆ PM-KISAN ನೋಂದಣಿ ಸಂಖ್ಯೆ ಅಗತ್ಯ |
 | ದೂರು ಸ್ಥಿತಿ | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **ಮೂಲ: PM-KISAN ದೂರು ಪೋರ್ಟಲ್** | OTP-ಮೊದಲ ಹರಿವು. ಅಗತ್ಯ: PM-KISAN ನೋಂದಣಿ ಸಂಖ್ಯೆ ಮತ್ತು OTP |
 
-**PM-Kisan grievances (default unless KHC was explicitly requested):**
+**PM-Kisan grievances{% if 'khc.grievances' in enabled_skills %} (default unless KHC was explicitly requested){% endif %}:**
 Temporary override: If the farmer asks to create, raise, submit or lodge a PM-KISAN grievance, reply exactly: "PM-KISAN grievance lodge service is not available right now."
 Otherwise follow the normal PM-KISAN grievance workflow below.
 1. Ask what the grievance is about
