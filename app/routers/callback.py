@@ -20,6 +20,15 @@ def _validate_callback_api_key(request: Request) -> None:
         return
     received_api_key = request.headers.get("x-api-key")
     if not received_api_key or not hmac.compare_digest(received_api_key, expected_api_key):
+        logger.warning(
+            "callback.auth_failed from=%s callbackSessionId=%s has_x_api_key=%s x_api_key_length=%d client=%s user_agent=%s",
+            request.query_params.get("from"),
+            request.query_params.get("callbackSessionId"),
+            bool(received_api_key),
+            len(received_api_key or ""),
+            request.client.host if request.client else None,
+            request.headers.get("user-agent"),
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid callback API key.")
 
 
@@ -132,6 +141,15 @@ async def agristack_callback(
     body_type, body = await _extract_body(request)
     query_params = _collect_query_params(request)
     callback_session_id = _extract_callback_session_id(query_params, body)
+    logger.info(
+        "callback.auth_ok from=%s callbackSessionId=%s has_x_api_key=%s x_api_key_length=%d client=%s user_agent=%s",
+        source,
+        callback_session_id,
+        bool(request.headers.get("x-api-key")),
+        len(request.headers.get("x-api-key") or ""),
+        request.client.host if request.client else None,
+        request.headers.get("user-agent"),
+    )
     response = {
         "status": "received",
         "from": source,
