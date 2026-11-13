@@ -1741,6 +1741,8 @@ def test_explicit_khc_pm_kisan_request_does_not_mix_workflows(later_turns):
     assert "Never ask for a PM-Kisan registration number" in note
     assert "Do not combine KHC and scheme-service questions" in note
     assert "If the scheme is already named, skip the scheme question" in note
+    assert "Apply the same stop gate when PM-KISAN is identified later" in note
+    assert "Strict override for loop prevention" in note
     assert "Ask only the first missing KHC detail" in note
     assert "These KHC rules override the general follow-up and source-order rules" in note
     assert "put the source last with nothing after it" in note
