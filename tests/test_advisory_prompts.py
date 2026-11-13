@@ -5,13 +5,18 @@ from pathlib import Path
 
 import pytest
 
-PROMPTS = sorted((Path(__file__).resolve().parent.parent / "assets" / "prompts" / "skills" / "crop" / "advice").glob("advice_*.md"))
+def _advice(icar_path):
+    """crop.advice prompt in the same language; ICAR rows live in crop.icar so production can switch them off."""
+    return icar_path.parent.parent / "advice" / icar_path.name.replace("icar_", "advice_")
+
+
+PROMPTS = sorted((Path(__file__).resolve().parent.parent / "assets" / "prompts" / "skills" / "crop" / "icar").glob("icar_*.md"))
 
 
 def _render(path, context=None):
     from agents.skill_catalog import get_catalog
 
-    return get_catalog().render_skill("crop.advice", path.stem.removeprefix("advice_"), context or {})
+    return get_catalog().render_skill("crop.icar", path.stem.removeprefix("icar_"), context or {})
 
 
 def test_all_thirteen_language_prompts_are_covered():
@@ -29,7 +34,7 @@ def test_prompt_has_a_search_advisory_row_in_the_tool_table(path):
 
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
 def test_existing_document_and_pest_rows_are_untouched(path):
-    text = path.read_text(encoding="utf-8")
+    text = _advice(path).read_text(encoding="utf-8")
     assert len(re.findall(r"^\|[^\n]*`search_documents`[^\n]*\|$", text, flags=re.M)) >= 2
     assert "`search_pests_diseases`" in text
 
@@ -77,7 +82,8 @@ def test_prompt_has_the_search_first_advisory_flow(path):
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
 def test_a_missing_crop_is_asked_first_in_the_tool_rows(path):
     lines = path.read_text(encoding="utf-8").splitlines()
-    pests = [l for l in lines if l.startswith("|") and "`search_pests_diseases`" in l and "`search_advisory`" not in l]
+    advice = _advice(path).read_text(encoding="utf-8").splitlines()
+    pests = [l for l in advice if l.startswith("|") and "`search_pests_diseases`" in l and "`search_advisory`" not in l]
     assert any("ask which crop first" in r and "`crop`" in r for r in pests), f"{path.name}: pests row must ask for a missing crop"
     advisory = [l for l in lines if l.startswith("|") and "`search_advisory`" in l and "ask which crop first" in l]
     assert len(advisory) == 1 and "general knowledge" in advisory[0]

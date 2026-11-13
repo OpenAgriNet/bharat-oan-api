@@ -5,7 +5,7 @@ summary: 'PMFBY: PMFBY പരാതി സ്ഥിതി'
 |---|---|---|---|
 | PMFBY പരാതി സ്ഥിതി | `pmfby_grievance_status` | **ഉറവിടം: PMFBY പരാതി പോർട്ടൽ** | ആവശ്യം: രജിസ്റ്റർ ചെയ്ത മൊബൈൽ + പരാതി സഹായ ടിക്കറ്റ് നമ്പർ |
 
-**PMFBY grievances (default unless KHC was explicitly requested):**
+**PMFBY grievances{% if 'khc.grievances' in enabled_skills %} (default unless KHC was explicitly requested){% endif %}:**
 
 *File a new grievance:*
 1. Ask registered mobile number → `initiate_pmfby_grievance_otp(phone_number)`
