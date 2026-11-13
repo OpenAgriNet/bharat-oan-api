@@ -18,7 +18,7 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from agents.tools.imd_advisory import agromet_note
 from app.config import DEFAULT_HTTP_TIMEOUT
-from helpers.advisory_pending import ADVISORY_FIRST_RETRY, PENDING_RETRY, advisory_not_searched, advisory_question_pending
+from helpers.advisory_pending import ADVISORY_FIRST_RETRY, PENDING_RETRY, advisory_not_searched, advisory_question_pending, crop_question_needs_advisory
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.scheme_qdrant_search import (
     format_scheme_unavailable,
@@ -468,6 +468,8 @@ async def search_documents(
     Returns:
         search_results: Formatted list of documents
     """
+    if crop_question_needs_advisory(ctx):
+        raise ModelRetry(ADVISORY_FIRST_RETRY)
     if advisory_question_pending(ctx):
         raise ModelRetry(PENDING_RETRY)
     try:

@@ -31,6 +31,8 @@ from helpers.advisory_pending import (
     answer_chain,
     farmer_gave_days,
     farmer_gave_season,
+    describe_turns,
+    farmer_named_crop,
     farmer_wrote,
     may_answer_now,
 )
@@ -42,8 +44,12 @@ logger = get_logger(__name__)
 
 KNOWLEDGE_ADVISORY_CATEGORY = "knowledge-advisory"
 
-# Source shown to the farmer for every advisory answer.
+# Source shown to the farmer for advisories from Kisan Sarathi.
 ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
+# The provider's `origin` for an advisory PDF uploaded in docs-pipeline; those cite the PDF's name.
+PDF_ADVISORY_ORIGIN = "docs-pipeline"
+# Crop of the coffee PDF advisories. They carry no season, sowing stage or place, so they are answered at once.
+COFFEE_CROP = "coffee"
 
 # Longest value forwarded for crop / season, and the accepted range for days after sowing.
 _MAX_PARAM_LENGTH = 100
@@ -126,6 +132,11 @@ def explicit_seasons(results: List[Dict[str, Any]]) -> List[str]:
 def _crop_eq(chunk_crop: str, crop: str) -> bool:
     a, b = chunk_crop.strip().lower(), crop.strip().lower()
     return bool(a) and bool(b) and (a == b or a in b or b in a)
+
+
+def is_coffee_pdf(result: Dict[str, Any]) -> bool:
+    """True for a coffee chunk from an uploaded PDF (provider `origin` docs-pipeline, crop Coffee)."""
+    return result.get("origin") == PDF_ADVISORY_ORIGIN and _crop_eq(result.get("crop") or "", COFFEE_CROP)
 
 
 def relevant_for_crop(results: List[Dict[str, Any]], crop_hint: str, query: str) -> tuple[List[Dict[str, Any]], str]:
@@ -267,6 +278,7 @@ def _advisory_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]
         "doc_id": (details.get("doc_id") or "").strip(),
         "chunk_id": (details.get("chunk_id") or item.get("id") or "").strip(),
         "source": (details.get("source") or "").strip(),
+        "origin": (details.get("origin") or "").strip().lower(),
         "text": text,
         "seasons": parse_chunk_seasons(text),
         # Where the advisory applies. Chunks from a provider without location read as "applies everywhere".
@@ -308,23 +320,35 @@ def parse_advisory_response(data: Dict[str, Any]) -> tuple[List[Dict[str, Any]],
     return [], fallback_ctx
 
 
+def _same_words(a: str, b: str) -> bool:
+    return " ".join(re.findall(r"\w+", a.lower())) == " ".join(re.findall(r"\w+", b.lower()))
+
+
 _TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
+
+
+def advisory_source(result: Dict[str, Any]) -> str:
+    """Source to cite for one advisory: the PDF's name for an uploaded PDF, else ADVISORY_SOURCE."""
+    if result.get("origin") == PDF_ADVISORY_ORIGIN and result.get("title"):
+        return result["title"]
+    return ADVISORY_SOURCE
 
 
 def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
     """Readable block per advisory for the agent.
 
     The provider appends "Source: institute, creator" to each text. That line names the
-    institute and a user name, so it is removed here; the answer cites ADVISORY_SOURCE instead.
+    institute and a user name, so it is removed here; the answer cites advisory_source instead.
     """
     blocks = []
     for r in results:
         text = _TRAILING_SOURCE.sub("", r["text"]).rstrip()
         blocks.append(f"**{r.get('title') or 'Advisory'}**\n```\n{text}\n```")
+    sources = list(dict.fromkeys(advisory_source(r) for r in results))
     return (
         "> Advisory Search Results for `" + query + "`\n\n"
         + "\n\n----\n\n".join(blocks)
-        + f"\n\n> Cite as (in bold): **Source: {ADVISORY_SOURCE}**"
+        + f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
     )
 
 
@@ -454,6 +478,13 @@ def format_search_notes(
     return "\n".join(lines)
 
 
+POLITE_ASK = (
+    "Be polite and warm: start the question with \"Could you please tell me\" (in the farmer's language). Never "
+    "say \"I can only answer after you tell me\", \"I need\", \"you must\", \"before I can answer\" or any "
+    "wording that sounds like a condition or an order; do not open with the crop or the topic."
+)
+
+
 def _join_names(names: List[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
@@ -482,7 +513,7 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
         f"{PENDING_MARKER}\n> Advisory Search Results for `{query}`\n\n"
         "> Advisories were found, but the right one depends on details the farmer has not given. Do not give any "
         "advice yet. Your whole reply is only that one question: no introduction or explanation of why you are "
-        "asking, no repeated sentence, and no Source line. Ask the farmer ONE short, natural question asking "
+        "asking, no repeated sentence, and no Source line. " + POLITE_ASK + " Ask the farmer ONE short, natural question asking "
         + " and ".join(parts)
         + f". Example (use the farmer's crop name instead of \"your crop\" and translate it to the farmer's language): \"{example}\"." + seasons_note
         + " Do not suggest which season it is or say which season the advice is for: the farmer decides."
@@ -510,7 +541,7 @@ def format_location_question(query: str, restate: str = "") -> str:
         f"{PENDING_MARKER}{LOCATION_MARKER}\n> Advisory Search Results for `{query}`\n\n"
         "> These advisories are meant for particular places, and the farmer has not said where they farm. Do not give "
         "any advice yet. Your whole reply is only that one question: no introduction or explanation of why you are "
-        "asking, no repeated sentence, and no Source line. Ask the farmer ONE short, natural question asking their "
+        "asking, no repeated sentence, and no Source line. " + POLITE_ASK + " Ask the farmer ONE short, natural question asking their "
         "state and district. Example (translate it to the farmer's language): \"Could you please tell me which state "
         "and district you are farming in?\" Write it as a normal sentence. When they answer, call `search_advisory` "
         f"again with the same `query` and `crop`{restate} plus `state` and `district` (the names they gave, in English). "
@@ -664,6 +695,7 @@ async def search_advisory(
     answer_now: bool = False,
     state: Optional[str] = None,
     district: Optional[str] = None,
+    crop_words: Optional[str] = None,
 ) -> str:
     """
     Search crop advisories for a farming problem: pests, diseases, symptoms, crop practices
@@ -690,6 +722,9 @@ async def search_advisory(
             (or do not want to say): the tool then answers without asking again.
         state: The farmer's state in English (for example "Uttar Pradesh"), only if the farmer said it.
         district: The farmer's district in English (for example "Agra"), only if the farmer said it.
+        crop_words: The farmer's own words naming the crop, exactly as written in their message for this
+            question (any language), for example "गेहूं". The crop must come from the farmer's current
+            question, never from an earlier question in the chat.
 
     Returns:
         Advisory text with a "Search notes" line; or an instruction to ask the farmer one question; or an
@@ -717,6 +752,23 @@ async def search_advisory(
             "The crop is required. If the farmer named a crop, call search_advisory again with `crop`. "
             "If they did not, ask them which crop in one short question, wait for the answer, then search."
         )
+    if not farmer_named_crop(ctx, crop_hint, _clean_param(crop_words)):
+        logger.info(
+            "search_advisory: crop %r is not in the farmer's words for this question; turns (* = ended with a "
+            "search_advisory question): %s",
+            crop_hint, describe_turns(ctx, crop_hint),
+        )
+        said = (answer_chain(ctx) or [("", False)])[-1][0].strip()
+        raise ModelRetry(
+            f"The crop `{crop_hint}` is not in the farmer's words for this question. Their message is: \"{said}\". "
+            "Read it again. If it names a crop (in any language), call search_advisory again with that crop as "
+            "`crop` and the farmer's exact words for it as `crop_words`; do not ask which crop. Only if it names "
+            "no crop at all, do not search: ask which crop in one short question, with no advice and no Source "
+            "line, and search when they answer."
+        )
+    # The farmer answered the crop question with only the crop: search the crop's general advisory.
+    if _same_words(query, crop_hint):
+        query = f"{crop_hint} crop advisory"
     limit = _clean_top_k(top_k) or 5
 
     results, search_ctx, status, message = await _run_search(
@@ -728,6 +780,12 @@ async def search_advisory(
         return _no_results_message(query, status, message)
 
     chunks, crop_name = relevant_for_crop(results, crop_hint, query)
+    coffee_pdf = [r for r in chunks if is_coffee_pdf(r)]
+    if coffee_pdf:
+        # Generic answer: a coffee PDF is not tied to a season, sowing stage or place, so ask the farmer nothing.
+        # Chunk-level season/place are blanked so no re-query, suggestion or place sentence is triggered.
+        generic = [{**r, "seasons": [], "location_national": True} for r in coffee_pdf]
+        return _answer(generic, {**search_ctx, "has_day_range": "false"}, query, limit, None, "")
     seen = list(results)  # every chunk looked at, for the seasons offered later
     season_ok = [r for r in chunks if season_matches(r, season_value)] if season_value else chunks
 

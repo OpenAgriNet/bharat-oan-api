@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from pydantic_ai import ModelRetry
 
 from agents.tools import advisory as sa
 
@@ -24,7 +25,7 @@ def _tag(code, value):
 
 
 def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.8321",
-          source="ICAR–DKMA, jak", section="full", crop="Sorghum", doc_id="row-1", location=None):
+          source="ICAR–DKMA, jak", section="full", crop="Sorghum", doc_id="row-1", location=None, origin=None):
     """`location` is an optional dict: match, national, states, districts (provider's per-chunk location tags)."""
     location = location or {}
     location_tags = [] if not location else [
@@ -33,6 +34,7 @@ def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.
         _tag("location-states", ", ".join(location.get("states", []))),
         _tag("location-districts", ", ".join(location.get("districts", []))),
     ]
+    origin_tags = [] if origin is None else [_tag("origin", origin)]
     return {
         "id": chunk_id,
         "descriptor": {"name": title, "code": section, "long_desc": text},
@@ -42,7 +44,7 @@ def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.
                 "list": [
                     _tag("title", title), _tag("crop", crop), _tag("section", section),
                     _tag("score", score), _tag("doc_id", doc_id), _tag("chunk_id", chunk_id),
-                    _tag("source", source), _tag("text", text), *location_tags,
+                    _tag("source", source), _tag("text", text), *location_tags, *origin_tags,
                 ],
             }
         ],
@@ -192,6 +194,12 @@ class TestParse:
         results, _ = sa.parse_advisory_response(_on_search([_item("c1", text="")]))
         assert results == []
 
+    def test_reads_where_each_chunk_came_from(self):
+        results, _ = sa.parse_advisory_response(
+            _on_search([_item("c1", origin="docs-pipeline"), _item("c2", origin="webhook"), _item("c3")])
+        )
+        assert [r["origin"] for r in results] == ["docs-pipeline", "webhook", ""]
+
 
 class TestFormat:
     def test_formats_title_and_text(self):
@@ -213,6 +221,32 @@ class TestSourceLine:
         )
         assert "jak" not in out and "DKMA" not in out
         assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
+
+    def test_cites_the_pdf_name_for_an_advisory_uploaded_as_a_pdf(self):
+        out = sa.format_advisory_results(
+            [{"title": "coffee_guide_2023_mini", "text": "Spray Bordeaux mixture.", "section": "full",
+              "origin": "docs-pipeline"}],
+            "q",
+        )
+        assert out.rstrip().endswith("**Source: coffee_guide_2023_mini**")
+        assert "Kisan Sarathi" not in out
+
+    def test_cites_kisan_sarathi_for_a_webhook_advisory(self):
+        out = sa.format_advisory_results(
+            [{"title": "T", "text": TEXT, "section": "full", "origin": "webhook"}], "q"
+        )
+        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
+
+    def test_cites_both_when_pdf_and_kisan_sarathi_advisories_are_returned(self):
+        out = sa.format_advisory_results(
+            [
+                {"title": "Wheat Insect Management", "text": TEXT, "section": "full", "origin": "webhook"},
+                {"title": "coffee_guide_2023_mini", "text": "Spray.", "section": "full", "origin": "docs-pipeline"},
+                {"title": "Package of Practices for Wheat", "text": TEXT, "section": "full", "origin": "webhook"},
+            ],
+            "q",
+        )
+        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi; coffee_guide_2023_mini**")
 
     def test_leaves_text_without_a_source_line_alone(self):
         out = sa.format_advisory_results([{"title": "T", "text": "Advisory: Harvest.", "section": "full"}], "q")
@@ -359,6 +393,7 @@ class TestSearchFirst:
         params = inspect.signature(sa.search_advisory).parameters
         assert list(params)[1:] == [
             "query", "crop", "days_after_sowing", "season", "location", "top_k", "answer_now", "state", "district",
+            "crop_words",
         ]
         assert "advice_type" not in params
 
@@ -773,12 +808,12 @@ class TestPlaceComesFromTheFarmersWords:
     def test_a_place_carried_over_by_the_model_does_not_replace_the_farmers_answer(self, bap):
         bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
         history = (
-            [_user("maize nursery bed, Rabi")]
+            [_user("wheat nursery bed, Rabi")]
             + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q")
             + [_user("Bareilly, Uttar Pradesh")]
         )
         out = asyncio.run(
-            sa.search_advisory(_ctx(history), "maize nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
+            sa.search_advisory(_ctx(history), "wheat nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
         )
         assert _params(_sent(bap, 0))["district_lgd_code"] == "130"
         assert "Tamil Nadu" not in out
@@ -786,12 +821,12 @@ class TestPlaceComesFromTheFarmersWords:
     def test_an_answer_the_lookup_does_not_know_is_named_not_replaced_by_an_earlier_place(self, bap):
         bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
         history = (
-            [_user("maize nursery bed, Rabi")]
+            [_user("wheat nursery bed, Rabi")]
             + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q")
             + [_user("dharwad")]
         )
         out = asyncio.run(
-            sa.search_advisory(_ctx(history), "maize nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
+            sa.search_advisory(_ctx(history), "wheat nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
         )
         assert "state_lgd_code" not in bap.requests[0].read().decode()
         assert "I could not match dharwad to a state or district. This is the general advice found for your crop." in out
@@ -874,3 +909,155 @@ class TestPlaceSentenceWording:
             [self._result(["Agra", "Aligarh", "Azamgarh"], ("Uttar Pradesh",), "state_partial")], resolve_place("Uttar Pradesh")
         )
         assert opening == "This advice is for some districts of Uttar Pradesh: Agra, Aligarh and Azamgarh."
+
+
+class TestCoffeePdfAnswersGenerically:
+    """An uploaded coffee PDF (origin docs-pipeline, crop Coffee) is answered at once: no season, days or place question."""
+
+    @staticmethod
+    def _pdf(chunk_id="p1", season="Rabi", **kw):
+        return _chunk(chunk_id, season, crop="Coffee", title="coffee_guide_2023_mini", origin="docs-pipeline", **kw)
+
+    def test_no_season_days_or_place_question(self, bap):
+        located = {"match": "not_requested", "national": False, "states": ["Karnataka"], "districts": ["Kodagu"]}
+        bap.response = _respond([self._pdf("p1", "Rabi", location=located), self._pdf("p2", "Kharif")], has_day_range="true")
+        out = asyncio.run(sa.search_advisory(CTX, "leaf rust", crop="Coffee"))
+        assert "Scout for aphids (p1)" in out and "Source: coffee_guide_2023_mini" in out
+        assert sa.PENDING_MARKER not in out and "ask" not in out.lower().split("search notes")[0]
+        assert "advisory_has_day_range=no" in out
+        assert "applies everywhere" not in out and "This advice is for" not in out
+        assert len(bap.requests) == 1
+
+    def test_a_season_the_farmer_gave_does_not_trigger_a_requery_or_suggestion(self, bap):
+        bap.response = _respond([self._pdf("p1", "Rabi")], has_day_range="true")
+        out = asyncio.run(sa.search_advisory(_ctx([_user("coffee leaf rust, it is kharif season")]), "leaf rust", crop="Coffee", season="Kharif"))
+        assert "Scout for aphids (p1)" in out and len(bap.requests) == 1
+
+    def test_a_coffee_chunk_from_kisan_sarathi_still_asks(self, bap):
+        bap.response = _respond([_chunk("w1", "Rabi", crop="Coffee", origin="webhook")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "leaf rust", crop="Coffee"))
+        assert "Scout for aphids (w1)" not in out
+
+    def test_a_pdf_of_another_crop_still_asks(self, bap):
+        bap.response = _respond([_chunk("w1", "Rabi", crop="Wheat", origin="docs-pipeline")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "aphids", crop="Wheat"))
+        assert "Scout for aphids (w1)" not in out
+
+    def test_coffee_pdf_chunks_win_over_other_coffee_chunks(self, bap):
+        bap.response = _respond([_chunk("w1", "Rabi", crop="Coffee", origin="webhook"), self._pdf("p1")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(CTX, "leaf rust", crop="Coffee"))
+        assert "(p1)" in out and "(w1)" not in out
+
+
+class TestCropGuard:
+    """The crop must come from the farmer's words for this question."""
+
+    @staticmethod
+    def _earlier_answer():
+        return [_user("wheat aphids"), ModelResponse(parts=[TextPart(content="answer")])]
+
+    def test_a_crop_taken_from_an_earlier_question_is_refused(self, bap):
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        history = self._earlier_answer() + [_user("how to manage mealybugs")]
+        with pytest.raises(ModelRetry, match="not in the farmer's words"):
+            asyncio.run(sa.search_advisory(_ctx(history), "mealybug management", crop="Wheat"))
+        assert bap.requests == []
+
+    def test_the_refusal_quotes_the_farmers_message_so_the_model_can_retry_with_the_right_crop(self, bap):
+        history = self._earlier_answer() + [_user("How do I monitor aphids in my sorghum crop?")]
+        with pytest.raises(ModelRetry) as err:
+            asyncio.run(sa.search_advisory(_ctx(history), "aphids", crop="Coffee"))
+        text = str(err.value)
+        assert "How do I monitor aphids in my sorghum crop?" in text and "do not ask which crop" in text
+
+    def test_the_crop_in_the_farmers_message_is_accepted(self, bap):
+        bap.response = _respond([_item("c1", crop="Wheat")], **NO_DAYS)
+        out = asyncio.run(sa.search_advisory(_ctx([_user("wheat aphids")]), "wheat aphids", crop="Wheat"))
+        assert "Search notes" in out
+
+    def test_the_crop_answer_to_a_crop_question_is_accepted(self, bap):
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        history = [_user("aphids"), ModelResponse(parts=[TextPart(content="Which crop?")]), _user("Sorghum")]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids", crop="Sorghum"))
+        assert "Search notes" in out
+
+    def test_a_season_question_the_model_wrote_itself_keeps_the_crop_of_the_question(self, bap):
+        bap.response = _respond([_item("c1", crop="Japanese mint")], **NO_DAYS)
+        history = self._earlier_answer() + [
+            _user("How should I do seed treatment for Japanese mint?"),
+            ModelResponse(parts=[TextPart(content="Could you please tell me which season you are growing it in?")]),
+            _user("Zaid, 60 days"),
+        ]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "seed treatment", crop="Japanese mint"))
+        assert "Search notes" in out
+
+    def test_questions_the_model_wrote_itself_keep_the_whole_chain(self):
+        from helpers import advisory_pending as ap
+
+        history = [
+            _user("How do I manage brown rust in my wheat crop?"),
+            ModelResponse(parts=[TextPart(content="Could you please tell me which season you are growing your wheat in, and how many days ago you sowed it?")]),
+            _user("Rabi, 20 days"),
+            ModelResponse(parts=[TextPart(content="Could you please tell me which state and district you are farming in?")]),
+            _user("Nagaland"),
+        ]
+        ctx = _ctx(history)
+        assert ap.asked_in_previous_turn(ctx) and ap.asked_location_in_previous_turn(ctx)
+        assert ap.farmer_gave_season(ctx) and ap.farmer_gave_days(ctx) and ap.farmer_gave_place(ctx)
+        assert ap.farmer_named_crop(ctx, "Wheat")
+
+    def test_an_answer_with_a_source_line_does_not_continue_the_question(self, bap):
+        answer = "Advice.\n\n**Source: ICAR - Kisan Sarathi**\n\nWould you like pest advice for wheat?"
+        history = [_user("wheat aphids"), ModelResponse(parts=[TextPart(content=answer)]), _user("yes")]
+        with pytest.raises(ModelRetry, match="not in the farmer's words"):
+            asyncio.run(sa.search_advisory(_ctx(history), "pest advice", crop="Wheat"))
+
+    def test_crop_words_in_another_script_are_accepted(self, bap):
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        out = asyncio.run(
+            sa.search_advisory(_ctx([_user("गेहूं में माहू")]), "wheat aphids", crop="Sorghum", crop_words="गेहूं")
+        )
+        assert "Search notes" in out
+
+    def test_crop_words_the_farmer_never_wrote_are_refused(self, bap):
+        history = self._earlier_answer() + [_user("stem borer")]
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx(history), "stem borer", crop="Wheat", crop_words="wheat"))
+
+    def test_a_crop_only_query_becomes_a_general_crop_search(self, bap):
+        bap.response = _respond([_item("c1")], **NO_DAYS)
+        history = [_user("aphids"), ModelResponse(parts=[TextPart(content="Which crop?")]), _user("Sorghum")]
+        asyncio.run(sa.search_advisory(_ctx(history), "Sorghum", crop="Sorghum"))
+        assert "Sorghum crop advisory" in bap.requests[0].read().decode()
+
+    def test_the_standard_name_of_a_crop_the_farmer_called_by_another_name_is_accepted(self, bap):
+        # "paddy" in the first question, then only "Kharif, 145 days"; the model passes the standard name Rice
+        bap.response = _respond([_chunk("c1", "Kharif", crop="Rice")], **NO_DAYS)
+        history = (
+            [_user("At what stage should I harvest my paddy crop?")]
+            + _asked(f"{sa.PENDING_MARKER} q")
+            + [_user("Kharif, 145 days")]
+        )
+        out = asyncio.run(
+            sa.search_advisory(_ctx(history), "paddy harvest stage", crop="Rice", season="Kharif", days_after_sowing=145)
+        )
+        assert "Search notes" in out
+
+    def test_a_synonym_does_not_let_another_crop_through(self, bap):
+        history = [_user("At what stage should I harvest my paddy crop?")] + _asked("answer") + [_user("how to control aphids")]
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx(history), "aphids", crop="Rice"))
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx([_user("paddy harvest")]), "harvest", crop="Wheat"))
+
+    def test_arabica_counts_as_naming_coffee(self, bap):
+        bap.response = _respond(
+            [_chunk("p1", "Rabi", crop="Coffee", title="coffee_guide_2023_mini", origin="docs-pipeline")], **NO_DAYS
+        )
+        out = asyncio.run(sa.search_advisory(_ctx([_user("beetle on arabica stems")]), "stem borer", crop="Coffee"))
+        assert "Source: coffee_guide_2023_mini" in out
+
+    def test_coffee_is_refused_when_the_farmer_never_named_it(self, bap):
+        history = self._earlier_answer() + [_user("how to manage mealybugs")]
+        with pytest.raises(ModelRetry):
+            asyncio.run(sa.search_advisory(_ctx(history), "mealybug management", crop="Coffee"))
