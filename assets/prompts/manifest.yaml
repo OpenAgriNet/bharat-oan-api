@@ -155,7 +155,7 @@ agents:
     - te
     # bh-main comments out: ffs.booking, agristack.profile, khc.grievances, crop.icar
     enabled_skills:
-    - ffs.booking
+    # - ffs.booking
     - schemes.information
     - pm_kisan.status
     - pm_kisan.grievances
@@ -165,15 +165,15 @@ agents:
     - smam.status
     - aif.status
     - kcc.status
-    - khc.grievances
+    # - khc.grievances
     - crop.advice
-    - crop.icar
+    # - crop.icar
     - weather.forecast
     - location.resolve
     - mandi.prices
     - fertilizer.recommendations
     - seeds.availability
-    - agristack.profile
+    # - agristack.profile
     - weather.agromet
     - pm_kisan.installments
     - documents.search
