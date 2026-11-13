@@ -1066,7 +1066,7 @@ def test_find_location_sends_known_details_and_reports_one_village(monkeypatch):
 
 
 @pytest.mark.parametrize("needs,expected", [
-    ("state", "the scheme comes before the state"),
+    ("state", "Please share the name of your state"),
     ("district", "Can you please share your district name"),
     ("geocode", "forward_geocode"),
 ])
@@ -1186,58 +1186,6 @@ def test_grievance_options_does_not_list_schemes_before_the_farmer_names_one(mon
     assert "has not named a scheme yet" in output and "Do not show a list" in output
     assert "AIF" not in output
     assert 'reference_type="schemes", parent_id=9' in output
-
-
-def test_grievance_options_recovers_missing_scheme_from_history(monkeypatch):
-    call = AsyncMock(return_value="ok")
-    monkeypatch.setattr(khc, "_call", call)
-    chat = _chat(
-        "i want to raise grivance with khc",
-        ("bot", "Could you please tell me which scheme your complaint is about?"),
-        "AIF",
-        ("bot", "Please share the name of your state."),
-        "Uttar Pradesh",
-    )
-    output = asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh"))
-    assert output == "ok"
-    assert call.call_args.kwargs["scheme_name"] == "AIF"
-
-
-def test_find_location_recovers_missing_district_from_history(monkeypatch):
-    import json
-
-    calls = []
-    village = {
-        "level": "village", "id": 5, "name": "Abupur",
-        "state": {"id": 9, "name": "Uttar Pradesh"}, "district": {"id": 221, "name": "Ghaziabad"},
-        "subDistrict": {"id": 1067, "name": "Loni"},
-    }
-    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_location", {
-        "matches": json.dumps([village]), "total": "1",
-    })), calls)
-    chat = _chat(
-        "i want to raise grivance with khc", ("bot", "Could you please tell me which scheme your complaint is about?"),
-        "AIF", ("bot", "Please share the name of your state."), "Uttar Pradesh",
-        ("bot", "Can you please share your district name"), "Ghaziabad",
-    )
-    output = asyncio.run(khc.find_khc_location(chat, "Abupur", "Uttar Pradesh"))
-    assert _tags(calls[0])["district_name"] == "Ghaziabad"
-    assert "Found one place" in output
-
-
-def test_grievance_options_recovers_category_pick_from_history(monkeypatch):
-    call = AsyncMock(return_value="ok")
-    monkeypatch.setattr(khc, "_call", call)
-    chat = _chat(
-        "i want to raise grivance with khc", "AIF", "Uttar Pradesh", "Ghaziabad", "Abupur",
-        ("bot", "Which one feels closest to your problem?\n- Bank Loan Sanction Issues\n- Fund Disbursement Issues"),
-        "Bank Loan Sanction Issues",
-    )
-    output = asyncio.run(khc.get_khc_grievance_options(
-        chat, "Uttar Pradesh", "AIF", "bank loan sanction issue", "",
-    ))
-    assert output == "ok"
-    assert call.call_args.kwargs["category_name"] == "Bank Loan Sanction Issues"
 
 
 def test_grievance_options_lists_only_the_schemes_that_matched(monkeypatch):
@@ -1712,21 +1660,11 @@ def test_a_reply_in_another_language_to_the_problem_question_is_used(monkeypatch
 def test_a_tool_called_with_no_state_never_asks_for_the_state_first(monkeypatch):
     call = AsyncMock()
     monkeypatch.setattr(khc, "_call", call)
-    output = asyncio.run(khc.get_khc_grievance_options(ctx(), "", ""))
+    output = asyncio.run(khc.get_khc_grievance_options(ctx(), "", "AIF"))
     assert "Nothing to look up yet: no state has been given" in output
     assert "Do not ask anything because of this message" in output
     assert "the scheme comes before the state" in output
     assert "Which state" not in output and "share the name of your state" not in output
-    call.assert_not_called()
-
-
-def test_missing_state_after_scheme_moves_to_state_step(monkeypatch):
-    call = AsyncMock()
-    monkeypatch.setattr(khc, "_call", call)
-    output = asyncio.run(khc.get_khc_grievance_options(ctx(), "", "AIF"))
-    assert "Nothing to look up yet: no state has been given" in output
-    assert "next step that is not done yet, which is 'Please share the name of your state'" in output
-    assert "the scheme comes before the state" not in output
     call.assert_not_called()
 
 
@@ -1804,9 +1742,9 @@ def test_explicit_khc_pm_kisan_request_does_not_mix_workflows(later_turns):
     assert "Do not combine KHC and scheme-service questions" in note
     assert "If the scheme is already named, skip the scheme question" in note
     assert "Apply the same stop gate when PM-KISAN is identified later" in note
-    assert "Strict override for loop prevention" in note
-    assert 'Farmer: "AIF" -> Ask: "Please share the name of your state."' in note
-    assert 'Loop prevention sequence: "AIF" -> "Uttar Pradesh" -> next question must be district or village' in note
+    assert "Loop guard (answered steps stay answered)" in note
+    assert 'Farmer: "AIF" -> Ask: "Please share the name of your state"' in note
+    assert '"AIF" -> "Please share the name of your state" -> "uttar pradesh" -> "Can you please share your district name"' in note
     assert "Ask only the first missing KHC detail" in note
     assert "These KHC rules override the general follow-up and source-order rules" in note
     assert "put the source last with nothing after it" in note

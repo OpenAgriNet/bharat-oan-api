@@ -85,53 +85,6 @@ def _asked_for_problem(text: str) -> bool:
     return "own words" in low and any(word in low for word in ("problem", "complaint", "issue"))
 
 
-def _asked_for_scheme(text: str) -> bool:
-    low = text.lower()
-    return "which scheme" in low and "complaint" in low
-
-
-def _asked_for_state(text: str) -> bool:
-    low = text.lower()
-    return "name of your state" in low
-
-
-def _asked_for_district(text: str) -> bool:
-    return "district name" in text.lower()
-
-
-def _asked_for_village(text: str) -> bool:
-    return "name of your village" in text.lower()
-
-
-def _asked_for_sub_district(text: str) -> bool:
-    return "which sub-district" in text.lower()
-
-
-def _asked_for_category_choice(text: str) -> bool:
-    return "which one feels closest to your problem" in text.lower()
-
-
-def _recover_latest_reply(turns: list[tuple[str, str]], asked) -> str:
-    for index in range(len(turns) - 1, -1, -1):
-        who, text = turns[index]
-        if who != "farmer":
-            continue
-        if index and turns[index - 1][0] == "bot" and asked(turns[index - 1][1]):
-            return " ".join(text.split())
-    return ""
-
-
-def _recover_khc_slots(turns: list[tuple[str, str]]) -> dict[str, str]:
-    return {
-        "scheme": _recover_latest_reply(turns, _asked_for_scheme),
-        "state": _recover_latest_reply(turns, _asked_for_state),
-        "district": _recover_latest_reply(turns, _asked_for_district),
-        "village": _recover_latest_reply(turns, _asked_for_village),
-        "sub_district": _recover_latest_reply(turns, _asked_for_sub_district),
-        "category": _recover_latest_reply(turns, _asked_for_category_choice),
-    }
-
-
 def _resolve_concern(ctx, concern: str, scheme: str) -> str | None:
     """The concern to search with, or None when the farmer has not described a problem yet.
 
@@ -208,9 +161,8 @@ def _render_location(fields: dict[str, str], place: str) -> str:
     if not matches:
         ask = {
             "state": (
-                "No state was given. Do not ask anything because of this message: go back to the KHC step order "
-                "and ask the first step that is not done yet (the scheme comes before the state), then call this "
-                "tool again once the state and district are known."
+                "No state was given. Ask 'Please share the name of your state', then call this tool again once "
+                "the state and district are known."
             ),
             "district": "Ask 'Can you please share your district name', then call this tool again with that district.",
             "geocode": (
@@ -563,19 +515,6 @@ async def find_khc_location(
     """
     place, state, district = place.strip(), state.strip(), district.strip()
     sub_district = sub_district.strip()
-    slots = _recover_khc_slots(_turns(getattr(ctx, "messages", None)))
-    if not state and slots["state"]:
-        state = slots["state"]
-        logger.info("khc.state_from_farmer_reply session=%s", ctx.deps.session_id)
-    if not district and slots["district"]:
-        district = slots["district"]
-        logger.info("khc.district_from_farmer_reply session=%s", ctx.deps.session_id)
-    if not sub_district and slots["sub_district"]:
-        sub_district = slots["sub_district"]
-        logger.info("khc.sub_district_from_farmer_reply session=%s", ctx.deps.session_id)
-    if not place and slots["village"]:
-        place = slots["village"]
-        logger.info("khc.village_from_farmer_reply session=%s", ctx.deps.session_id)
     if not place or len(place) > 200 or max(len(state), len(district), len(sub_district)) > 100:
         return "Ask the farmer for their village or place name (up to 200 characters)."
     if state and _loose(place) == _loose(state):
@@ -615,26 +554,7 @@ async def get_khc_grievance_options(
     """
     state, scheme, concern = state.strip(), scheme.strip(), " ".join(concern.split())
     category = category.strip()
-    turns = _turns(getattr(ctx, "messages", None))
-    slots = _recover_khc_slots(turns)
-    if not scheme:
-        scheme = slots["scheme"]
-        if scheme:
-            logger.info("khc.scheme_from_farmer_reply session=%s", ctx.deps.session_id)
     if not state:
-        state = slots["state"]
-        if state:
-            logger.info("khc.state_from_farmer_reply session=%s", ctx.deps.session_id)
-    if not category and slots["category"]:
-        category = slots["category"]
-        logger.info("khc.category_from_farmer_reply session=%s", ctx.deps.session_id)
-    if not state:
-        if scheme:
-            return (
-                "Nothing to look up yet: no state has been given. Do not ask anything because of this message. "
-                "Go back to the KHC step order and ask the next step that is not done yet, which is "
-                "'Please share the name of your state'."
-            )
         return (
             "Nothing to look up yet: no state has been given. Do not ask anything because of this message. "
             "Go back to the KHC step order and ask the first step that is not done yet; the scheme comes "
