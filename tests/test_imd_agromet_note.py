@@ -4,6 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
+from agents.skill_catalog import get_catalog
 from agents.tools import imd_advisory
 
 BULLETIN = {
@@ -36,9 +37,11 @@ class FakeCache:
         self.data[(namespace, key)] = value
 
 
-def context(session_id="s1"):
+def context(session_id="s1", allowed=None):
+    tools = get_catalog().tools if allowed is None else set(allowed)
     return SimpleNamespace(deps=SimpleNamespace(
         session_id=session_id, latitude=19.9975, longitude=73.7898, lang_code="en",
+        skills=SimpleNamespace(allowed_tools=tools),
     ))
 
 
@@ -214,9 +217,8 @@ class AgrometNote(unittest.TestCase):
         self.assertIn("Start by saying this bulletin has no advisory for Buffalo.", text)
         self.assertIn("Maize", text)
 
-    def test_unconfigured_service_says_do_not_mention(self):
-        with mock.patch.object(imd_advisory, "IMD_DB_URL", None):
-            self.assertEqual(self.note(context()), imd_advisory.NO_MENTION)
+    def test_tool_not_allowed_adds_nothing(self):
+        self.assertEqual(self.note(context(allowed={"weather_forecast"})), "")
 
 
 class AdvisoryText(unittest.TestCase):

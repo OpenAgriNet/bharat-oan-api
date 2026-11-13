@@ -1,6 +1,9 @@
 import re
 import unittest
 from pathlib import Path
+from agents.skill_catalog import get_catalog
+from agents.skill_policy import SkillState
+from agents.skills import render_prompt
 
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "assets" / "prompts"
@@ -8,15 +11,18 @@ PROMPT_DIR = Path(__file__).resolve().parents[1] / "assets" / "prompts"
 
 class PmkisanPromptValidationTests(unittest.TestCase):
     def test_registration_examples_and_tool_handoff_in_every_language(self):
-        prompts = sorted(PROMPT_DIR.glob("agrinet_*.md"))
+        prompts = sorted((PROMPT_DIR / "chat").glob("agrinet_*.md"))
         self.assertTrue(prompts)
         for path in prompts:
             with self.subTest(language=path.stem):
-                prompt = path.read_text(encoding="utf-8")
+                prompt = render_prompt(SkillState(), path.stem.rsplit("_", 1)[1], {})
                 rule = next(
                     line for line in prompt.splitlines()
                     if line.startswith("**PM-KISAN Registration Number Validation:**")
                 )
+                self.assertNotIn("Before any PM-KISAN tool call", rule)
+                self.assertIn("Only for personal status or grievance requests", rule)
+                self.assertIn("does not apply to scheme information or public release dates", rule)
                 self.assertIn("trim surrounding whitespace", rule)
                 pattern = rule.split("`")[1]
                 for example in ("TN110700729", "TN110698429"):

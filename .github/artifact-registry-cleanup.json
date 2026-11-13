@@ -1,0 +1,19 @@
+[
+  {
+    "name": "keep-branch-images",
+    "action": {"type": "Keep"},
+    "condition": {
+      "tagState": "TAGGED",
+      "tagPrefixes": ["bh-dev", "bh-main", "dev", "main"]
+    }
+  },
+  {
+    "name": "delete-pr-images-after-7d",
+    "action": {"type": "Delete"},
+    "condition": {
+      "tagState": "TAGGED",
+      "tagPrefixes": ["pr-"],
+      "olderThan": "7d"
+    }
+  }
+]

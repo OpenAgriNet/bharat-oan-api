@@ -1,0 +1,82 @@
+{
+  "code": 200,
+  "data": [
+    {
+      "productId": 1105,
+      "productName": "Sulphur Coated Urea(40Kg)",
+      "plantId": 99999999,
+      "plantName": "default",
+      "productGroupId": 11,
+      "productGroupName": "Urea",
+      "sequenceNo": 1,
+      "bagWeightKg": 40.0
+    },
+    {
+      "productId": 1089,
+      "productName": "Neem Coated Urea(45 Kg)",
+      "plantId": 99999999,
+      "plantName": "default",
+      "productGroupId": 11,
+      "productGroupName": "Urea",
+      "sequenceNo": 1,
+      "bagWeightKg": 45.0
+    },
+    {
+      "productId": 1005,
+      "productName": "DAP",
+      "plantId": 99999999,
+      "plantName": "default",
+      "productGroupId": 12,
+      "productGroupName": "DAP",
+      "sequenceNo": 3,
+      "bagWeightKg": 50.0
+    },
+    {
+      "productId": 1078,
+      "productName": "Zincated DAP",
+      "plantId": 99999999,
+      "plantName": "default",
+      "productGroupId": 12,
+      "productGroupName": "DAP",
+      "sequenceNo": 3,
+      "bagWeightKg": 50.0
+    },
+    {
+      "productId": 1010,
+      "productName": "TSP",
+      "plantId": 99999999,
+      "plantName": "default",
+      "productGroupId": 12,
+      "productGroupName": "DAP",
+      "sequenceNo": 3,
+      "bagWeightKg": 50.0
+    },
+    {
+      "productId": 1051,
+      "productName": "Boronated DAP",
+      "plantId": 99999999,
+      "plantName": "default",
+      "productGroupId": 12,
+      "productGroupName": "DAP",
+      "sequenceNo": 3,
+      "bagWeightKg": 50.0
+    },
+    {
+      "productId": 1008,
+      "productName": "MAP",
+      "plantId": 99999999,
+      "plantName": "default",
+      "productGroupId": 12,
+      "productGroupName": "DAP",
+      "sequenceNo": 3,
+      "bagWeightKg": 50.0
+    }
+  ],
+  "message": "Get records.",
+  "method": "GET",
+  "pageNo": null,
+  "pageSize": null,
+  "status": "success",
+  "totalPages": null,
+  "totalRecords": null
+}

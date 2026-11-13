@@ -18,10 +18,12 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from agents.tools.imd_advisory import agromet_note
 from app.config import DEFAULT_HTTP_TIMEOUT
+from helpers.advisory_pending import ADVISORY_FIRST_RETRY, PENDING_RETRY, advisory_not_searched, advisory_question_pending
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.scheme_qdrant_search import (
     format_scheme_unavailable,
     format_search_results,
+    format_status_check_offer,
     get_builtin_scheme_list,
     query_names_unindexed_scheme,
     resolve_scheme_code,
@@ -423,7 +425,10 @@ async def search_schemes(
             resolved or scheme_code, len(results), doc_ids,
         )
 
-        return format_search_results(results, query, scheme_list)
+        formatted = format_search_results(results, query, scheme_list)
+        if results:
+            formatted += format_status_check_offer(resolved or scheme_code)
+        return formatted
 
     except httpx.TimeoutException as e:
         logger.error("Scheme network search timed out: %s", e)
@@ -463,6 +468,8 @@ async def search_documents(
     Returns:
         search_results: Formatted list of documents
     """
+    if advisory_question_pending(ctx):
+        raise ModelRetry(PENDING_RETRY)
     try:
         # Initialize Marqo client
         endpoint_url = os.getenv('MARQO_ENDPOINT_URL')
@@ -546,8 +553,9 @@ async def search_video(
 @observe(name="tool:search_pests_diseases", as_type="tool")
 async def search_pests_diseases(
     ctx: RunContext[FarmerContext],
-    query: str, 
-    top_k: int = 10, 
+    query: str,
+    crop: str,
+    top_k: int = 10,
 ) -> str:
     """
     Semantic search for **crop** pests and diseases only (e.g. crop insects, fungal/bacterial diseases of plants).
@@ -555,11 +563,22 @@ async def search_pests_diseases(
     
     Args:
         query: The search query in *English* (required)
+        crop: The crop in English, for example "Wheat" (required). If the farmer has not said which crop,
+            do not call this tool: ask which crop first.
         top_k: Maximum number of results to return (default: 10)
         
     Returns:
         search_results: Formatted list of pests and diseases information
     """
+    if not " ".join(str(crop or "").split()):
+        raise ModelRetry(
+            "The crop is required. If the farmer named a crop, call search_pests_diseases again with `crop`. "
+            "If they did not, ask them which crop in one short question, wait for the answer, then search."
+        )
+    if advisory_not_searched(ctx):
+        raise ModelRetry(ADVISORY_FIRST_RETRY)
+    if advisory_question_pending(ctx):
+        raise ModelRetry(PENDING_RETRY)
     try:
         # Initialize Marqo client
         endpoint_url = os.getenv('MARQO_ENDPOINT_URL')

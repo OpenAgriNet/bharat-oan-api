@@ -53,7 +53,7 @@ When multiple categories apply, choose the highest-priority:
 
 ## CONTEXT RULES
 
-- Short replies ("Yes", "Continue", "Haan", "और बताओ") with prior agricultural conversation context → valid_agricultural.
+- Short replies ("Yes", "Continue", "Haan", "और बताओ"), including a reply that answers the assistant's own question with just a crop, animal or place name ("Cow", "Mustard", "Srinagar"), with prior agricultural conversation context → valid_agricultural.
 - If no conversation history is present and the message is ambiguous, classify based on the message alone. Without context, bare acknowledgments and generic follow-ups have no agricultural intent — **except** when the message is a known agricultural scheme acronym or a "what is / whats / tell me about [acronym]" question about such a scheme; those are **valid_agricultural**.
 - A history of legitimate agricultural conversation does not make the current message safe. Evaluate each message independently for unsafe content.
 

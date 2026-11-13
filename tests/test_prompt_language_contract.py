@@ -1,10 +1,13 @@
-"""Stdlib-only guard for newly added PMFBY instructions in language prompts.
+"""Guard for PM-KISAN routing and localized PMFBY/IMD instructions in rendered prompts.
 
 This checks script and identifiers, not translation quality or model behavior.
 """
 from pathlib import Path
 import re
 import unittest
+from agents.skill_catalog import get_catalog
+from agents.skill_policy import SkillState
+from agents.skills import render_prompt
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_RANGES = {
@@ -15,16 +18,62 @@ SCRIPT_RANGES = {
 }
 
 
+def render(language, **context):
+    return render_prompt(SkillState(), language, context)
+
+
 class PromptLanguageContract(unittest.TestCase):
+    def test_pmkisan_release_date_is_not_personal_status(self):
+        for language in ["en", *SCRIPT_RANGES]:
+            with self.subTest(language=language):
+                text = render(language, today_date="28 October 2026")
+                blocks = [block for block in text.split("\n\n")
+                          if block.startswith("**PM-KISAN 24th installment release date:**")]
+                self.assertEqual(len(blocks), 1)
+                block = blocks[0]
+                self.assertIn("Do not call search_schemes, load_skill or any status/OTP tool", block)
+                self.assertNotIn("The 24th instalment of PM-KISAN will be released on 30th October 2026.", text)
+                self.assertIn("The 24th instalment of PM-KISAN was released on 30th October 2026.", text)
+                self.assertNotIn("पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की जाएगी।", text)
+                self.assertIn("पीएम-किसान योजना की 24वीं किस्त दिनांक 30 अक्टूबर 2026 को जारी की गई।", text)
+                self.assertIn("When will the next PM-KISAN installment be released?", block)
+                self.assertIn("No registration number or OTP is needed", block)
+                self.assertIn("30 October 2026", text)
+                self.assertNotIn("31 October 2026", block)
+                self.assertIn("Use past tense for this released installment.", block)
+                self.assertNotIn("or when the next instalment will come", text)
+                self.assertNotIn("23rd", text)
+                self.assertIn('"PM Kisan installment status"', text)
+                self.assertIn("initiate_pm_kisan_status_check", text)
+                self.assertIn("check_pm_kisan_status_with_otp", text)
+
+    def test_scheme_skill_keeps_release_routing(self):
+        for language in ["en", *SCRIPT_RANGES]:
+            with self.subTest(language=language):
+                text = get_catalog().render_skill("schemes.information", language, {})
+                block = next(block for block in text.split("\n\n")
+                             if "**Scheme information vs. status request:**" in block)
+                self.assertIn("When will the next PM-KISAN installment be released?", block)
+                self.assertIn("when will pm kisan installement arrivces", block)
+                self.assertIn("A previous status-check offer is not consent", block)
+                self.assertIn("Do not continue a pending request for identifiers", block)
+                self.assertIn("Answer directly from the configured release announcement in this prompt", block)
+                self.assertIn("do not search or load a skill", block)
+                self.assertLess(block.index("**General PM-KISAN release date**"),
+                                block.index("**Direct status request**"))
+                self.assertIn("do not ask for registration number, phone number or OTP", block)
+
     def test_pmfby_safeguards_keep_language_and_tool_arguments(self):
         for language in ["en", *SCRIPT_RANGES]:
             with self.subTest(language=language):
-                text = (ROOT / "assets/prompts" / f"agrinet_{language}.md").read_text()
+                text = get_catalog().render_skill("pmfby.grievances", language, {})
                 self.assertNotIn("### PMFBY grievance verification rules", text)
                 headings = list(re.finditer(r"^### .*PMFBY.*$", text, re.M))
                 self.assertTrue(headings, "Missing localized PMFBY safeguards")
                 start = headings[-1].start()
-                end = text.index("\n## ", start)
+                end = text.find("\n## ", start)
+                if end < 0:
+                    end = len(text)
                 block = text[start:end]
                 for call in [
                     "initiate_pmfby_grievance_otp(phone_number)",
@@ -44,6 +93,30 @@ class PromptLanguageContract(unittest.TestCase):
                     if line.startswith("- "):
                         self.assertTrue(any(lo <= ord(char) <= hi for char in line), "Instruction is missing the language's script")
 
+    def test_imd_agromet_instructions_keep_language_and_tool_names(self):
+        for language in ["en", *SCRIPT_RANGES]:
+            with self.subTest(language=language):
+                rows = [line for line in render(language).splitlines()
+                        if line.startswith("|") and "`imd_agromet_advisory`" in line]
+                self.assertEqual(len(rows), 1, "Expected exactly one IMD agromet tool row")
+                section = get_catalog().render_skill("weather.agromet", language, {})
+                section = "\n".join(line for line in section.splitlines() if not line.startswith("|"))
+                self.assertIn(section.strip(), render(language), "IMD agromet section is not included")
+                for name in ["place", "forward_geocode", "crop.advice"]:
+                    self.assertIn(f"`{name}`", rows[0])
+                self.assertIn("`crop`", section)
+                if language == "en":
+                    continue
+                lo, hi = SCRIPT_RANGES[language]
+                for text in [rows[0], section]:
+                    prose = re.sub(r"`[^`]+`", "", text)
+                    prose = re.sub(r"(?<![A-Za-z])IMD(?![A-Za-z])", "", prose)
+                    self.assertIsNone(re.search(r"[A-Za-z]{2,}", prose), "English prose in localized IMD instructions")
+                for cell in rows[0].strip("|").split("|"):
+                    self.assertTrue(any(lo <= ord(char) <= hi for char in cell), "Cell is missing the language's script")
+                for line in section.splitlines():
+                    if line.startswith("- "):
+                        self.assertTrue(any(lo <= ord(char) <= hi for char in line), "Instruction is missing the language's script")
 
 if __name__ == "__main__":
     unittest.main()

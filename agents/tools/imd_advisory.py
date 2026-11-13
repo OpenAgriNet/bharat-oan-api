@@ -433,8 +433,10 @@ async def agromet_note(
     When a current IMD advisory exists for the location (and, for a crop search, covers a crop named in the query)
     and it has not been mentioned or shared in this conversation yet, the note tells the model to offer it in one
     line. In every other case, including any lookup failure, the note tells the model not to mention it, so the
-    model never offers an advisory that does not exist.
+    model never offers an advisory that does not exist. Empty only when the IMD tool is not enabled.
     """
+    if "imd_agromet_advisory" not in ctx.deps.skills.allowed_tools:
+        return ""
     lat, lon = await _coords(ctx, latitude, longitude)
     if lat is None or lon is None or not resolver_configured() or not IMD_DB_URL:
         return NO_MENTION

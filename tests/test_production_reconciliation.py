@@ -153,6 +153,9 @@ def test_chat_returns_actual_stream_qid_in_exposed_header(load_module, monkeypat
     async def history(session_id):
         return session_id, []
 
+    async def ffs_context(session_id):
+        return {}
+
     captured = []
     async def stream(**kwargs):
         captured.append(kwargs)
@@ -161,7 +164,9 @@ def test_chat_returns_actual_stream_qid_in_exposed_header(load_module, monkeypat
     stub("app.auth.jwt_auth", get_current_user=lambda: {"channel": "BharatVistaar"})
     models = load_module("app/models/requests.py")
     stub("app.models.requests", ChatRequest=models.ChatRequest)
-    stub("app.routers.chat_query_utils", get_session_history=history, normalize_chat_query=lambda query: (query, False), prepare_image_analyze_payload=lambda **kwargs: None)
+    stub("app.routers.chat_query_utils", ensure_session_id=lambda value: value or str(uuid.uuid4()),
+         get_session_history=history, normalize_chat_query=lambda query: (query, False), prepare_image_analyze_payload=lambda **kwargs: None)
+    stub("app.services.ffs", prepare_chat_turn=ffs_context)
     stub("app.services.chat", stream_chat_messages=stream)
     router = load_module("app/routers/chat.py")
     app = FastAPI()
@@ -260,5 +265,5 @@ def test_api_key_cannot_override_jwt_claims(token_module, monkeypatch):
 @pytest.mark.parametrize("language", ["en", "hi", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te"])
 def test_prompt_template_compiles(language):
     from jinja2 import Environment
-    text = (ROOT / "assets/prompts" / f"agrinet_{language}.md").read_text()
+    text = (ROOT / "assets/prompts/chat" / f"agrinet_{language}.md").read_text()
     Environment().parse(text)

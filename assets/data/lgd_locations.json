@@ -1,0 +1,505 @@
+{
+ "_note": "Seed list of Indian states/UTs and districts with LGD codes, used to turn the place a farmer types into the codes the advisory data uses. States are complete. Districts are only those seen in the advisory webhook so far (34 from the dev records): replace or extend this list with the full official LGD district directory (code, name, state code) without changing the format.",
+ "states": [
+  {
+   "code": 1,
+   "name": "Jammu and Kashmir",
+   "aliases": [
+    "J&K",
+    "Jammu Kashmir",
+    "जम्मू और कश्मीर"
+   ]
+  },
+  {
+   "code": 2,
+   "name": "Himachal Pradesh",
+   "aliases": [
+    "HP",
+    "हिमाचल प्रदेश",
+    "हिमाचल"
+   ]
+  },
+  {
+   "code": 3,
+   "name": "Punjab",
+   "aliases": [
+    "पंजाब"
+   ]
+  },
+  {
+   "code": 4,
+   "name": "Chandigarh",
+   "aliases": [
+    "चंडीगढ़"
+   ]
+  },
+  {
+   "code": 5,
+   "name": "Uttarakhand",
+   "aliases": [
+    "Uttaranchal",
+    "उत्तराखंड",
+    "उत्तराखण्ड"
+   ]
+  },
+  {
+   "code": 6,
+   "name": "Haryana",
+   "aliases": [
+    "हरियाणा"
+   ]
+  },
+  {
+   "code": 7,
+   "name": "Delhi",
+   "aliases": [
+    "NCT of Delhi",
+    "New Delhi",
+    "दिल्ली"
+   ]
+  },
+  {
+   "code": 8,
+   "name": "Rajasthan",
+   "aliases": [
+    "राजस्थान"
+   ]
+  },
+  {
+   "code": 9,
+   "name": "Uttar Pradesh",
+   "aliases": [
+    "UP",
+    "U.P.",
+    "उत्तर प्रदेश"
+   ]
+  },
+  {
+   "code": 10,
+   "name": "Bihar",
+   "aliases": [
+    "बिहार"
+   ]
+  },
+  {
+   "code": 11,
+   "name": "Sikkim",
+   "aliases": [
+    "सिक्किम"
+   ]
+  },
+  {
+   "code": 12,
+   "name": "Arunachal Pradesh",
+   "aliases": [
+    "अरुणाचल प्रदेश"
+   ]
+  },
+  {
+   "code": 13,
+   "name": "Nagaland",
+   "aliases": [
+    "नागालैंड"
+   ]
+  },
+  {
+   "code": 14,
+   "name": "Manipur",
+   "aliases": [
+    "मणिपुर"
+   ]
+  },
+  {
+   "code": 15,
+   "name": "Mizoram",
+   "aliases": [
+    "मिजोरम"
+   ]
+  },
+  {
+   "code": 16,
+   "name": "Tripura",
+   "aliases": [
+    "त्रिपुरा"
+   ]
+  },
+  {
+   "code": 17,
+   "name": "Meghalaya",
+   "aliases": [
+    "मेघालय"
+   ]
+  },
+  {
+   "code": 18,
+   "name": "Assam",
+   "aliases": [
+    "असम"
+   ]
+  },
+  {
+   "code": 19,
+   "name": "West Bengal",
+   "aliases": [
+    "WB",
+    "पश्चिम बंगाल"
+   ]
+  },
+  {
+   "code": 20,
+   "name": "Jharkhand",
+   "aliases": [
+    "झारखंड"
+   ]
+  },
+  {
+   "code": 21,
+   "name": "Odisha",
+   "aliases": [
+    "Orissa",
+    "ओडिशा",
+    "उड़ीसा"
+   ]
+  },
+  {
+   "code": 22,
+   "name": "Chhattisgarh",
+   "aliases": [
+    "Chattisgarh",
+    "छत्तीसगढ़",
+    "छत्तीसगढ"
+   ]
+  },
+  {
+   "code": 23,
+   "name": "Madhya Pradesh",
+   "aliases": [
+    "MP",
+    "M.P.",
+    "मध्य प्रदेश"
+   ]
+  },
+  {
+   "code": 24,
+   "name": "Gujarat",
+   "aliases": [
+    "गुजरात"
+   ]
+  },
+  {
+   "code": 27,
+   "name": "Maharashtra",
+   "aliases": [
+    "महाराष्ट्र"
+   ]
+  },
+  {
+   "code": 28,
+   "name": "Andhra Pradesh",
+   "aliases": [
+    "AP",
+    "आंध्र प्रदेश"
+   ]
+  },
+  {
+   "code": 29,
+   "name": "Karnataka",
+   "aliases": [
+    "कर्नाटक"
+   ]
+  },
+  {
+   "code": 30,
+   "name": "Goa",
+   "aliases": [
+    "गोवा"
+   ]
+  },
+  {
+   "code": 31,
+   "name": "Lakshadweep",
+   "aliases": [
+    "लक्षद्वीप"
+   ]
+  },
+  {
+   "code": 32,
+   "name": "Kerala",
+   "aliases": [
+    "केरल"
+   ]
+  },
+  {
+   "code": 33,
+   "name": "Tamil Nadu",
+   "aliases": [
+    "TN",
+    "Tamilnadu",
+    "तमिलनाडु"
+   ]
+  },
+  {
+   "code": 34,
+   "name": "Puducherry",
+   "aliases": [
+    "Pondicherry",
+    "पुडुचेरी"
+   ]
+  },
+  {
+   "code": 35,
+   "name": "Andaman and Nicobar Islands",
+   "aliases": [
+    "Andaman",
+    "A&N Islands",
+    "अंडमान और निकोबार"
+   ]
+  },
+  {
+   "code": 36,
+   "name": "Telangana",
+   "aliases": [
+    "तेलंगाना"
+   ]
+  },
+  {
+   "code": 37,
+   "name": "Ladakh",
+   "aliases": [
+    "लद्दाख"
+   ]
+  },
+  {
+   "code": 38,
+   "name": "Dadra and Nagar Haveli and Daman and Diu",
+   "aliases": [
+    "Dadra and Nagar Haveli",
+    "Daman and Diu",
+    "Daman",
+    "Diu"
+   ]
+  }
+ ],
+ "districts": [
+  {
+   "code": 15,
+   "name": "Bilaspur",
+   "state": 2,
+   "aliases": []
+  },
+  {
+   "code": 16,
+   "name": "Chamba",
+   "state": 2,
+   "aliases": []
+  },
+  {
+   "code": 17,
+   "name": "Hamirpur",
+   "state": 2,
+   "aliases": []
+  },
+  {
+   "code": 118,
+   "name": "Agra",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 119,
+   "name": "Aligarh",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 121,
+   "name": "Ambedkar Nagar",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 123,
+   "name": "Azamgarh",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 124,
+   "name": "Baghpat",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 125,
+   "name": "Bahraich",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 126,
+   "name": "Ballia",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 127,
+   "name": "Balrampur",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 128,
+   "name": "Banda",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 129,
+   "name": "Bara Banki",
+   "state": 9,
+   "aliases": [
+    "Barabanki"
+   ]
+  },
+  {
+   "code": 130,
+   "name": "Bareilly",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 131,
+   "name": "Basti",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 132,
+   "name": "Bijnor",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 133,
+   "name": "Budaun",
+   "state": 9,
+   "aliases": [
+    "Badaun"
+   ]
+  },
+  {
+   "code": 134,
+   "name": "Bulandshahr",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 135,
+   "name": "Chandauli",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 136,
+   "name": "Chitrakoot",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 154,
+   "name": "Amroha",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 179,
+   "name": "Bhadohi",
+   "state": 9,
+   "aliases": [
+    "Sant Ravidas Nagar"
+   ]
+  },
+  {
+   "code": 305,
+   "name": "Bankura",
+   "state": 19,
+   "aliases": []
+  },
+  {
+   "code": 307,
+   "name": "Birbhum",
+   "state": 19,
+   "aliases": []
+  },
+  {
+   "code": 436,
+   "name": "Umaria",
+   "state": 23,
+   "aliases": []
+  },
+  {
+   "code": 530,
+   "name": "Vijayapura",
+   "state": 29,
+   "aliases": [
+    "Bijapur"
+   ]
+  },
+  {
+   "code": 555,
+   "name": "Ernakulam",
+   "state": 32,
+   "aliases": []
+  },
+  {
+   "code": 556,
+   "name": "Idukki",
+   "state": 32,
+   "aliases": []
+  },
+  {
+   "code": 557,
+   "name": "Kannur",
+   "state": 32,
+   "aliases": [
+    "Cannanore"
+   ]
+  },
+  {
+   "code": 558,
+   "name": "Kasaragod",
+   "state": 32,
+   "aliases": [
+    "Kasargod"
+   ]
+  },
+  {
+   "code": 603,
+   "name": "Nicobars",
+   "state": 35,
+   "aliases": [
+    "Nicobar"
+   ]
+  },
+  {
+   "code": 635,
+   "name": "Yadgir",
+   "state": 29,
+   "aliases": [
+    "Yadagiri"
+   ]
+  },
+  {
+   "code": 640,
+   "name": "Amethi",
+   "state": 9,
+   "aliases": []
+  },
+  {
+   "code": 745,
+   "name": "Alluri Sitharama Raju",
+   "state": 28,
+   "aliases": []
+  }
+ ]
+}

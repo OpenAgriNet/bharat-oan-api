@@ -1,0 +1,49 @@
+{
+  "code": 200,
+  "data": [
+    {
+      "address1": "Mock address",
+      "retailerId": 900032,
+      "retailerName": "Mock retailerName",
+      "contactMobile": "9999999999",
+      "contactPerson": "Mock Farmer",
+      "retailerTypeId": 4,
+      "retailerTypeName": "PACS",
+      "availableProducts": [
+        {
+          "productGroupId": 11,
+          "productGroupName": "Urea",
+          "products": [
+            {
+              "productId": 1089,
+              "productName": "Neem Coated Urea(45 Kg)",
+              "noBagsAvailable": 611,
+              "quantityOfBagKg": 45,
+              "waitlistEligible": false
+            }
+          ]
+        },
+        {
+          "productGroupId": 12,
+          "productGroupName": "DAP",
+          "products": [
+            {
+              "productId": 1005,
+              "productName": "DAP",
+              "noBagsAvailable": 81,
+              "quantityOfBagKg": 50,
+              "waitlistEligible": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "message": "Get records.",
+  "method": "GET",
+  "pageNo": 1,
+  "pageSize": 100,
+  "status": "success",
+  "totalPages": 1,
+  "totalRecords": 1
+}

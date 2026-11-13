@@ -1,13 +1,17 @@
 from pydantic_ai import RunContext
-from helpers.utils import get_prompt, get_today_date_str, get_crop_season, get_last_weekday_table, get_logger
+from helpers.utils import get_today_date_str, get_crop_season, get_last_weekday_table, get_logger
 from helpers.scheme_qdrant_search import format_vector_schemes_prompt_block
-from helpers.pmkisan_installment_release import get_pm_kisan_24th_installment_release_section
 from agents.models import configured_agent
 from agents.tools import TOOLS
+from agents.tools.khc import khc_service_note
 from pydantic_ai.models.openai import OpenAIChatModelSettings
 from agents.deps import FarmerContext
+from agents.skill_catalog import get_catalog
+from agents.skills import SKILL_LOADER, prepare_skill_tools, render_prompt
+
 
 logger = get_logger(__name__)
+get_catalog().validate_tools(TOOLS)
 
 
 agrinet_agent = configured_agent(
@@ -17,7 +21,8 @@ agrinet_agent = configured_agent(
     output_type=str,
     deps_type=FarmerContext,
     retries=3,
-    tools=TOOLS,
+    tools=[*TOOLS, SKILL_LOADER],
+    prepare_tools=prepare_skill_tools,
     end_strategy='exhaustive',
     model_settings=OpenAIChatModelSettings(
         temperature=0.7,
@@ -37,12 +42,15 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
         'today_date': get_today_date_str(),
         'crop_season': get_crop_season(),
         'last_weekday_table': get_last_weekday_table(),
-        'pm_kisan_installment_release': get_pm_kisan_24th_installment_release_section(),
         **scheme_block,
     }
-    # Rendered fresh every turn so newly published schemes need no app restart.
+    # Rendered fresh every turn (unlike the tool docstring, frozen at startup —
+    # see agents/tools/search.py) — this confirms live per-turn freshness
+    # directly in the logs without needing a Redis GUI or a restart to check.
     logger.info(
         "System prompt rendered for session=%s lang=%s — %s vector schemes live",
         getattr(deps, "session_id", None), lang_code, scheme_block.get("vector_scheme_count"),
     )
-    return get_prompt(f'agrinet_{lang_code}', context=context)
+    deps.skills.restore(ctx.messages)
+    context['khc_service_note'] = khc_service_note(ctx.messages, current_query=deps.query)
+    return render_prompt(deps.skills, lang_code, context)
