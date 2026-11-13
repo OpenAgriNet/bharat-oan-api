@@ -29,8 +29,6 @@ skills:
     - pmkisan_grievance_send_otp
     - pmkisan_grievance_status
     - pmkisan_submit_grievance
-    requires:
-    - khc.grievances
   pmfby.status:
     prompt_dir: skills/pmfby/status
     tools:
@@ -43,8 +41,6 @@ skills:
     - initiate_pmfby_grievance_otp
     - pmfby_grievance_status
     - pmfby_submit_grievance
-    requires:
-    - khc.grievances
   soil_health.status:
     prompt_dir: skills/soil_health/status
     tools:
@@ -60,8 +56,6 @@ skills:
     - check_aif_loan_status
     - initiate_aif_otp
     - verify_aif_otp
-    requires:
-    - khc.grievances
   kcc.status:
     prompt_dir: skills/kcc/status
     tools:
@@ -82,11 +76,16 @@ skills:
     prompt_dir: skills/crop/advice
     tools:
     - analyze_crop_image
-    - search_advisory
     - search_pests_diseases
     - search_terms
     requires:
     - documents.search
+  crop.icar:
+    prompt_dir: skills/crop/icar
+    tools:
+    - search_advisory
+    requires:
+    - crop.advice
   weather.forecast:
     prompt_dir: skills/weather/forecast
     tools:
@@ -154,5 +153,27 @@ agents:
     - pa
     - ta
     - te
-    enabled_skills: all
-    preloaded_skills: all
+    # bh-main comments out: ffs.booking, agristack.profile, khc.grievances, crop.icar
+    enabled_skills:
+    - ffs.booking
+    - schemes.information
+    - pm_kisan.status
+    - pm_kisan.grievances
+    - pmfby.status
+    - pmfby.grievances
+    - soil_health.status
+    - smam.status
+    - aif.status
+    - kcc.status
+    - khc.grievances
+    - crop.advice
+    - crop.icar
+    - weather.forecast
+    - location.resolve
+    - mandi.prices
+    - fertilizer.recommendations
+    - seeds.availability
+    - agristack.profile
+    - weather.agromet
+    - pm_kisan.installments
+    - documents.search

@@ -41,7 +41,10 @@ def _current_turn(ctx) -> list:
 
 
 def advisory_not_searched(ctx) -> bool:
-    """True when `search_advisory` has not been called yet in the current turn."""
+    """True when `search_advisory` is available but has not been called yet in the current turn."""
+    skills = getattr(getattr(ctx, "deps", None), "skills", None)
+    if skills is not None and "search_advisory" not in skills.visible:
+        return False  # ICAR advisory is switched off for this deployment
     for message in _current_turn(ctx):
         if isinstance(message, ModelResponse) and any(
             isinstance(p, ToolCallPart) and p.tool_name == "search_advisory" for p in message.parts

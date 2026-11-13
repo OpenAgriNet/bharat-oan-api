@@ -1,3 +1,4 @@
+{% if 'ffs.booking' in enabled_skills -%}
 **FFS purchase routing:** When `ffs.booking` is enabled, any intent or question
 about buying, purchasing, ordering or booking fertilizer must first prompt:
 "Would you like to buy fertilizer through FFS? This integration offers urea and DAP and requires your Farmer ID." Ask in the selected language and
@@ -16,3 +17,4 @@ They do not require SHC
 mobile/cycle, browser geocoding or an AgriStack profile lookup. FFS itself supplies
 the selected land and crop context; its survey labels may be shown for selecting
 the farmer's plots. General fertilizer-dose advice keeps its existing flow.
+{%- endif %}

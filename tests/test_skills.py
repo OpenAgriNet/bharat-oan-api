@@ -20,6 +20,10 @@ LANGUAGES = CAT.manifest.agents['chat'].languages
 CONTEXT = dict(today_date='04 November 2026', crop_season='Rabi', last_weekday_table='Tuesday',
                vector_scheme_count=2, vector_schemes_bullets='- Scheme one\n- Scheme two',
                vector_schemes_identifiers='one, two')
+# bh-main comments skills out of the manifest's enabled_skills; test whatever is enabled.
+ENABLED = SkillState().permitted
+ENABLED_TOOLS = CAT.tools_for(ENABLED)
+RENDER = {**CONTEXT, 'enabled_skills': ENABLED}
 
 
 def test_registry_covers_all_tools_with_shared_bindings():
@@ -40,13 +44,13 @@ def test_registry_covers_all_tools_with_shared_bindings():
 def test_all_loaded_hides_discovery_and_contains_all_instructions(language):
     state = SkillState()
     actual = render_prompt(state, language, CONTEXT)
-    assert state.visible == CAT.tools
+    assert state.visible == ENABLED_TOOLS
     assert '## Available skills' not in actual
-    for name in CAT.manifest.skills:
-        assert CAT.render_skill(name, language, CONTEXT).strip() in actual
+    for name in ENABLED:
+        assert CAT.render_skill(name, language, RENDER).strip() in actual
     tools = [SimpleNamespace(name=name) for name in [*CAT.tools, 'load_skill']]
     visible = asyncio.run(prepare_skill_tools(SimpleNamespace(deps=SimpleNamespace(skills=state)), tools))
-    assert {t.name for t in visible} == CAT.tools
+    assert {t.name for t in visible} == ENABLED_TOOLS
 
 
 @pytest.mark.parametrize('language', LANGUAGES)
@@ -55,7 +59,7 @@ def test_every_skill_loads_instructions_in_selected_language(language):
     prompt = render_prompt(state, language, CONTEXT)
     assert '## Available skills' in prompt
     ctx = SimpleNamespace(deps=SimpleNamespace(skills=state))
-    for name in CAT.manifest.skills:
+    for name in ENABLED:
         assert f'- {name}:' in prompt
         if name in state.active:
             continue
@@ -63,9 +67,9 @@ def test_every_skill_loads_instructions_in_selected_language(language):
         output = asyncio.run(load_skill(ctx, name))
         assert set(output['loaded_skills']) == set(CAT.resolve({name})) - prior
         for loaded in output['loaded_skills']:
-            assert CAT.render_skill(loaded, language, CONTEXT) in output['instructions']
+            assert CAT.render_skill(loaded, language, RENDER) in output['instructions']
         assert set(output['loaded_tools']) == CAT.tools_for({name})
-    assert state.visible == CAT.tools
+    assert state.visible == ENABLED_TOOLS
     assert '## Available skills' not in render_prompt(state, language, CONTEXT)
 
 

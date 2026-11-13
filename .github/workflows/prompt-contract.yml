@@ -33,4 +33,4 @@ jobs:
       - name: Check skill inventory, language coverage and agent loop
         run: >-
           python -m pytest -q tests/test_skills.py tests/test_skill_dependencies.py tests/test_prompt_structure.py
-          tests/test_advisory_prompts.py
+          tests/test_advisory_prompts.py tests/test_disabled_skills.py

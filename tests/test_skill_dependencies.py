@@ -80,7 +80,7 @@ def test_legacy_aliases_restore_only_complete_nonempty_tool_bindings(group, pref
     content = {'capability': group, 'loaded_tools': sorted(CAT.tools)}
     state.restore([ModelRequest(parts=[ToolReturnPart('load_capability', content)])])
     expected = {name for name, skill in CAT.manifest.skills.items()
-                if name.startswith(prefix + '.') and skill.tools}
+                if name.startswith(prefix + '.') and skill.tools and name in state.permitted}
     assert state.loaded_skills == expected
     assert 'pm_kisan.installments' not in state.loaded_skills  # No tools to recover from old history.
 
@@ -184,12 +184,12 @@ def test_real_loop_exposes_supporting_tools_on_next_step():
     ('aif.status', 'check_aif_grievance_status', 'pmfby_submit_grievance'),
 ])
 def test_scheme_grievances_do_not_load_other_schemes(skill, own, other):
-    """A scheme loads its own tools plus shared KHC fallback, not every scheme."""
+    """A scheme loads its own tools only: KHC is a separate skill so production can switch it off."""
     state = SkillState(enabled_skills=[skill])
     assert own in state.visible
     assert other not in state.visible
-    assert 'register_khc_grievance' in state.visible
-    assert 'khc.grievances' in state.active
+    assert 'register_khc_grievance' not in state.visible
+    assert 'khc.grievances' not in state.active
     assert 'grievances.manage' not in CAT.manifest.skills
 
 
