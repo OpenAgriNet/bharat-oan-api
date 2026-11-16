@@ -23,6 +23,16 @@ skills:
     tools:
     - check_pm_kisan_status_with_otp
     - initiate_pm_kisan_status_check
+  khc.grievances:
+    prompt_dir: skills/khc/grievances
+    tools:
+    - check_khc_grievance_status
+    - find_khc_location
+    - get_khc_grievance_options
+    - initiate_khc_otp
+    - lookup_khc_reference
+    - register_khc_grievance
+    - verify_khc_otp
   pm_kisan.grievances:
     prompt_dir: skills/pm_kisan/grievances
     tools:
@@ -62,16 +72,6 @@ skills:
     - check_kcc_application_status
     - initiate_kcc_otp
     - select_kcc_application
-  khc.grievances:
-    prompt_dir: skills/khc/grievances
-    tools:
-    - check_khc_grievance_status
-    - find_khc_location
-    - get_khc_grievance_options
-    - initiate_khc_otp
-    - lookup_khc_reference
-    - register_khc_grievance
-    - verify_khc_otp
   crop.advice:
     prompt_dir: skills/crop/advice
     tools:
