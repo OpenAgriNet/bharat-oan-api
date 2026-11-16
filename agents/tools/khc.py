@@ -101,6 +101,23 @@ def khc_service_note(messages, current_query: str = "") -> str:
     return routing + get_prompt("skills/khc/grievances/service_selected", context={})
 
 
+def _scheme_reply(ctx) -> str:
+    """The farmer's latest answer to the scheme question (or to the PM-KISAN stop), recovered from the chat.
+
+    Used when the model calls the options tool without the scheme the farmer already gave, so the
+    backend can match it by name instead of the bot asking for the scheme again.
+    """
+    turns = _turns(getattr(ctx, "messages", None))
+    for index in range(len(turns) - 1, 0, -1):
+        who, text = turns[index]
+        previous = turns[index - 1][1].lower()
+        if who == "farmer" and turns[index - 1][0] == "bot" and (
+            "which scheme your complaint" in previous or "not available right now" in previous
+        ):
+            return " ".join(text.split())[:100]
+    return ""
+
+
 def _asked_for_problem(text: str) -> bool:
     low = text.lower()
     return "own words" in low and any(word in low for word in ("problem", "complaint", "issue"))
@@ -425,7 +442,8 @@ async def get_khc_grievance_options(
 ) -> str:
     """Get a state's KHC grievance options in one call.
 
-    Without a scheme it lists the state's schemes. With the scheme the farmer named
+    The farmer must have named the scheme; do not call this before the scheme, district and
+    village are known. With the scheme the farmer named
     (AIF, A.I.F. and the full name all work) it needs concern: the farmer's original complaint
     (up to 500 characters), translated to English only if needed. Do not shorten it or drop
     category-identifying words. Call it only after the scheme, state, district and
@@ -439,6 +457,7 @@ async def get_khc_grievance_options(
     Prefer this over three separate lookup_khc_reference calls.
     """
     state, scheme, concern = state.strip(), scheme.strip(), " ".join(concern.split())
+    scheme = scheme or _scheme_reply(ctx)
     category = category.strip()
     if not state:
         return _msg("options_need_state")

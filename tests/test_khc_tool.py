@@ -1202,6 +1202,25 @@ def test_scheme_the_farmer_already_named_is_never_asked_again(monkeypatch):
     assert "which scheme your complaint is about" not in output
 
 
+def test_options_tool_recovers_the_scheme_the_farmer_answered_when_the_model_drops_it(monkeypatch):
+    import json
+
+    calls = []
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
+        "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}),
+        "scheme": json.dumps({"id": 38, "name": "Agriculture Infrastructure Fund", "division": 31}),
+    })), calls)
+    chat = _chat(
+        "i want to raise grivance with khc", ("bot", "Could you please tell me which scheme your complaint is about?"),
+        "AIF", ("bot", "Please share the name of your state"), "uttar pradesh",
+    )
+    output = asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh"))
+    tags = {t["descriptor"]["code"]: t["value"]
+            for t in calls[0]["message"]["order"]["fulfillments"][0]["customer"]["person"]["tags"]}
+    assert tags["scheme_name"] == "AIF"
+    assert "Nothing to show yet" in output
+
+
 def test_grievance_options_lists_only_the_schemes_that_matched(monkeypatch):
     import json
 
