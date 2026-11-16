@@ -1183,7 +1183,7 @@ def test_grievance_options_does_not_list_schemes_before_the_farmer_names_one(mon
         "schemes": json.dumps([{"id": 38, "name": "AIF", "division": 31}]),
     })), [])
     output = asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh"))
-    assert "has not named a scheme yet" in output and "Do not show a list" in output
+    assert "No scheme was passed to this tool" in output and "do not show a list" in output
     assert "AIF" not in output
     assert 'reference_type="schemes", parent_id=9' in output
 

@@ -1,17 +1,74 @@
 import json
+import hashlib
 import hmac
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, status
 from app.config import settings
 from app.core.cache import cache
+from app.tasks.telemetry import send_telemetry
+from helpers.telemetry import TelemetryRequest, create_ui_interact_event
 
 router = APIRouter(tags=["agristack-callback"])
 logger = logging.getLogger(__name__)
 
 _CALLBACK_STATUS_NAMESPACE = "callback-status"
+_MAX_SEARCH_DEPTH = 12
+
+
+def _find_first_string(node: Any, keys: tuple[str, ...], depth: int = 0) -> Optional[str]:
+    if depth > _MAX_SEARCH_DEPTH or node is None:
+        return None
+
+    if isinstance(node, str):
+        stripped = node.strip()
+        if not stripped.startswith("{") and not stripped.startswith("["):
+            return None
+        try:
+            return _find_first_string(json.loads(stripped), keys, depth + 1)
+        except json.JSONDecodeError:
+            return None
+
+    if isinstance(node, list):
+        for item in node:
+            found = _find_first_string(item, keys, depth + 1)
+            if found:
+                return found
+        return None
+
+    if not isinstance(node, dict):
+        return None
+
+    for key in keys:
+        value = node.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, (int, float)):
+            return str(value)
+
+    for value in node.values():
+        found = _find_first_string(value, keys, depth + 1)
+        if found:
+            return found
+    return None
+
+
+def _extract_agristack_observability(body: Optional[Any]) -> Dict[str, Optional[str]]:
+    farmer_id = _find_first_string(body, ("farmerId", "farmer_id", "frCentralId", "centralId"))
+    consent_name = _find_first_string(body, ("consentName",))
+    state_lgd_code = _find_first_string(body, ("stateLgdCode", "state_lgd_code", "stateCode", "state_code"))
+    consent_status = "unknown"
+    if consent_name:
+        consent_status = "with_consent" if consent_name.upper() == "CONTINUE WITH CONSENT" else "without_consent"
+
+    farmer_id_hash = hashlib.sha256(farmer_id.encode("utf-8")).hexdigest() if farmer_id else None
+    return {
+        "consent_status": consent_status,
+        "state_lgd_code": state_lgd_code,
+        "farmer_id_hash": farmer_id_hash,
+    }
 
 
 def _validate_callback_api_key(request: Request) -> None:
@@ -134,6 +191,7 @@ async def _extract_body(request: Request) -> Tuple[Optional[str], Optional[Any]]
 @router.post("/callback", status_code=status.HTTP_200_OK)
 async def agristack_callback(
     request: Request,
+    background_tasks: BackgroundTasks,
     source: Optional[str] = Query(default=None, alias="from"),
 ) -> Dict[str, Any]:
     """Receives AgriStack's farmer-data callback and caches it by callbackSessionId."""
@@ -168,6 +226,36 @@ async def agristack_callback(
             await _mark_callback_received(callback_session_id, source, request.method, body)
         except Exception as exc:
             logger.exception("callback.status_store_failed callbackSessionId=%s error=%s", callback_session_id, str(exc))
+
+    try:
+        observability = _extract_agristack_observability(body)
+        common_metadata = {
+            "sid": callback_session_id,
+            "source": source,
+            "callback_status": "received",
+            "consent_status": observability["consent_status"],
+            "state_lgd_code": observability["state_lgd_code"],
+            "farmer_id_hash": observability["farmer_id_hash"],
+        }
+        connect_event = create_ui_interact_event(
+            current_user={"channel": "BharatVistaar"},
+            event_name="agristack_connect_click",
+            category="agristack",
+            client_time=response["received_at_utc"],
+            metadata={**common_metadata, "origin": "api_callback"},
+        )
+        redirect_event = create_ui_interact_event(
+            current_user={"channel": "BharatVistaar"},
+            event_name="agristack_redirect_success",
+            category="agristack",
+            client_time=response["received_at_utc"],
+            metadata={**common_metadata, "origin": "api_callback"},
+        )
+        background_tasks.add_task(
+            send_telemetry, TelemetryRequest(events=[connect_event, redirect_event]).model_dump()
+        )
+    except Exception:
+        logger.exception("callback.telemetry_emit_failed callbackSessionId=%s", callback_session_id)
 
     logger.info("callback.received %s", json.dumps(response, default=str))
     return response
