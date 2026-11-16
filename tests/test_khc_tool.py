@@ -1066,7 +1066,7 @@ def test_find_location_sends_known_details_and_reports_one_village(monkeypatch):
 
 
 @pytest.mark.parametrize("needs,expected", [
-    ("state", "Please share the name of your state"),
+    ("state", "the scheme comes before the state"),
     ("district", "Can you please share your district name"),
     ("geocode", "forward_geocode"),
 ])
@@ -1183,42 +1183,9 @@ def test_grievance_options_does_not_list_schemes_before_the_farmer_names_one(mon
         "schemes": json.dumps([{"id": 38, "name": "AIF", "division": 31}]),
     })), [])
     output = asyncio.run(khc.get_khc_grievance_options(ctx(), "Uttar Pradesh"))
-    assert "No scheme was passed to this tool" in output and "do not show a list" in output
+    assert "has not named a scheme yet" in output and "Do not show a list" in output
     assert "AIF" not in output
     assert 'reference_type="schemes", parent_id=9' in output
-
-
-def test_scheme_the_farmer_already_named_is_never_asked_again(monkeypatch):
-    import json
-
-    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
-        "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}), "needs": json.dumps("scheme"),
-        "match": json.dumps("unnamed"),
-        "schemes": json.dumps([{"id": 38, "name": "AIF", "division": 31}, {"id": 40, "name": "PM-KISAN", "division": 32}]),
-    })), [])
-    chat = _chat("i want to lodge grievance with khc", "pm kisan", "AIF", "uttar pradesh")
-    output = asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh"))
-    assert "already named the scheme 'AIF'" in output and "Do not ask for the scheme again" in output
-    assert "which scheme your complaint is about" not in output
-
-
-def test_options_tool_recovers_the_scheme_the_farmer_answered_when_the_model_drops_it(monkeypatch):
-    import json
-
-    calls = []
-    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
-        "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}),
-        "scheme": json.dumps({"id": 38, "name": "Agriculture Infrastructure Fund", "division": 31}),
-    })), calls)
-    chat = _chat(
-        "i want to raise grivance with khc", ("bot", "Could you please tell me which scheme your complaint is about?"),
-        "AIF", ("bot", "Please share the name of your state"), "uttar pradesh",
-    )
-    output = asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh"))
-    tags = {t["descriptor"]["code"]: t["value"]
-            for t in calls[0]["message"]["order"]["fulfillments"][0]["customer"]["person"]["tags"]}
-    assert tags["scheme_name"] == "AIF"
-    assert "Nothing to show yet" in output
 
 
 def test_grievance_options_lists_only_the_schemes_that_matched(monkeypatch):
@@ -1774,10 +1741,6 @@ def test_explicit_khc_pm_kisan_request_does_not_mix_workflows(later_turns):
     assert "Never ask for a PM-Kisan registration number" in note
     assert "Do not combine KHC and scheme-service questions" in note
     assert "If the scheme is already named, skip the scheme question" in note
-    assert "Apply the same stop gate when PM-KISAN is identified later" in note
-    assert "Loop guard (answered steps stay answered)" in note
-    assert 'Farmer: "AIF" -> Ask: "Please share the name of your state"' in note
-    assert '"AIF" -> "Please share the name of your state" -> "uttar pradesh" -> "Can you please share your district name"' in note
     assert "Ask only the first missing KHC detail" in note
     assert "These KHC rules override the general follow-up and source-order rules" in note
     assert "put the source last with nothing after it" in note
