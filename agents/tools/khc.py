@@ -66,14 +66,6 @@ def _turns(messages) -> list[tuple[str, str]]:
     return turns
 
 
-_KHC_WORDS = re.compile(
-    r"\bkhc\b|\bk\.h\.c\b|"
-    r"\bkisan\s*(?:help\s*-?\s*(?:line\s*)?|heliline\s*)cent(?:er|re)\b|"
-    r"किसान\s*हेल्प(?:लाइन)?\s*सेंटर|केएचसी",
-    re.IGNORECASE,
-)
-
-
 def khc_service_note(messages, current_query: str = "") -> str:
     """Always provide status routing, plus a scoped reminder of an earlier KHC choice.
 
@@ -85,13 +77,7 @@ def khc_service_note(messages, current_query: str = "") -> str:
         "status_id_prompt": _STATUS_ID_PROMPT,
         "status_otp_prompt": _STATUS_OTP_PROMPT,
     })
-    turns = _turns(messages)
-    if current_query:
-        turns.append(("farmer", current_query))
-    for who, text in turns:
-        if who == "farmer" and _KHC_WORDS.search(text):
-            return routing + get_prompt("skills/khc/grievances/service_selected", context={})
-    return routing
+    return routing + get_prompt("skills/khc/grievances/service_selected", context={})
 
 
 def _asked_for_problem(text: str) -> bool:
@@ -175,9 +161,8 @@ def _render_location(fields: dict[str, str], place: str) -> str:
     if not matches:
         ask = {
             "state": (
-                "No state was given. Do not ask anything because of this message: go back to the KHC step order "
-                "and ask the first step that is not done yet (the scheme comes before the state), then call this "
-                "tool again once the state and district are known."
+                "No state was given. Ask 'Please share the name of your state', then call this tool again once "
+                "the state and district are known."
             ),
             "district": "Ask 'Can you please share your district name', then call this tool again with that district.",
             "geocode": (

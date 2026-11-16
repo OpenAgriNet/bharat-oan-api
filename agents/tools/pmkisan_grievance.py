@@ -67,6 +67,12 @@ GrievanceTypeLiteral = Literal[tuple(GRIEVANCE_TYPES)] if GRIEVANCE_TYPES else s
 
 _REGISTRATION_NUMBER_LABEL = "Registration Number"
 _BAP_ENDPOINT_NOT_CONFIGURED_MSG = "BAP_ENDPOINT is not configured in environment."
+# ponytail: Temporary PM-KISAN grievance-lodge stop. To re-enable, remove the
+# early-return guards that use this message in pmkisan_grievance_send_otp
+# (submit_grievance purpose) and pmkisan_submit_grievance.
+_PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG = (
+    "PM-KISAN grievance submission is temporarily unavailable. Please try again later."
+)
 
 # -----------------------
 # Response formatting
@@ -798,6 +804,10 @@ async def pmkisan_grievance_send_otp(
     Returns:
         OTP send confirmation or service error.
     """
+    # ponytail: Remove this block to re-enable submit grievance OTP flow.
+    if purpose == "submit_grievance":
+        return _PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG
+
     try:
         reg_no_clean = _validate_pmkisan_registration_number(reg_no)
         purpose_text = "submit the grievance" if purpose == "submit_grievance" else "check grievance status"
@@ -856,6 +866,9 @@ async def pmkisan_submit_grievance(
     Returns:
         Grievance submission result or OTP verification error.
     """
+    # ponytail: Remove this line to re-enable PM-KISAN grievance submission API call.
+    return _PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG
+
     try:
         identifier_value, reg_no_clean = _validate_submit_grievance_inputs(
             reg_no, grievance_type, grievance_description, otp

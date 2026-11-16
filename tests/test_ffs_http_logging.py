@@ -17,7 +17,7 @@ from tests.test_ffs import setup
     (200, 'invalid JSON\n', True),
 ])
 def test_full_response_logged_before_validation(setup, caplog, status, body, failed):
-    service = ffs.FFSService('response-session', 'owner', 'response-question')
+    service = ffs.FFSService('response-session', 'response-question')
     service.state['token'] = 'outbound-token'
     calls = []
 
@@ -30,9 +30,9 @@ def test_full_response_logged_before_validation(setup, caplog, status, body, fai
             service.client = client
             if failed:
                 with pytest.raises(ffs.FFSError):
-                    await service.call('POST', ffs.APPROVAL, '/bharatVistar/createMultipleBookingV2', {})
+                    await service.call('POST', ffs.APPROVAL, '/bharatVistar/applicantFetch', {})
             else:
-                result = await service.call('POST', ffs.APPROVAL, '/bharatVistar/createMultipleBookingV2', {})
+                result = await service.call('POST', ffs.APPROVAL, '/bharatVistar/applicantFetch', {})
                 assert result == {'userToken': 'returned-token'}
 
     asyncio.run(run())
@@ -51,7 +51,7 @@ def test_full_response_logged_before_validation(setup, caplog, status, body, fai
 
 
 def test_log_handler_failure_does_not_change_response(setup, monkeypatch):
-    service = ffs.FFSService('response-session', 'owner', 'response-question')
+    service = ffs.FFSService('response-session', 'response-question')
     service.state['token'] = 'outbound-token'
     calls = []
 
@@ -67,7 +67,7 @@ def test_log_handler_failure_does_not_change_response(setup, monkeypatch):
     async def run():
         async with setup.client_class(transport=httpx.MockTransport(respond)) as client:
             service.client = client
-            assert await service.call('POST', ffs.APPROVAL, '/bharatVistar/createMultipleBookingV2', {}) == {'accepted': True}
+            assert await service.call('POST', ffs.APPROVAL, '/bharatVistar/applicantFetch', {}) == {'accepted': True}
 
     asyncio.run(run())
     assert len(calls) == 1

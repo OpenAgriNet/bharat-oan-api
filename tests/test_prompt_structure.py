@@ -20,7 +20,8 @@ def test_inventory_and_language_coverage():
     assert len(LANGUAGES) == 13
     expected = {}
     for agent, config in cat.manifest.agents.items():
-        roots = set(cat.manifest.skills) if config.enabled_skills == 'all' else set(config.enabled_skills)
+        # Every catalogued skill keeps its translations, even when bh-main leaves it out of enabled_skills.
+        roots = set(cat.manifest.skills)
         names = cat.resolve(roots)
         for name in names:
             folder = cat.path(cat.manifest.skills[name].prompt_dir)

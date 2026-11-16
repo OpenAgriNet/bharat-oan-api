@@ -1,5 +1,5 @@
 from typing import Any, Literal, Optional
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field
 from langcodes import Language
 from agents.skill_policy import SkillState
 
@@ -22,8 +22,6 @@ class FarmerContext(BaseModel):
         **Moderation Compliance:** "Valid Agricultural (This is a valid agricultural question.)"
     """
     skills: SkillState = Field(default_factory=SkillState)
-    ffs_owner: str = Field(default="", exclude=True, repr=False)
-    ffs_otp: Optional[SecretStr] = Field(default=None, exclude=True, repr=False)
     ffs_context: dict[str, Any] = Field(default_factory=dict, exclude=True)
     query: str = Field(description="The user's question.")
     lang_code: str = Field(description="The language code of the user's question.", default='hi')

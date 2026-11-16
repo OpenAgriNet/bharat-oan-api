@@ -33,7 +33,7 @@ async def chat_endpoint(
     Requires JWT authentication.
     """
     session_id = ensure_session_id(request.session_id)
-    safe_query, ffs_otp, ffs_owner, ffs_context = await prepare_chat_turn(request.query or "", session_id, current_user)
+    ffs_context = await prepare_chat_turn(session_id)
     session_id, history = await get_session_history(session_id)
     qid = request.qid or str(uuid.uuid4())
     channel = current_user.get("channel", "BharatVistaar")
@@ -42,11 +42,11 @@ async def chat_endpoint(
     logger.info(
         f"Chat request received - session_id: {session_id}, qid: {qid}, user_id: {request.user_id}, "
         f"authenticated_user: {authenticated_user}, channel: {channel}, source_lang: {request.source_lang}, "
-        f"target_lang: {request.target_lang}, query: {safe_query}"
+        f"target_lang: {request.target_lang}, query: {request.query}"
     )
     logger.debug(f"Retrieved message history for session {session_id} - length: {len(history)}")
 
-    query_text, is_image_analysis = normalize_chat_query(safe_query)
+    query_text, is_image_analysis = normalize_chat_query(request.query or "")
 
     return StreamingResponse(
         stream_chat_messages(
@@ -63,8 +63,6 @@ async def chat_endpoint(
             longitude=request.longitude,
             qid=qid,
             current_user=current_user,
-            ffs_otp=ffs_otp,
-            ffs_owner=ffs_owner,
             ffs_context=ffs_context,
         ),
         media_type="text/event-stream",
@@ -95,7 +93,7 @@ async def chat_analyze_image_endpoint(
 
     session_id = ensure_session_id(session_id)
     qid = str(uuid.uuid4())
-    query, ffs_otp, ffs_owner, ffs_context = await prepare_chat_turn(query or "", session_id, current_user)
+    ffs_context = await prepare_chat_turn(session_id)
     logger.info(
         f"Image analyze request received - session_id: {session_id}, user_id: {user_id}, "
         f"authenticated_user: {authenticated_user}, channel: {channel}, source_lang: {source_lang}, "
@@ -124,8 +122,6 @@ async def chat_analyze_image_endpoint(
             longitude=longitude,
             qid=qid,
             current_user=current_user,
-            ffs_otp=ffs_otp,
-            ffs_owner=ffs_owner,
             ffs_context=ffs_context,
         ),
         media_type="text/event-stream",

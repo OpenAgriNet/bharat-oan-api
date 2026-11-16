@@ -60,7 +60,7 @@ def test_real_span_tree_safe_outputs_and_cached_decisions(setup, tracing, caplog
             answer = await ffs_get_entitlement(context('3'), village, crops)
             assert answer['status'] == 'ok'
             assert await ffs_get_entitlement(context('4'), village, crops) == answer
-            await ffs_find_shops(context('5'))
+            await ffs_find_shops(context('5'), order=[ffs.OrderItem(product='urea', product_id=1089, bags=1)])
     asyncio.run(run())
     client.flush()
     spans = exporter.get_finished_spans()
@@ -72,7 +72,8 @@ def test_real_span_tree_safe_outputs_and_cached_decisions(setup, tracing, caplog
     assert all(s.parent.span_id == root.context.span_id for s in tools)
     assert all(s.parent.span_id in {t.context.span_id for t in tools} for s in apis)
     cached = next(s for s in tools if output(s).get('api_calls') == 0)
-    assert output(cached)['decisions'] == [{'event': 'entitlement_reused'}]
+    assert {'event': 'entitlement_reused'} in output(cached)['decisions']
+    assert {'event': 'crop_resolution_reused', 'count': 1} in output(cached)['decisions']
     quantity = next(s for s in tools if any(d['event'] == 'entitlement_quantity' for d in output(s)['decisions']))
     assert output(quantity)['products'][0]['bags'] == 6
     assert output(quantity)['stage_after'] == 'entitlement_ready'
@@ -95,7 +96,7 @@ def test_api_failures_keep_safe_provider_reason(setup, tracing, caplog, status, 
     caplog.set_level(logging.INFO, logger='helpers.ffs_tracing')
     async def response(request):
         return httpx.Response(status, json=body) if isinstance(body, dict) else httpx.Response(status, text=body)
-    service = ffs.FFSService('session-test', 'owner-test', 'question-test')
+    service = ffs.FFSService('session-test', 'question-test')
     async def run():
         async with setup.client_class(transport=httpx.MockTransport(response)) as http:
             service.client = http
@@ -145,9 +146,9 @@ def test_booking_summary_logging_omits_reference_codes(setup, tracing, caplog):
     async def run():
         village, crops = selection(await login())
         await ffs_get_entitlement(context('3'), village, crops)
-        shops = await ffs_find_shops(context('4'))
+        shops = await ffs_find_shops(context('4'), order=[ffs.OrderItem(product='urea', product_id=1089, bags=4)])
         shop = shops['data']['shops'][0]['shop_ref']
-        preview = await ffs_create_booking(context('5'), shop, quantities=[ffs.BookingQuantity(product='urea', bags=4)])
+        preview = await ffs_create_booking(context('5'), shop)
         result = await ffs_create_booking(context('6'), shop, True)
         assert result['status'] == 'ok'
     asyncio.run(run())

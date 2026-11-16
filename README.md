@@ -99,10 +99,12 @@ Behavior:
 - Callback receipt is stored in Redis namespace callback-status with TTL.
 - Status endpoint returns received or not_found.
 - farmerId and consent fields are extracted as metadata when present.
+- When `AGRISTACK_CALLBACK_API_KEY` is set, callback POST must include matching `x-api-key`.
 
 Optional env vars:
 
 - CALLBACK_SESSION_TTL_SECONDS (default 3600)
+- AGRISTACK_CALLBACK_API_KEY (when set, validates `x-api-key` on POST /api/callback)
 - CALLBACK_AUDIT_DB_URL (Postgres URL, enables audit writes)
 - CALLBACK_AUDIT_TABLE_NAME (default agristack_callback_audit)
 
@@ -326,6 +328,9 @@ Use these public callback endpoints for AgriStack integration.
 
 - Callback (POST, from AgriStack): `/api/callback?from=agristack`
 - Status check (GET, from frontend): `/api/callback/status?from=agristack&callbackSessionId=<id>`
+
+If `AGRISTACK_CALLBACK_API_KEY` is configured, callback POST requests must send
+`x-api-key: <AGRISTACK_CALLBACK_API_KEY>`.
 
 The callback response includes:
 - `from` query param value

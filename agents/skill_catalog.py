@@ -75,6 +75,8 @@ class SkillCatalog:
         self.manifest = Manifest.model_validate(yaml.load(
             (self.root / 'manifest.yaml').read_text(), Loader=UniqueKeysLoader))
         self.env = Environment(loader=FileSystemLoader(self.root), autoescape=False)
+        # Default for direct renders; render_prompt passes the session's enabled skills.
+        self.env.globals['enabled_skills'] = set(self.manifest.skills)
         self.validate()
 
     @property

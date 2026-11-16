@@ -4,7 +4,10 @@ Tools for the BharatVistaar AI Agent.
 
 # from agents.tools.search_beckn import search_documents
 
+from dataclasses import replace
+
 from pydantic_ai import Tool
+from helpers.gemma_schema import gemma_compatible
 from agents.tools.ffs import ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, ffs_find_shops, ffs_create_booking
 
 from agents.tools.amul_vistaar import call_amul_vistaar_network
@@ -80,12 +83,16 @@ from agents.tools.agristack import (
     only_with_agristack_consent,
 )
 
+async def _gemma_schema(ctx, tool_def):
+    return replace(tool_def, parameters_json_schema=gemma_compatible(tool_def.parameters_json_schema))
+
+
 TOOLS = [
-    Tool(ffs_send_otp, takes_ctx=True, sequential=True, strict=False),
-    Tool(ffs_verify_otp, takes_ctx=True, sequential=True, strict=False),
-    Tool(ffs_get_entitlement, takes_ctx=True, sequential=True, strict=False),
-    Tool(ffs_find_shops, takes_ctx=True, sequential=True, strict=False),
-    Tool(ffs_create_booking, takes_ctx=True, sequential=True, strict=False),
+    Tool(ffs_send_otp, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
+    Tool(ffs_verify_otp, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
+    Tool(ffs_get_entitlement, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
+    Tool(ffs_find_shops, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
+    Tool(ffs_create_booking, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
     Tool(
         call_amul_vistaar_network,
         takes_ctx=True,

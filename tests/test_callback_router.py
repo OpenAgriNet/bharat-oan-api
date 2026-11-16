@@ -129,3 +129,27 @@ def test_callback_cache_failure_still_returns_200(monkeypatch):
     response = client.post("/api/callback?callbackSessionId=R1", json={})
     assert response.status_code == 200
     assert response.json()["status"] == "received"
+
+
+def test_callback_rejects_missing_api_key_when_configured(monkeypatch):
+    client = _build_test_client(monkeypatch)
+    monkeypatch.setattr(callback_router.settings, "agristack_callback_api_key", "test-key")
+
+    response = client.post("/api/callback?from=agristack", json={"sessionId": "ABC123"})
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid callback API key."
+
+
+def test_callback_accepts_valid_api_key_when_configured(monkeypatch):
+    client = _build_test_client(monkeypatch)
+    monkeypatch.setattr(callback_router.settings, "agristack_callback_api_key", "test-key")
+
+    response = client.post(
+        "/api/callback?from=agristack",
+        json={"sessionId": "ABC123"},
+        headers={"x-api-key": "test-key"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "received"

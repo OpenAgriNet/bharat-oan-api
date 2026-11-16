@@ -1,6 +1,5 @@
-"""Verify guest-token uniqueness and the bearer binding used by FFS."""
+"""Existing API authentication remains required after removing FFS ownership."""
 import asyncio
-import hashlib
 import importlib.util
 from pathlib import Path
 
@@ -10,7 +9,6 @@ import jwt
 import pytest
 
 from app.config import settings
-from app.services.ffs import owner_id
 
 
 def load(name, relative):
@@ -21,7 +19,7 @@ def load(name, relative):
     return module
 
 
-def test_same_guest_subject_gets_distinct_verified_ffs_owners(tmp_path, monkeypatch):
+def test_guest_tokens_remain_unique_and_forged_bearer_is_rejected(tmp_path, monkeypatch):
     key = RSA.generate(2048)
     private, public = tmp_path / "private.pem", tmp_path / "public.pem"
     private.write_bytes(key.export_key())
@@ -37,8 +35,7 @@ def test_same_guest_subject_gets_distinct_verified_ffs_owners(tmp_path, monkeypa
         user_a, user_b = await auth.get_current_user(a.token), await auth.get_current_user(b.token)
         assert user_a["sub"] == user_b["sub"] == "guest:anon"
         assert a.token != b.token
-        assert user_a["auth_token_id"] == hashlib.sha256(a.token.encode()).hexdigest()
-        assert owner_id(user_a) != owner_id(user_b)
+        assert "auth_token_id" not in user_a
         claims_a = jwt.decode(a.token, key.public_key().export_key(), algorithms=["RS256"])
         claims_b = jwt.decode(b.token, key.public_key().export_key(), algorithms=["RS256"])
         assert claims_a["jti"] != claims_b["jti"]
