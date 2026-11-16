@@ -201,7 +201,7 @@ def _render_location(fields: dict[str, str], place: str) -> str:
     return _msg("location_several", place=place, options=options, listing=listing, cut=cut)
 
 
-def _render_tree(fields: dict[str, str], scheme_name: str = "", concern: str = "") -> str:
+def _render_tree(fields: dict[str, str], scheme_name: str = "", concern: str = "", said: str = "") -> str:
     needs = fields.get("needs", "").strip('"')
     if needs == "state":
         names = "\n".join(f"- {m['name']}" for m in json.loads(fields.get("matches", "[]")))
@@ -216,6 +216,15 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern: str = "
         match = fields.get("match", "").strip('"')
         # No names for "unnamed" on purpose: a list shown before the farmer is asked becomes a menu.
         key = {"none": "tree_scheme_none", "unnamed": "tree_scheme_unnamed"}.get(match, "tree_scheme_many")
+        if match == "unnamed":
+            # The model dropped the scheme the farmer already said: name the latest one so it cannot ask again.
+            latest = {
+                s["name"]: max(m.start() for m in found)
+                for s in schemes
+                if (found := list(re.finditer(rf"(?<!\w){re.escape(s['name'])}(?!\w)", said, re.I)))
+            }
+            if latest:
+                scheme_name, key = max(latest, key=latest.get), "tree_scheme_already_named"
         return _msg(key, scheme_name=scheme_name, lines=lines, **state_info)
     scheme = json.loads(fields.get("scheme", "null"))
     scheme_info = {**state_info, "scheme_name": scheme["name"], "scheme_id": scheme["id"], "division": scheme["division"]}
@@ -298,7 +307,8 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
         if code == "khc_location":
             return f"{_render_location(fields, values.get('name', ''))}\n{SOURCE}"
         if code == "khc_grievance_tree":
-            return f"{_render_tree(fields, values.get('scheme_name', ''), values.get('concern', ''))}\n{SOURCE}"
+            said = " ".join(text for who, text in _turns(getattr(ctx, "messages", None)) if who == "farmer")
+            return f"{_render_tree(fields, values.get('scheme_name', ''), values.get('concern', ''), said)}\n{SOURCE}"
         if code == "khc_reference":
             options = json.loads(fields.get("options", "null"))
             if not isinstance(options, list) or not all(isinstance(option, dict) for option in options):

@@ -1188,6 +1188,20 @@ def test_grievance_options_does_not_list_schemes_before_the_farmer_names_one(mon
     assert 'reference_type="schemes", parent_id=9' in output
 
 
+def test_scheme_the_farmer_already_named_is_never_asked_again(monkeypatch):
+    import json
+
+    fake_http(monkeypatch, khc.httpx.Response(200, json=envelope("init", "khc_grievance_tree", {
+        "state": json.dumps({"id": 9, "name": "Uttar Pradesh"}), "needs": json.dumps("scheme"),
+        "match": json.dumps("unnamed"),
+        "schemes": json.dumps([{"id": 38, "name": "AIF", "division": 31}, {"id": 40, "name": "PM-KISAN", "division": 32}]),
+    })), [])
+    chat = _chat("i want to lodge grievance with khc", "pm kisan", "AIF", "uttar pradesh")
+    output = asyncio.run(khc.get_khc_grievance_options(chat, "Uttar Pradesh"))
+    assert "already named the scheme 'AIF'" in output and "Do not ask for the scheme again" in output
+    assert "which scheme your complaint is about" not in output
+
+
 def test_grievance_options_lists_only_the_schemes_that_matched(monkeypatch):
     import json
 

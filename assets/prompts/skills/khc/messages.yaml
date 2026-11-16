@@ -146,6 +146,9 @@ tree_scheme_none: >-
 tree_scheme_unnamed: >-
   State: {{ state_name }} [stateId={{ state_id }}]. No scheme was passed to this tool. If the farmer already named a scheme earlier in this chat (even before the state), do not ask again: go back to the KHC step order and ask the next step that is not done, and pass that scheme on later calls. Only if they truly never named one: do not show a list, ask 'Could you please tell me which scheme your complaint is about?' and call this tool again with the scheme they say. Only if they ask which schemes are available, call lookup_khc_reference(reference_type="schemes", parent_id={{ state_id }}, name="") and show the names.
 
+tree_scheme_already_named: >-
+  State: {{ state_name }} [stateId={{ state_id }}]. The farmer already named the scheme '{{ scheme_name }}' earlier. Do not ask for the scheme again and do not show a list. Go back to the KHC step order and ask the next step that is not done yet (district, then village, then the problem). Pass scheme='{{ scheme_name }}' and the state on every later KHC tool call.
+
 tree_scheme_many: >-
   State: {{ state_name }} [stateId={{ state_id }}]. More than one scheme matched what the farmer said. Show only these scheme names (no IDs) and ask which one:
 
