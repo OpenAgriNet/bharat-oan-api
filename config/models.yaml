@@ -53,6 +53,16 @@ models:
 # Use cases — which aliases each feature picks from and at what proportions.
 # proportions must sum to 100. Omit proportions for a single-alias use case.
 use_cases:
+  ffs_product_resolution:
+    default_alias: gemma_vllm
+    aliases: [gemma_vllm]
+    timeout_seconds: 20
+
+  ffs_crop_resolution:
+    default_alias: gemma_vllm
+    aliases: [gemma_vllm]
+    timeout_seconds: 20
+
   moderation:
     default_alias: gemma_vllm
     aliases: [gemma_vllm]

@@ -16,7 +16,9 @@ from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
+from agents.tools.imd_advisory import agromet_note
 from app.config import DEFAULT_HTTP_TIMEOUT
+from helpers.advisory_pending import ADVISORY_FIRST_RETRY, PENDING_RETRY, advisory_not_searched, advisory_question_pending, crop_question_needs_advisory
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.scheme_qdrant_search import (
     NO_RESULTS_MESSAGE,
@@ -437,6 +439,7 @@ async def search_schemes(
 
 @observe(name="tool:search_documents", as_type="tool")
 async def search_documents(
+    ctx: RunContext[FarmerContext],
     query: str, 
     top_k: int = 10, 
 ) -> str:
@@ -450,6 +453,10 @@ async def search_documents(
     Returns:
         search_results: Formatted list of documents
     """
+    if crop_question_needs_advisory(ctx):
+        raise ModelRetry(ADVISORY_FIRST_RETRY)
+    if advisory_question_pending(ctx):
+        raise ModelRetry(PENDING_RETRY)
     try:
         # Initialize Marqo client
         endpoint_url = os.getenv('MARQO_ENDPOINT_URL')
@@ -488,7 +495,7 @@ async def search_documents(
             search_hits = [SearchHit(**hit) for hit in results]            
             # Convert back to dict format for compatibility
             document_string = '\n\n----\n\n'.join([str(document) for document in search_hits])
-            return "> Search Results for `" + query + "`\n\n" + document_string
+            return "> Search Results for `" + query + "`\n\n" + document_string + await agromet_note(ctx, query=query)
     except Exception as e:
         logger.error(f"Error searching documents: {e} for query: {query}")
         raise ModelRetry(f"Error searching documents, please try again")
@@ -532,8 +539,10 @@ async def search_video(
 
 @observe(name="tool:search_pests_diseases", as_type="tool")
 async def search_pests_diseases(
-    query: str, 
-    top_k: int = 10, 
+    ctx: RunContext[FarmerContext],
+    query: str,
+    crop: str,
+    top_k: int = 10,
 ) -> str:
     """
     Semantic search for **crop** pests and diseases only (e.g. crop insects, fungal/bacterial diseases of plants).
@@ -541,11 +550,22 @@ async def search_pests_diseases(
     
     Args:
         query: The search query in *English* (required)
+        crop: The crop in English, for example "Wheat" (required). If the farmer has not said which crop,
+            do not call this tool: ask which crop first.
         top_k: Maximum number of results to return (default: 10)
         
     Returns:
         search_results: Formatted list of pests and diseases information
     """
+    if not " ".join(str(crop or "").split()):
+        raise ModelRetry(
+            "The crop is required. If the farmer named a crop, call search_pests_diseases again with `crop`. "
+            "If they did not, ask them which crop in one short question, wait for the answer, then search."
+        )
+    if advisory_not_searched(ctx):
+        raise ModelRetry(ADVISORY_FIRST_RETRY)
+    if advisory_question_pending(ctx):
+        raise ModelRetry(PENDING_RETRY)
     try:
         # Initialize Marqo client
         endpoint_url = os.getenv('MARQO_ENDPOINT_URL')
@@ -582,7 +602,7 @@ async def search_pests_diseases(
             search_hits = [SearchHit(**hit) for hit in results]            
             # Convert back to dict format for compatibility
             document_string = '\n\n----\n\n'.join([str(document) for document in search_hits])
-            return "> Pests & Diseases Search Results for `" + query + "`\n\n" + document_string
+            return "> Pests & Diseases Search Results for `" + query + "`\n\n" + document_string + await agromet_note(ctx, query=query)
     except Exception as e:
         logger.error(f"Error searching pests and diseases: {e} for query: {query}")
         raise ModelRetry(f"Error searching pests and diseases, please try again")

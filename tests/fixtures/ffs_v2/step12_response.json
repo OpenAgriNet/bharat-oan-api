@@ -1,0 +1,37 @@
+{
+  "code": 200,
+  "data": {
+    "isValid": true,
+    "message": "All 1 booking(s) created successfully",
+    "bookingResults": [
+      {
+        "retailerId": 900033,
+        "isValid": true,
+        "message": "Booking saved successfully.",
+        "procurementId": 900034,
+        "procurementApplicationCode": "PRC-TEST-V2",
+        "totalBagsRequested": 1,
+        "maxBagsAllowed": 50,
+        "alreadyBookedBags": 0,
+        "remainingBags": 50,
+        "expiryDatetime": "2026-11-06 23:00:00",
+        "numberOfProducts": 1,
+        "statusCode": 304,
+        "isWaitlisted": false,
+        "waitlistGroupId": null,
+        "waitlistExpiresOn": null
+      }
+    ],
+    "totalBookingsRequested": 1,
+    "totalBookingsSuccessful": 1,
+    "totalBookingsFailed": 0,
+    "applicantUserId": 900035,
+    "stateLgdCode": 24,
+    "month": 11,
+    "year": 2026
+  },
+  "message": "Multiple booking successful",
+  "method": "POST",
+  "status": "success",
+  "totalRecords": null
+}

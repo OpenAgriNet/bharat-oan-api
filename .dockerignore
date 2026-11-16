@@ -4,10 +4,13 @@
 .dockerignore
 .venv
 .env.example
+.env
+.env.*
 __pycache__
 *.pyc
 *.pyo
 tests/
 logs/
 *.md
+!assets/prompts/**/*.md
 .claude/

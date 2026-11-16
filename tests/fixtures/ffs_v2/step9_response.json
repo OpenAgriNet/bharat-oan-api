@@ -1,0 +1,66 @@
+{
+  "code": 200,
+  "data": [
+    {
+      "gfrType": 1,
+      "recommendations": [
+        {
+          "productGroupId": 11,
+          "productGroupName": "Urea",
+          "sequenceNo": 1,
+          "totalKgRequired": 45.31,
+          "kgPerBag": 45.0,
+          "noOfBagsRequired": 1,
+          "noOfBagsGFR": 1,
+          "perPersonRemainingBags": 50,
+          "alreadyPurchasedBags": 0,
+          "offeredBags": 1,
+          "appliedCase": "GFR"
+        },
+        {
+          "productGroupId": 14,
+          "productGroupName": "NPKS",
+          "sequenceNo": 2,
+          "totalKgRequired": 33.56,
+          "kgPerBag": 50.0,
+          "noOfBagsRequired": 1,
+          "noOfBagsGFR": 1,
+          "perPersonRemainingBags": 50,
+          "alreadyPurchasedBags": 0,
+          "offeredBags": 1,
+          "appliedCase": "GFR"
+        },
+        {
+          "productGroupId": 12,
+          "productGroupName": "DAP",
+          "sequenceNo": 3,
+          "totalKgRequired": 33.56,
+          "kgPerBag": 50.0,
+          "noOfBagsRequired": 1,
+          "noOfBagsGFR": 1,
+          "perPersonRemainingBags": 50,
+          "alreadyPurchasedBags": 0,
+          "offeredBags": 1,
+          "appliedCase": "GFR"
+        },
+        {
+          "productGroupId": 13,
+          "productGroupName": "MOP",
+          "sequenceNo": 5,
+          "totalKgRequired": 67.12,
+          "kgPerBag": 50.0,
+          "noOfBagsRequired": 2,
+          "noOfBagsGFR": 2,
+          "perPersonRemainingBags": 50,
+          "alreadyPurchasedBags": 0,
+          "offeredBags": 2,
+          "appliedCase": "GFR"
+        }
+      ]
+    }
+  ],
+  "message": "Get records.",
+  "method": "GET",
+  "status": "success",
+  "totalRecords": null
+}

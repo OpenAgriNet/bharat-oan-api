@@ -2,6 +2,7 @@ import asyncio
 import hmac
 import json
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -436,6 +437,7 @@ def _build_guest_auth_payload(
     exp = now + timedelta(minutes=settings.jwt_expiry_minutes)
     payload = {
         "sub": guest_sub,
+        "jti": str(uuid.uuid4()),
         "name": name,
         "role": role,
         "channel": channel,

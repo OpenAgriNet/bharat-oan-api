@@ -67,6 +67,12 @@ GrievanceTypeLiteral = Literal[tuple(GRIEVANCE_TYPES)] if GRIEVANCE_TYPES else s
 
 _REGISTRATION_NUMBER_LABEL = "Registration Number"
 _BAP_ENDPOINT_NOT_CONFIGURED_MSG = "BAP_ENDPOINT is not configured in environment."
+# ponytail: Temporary PM-KISAN grievance-lodge stop. To re-enable, remove the
+# early-return guards that use this message in pmkisan_grievance_send_otp
+# (submit_grievance purpose) and pmkisan_submit_grievance.
+_PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG = (
+    "PM-KISAN grievance submission is temporarily unavailable. Please try again later."
+)
 
 # -----------------------
 # Response formatting
@@ -798,6 +804,10 @@ async def pmkisan_grievance_send_otp(
     Returns:
         OTP send confirmation or service error.
     """
+    # ponytail: Remove this block to re-enable submit grievance OTP flow.
+    if purpose == "submit_grievance":
+        return _PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG
+
     try:
         reg_no_clean = _validate_pmkisan_registration_number(reg_no)
         purpose_text = "submit the grievance" if purpose == "submit_grievance" else "check grievance status"
@@ -835,12 +845,20 @@ async def pmkisan_submit_grievance(
     Args:
         reg_no: PM-KISAN registration number used for OTP verification and grievance submission.
         grievance_description: Detailed description of the grievance.
-        grievance_type: Must be exactly one of: "ACCOUNT_NUMBER_NOT_CORRECT",
-            "ONLINE_APPLICATION_PENDING_FOR_APPROVAL", "INSTALLMENT_NOT_RECEIVED",
-            "TRANSACTION_FAILED", "PROBLEM_IN_AADHAAR_CORRECTION", "GENDER_NOT_CORRECT",
-            "PAYMENT_RELATED", "PROBLEM_IN_OTP_BASED_EKYC", "PROBLEM_IN_BIO_METRIC_BASED_EKYC",
-            "PROBLEM_IN_FACIAL_BASED_EKYC". Map the farmer's free-text complaint to the
-            closest matching value from this list; never invent a new label.
+        grievance_type: Must be exactly one of: "LATEST_INSTALMENT_NOT_RECEIVED",
+            "TRANSACTION_FAILED", "PREVIOUS_INSTALMENTS_NOT_RECEIVED",
+            "INCORRECTLY_MARKED_AS_DECEASED", "INCORRECTLY_MARKED_AS_DECEASED_PREVIOUS_LANDOWNER",
+            "INCORRECTLY_MARKED_AS_INELIGIBLE", "VOLUNTARY_SURRENDER_BY_MISTAKE",
+            "INCORRECTLY_MARKED_UNDER_SUSPECTED_CASES", "PROBLEM_WITH_UPDATING_LAND_DETAILS",
+            "PROBLEM_WITH_SEEDING_AADHAAR_IN_BANK_ACCOUNT", "PROBLEM_WITH_BIOMETRIC_EKYC",
+            "PROBLEM_WITH_FACIAL_EKYC", "PENDING_APPROVAL_FOR_SELF_REGISTRATION",
+            "PENDING_APPROVAL_FOR_INELIGIBILITY_REVOCATION",
+            "PENDING_APPROVAL_FOR_SURRENDER_REVOCATION",
+            "PENDING_APPROVAL_FOR_UPDATION_OF_MISSING_INFORMATION",
+            "PENDING_ACTION_SUSPECTED_SPOUSE_OR_MINOR",
+            "PENDING_ACTION_SUSPECTED_INCORRECT_LAND_OR_PREVIOUS_OWNER", "CORRUPTION",
+            "URGENT". Map the farmer's free-text complaint to the closest matching value
+            from this list; never invent a new label.
         otp: 4-digit OTP received on the registered mobile.
         phone_number: Optional registered mobile number to include in OTP verification.
         raw: If True, return the raw response body.
@@ -848,6 +866,9 @@ async def pmkisan_submit_grievance(
     Returns:
         Grievance submission result or OTP verification error.
     """
+    # ponytail: Remove this line to re-enable PM-KISAN grievance submission API call.
+    return _PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG
+
     try:
         identifier_value, reg_no_clean = _validate_submit_grievance_inputs(
             reg_no, grievance_type, grievance_description, otp

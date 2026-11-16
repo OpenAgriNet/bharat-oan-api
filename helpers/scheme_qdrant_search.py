@@ -683,7 +683,9 @@ SCHEME_STATUS_SERVICES: dict[str, tuple[tuple[str, str], ...]] = {
 
 def format_status_check_offer(scheme_code: Optional[str]) -> str:
     """Offer block appended to search_schemes output; empty when the scheme has no status flow."""
-    services = SCHEME_STATUS_SERVICES.get((scheme_code or "").strip().lower())
+    code = (scheme_code or "").strip().lower()
+    code = {"pk": "pmkisan", "af": "aif", "aea": "aif"}.get(code, code)
+    services = SCHEME_STATUS_SERVICES.get(code)
     if not services:
         return ""
     lines = "\n".join(f"- {label} (tools: {flow})" for label, flow in services)

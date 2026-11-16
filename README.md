@@ -1,5 +1,68 @@
 # bharat-oan-api
 
+## Python runtime
+
+Use **Python 3.15** for the API, IMD agromet loader, and prompt-contract CI.
+The Docker dependency lock targets Linux amd64 and uses a CPython 3.15
+CPU-only Torch wheel. `psycopg2-binary` is pinned to 2.9.13 for Python 3.15 wheels.
+
+Python 3.15 wheels require pandas 3.1.0, pydantic 2.14.1 with pydantic-core
+2.50.1, rapidfuzz 3.14.6, and zope-interface 8.7. The lock includes their
+published Linux amd64 wheel hashes.
+
+`marisa-trie==1.4.1` (used by language-data) and `PyYAML==6.0.3` do not publish
+Python 3.15 wheels. Docker permits source builds **only for these two packages**,
+using their existing locked source hashes, C++/libyaml system headers, and the
+hash-locked tools in `requirements-build.lock`. Build isolation is disabled so
+pip cannot silently install unpinned build tools. All other packages remain
+binary-only, and `--require-hashes` remains enabled for both install steps.
+Docker runs `pip check` and a native-import/language-data smoke check before
+downloading the embedding model.
+
+Published artifact metadata was checked without installing packages locally.
+The Python 3.15 source builds and image smoke check still must pass in CI before
+deployment. To regenerate the application lock where downloads are allowed
+(do not pass `--only-binary=:all:`, since these two source builds are required):
+
+```sh
+uv pip compile requirements-docker.in --generate-hashes --python-version 3.15 --python-platform x86_64-manylinux_2_28 --default-index https://pypi.org/simple -o requirements.lock
+```
+
+## PM-KISAN installment release date
+
+The configured announcement is:
+"The 24th installment of PM kisan will release on 30th October 2026."
+English and Hindi answers use future tense through October 30 (Asia/Kolkata),
+then past tense from October 31, preserving the existing date-based behavior.
+
+- General release-date questions, including "When will the next PM-KISAN
+  installment be released?" and "when will pm kisan installement arrivces",
+  are answered directly from the configured prompt announcement. No search,
+  capability loading, registration number, phone number or OTP is needed.
+  A previous status offer or request for identifiers does not turn a release-date
+  question into consent for a personal status check. Do not append a status-check
+  offer or follow-up question to this announcement.
+- "PM Kisan installment status" and personal payment questions retain the
+  existing registration-number and OTP status-check flow.
+- All 13 language prompts share the
+  [installment instructions](assets/prompts/capabilities/agrinet/pmkisan/instalments/pmkisan_instalments_common.md).
+  The announcement is present even when no tools or capabilities are loaded.
+  Answers still use the selected language.
+- This routing change is prompt-only; existing search and personal-status tool
+  implementations are unchanged.
+
+Run the isolated, offline checks with the prompt-contract CI dependencies:
+
+```sh
+python3 -m pytest -q tests/test_pmkisan_installment_release.py \
+  tests/test_prompt_language_contract.py tests/test_pmkisan_prompt_validation.py \
+  --cov=helpers.pmkisan_installment_release --cov-fail-under=80
+```
+
+These checks cover search output and the rendered full/lazy prompt rules,
+including restored personal-status capabilities. They do not call a live model;
+recheck the reported conversation after deploying and restarting the API.
+
 ## PM-KISAN registration validation
 
 Registration numbers contain two letters followed by nine digits (11 characters,
@@ -36,10 +99,12 @@ Behavior:
 - Callback receipt is stored in Redis namespace callback-status with TTL.
 - Status endpoint returns received or not_found.
 - farmerId and consent fields are extracted as metadata when present.
+- When `AGRISTACK_CALLBACK_API_KEY` is set, callback POST must include matching `x-api-key`.
 
 Optional env vars:
 
 - CALLBACK_SESSION_TTL_SECONDS (default 3600)
+- AGRISTACK_CALLBACK_API_KEY (when set, validates `x-api-key` on POST /api/callback)
 - CALLBACK_AUDIT_DB_URL (Postgres URL, enables audit writes)
 - CALLBACK_AUDIT_TABLE_NAME (default agristack_callback_audit)
 
@@ -84,28 +149,63 @@ grievance status via the `khc-agri` Beckn provider. It uses the existing
 `BAP_ENDPOINT`, `BAP_ID`, `BAP_URI`, `BPP_ID`, and `BPP_URI` configuration.
 Only the provider backend needs `KHC_BASE_URL` and `KHC_API_KEY`.
 
-KHC is intent-gated: the agent does not proactively suggest it. For an
-unspecified grievance request, it may ask whether the user wants KHC and must
-wait for explicit agreement before calling KHC. A grievance for another named
-service stays on that service; unrelated questions do not trigger KHC suggestions.
-An explicit registration/status request naming KHC, Kisan Help Center/Centre or
-Kisan Helpline Center/Centre already satisfies this opt-in; do not ask it again.
-Registration proceeds to collecting a missing mobile number or sending OTP to
-the supplied mobile, while status proceeds to collecting a missing grievance
-number or checking it. OTP verification and final submission confirmation are
-still required for registration.
+Existing grievance services remain the default: PM-Kisan and PMFBY use their own
+registration/status flows, and AIF uses its own status flow. Once the scheme or
+service identifies the route, do not ask the farmer to choose between services.
+An explicit request for KHC, Kisan Help Center/Centre
+or Kisan Helpline Center/Centre overrides the default for that grievance.
+The per-turn KHC reminder also recognizes the reported spelling "Kisan heliline
+center". A KHC request that already names PM-Kisan proceeds to the first missing
+KHC detail (state when no location is supplied), never a PM-Kisan registration
+number. Replies contain one question with the KHC source last, not a second
+follow-up question after the source.
+Schemes without an existing flow use KHC directly. New AIF complaints also use KHC
+because AIF's own integration supports tracking only. For registration, if the
+scheme is missing, ask for it first, then route; that question alone does not select KHC.
+Unrelated questions do not trigger KHC suggestions.
 
-- **Registration:** `initiate_khc_otp` sends an OTP to the supplied mobile;
-  `verify_khc_otp` verifies it and returns whether the farmer is registered.
+- **Status routing before identifiers:** "I want to know my grievance status"
+  with no known scheme/service prompts "Could you please tell me which scheme
+  or service your grievance is with?", without any service source label.
+  PM-Kisan, PMFBY and AIF selections start their own existing status flows;
+  an explicit KHC selection asks only for a missing grievance number.
+  KCC (Kisan Credit Card) grievance status and other schemes without a primary
+  grievance-status flow go directly to KHC, with no service-choice question.
+  KCC's own tools are for application status only, not grievance tracking.
+  Reuse the route and identifiers for the same grievance. An unrelated earlier
+  KHC request, a bare number, a loaded capability or the bot's own KHC source
+  label must not select KHC for a new status request. Honor explicit service switches.
+  This gate is defined in [the shared routing prompt](assets/prompts/grievance_status_routing.md)
+  and supplied on every turn in every language, including before capability
+  loading. The model uses that prompt and conversation history to route KCC and
+  other schemes; there is no KCC-specific Python history matcher or route lock.
+  The prompt covers repeated scheme/ID/OTP replies after an erroneous bot service
+  question and distinguishes application requests, explicit switches and unrelated turns.
+  The current query is passed explicitly into the routing reminder because dynamic
+  system prompts run before that user message is added to history. An opening such
+  as "i want to check khc grivance status" therefore selects KHC immediately and
+  asks only for the missing grievance number. A later bare "aif" does not switch
+  the same grievance to AIF's beneficiary-ID flow, even after an erroneous
+  scheme/service clarification. Embedded conversation summaries are excluded when
+  reading individual historical user turns, so earlier wording is not mistaken
+  for the farmer's latest reply or explicit service switch.
+- **Registration order (all KHC schemes):** scheme, state/district/village,
+  concern, matching, issue summary with the mapped sub-category, confirmation,
+  mobile, OTP verification, new-farmer profile if required, submission.
+  Reuse supplied details and ask only for missing information, one question at a time.
+  `initiate_khc_otp` sends an OTP only after summary/sub-category confirmation;
+  `verify_khc_otp` verifies it and returns `isRegistered`.
   While awaiting OTP, a six-digit reply goes directly to verification using the
   same mobile; leading zeros are preserved and regional digits are normalized.
   The agent must not reject it or request it again without a verification result.
   Actual invalid/expired OTP responses and service failures are distinguished;
-  language and other remaining details are collected only after verification succeeds.
-  `lookup_khc_reference` resolves state/district/sub-district/village and
-  scheme/division/category/subcategory IDs from KHC. After summarizing the
-  grievance and obtaining explicit approval, `register_khc_grievance` submits it.
-  New farmers supply name/gender; existing farmers do not need to repeat them.
+  `find_khc_location` and `get_khc_grievance_options` resolve the required IDs
+  before confirmation; `lookup_khc_reference` supplies fallback and change-option lists.
+  Only after successful OTP verification, `isRegistered=false` triggers collection
+  of any missing name, then gender (Male/Female/Other); do not infer gender.
+  Already supplied profile details are reused. `isRegistered=true` skips both
+  questions. Then `register_khc_grievance` submits the confirmed grievance;
+  new-farmer profile collection does not restart complaint collection or confirmation.
   Registration accepts only OAN UI languages also accepted by the KHC provider:
   `hi`, `en`, `mr`, `bn`, `gu`, `kn`, `ta`, `te`, `as`, `ml`.
   UI language Maithili (`mai`) is not currently accepted by the KHC provider;
@@ -125,44 +225,98 @@ still required for registration.
   If coordinates are absent or incomplete, or the geocoder cannot identify the
   village, the agent asks only for the missing state/village/district details.
   If the district cannot be established from the village details, the agent asks
-  for it rather than guessing. After verifying the district in KHC, it fetches
-  the district's sub-district list and presents bulleted API-backed choices
-  (with further pages when available) if the sub-district is missing. Farmers
-  select by name only from the list, not by number.
+  for it rather than guessing. `find_khc_location` resolves the sub-district from
+  the village when possible. Ask for the sub-district only for an ambiguous
+  village or as a fallback when the village cannot be found. Farmers select by
+  name from API-backed choices (with further pages when available), not by number.
   The selected sub-district is used to fetch villages and match the village
   already supplied. Empty/failed lookups are explained, not replaced with guesses.
   Village and all other required IDs are resolved before final submission
   confirmation; already supplied/resolved location details are reused.
   The final summary confirms the resolved grievance location before submission.
   This does not require an AgriStack login.
-- **Status:** ask for the grievance number, retaining slashes and leading zeros,
-  then call `check_khc_grievance_status`. No mobile, OTP or cookie is needed.
-- Verification is bound to the conversation/mobile and expires locally after
+- **Status:** ask "Please share the grievance ID you received by SMS on your
+  registered mobile number. For example, UP/231026/5." Validate the format while retaining slashes and leading zeros,
+  then call `check_khc_grievance_status` without `otp` to send an SMS to the mobile
+  registered on the grievance. After successful sending, collect the six-digit OTP
+  and call the same tool with `grievance_number` and `otp`. No mobile or cookie is
+  needed. The OTP is valid for five minutes and single-use; resend only on request,
+  which invalidates the previous OTP. Wrong OTPs can be corrected until expiry;
+  expired/used OTPs require a new send. Do not use registration OTP tools for status.
+  Verified responses include location, escalation history and dated officer comments
+  when available. Missing registered mobiles and API/authentication failures are
+  reported separately from incorrect OTPs. Existing status tool/capability names
+  are unchanged, so all language prompts use the shared two-step flow.
+  Only after the send call succeeds, say "An OTP has been sent to your registered
+  mobile number. Please share the 6-digit OTP." Sending is not proof of delivery.
+  Reject malformed OTPs locally with an explanation that exactly six digits are needed.
+  Distinguish grievance-ID/not-found errors from OTP failures using the provider's
+  response. Preserve "invalid or expired" when KHC does not distinguish those causes;
+  never blame an ID/OTP for SMS, authentication or service failures.
+- **Grievance number validation:** before either status OTP call, require
+  `XX/NNNNNN/sequence` (for example `UP/231026/5` or `JK/231026/1`):
+  two ASCII letters, exactly six digits in the middle and a positive digit-only
+  sequence, within 100 normalized characters. KHC generates `grievanceNo` on
+  creation; Bharat Vistaar generates only the separate `BV-...` external reference.
+  Reject `UP/2345232/fdf`, `UP/2345232/1` and `UP/234523/fdf` locally,
+  before sending or verifying an OTP. Never truncate, pad or replace invalid characters.
+  Trim surrounding whitespace, uppercase the prefix and normalize regional digits;
+  preserve leading zeros. Zero-only sequences and malformed numbers are rejected
+  without HTTP requests, with a prompt to copy the full number from the KHC SMS.
+  The six-digit middle section is not interpreted as a calendar date;
+  existence is checked by KHC. Invalid-ID tool results request only an ID correction,
+  never a scheme/service restart. A supplied invalid ID gets an explicit error
+  explanation, including the actual middle-section digit count when its length
+  is wrong, followed by one correction request. Do not repeat the initial example
+  prompt or append another question after the source. OTPs still require exactly six digits.
+- Registration verification is bound to the conversation/mobile and expires locally after
   five minutes. Changed mobiles, expiry and provider restarts require fresh OTP.
   Do not automatically retry OTP sends or registration after uncertain failures.
 - Scheme IDs and division IDs come from the same reference row. Never guess IDs
   or apply sample IDs to a different farmer. Name-filtered lookups return 50
   options per page. Ask the farmer when matching entries are ambiguous.
-- **Problem-based routing:** after resolving the state, the agent fetches its
-  schemes and matches the farmer's complaint to returned scheme names, then
-  resolves category/subcategory using their parent IDs. Farmers are not asked
-  for scheme names or internal IDs upfront. A generic complaint that fits several
-  schemes triggers a focused clarification, not an assumed scheme. The `name`
+- **Problem matching:** capture the scheme first, then location and the farmer's
+  own concern. Use only the scheme the farmer named and match the concern to
+  that scheme's categories/sub-categories. Never infer a scheme from the concern
+  or ask for internal IDs. The `name`
   filter is a literal substring, not semantic search; unfiltered options and
   further pages are checked when a keyword has no match. Already supplied details
   are reused instead of requesting a full registration questionnaire after OTP.
   AIF, A.I.F. and Agriculture Infrastructure Fund are treated as equivalent
   names when matching returned schemes; an already named AIF is not reconfirmed.
-  Categories/sub-categories are matched by meaning, with API-backed names or a
-  focused clarification if ambiguous. Empty filters trigger unfiltered lookup
+  The existing chat LLM matches categories/sub-categories by meaning against the
+  full KHC catalogue returned privately by the tool, including names, IDs and
+  parent-child relationships. No complaint synonym table or extra model service
+  is needed. A missing provider keyword suggestion does not trigger a farmer-facing
+  list: the LLM first compares meaning, paraphrases and negation. Only unresolved
+  ambiguity triggers a focused clarification. Empty filters trigger unfiltered lookup
   and pagination; API failures are not reported as unsupported schemes.
   Missing mappings block readiness claims and final confirmation: there is no
   category-only submission or invented sub-category fallback.
+- **Complaint retention:** a farmer's answer to the problem question is reused
+  after category selection or later location questions, even if the model omits
+  it from the next tool call. A direct ASCII answer to the problem question is
+  sent intact (within the 500-character lookup limit), rather than allowing a
+  model summary to drop matching words such as "bank" or "sanction".
+  Non-ASCII complaints can still use an English translation, and later
+  clarifications are retained. Selecting a category does not restart complaint
+  collection. Match the complaint first: a clear category/sub-category match goes
+  straight to the summary with no selection list. If only the category matches,
+  offer only its sub-categories; show the category list only when no category
+  clearly matches.
+- **Summary and changes:** show the issue, scheme, resolved location, category
+  and mapped sub-category name, with no internal IDs. Ask whether to confirm or
+  change the sub-category. On an explicit change request, fetch all categories
+  under the verified scheme and their sub-category lists, including remaining
+  pages, and show names grouped by category. Update both parent category and
+  sub-category IDs from the farmer's selection and obtain fresh confirmation.
+  These are KHC-backed reference lists (provider database cache with API fallback),
+  not hardcoded options.
 - Creation uses a stable external reference for the same conversation/details,
   supported by KHC's duplicate-reference semantics. Unconfirmed submissions are
   reported explicitly; do not claim success without a returned grievance number.
 
-All language prompts include the shared KHC flow rules. OTP verification tool
+All language prompts include the shared KHC flow rules. Registration and status OTP tool
 input/output capture is disabled; no login tokens or cookies reach the model.
 
 Run focused tests:
@@ -174,6 +328,9 @@ Use these public callback endpoints for AgriStack integration.
 
 - Callback (POST, from AgriStack): `/api/callback?from=agristack`
 - Status check (GET, from frontend): `/api/callback/status?from=agristack&callbackSessionId=<id>`
+
+If `AGRISTACK_CALLBACK_API_KEY` is configured, callback POST requests must send
+`x-api-key: <AGRISTACK_CALLBACK_API_KEY>`.
 
 The callback response includes:
 - `from` query param value

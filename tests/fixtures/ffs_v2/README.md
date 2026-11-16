@@ -1,0 +1,1 @@
+Sanitized copies of supplied mock_responses_v2 (5 November 2026). Identity, contact, token, private IDs and address fields are synthetic; response shapes and business values are retained. over_limit.json is the supplied rejection example. Tests change expired timestamps where needed; no fixture token authenticates to FFS.

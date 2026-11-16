@@ -1,6 +1,7 @@
 from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 from langcodes import Language
+from agents.skill_policy import SkillState
 
 
 class FarmerContext(BaseModel):
@@ -20,6 +21,8 @@ class FarmerContext(BaseModel):
         **Selected Language:** Hindi
         **Moderation Compliance:** "Valid Agricultural (This is a valid agricultural question.)"
     """
+    skills: SkillState = Field(default_factory=SkillState)
+    ffs_context: dict[str, Any] = Field(default_factory=dict, exclude=True)
     query: str = Field(description="The user's question.")
     lang_code: str = Field(description="The language code of the user's question.", default='hi')
     session_id: str = Field(description="The session ID for the conversation.")
@@ -32,7 +35,7 @@ class FarmerContext(BaseModel):
     longitude: Optional[float] = Field(default=None, description="User's longitude for geocoding.")
     agristack_status: Literal["not_logged_in", "no_consent", "consent"] = Field(
         default="not_logged_in",
-        description="AgriStack login state for this session (see assets/prompts/agristack_rules.md).",
+        description="AgriStack login state for this session (see assets/prompts/skills/agristack/profile/).",
     )
     npss_used: bool = Field(default=False, description="Whether NPSS image analysis was used in this turn.")
     npss_source_name: Optional[str] = Field(default=None, description="Official NPSS source name.")
@@ -81,7 +84,9 @@ class FarmerContext(BaseModel):
         if self.latitude is not None and self.longitude is not None:
             return (
                 "**Browser Location Coordinates:** "
-                f"Latitude={self.latitude}, Longitude={self.longitude}"
+                f"Latitude={self.latitude}, Longitude={self.longitude} "
+                "(the device location; never use it, or a place worked out from it, for a crop advisory question: "
+                "for crop advice the farmer's state and district come only from the farmer)"
             )
         return None
     
@@ -91,7 +96,7 @@ class FarmerContext(BaseModel):
             return (
                 "**AgriStack status:** logged in with consent. If this question needs the farmer's place, crop, or "
                 "profile details and the farmer did not name/give them, call the AgriStack tool first instead of "
-                "asking or following the normal ask-first flow: `get_agristack_farmer_location` for weather "
+                "asking: `get_agristack_farmer_location` for weather "
                 "forecast/advisory/alerts; `get_agristack_farmer_crops` for crop advisory, pests/diseases and mandi "
                 "prices; `get_agristack_farmer_profile` for scheme eligibility/application/renewal, grievance "
                 "submission, and fertilizer recommendation/quota."
@@ -112,5 +117,6 @@ class FarmerContext(BaseModel):
             self._moderation_string(),
             self._location_context_string(),
             self._agristack_context_string(),
+            ("**FFS workflow:** " + str(self.ffs_context)) if self.ffs_context else None,
         ]
         return "\n".join([x for x in strings if x])

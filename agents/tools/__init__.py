@@ -4,9 +4,12 @@ Tools for the BharatVistaar AI Agent.
 
 # from agents.tools.search_beckn import search_documents
 
-from pydantic_ai import Tool
+from dataclasses import replace
 
-from agents.tools.scheme_info import get_scheme_info
+from pydantic_ai import Tool
+from helpers.gemma_schema import gemma_compatible
+from agents.tools.ffs import ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, ffs_find_shops, ffs_create_booking
+
 from agents.tools.amul_vistaar import call_amul_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
 from agents.tools.pmkisan_scheme_status import (
@@ -45,6 +48,8 @@ from agents.tools.khc import (
     initiate_khc_otp,
     verify_khc_otp,
     lookup_khc_reference,
+    find_khc_location,
+    get_khc_grievance_options,
     check_khc_grievance_status,
     register_khc_grievance,
 )
@@ -78,12 +83,16 @@ from agents.tools.agristack import (
     only_with_agristack_consent,
 )
 
+async def _gemma_schema(ctx, tool_def):
+    return replace(tool_def, parameters_json_schema=gemma_compatible(tool_def.parameters_json_schema))
+
+
 TOOLS = [
-    Tool(
-        get_scheme_info,
-        takes_ctx=True,
-        strict=False,
-    ),
+    Tool(ffs_send_otp, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
+    Tool(ffs_verify_otp, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
+    Tool(ffs_get_entitlement, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
+    Tool(ffs_find_shops, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
+    Tool(ffs_create_booking, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
     Tool(
         call_amul_vistaar_network,
         takes_ctx=True,
@@ -215,6 +224,16 @@ TOOLS = [
         strict=False,
     ),
     Tool(
+        find_khc_location,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        get_khc_grievance_options,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
         register_khc_grievance,
         takes_ctx=True,
         strict=False,
@@ -226,7 +245,7 @@ TOOLS = [
     ),
     Tool(
         search_documents,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -246,7 +265,7 @@ TOOLS = [
     ),
     Tool(
         search_pests_diseases,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
@@ -266,7 +285,7 @@ TOOLS = [
     ),
     Tool(
         forward_geocode,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(

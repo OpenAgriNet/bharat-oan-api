@@ -6,7 +6,7 @@ httpx_oauth==0.17.0
 Jinja2==3.1.6 # For template rendering
 
 # for data/DB
-pandas==3.0.5
+pandas==3.1.0
 simplejson==4.1.1
 
 ### for DB
@@ -14,7 +14,7 @@ simplejson==4.1.1
 
 # LLM
 openai==2.48.0
-pydantic==2.13.4
+pydantic==2.14.1
 tenacity==9.1.4
 
 # Logfire
@@ -37,6 +37,10 @@ openpyxl==3.1.5
 # version actually provides -- ModuleNotFoundError at import time, on any
 # opentelemetry-api version. Fixed upstream in pydantic-ai-slim 1.32.0.
 pydantic-ai==1.32.0
+# genai-prices >=0.1.0 returns `output_reasoning_tokens`, which pydantic-ai 1.32.0's
+# RequestUsage rejects; the TypeError is swallowed and every OpenAI Responses API
+# call (azure_gpt54_mini) reports 0 tokens to Langfuse. Remove on pydantic-ai 2.x.
+genai-prices==0.0.73
 asgiref==3.12.1
 
 # Web Server
@@ -57,7 +61,7 @@ marqo==3.18.2 # Vector search
 qdrant-client==1.18.0 # Qdrant vector search (scheme documents)
 torch==2.14.0 # Docker installs the CPU wheel from the PyTorch index
 sentence-transformers==5.6.1 # Embeddings for Qdrant scheme search
-rapidfuzz==3.14.5 # Fuzzy string matching
+rapidfuzz==3.14.6 # Fuzzy string matching
 
 # Cloud Services
 boto3==1.43.56 # AWS SDK
@@ -85,7 +89,7 @@ markdownify==1.2.3
 humanize==4.16.0
 
 pycryptodome==3.23.0
-psycopg2-binary==2.9.10  # optional AgriStack callback audit writes (CALLBACK_AUDIT_DB_URL)
+psycopg2-binary==2.9.13  # CPython 3.15 wheels; IMD agromet DB (IMD_DB_URL), optional callback audit writes (CALLBACK_AUDIT_DB_URL)
 
 langfuse==4.14.1
 

@@ -8,10 +8,12 @@ from app.auth.jwt_auth import get_current_user
 from app.models.requests import ChatRequest
 from app.routers.chat_query_utils import (
     get_session_history,
+    ensure_session_id,
     normalize_chat_query,
     prepare_image_analyze_payload,
 )
 from app.services.chat import stream_chat_messages
+from app.services.ffs import prepare_chat_turn
 from helpers.utils import get_logger
 
 
@@ -30,7 +32,9 @@ async def chat_endpoint(
     Chat endpoint that streams responses back to the client.
     Requires JWT authentication.
     """
-    session_id, history = await get_session_history(request.session_id)
+    session_id = ensure_session_id(request.session_id)
+    ffs_context = await prepare_chat_turn(session_id)
+    session_id, history = await get_session_history(session_id)
     qid = request.qid or str(uuid.uuid4())
     channel = current_user.get("channel", "BharatVistaar")
     authenticated_user = current_user.get("mobile")
@@ -59,6 +63,7 @@ async def chat_endpoint(
             longitude=request.longitude,
             qid=qid,
             current_user=current_user,
+            ffs_context=ffs_context,
         ),
         media_type="text/event-stream",
         headers={"X-QID": qid, "Access-Control-Expose-Headers": "X-QID"},
@@ -86,6 +91,9 @@ async def chat_analyze_image_endpoint(
     channel = current_user.get("channel", "BharatVistaar")
     authenticated_user = current_user.get("mobile")
 
+    session_id = ensure_session_id(session_id)
+    qid = str(uuid.uuid4())
+    ffs_context = await prepare_chat_turn(session_id)
     logger.info(
         f"Image analyze request received - session_id: {session_id}, user_id: {user_id}, "
         f"authenticated_user: {authenticated_user}, channel: {channel}, source_lang: {source_lang}, "
@@ -112,8 +120,9 @@ async def chat_analyze_image_endpoint(
             is_image_analysis=True,
             latitude=latitude,
             longitude=longitude,
-            qid=str(uuid.uuid4()),
+            qid=qid,
             current_user=current_user,
+            ffs_context=ffs_context,
         ),
         media_type="text/event-stream",
         headers={"X-QID": qid, "Access-Control-Expose-Headers": "X-QID"},

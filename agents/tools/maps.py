@@ -4,10 +4,14 @@ Maps tool for geocoding using Photon.
 import os
 import httpx
 from dotenv import load_dotenv
-from typing import Optional, Any
+from typing import Optional, Any, Tuple
 from urllib.parse import urlparse
 from pydantic import BaseModel, field_validator
 from langfuse import observe
+from pydantic_ai.tools import RunContext
+
+from agents.deps import FarmerContext
+from agents.tools.chat_place import remember_place
 from helpers.utils import get_logger
 
 logger = get_logger(__name__)
@@ -57,6 +61,11 @@ class Location(BaseModel):
         return f"{self.place_name} ({self.latitude}, {self.longitude})"
 
 
+def _in_india(coords: list) -> bool:
+    return (len(coords) >= 2 and INDIA_BBOX[1] <= coords[1] <= INDIA_BBOX[3]
+            and INDIA_BBOX[0] <= coords[0] <= INDIA_BBOX[2])
+
+
 def _feature_to_location(feature: dict, fallback_name: str = None) -> Location:
     """Convert a Photon GeoJSON feature to a Location object."""
     props = feature.get("properties", {})
@@ -86,8 +95,35 @@ def _feature_to_location(feature: dict, fallback_name: str = None) -> Location:
 
 
 
+def _area_name(feature: dict) -> Optional[str]:
+    """'Srinagar, Jammu and Kashmir, India' for a point: its town or district, never the nearest shop or street."""
+    props = feature.get("properties", {})
+    parts = [props.get("city") or props.get("county"), props.get("state"), props.get("country")]
+    return ", ".join(part for part in parts if part) or None
+
+
+async def locate(place_name: str) -> Optional[Tuple[Location, Optional[str]]]:
+    """Best Photon match for a place name (preferring India) and its place type, e.g. "city" or "state".
+
+    None when nothing is found; httpx errors are left to the caller.
+    """
+    response = await _http_client.get("/api", params={
+        "q": place_name,
+        "limit": 10,
+        "lang": "en",
+        "bbox": f"{INDIA_BBOX[0]},{INDIA_BBOX[1]},{INDIA_BBOX[2]},{INDIA_BBOX[3]}",
+    })
+    response.raise_for_status()
+    features = response.json().get("features", [])
+    if not features:
+        return None
+    in_india = (feature for feature in features if _in_india(feature.get("geometry", {}).get("coordinates", [])))
+    feature = next(in_india, features[0])
+    return _feature_to_location(feature, place_name), feature.get("properties", {}).get("type")
+
+
 @observe(name="tool:forward_geocode", as_type="tool")
-async def forward_geocode(place_name: str) -> str:
+async def forward_geocode(ctx: RunContext[FarmerContext], place_name: str) -> str:
     """Forward Geocoding to get latitude and longitude from a place name in India.
 
     Args:
@@ -97,27 +133,12 @@ async def forward_geocode(place_name: str) -> str:
         str: The location details or an error message if not found in India.
     """
     try:
-        response = await _http_client.get("/api", params={
-            "q": place_name,
-            "limit": 10,
-            "lang": "en",
-            "bbox": f"{INDIA_BBOX[0]},{INDIA_BBOX[1]},{INDIA_BBOX[2]},{INDIA_BBOX[3]}",
-        })
-        response.raise_for_status()
-        features = response.json().get("features", [])
-
-        if features:
-            # Prefer results within India bounding box
-            for feature in features:
-                coords = feature.get("geometry", {}).get("coordinates", [])
-                if len(coords) >= 2:
-                    lon, lat = coords[0], coords[1]
-                    if (INDIA_BBOX[1] <= lat <= INDIA_BBOX[3] and
-                            INDIA_BBOX[0] <= lon <= INDIA_BBOX[2]):
-                        return _feature_to_location(feature, place_name)._location_string()
-
-            # Fallback to first result if none matched India bbox
-            return _feature_to_location(features[0], place_name)._location_string()
+        found = await locate(place_name)
+        if found:
+            location, kind = found
+            if location.latitude is not None and location.longitude is not None:
+                await remember_place(ctx.deps.session_id, location.latitude, location.longitude, kind)
+            return location._location_string()
         else:
             logger.info(f"No results found for place: {place_name}")
             return f"No location found for '{place_name}'. Please check the spelling or try a different location name."
@@ -158,16 +179,13 @@ async def reverse_geocode(latitude: float, longitude: float) -> Optional[Locatio
             "lat": latitude,
             "lon": longitude,
             "lang": "en",
-            "bbox": f"{INDIA_BBOX[0]},{INDIA_BBOX[1]},{INDIA_BBOX[2]},{INDIA_BBOX[3]}",
         })
         response.raise_for_status()
         features = response.json().get("features", [])
 
         if features:
-            location = _feature_to_location(features[0])
-            location.latitude = round(latitude, 3)
-            location.longitude = round(longitude, 3)
-            return location
+            return Location(place_name=_area_name(features[0]) or "Unknown Location",
+                            latitude=latitude, longitude=longitude)
         else:
             logger.info(f"No results found for coordinates: ({latitude}, {longitude})")
             return Location(latitude=latitude, longitude=longitude, place_name="Unknown Location")
