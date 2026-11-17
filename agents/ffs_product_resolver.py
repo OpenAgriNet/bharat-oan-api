@@ -6,13 +6,14 @@ import io
 import json
 from typing import Literal
 
+from langfuse import observe
 from pydantic import BaseModel, Field, field_validator
 from pydantic_ai import PromptedOutput
 from pydantic_ai.usage import UsageLimits
 
 from agents.model_registry import get_registry
 from agents.models import configured_agent
-from helpers.ffs_tracing import observation
+from helpers.langfuse_tracing import lf_update_current_observation
 
 
 class ProductMatch(BaseModel):
@@ -50,30 +51,30 @@ def product_agent():
         ))
 
 
+@observe(name="ffs.product_resolution")
 async def resolve_products(names, products, *, session_id, question_id):
-    with observation("ffs.product_resolution", metadata={"session_id": session_id,
-            "question_id": question_id, "channel": "chat", "product_count": len(names),
-            "catalog_count": len(products)}) as diagnostic:
-        catalogue = io.StringIO()
-        writer = csv.writer(catalogue, lineterminator="\n")
-        writer.writerow(["name", "product_id", "group", "bag_weight_kg"])
-        writer.writerows((p["productName"], p["productId"], p["productGroupId"], p["bagWeightKg"]) for p in products)
-        prompt = "Product catalogue (CSV):\n" + catalogue.getvalue() + "\nFarmer phrases (JSON):\n" + json.dumps(
-            [{"index": i, "text": name} for i, name in enumerate(names)], ensure_ascii=False)
-        registry = get_registry()
-        diagnostic["model_alias"] = registry.get_default_alias("ffs_product_resolution")
-        async with asyncio.timeout(registry.get_timeout("ffs_product_resolution")):
-            run = await product_agent().run(prompt, usage_limits=UsageLimits(request_limit=1))
-        diagnostic.update(input_tokens=run.usage().input_tokens or None, output_tokens=run.usage().output_tokens or None)
-        matches = run.output.matches
-        ids = {p["productId"] for p in products}
-        if len(matches) != len(names) or {m.index for m in matches} != set(range(len(names))):
-            raise ValueError("Product resolver returned incomplete indexes")
-        for m in matches:
-            valid = ((m.status == "matched" and m.product_id in ids and not m.candidates)
-                     or (m.status == "ambiguous" and m.product_id is None and bool(m.candidates) and set(m.candidates) <= ids)
-                     or (m.status == "not_found" and m.product_id is None and not m.candidates))
-            if not valid:
-                raise ValueError("Product resolver returned an unsupported product or inconsistent result")
-        diagnostic["statuses"] = [m.status for m in matches]
-        return sorted(matches, key=lambda m: m.index)
+    registry = get_registry()
+    metadata = {"session_id": session_id, "question_id": question_id, "channel": "chat",
+                "product_count": len(names), "catalog_count": len(products),
+                "model_alias": registry.get_default_alias("ffs_product_resolution")}
+    catalogue = io.StringIO()
+    writer = csv.writer(catalogue, lineterminator="\n")
+    writer.writerow(["name", "product_id", "group", "bag_weight_kg"])
+    writer.writerows((p["productName"], p["productId"], p["productGroupId"], p["bagWeightKg"]) for p in products)
+    prompt = "Product catalogue (CSV):\n" + catalogue.getvalue() + "\nFarmer phrases (JSON):\n" + json.dumps(
+        [{"index": i, "text": name} for i, name in enumerate(names)], ensure_ascii=False)
+    async with asyncio.timeout(registry.get_timeout("ffs_product_resolution")):
+        run = await product_agent().run(prompt, usage_limits=UsageLimits(request_limit=1))
+    matches = run.output.matches
+    ids = {p["productId"] for p in products}
+    if len(matches) != len(names) or {m.index for m in matches} != set(range(len(names))):
+        raise ValueError("Product resolver returned incomplete indexes")
+    for m in matches:
+        valid = ((m.status == "matched" and m.product_id in ids and not m.candidates)
+                 or (m.status == "ambiguous" and m.product_id is None and bool(m.candidates) and set(m.candidates) <= ids)
+                 or (m.status == "not_found" and m.product_id is None and not m.candidates))
+        if not valid:
+            raise ValueError("Product resolver returned an unsupported product or inconsistent result")
+    lf_update_current_observation(metadata={**metadata, "statuses": [m.status for m in matches]},
+                                  input_tokens=run.usage().input_tokens or None, output_tokens=run.usage().output_tokens or None)
+    return sorted(matches, key=lambda m: m.index)

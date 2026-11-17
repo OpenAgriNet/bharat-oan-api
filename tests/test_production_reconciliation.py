@@ -166,7 +166,7 @@ def test_chat_returns_actual_stream_qid_in_exposed_header(load_module, monkeypat
     stub("app.models.requests", ChatRequest=models.ChatRequest)
     stub("app.routers.chat_query_utils", ensure_session_id=lambda value: value or str(uuid.uuid4()),
          get_session_history=history, normalize_chat_query=lambda query: (query, False), prepare_image_analyze_payload=lambda **kwargs: None)
-    stub("app.services.ffs", prepare_chat_turn=ffs_context)
+    stub("agents.tools.ffs", prepare_chat_turn=ffs_context)
     stub("app.services.chat", stream_chat_messages=stream)
     router = load_module("app/routers/chat.py")
     app = FastAPI()

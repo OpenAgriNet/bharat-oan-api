@@ -15,7 +15,17 @@ from pydantic_ai.usage import RequestUsage
 from pydantic_core import to_jsonable_python
 
 from app import utils
-from tests.test_ffs import MemoryCache
+
+
+class MemoryCache:
+    def __init__(self):
+        self.values = {}
+
+    async def get(self, key, namespace=None):
+        return self.values.get((namespace, key))
+
+    async def set(self, key, value, ttl=None, namespace=None):
+        self.values[(namespace, key)] = value
 
 
 def old_prompt(query, stage):

@@ -13,7 +13,7 @@ from app.routers.chat_query_utils import (
     prepare_image_analyze_payload,
 )
 from app.services.chat import stream_chat_messages
-from app.services.ffs import prepare_chat_turn
+from agents.tools.ffs import prepare_chat_turn
 from helpers.utils import get_logger
 
 

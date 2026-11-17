@@ -6,13 +6,14 @@ import io
 import json
 from typing import Literal
 
+from langfuse import observe
 from pydantic import BaseModel, Field, field_validator
 from pydantic_ai import PromptedOutput
 from pydantic_ai.usage import UsageLimits
 
 from agents.model_registry import get_registry
 from agents.models import configured_agent
-from helpers.ffs_tracing import observation
+from helpers.langfuse_tracing import lf_update_current_observation
 
 
 class CropMatch(BaseModel):
@@ -54,36 +55,36 @@ def crop_agent():
     )
 
 
+@observe(name="ffs.crop_resolution")
 async def resolve_crops(names, crops, *, state_code, session_id, question_id):
     """One batched model call; validate IDs before any caller can write crop records."""
+    registry = get_registry()
     metadata = {"session_id": session_id, "question_id": question_id, "channel": "chat",
-                "state_code": state_code, "crop_count": len(names), "catalog_count": len(crops)}
-    with observation("ffs.crop_resolution", metadata=metadata) as diagnostic:
-        catalogue = io.StringIO()
-        writer = csv.writer(catalogue, lineterminator="\n")
-        writer.writerow(["crop_name", "crop_code"])
-        writer.writerows((row["cropName"], row["cropCode"]) for row in crops)
-        phrases = [{"index": i, "text": name} for i, name in enumerate(names)]
-        prompt = (f"State LGD code: {state_code}\nCrop catalogue (CSV):\n{catalogue.getvalue()}"
-                  "\nFarmer phrases (JSON):\n" + json.dumps(phrases, ensure_ascii=False, separators=(",", ":")))
-        registry = get_registry()
-        diagnostic["model_alias"] = registry.get_default_alias("ffs_crop_resolution")
-        async with asyncio.timeout(registry.get_timeout("ffs_crop_resolution")):
-            run = await crop_agent().run(prompt, usage_limits=UsageLimits(request_limit=1))
-        usage = run.usage()
-        diagnostic.update(input_tokens=usage.input_tokens or None, output_tokens=usage.output_tokens or None)
-        matches = run.output.matches
-        if len(matches) != len(names) or {m.index for m in matches} != set(range(len(names))):
-            raise ValueError("Crop resolver returned incomplete or duplicate input indexes")
-        codes = {row["cropCode"] for row in crops}
-        for match in matches:
-            if match.status == "matched":
-                valid = match.crop_code in codes and not match.candidates
-            elif match.status == "ambiguous":
-                valid = match.crop_code is None and bool(match.candidates) and set(match.candidates) <= codes
-            else:
-                valid = match.crop_code is None and not match.candidates
-            if not valid:
-                raise ValueError("Crop resolver returned an unsupported code or inconsistent result")
-        diagnostic["statuses"] = [m.status for m in matches]
-        return sorted(matches, key=lambda m: m.index)
+                "state_code": state_code, "crop_count": len(names), "catalog_count": len(crops),
+                "model_alias": registry.get_default_alias("ffs_crop_resolution")}
+    catalogue = io.StringIO()
+    writer = csv.writer(catalogue, lineterminator="\n")
+    writer.writerow(["crop_name", "crop_code"])
+    writer.writerows((row["cropName"], row["cropCode"]) for row in crops)
+    phrases = [{"index": i, "text": name} for i, name in enumerate(names)]
+    prompt = (f"State LGD code: {state_code}\nCrop catalogue (CSV):\n{catalogue.getvalue()}"
+              "\nFarmer phrases (JSON):\n" + json.dumps(phrases, ensure_ascii=False, separators=(",", ":")))
+    async with asyncio.timeout(registry.get_timeout("ffs_crop_resolution")):
+        run = await crop_agent().run(prompt, usage_limits=UsageLimits(request_limit=1))
+    usage = run.usage()
+    matches = run.output.matches
+    if len(matches) != len(names) or {m.index for m in matches} != set(range(len(names))):
+        raise ValueError("Crop resolver returned incomplete or duplicate input indexes")
+    codes = {row["cropCode"] for row in crops}
+    for match in matches:
+        if match.status == "matched":
+            valid = match.crop_code in codes and not match.candidates
+        elif match.status == "ambiguous":
+            valid = match.crop_code is None and bool(match.candidates) and set(match.candidates) <= codes
+        else:
+            valid = match.crop_code is None and not match.candidates
+        if not valid:
+            raise ValueError("Crop resolver returned an unsupported code or inconsistent result")
+    lf_update_current_observation(metadata={**metadata, "statuses": [m.status for m in matches]},
+                                  input_tokens=usage.input_tokens or None, output_tokens=usage.output_tokens or None)
+    return sorted(matches, key=lambda m: m.index)

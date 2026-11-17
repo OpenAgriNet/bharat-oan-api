@@ -13,56 +13,39 @@ Only urea/DAP booking is supported; explain that before login for other products
 General dose/advisory questions keep their existing flow. Purchase routing is
 also visible when the FFS skill is enabled but not yet loaded.
 
+## Architecture
+
+The workflow, FFS credentials and per-session state live in **bharat-provider-backend**
+(`src/services/ffs/`, Beckn provider `ffs-agri`). The tools in `agents/tools/ffs.py` are thin,
+like the other provider tools: they validate input, check that the `ffs.booking` skill is
+loaded, and POST a Beckn `/init` to `BAP_ENDPOINT` with `provider.id=ffs-agri`,
+`items[0].id=ffs-booking`, a `request_type` tag (`send_otp`, `verify_otp`, `entitlement`,
+`find_shops`, `create_booking`, `context`) and one tag per argument (lists as JSON text).
+`context.tags` carries `session_id` and `question_id`. The reply is one `ffs_result` tag on
+`items[0]` holding the JSON `result` (what the model sees) and `diagnostics` (for Langfuse).
+
+Free-text crop and fertilizer wording is still interpreted by the LLM resolvers in this API
+(`agents/ffs_crop_resolver.py`, `agents/ffs_product_resolver.py`). When names need matching the
+provider answers `needs_resolution` with the catalogue; the tool resolves them and repeats the
+call with a `resolution` tag, and the provider validates every code against its catalogue.
+`prepare_chat_turn` asks the provider for the `context` summary, but only for sessions that
+used an FFS tool in the last 20 minutes (a small Redis marker).
+
 ## Configuration and authentication
-
-Use a **server-side** environment file for local development. On this workspace,
-the prepared mock configuration is `/mnt/raid/gautam/envs/ffs-integration-v0.env`
-with permissions `0600`, outside the repository. It points to the local FFS mock
-on 18140 and a dedicated test Redis on 6401. Do not commit or bake this file into
-an image. `.env.example` contains empty placeholders only; Git and Docker ignore
-environment files. Load it into the process environment, or supply it with the
-container's `--env-file`; the application does not automatically discover that
-external path.
-
-```dotenv
-FFS_BASE_URL=http://127.0.0.1:18140
-FFS_ESA_KEY=
-FFS_ESA_IV=
-FFS_APP_VERSION=
-```
-
-Fill the key and IV with the exact values supplied by FFS: 32 UTF-8 bytes and
-16 UTF-8 bytes respectively. Settings use `SecretStr`. Leaving the base URL blank
-makes FFS calls unavailable. Use the host address reachable by your container;
-loopback inside a bridged container refers to that container.
-
-There are three independent authentication layers:
 
 | Layer | Storage/use |
 |---|---|
 | Bharat API JWT | Existing caller authentication remains required. FFS uses the supplied conversation session ID like other features; there is no additional FFS owner binding to a bearer token. |
-| Shared FFS ESA key/IV | Server configuration; encrypts the two login bodies using AES-256-CBC and Base64. This is not a farmer login token or an OTP bypass. |
-| Per-farmer FFS `userToken` | Obtained only after OTP verification. Stored in Redis state for that session with its expiry; never configured in `.env` or returned to the model. |
+| Shared FFS ESA key/IV | **Provider backend** environment (`FFS_BASE_URL`, `FFS_ESA_KEY`, `FFS_ESA_IV`, `FFS_APP_VERSION`, optional `FFS_TIMEOUT` in ms); encrypts the two login bodies using AES-256-CBC and Base64. Not set in this API any more. |
+| Per-farmer FFS `userToken` | Obtained only after OTP verification. Held in the provider's in-memory session store with its expiry; never returned to the model. |
+
+This API needs only `BAP_ENDPOINT` (and the usual `BAP_*`/`BPP_*` ids) for FFS. The provider
+session store is in-memory (like KCC): a restart or a second replica loses the login and the
+farmer is asked for a fresh OTP; move it to Redis before running several provider replicas.
 
 The workflow record lasts up to 20 minutes, while token validity is checked
-independently against the expiry returned by FFS, without a local 15-minute cap. There is no
-separate timed owner binding. Re-login clears/refetches selection state; there is no
-assumed refresh-token flow. No extra FFS `x-api-key` is invented or required by
-this implementation.
-
-Refreshing a valid Bharat bearer does not force a new FFS login. Session IDs select
-state; this is not caller ownership enforcement. Platform-wide session ownership
-is a separate concern. The per-session execution lock remains. Old `ffs-owner`
-keys are unused and expire naturally; no bulk Redis deletion is needed on upgrade.
-
-For production, store the shared values in the deployment's secret store,
-such as [Google Secret Manager](https://docs.cloud.google.com/secret-manager/docs/best-practices),
-and supply them at runtime. Do not use Docker build arguments or source literals.
-The current client uses the web login body and Bearer plus `X-Session-Id` after
-login. `FFS_APP_VERSION` is optional; it does not emulate Android integrity.
-Production CAPTCHA/integrity/DPoP and any dedicated server-to-server credential
-still require the approved FFS integration contract. Changing the host alone does
-not resolve these requirements.
+independently against the expiry returned by FFS. Re-login clears/refetches selection state;
+there is no assumed refresh-token flow. Calls for one session run one at a time on the provider.
 
 User text reaches the model unchanged. `ffs_verify_otp(otp="001234")` accepts a
 model-supplied string, preserving leading zeros. The model interprets clear spoken
@@ -74,7 +57,7 @@ OTP still resumes setup when a valid login is already stored.
 
 `ffs_send_otp(farmer_id, state_lgd_code, resend=False)` takes a numeric LGD code
 as a string. Its tool description includes the state/UT names and codes from
-`assets/data/ffs_states.json`; Python checks code membership but does not map names
+`assets/data/ffs_states.json`; the provider checks code membership but does not map names
 or infer state from a city. The model handles names/variants and clarifies ambiguity.
 The snapshot contains 36 active geographic records from
 `GET /ufa-user-service/ufa-user/v1/api/boundary/state/getStateLgdMaster`, verified
@@ -144,25 +127,10 @@ caller isolation, setup recovery, partial crop writes, expiry, quantities and sh
 ranking/paging. A deterministic Pydantic model drives the multi-turn tool loop;
 this verifies orchestration, not live model answer quality.
 
-The opt-in HTTP test first requires `/health` and `X-FFS-Mock: true`, with live
-forwarding and booking disabled. It then tests the running fixture API, optionally
-using a real dedicated Redis instance:
-
-```bash
-set -a
-source /mnt/raid/gautam/envs/ffs-integration-v0.env
-set +a
-FFS_MOCK_TEST_URL=http://127.0.0.1:18140 FFS_REDIS_TEST_PORT=6401 \
-  python -m pytest -q tests/test_ffs.py
-```
-
-Use the pinned test environment at
-`/mnt/raid/gautam/python_envs/ffs-integration-v0-checks/bin/python` here. Without
-`FFS_MOCK_TEST_URL`, the external HTTP test is skipped and tests use an isolated
-transport. **Do not point this test at real FFS.**
-No additional live OTP, production model request, or live booking is part of v0
-validation. Fixed GFR and synthetic retailer territories cannot prove real
-multi-plot calculations/geography. Live multilingual Gemma checks remain separate.
+Provider logic is covered by `bharat-provider-backend/src/services/ffs/ffs.workflow.spec.ts`
+(`npx jest src/services/ffs`) against a fake FFS. This API's `tests/test_ffs_client.py` covers
+the thin tools, resolution loop and chat context with the provider stubbed.
+**Do not point tests at real FFS.** Live multilingual Gemma checks remain separate.
 
 ## OTP-send request headers
 
@@ -197,60 +165,12 @@ no internal HTTP retry loop and no new booking-status endpoint.
 
 ## Chat tracing
 
-FFS tools emit explicit summaries to Langfuse and structured `ffs` log lines:
-
-Console summaries fall back from INFO to WARNING when INFO is disabled, preserving
-the visibility added on `bh-dev` without printing raw provider payloads. Failures
-are logged at ERROR.
-
-```text
-agent.vistaar                         final answer, not internal AgentRunResult
-  tool:ffs_get_entitlement            status, stages, decisions, quantities
-    ffs.api:/applicant/land/crop/add   endpoint, duration, HTTP/provider status
-    ffs.api:/...                      one span per actual HTTP request
-```
-
-All five FFS tools use the same tracing wrapper. Each tool/API event carries
-session and question IDs; console events also include trace/span IDs when
-available. Tool completion reports lock wait, API count, stage before/after,
-cache reuse, OTP suppression, crop reconciliation, quantity source, shop search
-territory/page counts and booking confirmation/submission decisions where relevant.
-An API span records method, host/path, encryption, public application headers,
-authorization/CAPTCHA presence, HTTP status, numeric provider code and a fixed
-failure category. Exception **classes**, not messages, identify transport/state
-failures. A cached result has no new API spans and includes a reuse decision.
-
-Request/response bodies, OTPs, tokens, farmer identifiers, names, phone numbers,
-land registry IDs and booking confirmation/reference codes are excluded from
-these summaries. Full received response bodies are separately logged to the
-`ffs.http` console logger with prefix `FFS_HTTP_RESPONSE`, before JSON parsing or
-HTTP/provider validation. Each event is one JSON line containing `response_body`
-(the original response text, including JSON whitespace), HTTP status, method,
-URL, session/question IDs and trace/span IDs when available. These console logs
-include any sensitive values returned by FFS; raw bodies are not added to
-Langfuse summaries. Transport failures without a response have no body to log.
-Logging errors do not change workflow results or repeat a request.
-
-Continuously save actual responses on chat dev:
-
-```bash
-sudo docker logs --since 10m --timestamps --follow sva_app 2>&1 | \
-  grep --line-buffered 'FFS_HTTP_RESPONSE ' | tee -a /tmp/chat-dev-ffs-responses.log
-```
-
-The existing conversation input/output retains its existing chat behavior.
-
-`prompt:master_catalog_redis_check` is a preparation span with catalogue metadata
-and counts, not a tool call dumping the full multilingual prompt. The chat agent
-span keeps its explicitly recorded final answer instead of serializing the
-internal completed-run object. Telemetry setup, update or handler errors must
-not change a business result.
-
-Use `tests/test_ffs_tracing.py` for real SDK/in-memory exporter checks: parent-child
-links, safe summaries, HTTP/provider errors, timeouts, cache reuse, booking and
-final-answer capture. No external model, Langfuse export or real FFS request is
-needed. Login retains `userMobileNumber` for `contactNoForCommunication`; the
-booking tracing fixture now exercises the normal login path without patching state.
+Like the other provider tools, each FFS tool is wrapped in `@observe(name="tool:ffs_<step>", as_type="tool")`
+and adds the session, question and provider diagnostics (API call count, decisions, stage) as
+metadata. The crop and product resolvers appear as `ffs.crop_resolution` and `ffs.product_resolution`
+observations with model alias, counts, statuses and token usage. Every Beckn call is logged at INFO as
+`[FFS INIT] Request URL / Request Payload / Response Status / Response Payload` (OTP masked). FFS HTTP
+calls themselves are made, and logged, by the provider backend.
 
 ## Booking v8
 
