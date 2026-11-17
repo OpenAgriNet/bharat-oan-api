@@ -29,6 +29,8 @@ from helpers.advisory_pending import (
     PENDING_MARKER,
     asked_location_in_previous_turn,
     answer_chain,
+    chain_days,
+    chain_season,
     farmer_gave_days,
     farmer_gave_season,
     farmer_wrote,
@@ -476,6 +478,13 @@ POLITE_ASK = (
 )
 
 
+# Last thing the model reads in every question result, so it is the freshest instruction when it writes the reply.
+NO_SOURCE_ON_QUESTION = (
+    "\n\n> FINAL RULE: this reply is a question for the farmer, not an answer. It must not contain the word "
+    "\"Source\", \"ICAR\" or \"Kisan Sarathi\", and nothing but the one question."
+)
+
+
 def _join_names(names: List[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
@@ -512,6 +521,7 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
         " When they answer, call `search_advisory` again with the same `query` and `crop` plus their "
         + " and ".join(args)
         + ". If they say they do not know or do not want to answer, call it again with `answer_now=true`."
+        + NO_SOURCE_ON_QUESTION
     )
 
 
@@ -523,6 +533,7 @@ def format_season_suggestion(season: str, subject: str, seasons: List[str]) -> s
         f"{season}, and ask whether they would like the advice for {' or '.join(seasons)}. Do not give any advice "
         "yet and do not show a Source line. If they say yes, call `search_advisory` again with the same `query` "
         "and that `season`."
+        + NO_SOURCE_ON_QUESTION
     )
 
 
@@ -537,6 +548,7 @@ def format_location_question(query: str, restate: str = "") -> str:
         "and district you are farming in?\" Write it as a normal sentence. When they answer, call `search_advisory` "
         f"again with the same `query` and `crop`{restate} plus `state` and `district` (the names they gave, in English). "
         "If they say they do not know or do not want to say, call it again with `answer_now=true`."
+        + NO_SOURCE_ON_QUESTION
     )
 
 
@@ -729,6 +741,16 @@ async def search_advisory(
     if answer_now and not may_answer_now(ctx):
         logger.info("search_advisory: ignoring answer_now before the farmer was asked")
         answer_now = False
+    # The farmer's season and days from an earlier turn of this same question still count: the tool keeps no
+    # state, so a model that forgets to pass them on the turn that carries the place must not make us ask again.
+    if not season_value and not answer_now:
+        season_value = chain_season(ctx) or None
+        if season_value:
+            logger.info("search_advisory: using the season the farmer gave earlier in this question: %s", season_value)
+    if days is None and not answer_now:
+        days = chain_days(ctx)
+        if days is not None:
+            logger.info("search_advisory: using the days the farmer gave earlier in this question: %s", days)
     # The farmer's place comes only from the farmer. Their own words win over what the model passes, and the
     # model may not carry a place over from earlier in the chat.
     place, named_place = _farmer_place(ctx, state, district, location)
