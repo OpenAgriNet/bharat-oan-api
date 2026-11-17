@@ -266,6 +266,18 @@ class TestQuestionsCarryNoSource:
         assert "must not contain the word" not in advice
 
 
+class TestQuestionsTellModelToPassAnswersAgain:
+    def test_location_and_details_questions_say_to_pass_season_and_days_again(self):
+        from agents.tools import advisory as sa
+
+        for out in (
+            sa.format_location_question("wheat aphids"),
+            sa.format_location_question("wheat aphids", ', `season`="Rabi"'),
+            sa.format_details_question(["Rabi"], True, True, "wheat aphids"),
+        ):
+            assert "keeps no memory" in out and "`days_after_sowing`" in out
+
+
 class TestPlaceGuards:
     from helpers.advisory_pending import LOCATION_MARKER  # noqa: E402
 

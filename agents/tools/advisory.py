@@ -483,6 +483,14 @@ NO_SOURCE_ON_QUESTION = (
 )
 
 
+# The tool keeps no memory between calls, so the model must hand over again what the farmer already told it.
+PASS_AGAIN = (
+    " The tool keeps no memory between calls: in that call also pass every season (`season`) and number of days "
+    "since sowing (`days_after_sowing`) the farmer gave earlier in this same question, even if you passed them "
+    "before. If you leave them out, the farmer will be asked for them again."
+)
+
+
 def _join_names(names: List[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
@@ -518,7 +526,9 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
         " Write it as normal sentences: never put season names in brackets or in a list."
         " When they answer, call `search_advisory` again with the same `query` and `crop` plus their "
         + " and ".join(args)
-        + ". If they say they do not know or do not want to answer, call it again with `answer_now=true`."
+        + "."
+        + PASS_AGAIN
+        + " If they say they do not know or do not want to answer, call it again with `answer_now=true`."
         + NO_SOURCE_ON_QUESTION
     )
 
@@ -544,8 +554,9 @@ def format_location_question(query: str, restate: str = "") -> str:
         "asking, no repeated sentence, and no Source line. " + POLITE_ASK + " Ask the farmer ONE short, natural question asking their "
         "state and district. Example (translate it to the farmer's language): \"Could you please tell me which state "
         "and district you are farming in?\" Write it as a normal sentence. When they answer, call `search_advisory` "
-        f"again with the same `query` and `crop`{restate} plus `state` and `district` (the names they gave, in English). "
-        "If they say they do not know or do not want to say, call it again with `answer_now=true`."
+        f"again with the same `query` and `crop`{restate} plus `state` and `district` (the names they gave, in English)."
+        + PASS_AGAIN
+        + " If they say they do not know or do not want to say, call it again with `answer_now=true`."
         + NO_SOURCE_ON_QUESTION
     )
 
