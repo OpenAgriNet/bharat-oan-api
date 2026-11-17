@@ -933,6 +933,27 @@ class TestCoffeePdfAnswersGenerically:
         out = asyncio.run(sa.search_advisory(_ctx([_user("coffee leaf rust, it is kharif season")]), "leaf rust", crop="Coffee", season="Kharif"))
         assert "Scout for aphids (p1)" in out and len(bap.requests) == 1
 
+    def test_coffee_after_a_finished_wheat_chat_answers_at_once_with_the_pdf_name(self, bap):
+        """The season and days of the earlier wheat question must not leak into the coffee one."""
+        bap.response = _respond([self._pdf("p1", "Rabi")], has_day_range="true")
+        history = [
+            _user("wheat aphids in Agra, Rabi, 40 days"),
+            ModelResponse(parts=[ToolCallPart(tool_name="search_advisory", args={})]),
+            ModelRequest(parts=[ToolReturnPart(tool_name="search_advisory", tool_call_id="c1", content="> Advisory Search Results\n\nadvice")]),
+            ModelResponse(parts=[TextPart(content="advice")]),
+            _user("How do I manage root rot in my coffee plants?"),
+        ]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "coffee root rot", crop="Coffee"))
+        assert "Source: coffee_guide_2023_mini" in out and sa.PENDING_MARKER not in out
+        assert len(bap.requests) == 1
+        payload = str(bap.requests[0])
+        assert "Rabi" not in payload and "40" not in payload
+
+    def test_coffee_answers_at_once_even_if_the_model_passes_nothing(self, bap):
+        bap.response = _respond([self._pdf("p1", "Rabi")], has_day_range="true")
+        out = asyncio.run(sa.search_advisory(_ctx([_user("How do I manage root rot in my coffee plants?")]), "coffee root rot", crop="Coffee"))
+        assert "Source: coffee_guide_2023_mini" in out and sa.PENDING_MARKER not in out and len(bap.requests) == 1
+
     def test_a_coffee_chunk_from_kisan_sarathi_still_asks(self, bap):
         bap.response = _respond([_chunk("w1", "Rabi", crop="Coffee", origin="webhook")], **NO_DAYS)
         out = asyncio.run(sa.search_advisory(CTX, "leaf rust", crop="Coffee"))
