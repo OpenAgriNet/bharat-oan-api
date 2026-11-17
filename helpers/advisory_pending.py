@@ -266,58 +266,6 @@ def farmer_gave_days(ctx) -> bool:
     )
 
 
-# Season words grouped by the season they name, so a season the farmer gave can be read back from the chat.
-_SEASON_GROUPS = {
-    "Rabi": ("rabi", "rabbi", "रबी", "रब्बी", "রবি", "রব্বী", "ৰবি", "રવિ", "ಹಿಂಗಾರು", "ರಬಿ", "റാബി", "ରବି",
-             "ਹਾੜ੍ਹੀ", "ਹਾੜੀ", "ரபி", "రబీ"),
-    "Kharif": ("kharif", "khareef", "kharip", "खरीफ", "खरीप", "খরিফ", "খৰিফ", "ખરીફ", "ಮುಂಗಾರು", "ಖಾರಿಫ್", "ಖರೀಫ್",
-               "ഖരീഫ്", "ଖରିଫ", "ਸਾਉਣੀ", "காரிஃப்", "கரீஃப்", "ఖరీఫ్"),
-    "Zaid": ("zaid", "zayad", "jayad", "जायद", "ज़ायद", "জায়েদ"),
-}
-_DAYS_WITH_WORD = re.compile(r"(?<!\d)(\d{1,3})(?!\d)\s*(?:days?|din|दिन|দিন|દિવસ|ದಿನ|ദിവസം|ଦିନ|ਦਿਨ|நாள்|రోజు)", re.IGNORECASE)
-_ANY_NUMBER = re.compile(r"(?<!\d)(\d{1,3})(?!\d)")
-
-
-def chain_season(ctx) -> str:
-    """The season the farmer named in this question's chain of messages ("" when none, or when there is no history).
-
-    The tool keeps no state of its own: a model that forgets to pass the season on a later turn (the one that
-    carries the place) would make the farmer be asked for it again. What the farmer said still counts."""
-    if not _has_history(ctx):
-        return ""
-    for text, _ in reversed(answer_chain(ctx)):
-        lowered = text.lower()
-        best = None
-        for season, words in _SEASON_GROUPS.items():
-            for word in words:
-                pattern = rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9])" if word.isascii() else re.escape(word)
-                found = re.search(pattern, lowered)
-                if found and (best is None or found.start() < best[0]):
-                    best = (found.start(), season)
-        if best:
-            return best[1]
-    return ""
-
-
-def chain_days(ctx):
-    """The days since sowing the farmer gave in this question's chain of messages (None when none was given).
-
-    A reply to our question may be only a number ("40 days", "४०"); the farmer's first message needs the word
-    "days" so that other numbers in it are not read as days. Answers to the place question are never read."""
-    if not _has_history(ctx):
-        return None
-    for index in range(len(answer_chain(ctx)) - 1, -1, -1):
-        text, answers_place = answer_chain(ctx)[index]
-        if answers_place:
-            continue
-        found = _DAYS_WITH_WORD.search(text) or (_ANY_NUMBER.search(text) if index > 0 else None)
-        if found:
-            days = int(found.group(1))
-            if 0 < days <= 400:
-                return days
-    return None
-
-
 def may_answer_now(ctx) -> bool:
     """`answer_now` is honoured only when this message answers our question (never in the turn it was asked)."""
     if not _has_history(ctx):
