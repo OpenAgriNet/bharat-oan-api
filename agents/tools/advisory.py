@@ -46,8 +46,10 @@ logger = get_logger(__name__)
 
 KNOWLEDGE_ADVISORY_CATEGORY = "knowledge-advisory"
 
-# Source shown to the farmer for advisories from Kisan Sarathi.
+# Source shown to the farmer for advisories whose institute is ICAR (served through Kisan Sarathi).
 ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
+# Whole word, so ICARDA (a different institution) does not match.
+_ICAR_INSTITUTE = re.compile(r"\bICAR\b|Indian Council of Agricultural Research", re.IGNORECASE)
 # The provider's `origin` for an advisory PDF uploaded in docs-pipeline; those cite the PDF's name.
 PDF_ADVISORY_ORIGIN = "docs-pipeline"
 # Crop of the coffee PDF advisories. They carry no season, sowing stage or place, so they are answered at once.
@@ -254,8 +256,23 @@ def build_advisory_search_payload(
     }
 
 
+_TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
+
+
 def _split_names(value: Optional[str]) -> List[str]:
     return [part.strip() for part in str(value or "").split(",") if part.strip()]
+
+
+def _institute_from_text(text: str) -> str:
+    """Institute from the provider's trailing "Source: institute, creator" line ("" when absent).
+
+    Only the institute is kept: the creator after the last comma is a user name.
+    """
+    match = _TRAILING_SOURCE.search(text)
+    if not match:
+        return ""
+    line = match.group(0).strip()[len("Source:"):]
+    return line.rsplit(",", 1)[0].strip()
 
 
 def _advisory_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -281,6 +298,7 @@ def _advisory_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]
         "chunk_id": (details.get("chunk_id") or item.get("id") or "").strip(),
         "source": (details.get("source") or "").strip(),
         "origin": (details.get("origin") or "").strip().lower(),
+        "institute": (details.get("institute") or "").strip() or _institute_from_text(text),
         "text": text,
         "seasons": parse_chunk_seasons(text),
         # Where the advisory applies. Chunks from a provider without location read as "applies everywhere".
@@ -326,14 +344,18 @@ def _same_words(a: str, b: str) -> bool:
     return " ".join(re.findall(r"\w+", a.lower())) == " ".join(re.findall(r"\w+", b.lower()))
 
 
-_TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
-
-
 def advisory_source(result: Dict[str, Any]) -> str:
-    """Source to cite for one advisory: the PDF's name for an uploaded PDF, else ADVISORY_SOURCE."""
+    """Source to cite for one advisory.
+
+    The PDF's name for an uploaded PDF; ICAR - Kisan Sarathi when the institute is ICAR;
+    any other institute under its own name; "" when the institute is unknown.
+    """
     if result.get("origin") == PDF_ADVISORY_ORIGIN and result.get("title"):
         return result["title"]
-    return ADVISORY_SOURCE
+    institute = (result.get("institute") or "").strip()
+    if _ICAR_INSTITUTE.search(institute):
+        return ADVISORY_SOURCE
+    return institute
 
 
 def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
@@ -346,12 +368,11 @@ def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
     for r in results:
         text = _TRAILING_SOURCE.sub("", r["text"]).rstrip()
         blocks.append(f"**{r.get('title') or 'Advisory'}**\n```\n{text}\n```")
-    sources = list(dict.fromkeys(advisory_source(r) for r in results))
-    return (
-        "> Advisory Search Results for `" + query + "`\n\n"
-        + "\n\n----\n\n".join(blocks)
-        + f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
-    )
+    sources = list(dict.fromkeys(filter(None, (advisory_source(r) for r in results))))
+    out = "> Advisory Search Results for `" + query + "`\n\n" + "\n\n----\n\n".join(blocks)
+    if sources:
+        out += f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
+    return out
 
 
 def _places_of(result: Dict[str, Any]) -> str:
@@ -711,7 +732,7 @@ async def search_advisory(
 ) -> str:
     """
     Search crop advisories for a farming problem: pests, diseases, symptoms, crop practices
-    and harvesting guidance for a specific crop, from ICAR - Kisan Sarathi.
+    and harvesting guidance for a specific crop, from agricultural institutes (ICAR advisories are served through Kisan Sarathi).
 
     Use this for crop-advisory questions such as "aphids in wheat" or "when to harvest
     sorghum". Search straight away; do not ask the farmer anything first. Do NOT use it for

@@ -25,7 +25,7 @@ def _tag(code, value):
 
 
 def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.8321",
-          source="ICAR–DKMA, jak", section="full", crop="Sorghum", doc_id="row-1", location=None, origin=None):
+          source="ICAR–DKMA, jak", section="full", crop="Sorghum", doc_id="row-1", location=None, origin=None, institute=None):
     """`location` is an optional dict: match, national, states, districts (provider's per-chunk location tags)."""
     location = location or {}
     location_tags = [] if not location else [
@@ -35,6 +35,7 @@ def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.
         _tag("location-districts", ", ".join(location.get("districts", []))),
     ]
     origin_tags = [] if origin is None else [_tag("origin", origin)]
+    origin_tags += [] if institute is None else [_tag("institute", institute)]
     return {
         "id": chunk_id,
         "descriptor": {"name": title, "code": section, "long_desc": text},
@@ -204,7 +205,8 @@ class TestParse:
 class TestFormat:
     def test_formats_title_and_text(self):
         out = sa.format_advisory_results(
-            [{"title": "Wheat Insect Management", "text": "Advisory: Inspect.\n\nSource: ICAR–DKMA", "section": "full"}],
+            [{"title": "Wheat Insect Management", "text": "Advisory: Inspect.\n\nSource: ICAR–DKMA", "section": "full",
+              "institute": "ICAR–DKMA"}],
             "aphids",
         )
         assert "aphids" in out
@@ -217,7 +219,8 @@ class TestFormat:
 class TestSourceLine:
     def test_strips_the_providers_source_line_and_the_creator_name(self):
         out = sa.format_advisory_results(
-            [{"title": "T", "text": "Advisory: Harvest.\n\nSource: ICAR–DKMA, jak", "section": "full"}], "q"
+            [{"title": "T", "text": "Advisory: Harvest.\n\nSource: ICAR–DKMA, jak", "section": "full",
+              "institute": "ICAR–DKMA"}], "q"
         )
         assert "jak" not in out and "DKMA" not in out
         assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
@@ -233,16 +236,47 @@ class TestSourceLine:
 
     def test_cites_kisan_sarathi_for_a_webhook_advisory(self):
         out = sa.format_advisory_results(
-            [{"title": "T", "text": TEXT, "section": "full", "origin": "webhook"}], "q"
+            [{"title": "T", "text": TEXT, "section": "full", "origin": "webhook", "institute": "ICAR–DKMA"}], "q"
         )
         assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
+
+    def test_cites_another_institute_under_its_own_name(self):
+        out = sa.format_advisory_results(
+            [{"title": "T", "text": "Advice.", "section": "full", "origin": "webhook",
+              "institute": "Kerala Agricultural University"}], "q"
+        )
+        assert out.rstrip().endswith("**Source: Kerala Agricultural University**")
+        assert "Kisan Sarathi" not in out
+
+    def test_icarda_is_not_icar(self):
+        assert sa.advisory_source({"institute": "ICARDA"}) == "ICARDA"
+
+    def test_any_institute_naming_icar_is_cited_as_kisan_sarathi(self):
+        for name in ("ICAR-IARI", "Central Institute, ICAR", "icar", "Indian Council of Agricultural Research"):
+            assert sa.advisory_source({"institute": name}) == "ICAR - Kisan Sarathi", name
+
+    def test_no_source_line_when_the_institute_is_unknown(self):
+        out = sa.format_advisory_results([{"title": "T", "text": "Advice.", "section": "full"}], "q")
+        assert "Cite as" not in out and "Kisan Sarathi" not in out
+
+    def test_institute_comes_from_the_providers_source_line_without_the_creator(self):
+        item = _item("c1", text="Advice.\n\nSource: Kerala Agricultural University, jak")
+        results, _ = sa.parse_advisory_response(_on_search([item]))
+        assert results[0]["institute"] == "Kerala Agricultural University"
+
+    def test_institute_field_wins_over_the_source_line(self):
+        item = _item("c1", text="Advice.\n\nSource: Other, jak", institute="ICAR–DKMA")
+        results, _ = sa.parse_advisory_response(_on_search([item]))
+        assert results[0]["institute"] == "ICAR–DKMA"
 
     def test_cites_both_when_pdf_and_kisan_sarathi_advisories_are_returned(self):
         out = sa.format_advisory_results(
             [
-                {"title": "Wheat Insect Management", "text": TEXT, "section": "full", "origin": "webhook"},
+                {"title": "Wheat Insect Management", "text": TEXT, "section": "full", "origin": "webhook",
+                 "institute": "ICAR–DKMA"},
                 {"title": "coffee_guide_2023_mini", "text": "Spray.", "section": "full", "origin": "docs-pipeline"},
-                {"title": "Package of Practices for Wheat", "text": TEXT, "section": "full", "origin": "webhook"},
+                {"title": "Package of Practices for Wheat", "text": TEXT, "section": "full", "origin": "webhook",
+                 "institute": "ICAR–DKMA"},
             ],
             "q",
         )
