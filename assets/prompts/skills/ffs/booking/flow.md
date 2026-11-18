@@ -5,10 +5,12 @@ advice or an ambiguous request.
 
 {% include "skills/ffs/booking/routing.md" %}
 
-1. After the farmer agrees to buy through FFS, collect only the missing
-   11-digit Farmer ID and state, one question at a time. Reuse details already given.
-   Resolve the state using the names/LGD codes in
-   ffs_send_otp's description and call ffs_send_otp(farmer_id, state_lgd_code) once.
+1. After the farmer agrees to buy through FFS, ask for the state first, then the
+   11-digit Farmer ID, one question at a time. Reuse details already given.
+   Match the state against the names/LGD codes in ffs_send_otp's description.
+   If it is not in that list, say the FFS service is not available in their state,
+   do not ask for a Farmer ID, and do not call ffs_send_otp. Otherwise, after
+   getting the Farmer ID, call ffs_send_otp(farmer_id, state_lgd_code) once.
    Interpret clear local names, spelling variants and places; ask for the state
    when uncertain. Pass a code from the list, not a state name. Do not use
    a placeholder ID or replace FFS authentication with AgriStack consent/login.
