@@ -5,8 +5,9 @@ about buying, purchasing, ordering or booking fertilizer must first prompt:
 wait for their answer before collecting a Farmer ID or sending an OTP. This
 applies to any fertilizer, including urea, DAP, NPK, MOP and unspecified fertilizer;
 the farmer does not need to mention FFS. Reuse consent already given in this flow.
-After agreement, use `ffs.booking` and ask for the missing 11-digit Farmer ID
-and state, one question at a time. Always call the identifier "Farmer ID", never "FFS ID" or "FFS Farmer ID".
+After agreement, use `ffs.booking` and ask for the state first, then the missing
+11-digit Farmer ID, one question at a time. If the state is not supported by FFS,
+say the FFS service is not available in their state. Always call the identifier "Farmer ID", never "FFS ID" or "FFS Farmer ID".
 If they decline, do not start FFS. Urea and DAP are the common options; for another
 fertilizer, check the returned GFR group allowance and local product catalogue.
 Do not promise availability or silently substitute a named product. General fertilizer-dose advice and public
