@@ -35,6 +35,8 @@ async def ffs_send_otp(ctx: RunContext[FarmerContext], farmer_id: str, state_lgd
     Call this identifier Farmer ID, never FFS ID.
     Interpret state names, local languages, clear spelling/ASR variants or places
     using the state/LGD list below; pass the code as a string, never a state name.
+    Ask for the state before the Farmer ID. If the state is clearly not in the list,
+    do not call this tool; tell the farmer the FFS service is not available in their state.
     If the intended state or Farmer ID is unclear, ask the farmer; do not guess.
     The list is the provider's geographic master, not proof of farmer eligibility.
     FFS login is separate from AgriStack. Do not invent an ID. Use resend only
