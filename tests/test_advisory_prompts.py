@@ -73,7 +73,7 @@ def test_prompt_has_the_search_first_advisory_flow(path):
     assert "pass it as `location` so the tool can note it" not in flow
     assert "call `search_advisory` again with the same `query`" in flow
     assert "**Source: ICAR - Kisan Sarathi**" in flow
-    assert "end it with the Source line from the tool's `Cite as` line" in flow
+    assert "written as **Source: <label>** with the `Source label` shown under that advisory" in flow
     assert "your first reply is only one short question asking which crop" in flow
     assert "`answer_now=true`" in flow and "`crop=\"Wheat\"`, `days_after_sowing=40`" in flow
     assert "never put season names in brackets" in flow

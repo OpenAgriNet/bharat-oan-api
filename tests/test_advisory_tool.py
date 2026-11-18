@@ -910,3 +910,78 @@ class TestPlaceSentenceWording:
             [self._result(["Agra", "Aligarh", "Azamgarh"], ("Uttar Pradesh",), "state_partial")], resolve_place("Uttar Pradesh")
         )
         assert opening == "This advice is for some districts of Uttar Pradesh: Agra, Aligarh and Azamgarh."
+
+
+class TestCropSurvivesTheWholeQuestion:
+    """Crop, then season and days, then place: every step is the real tool output and none may ask for the crop again."""
+
+    @staticmethod
+    def _turn(tool_output, farmer_text):
+        """The messages after one tool question: the tool call, its output, the model's question, the farmer's reply."""
+        return _asked(tool_output) + [_user(farmer_text)]
+
+    def test_the_answer_comes_after_season_days_and_place_without_asking_for_the_crop(self, bap):
+        bap.response = _respond([_located()], has_day_range="true")
+
+        history = [_user("How can I control aphids in my wheat crop?")]
+        first = asyncio.run(sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat"))
+        assert sa.PENDING_MARKER in first and "which season" in first
+        assert "which crop" not in first.lower()
+
+        history += self._turn(first, "Rabi, 40 days")
+        second = asyncio.run(
+            sa.search_advisory(
+                _ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=40
+            )
+        )
+        assert sa.LOCATION_MARKER in second and "state and district" in second
+        assert "which crop" not in second.lower()
+
+        history += self._turn(second, "Agra, Uttar Pradesh")
+        final = asyncio.run(
+            sa.search_advisory(
+                _ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=40,
+                state="Uttar Pradesh", district="Agra",
+            )
+        )
+        assert sa.PENDING_MARKER not in final
+        assert "Scout for aphids" in final and "Source label: ICAR - Kisan Sarathi" in final
+        assert "which crop" not in final.lower()
+        # the last search carried the crop and the place the farmer gave, not a bare query
+        assert _params(_sent(bap, 2))["season"] == "Rabi"
+
+    def test_the_crop_given_late_is_kept_through_the_remaining_questions(self, bap):
+        """The farmer is asked for the crop first, then answers it; the later steps still do not ask for it again."""
+        bap.response = _respond([_located()], has_day_range="true")
+
+        history = [_user("How can I control aphids?")]
+        history += [
+            ModelResponse(parts=[TextPart(content="Could you please tell me which crop you are asking about?")]),
+            _user("Wheat"),
+        ]
+        first = asyncio.run(sa.search_advisory(_ctx(history), "Wheat", crop="Wheat"))
+        assert "which season" in first and "which crop" not in first.lower()
+        assert sent_query(bap, 0) == "Wheat crop advisory"
+
+        history += self._turn(first, "Rabi, 40 days")
+        second = asyncio.run(
+            sa.search_advisory(_ctx(history), "Wheat", crop="Wheat", season="Rabi", days_after_sowing=40)
+        )
+        assert sa.LOCATION_MARKER in second and "which crop" not in second.lower()
+
+    def test_a_model_that_forgets_season_and_days_on_the_last_call_asks_for_them_not_for_the_crop(self, bap):
+        """The prompt tells the model to pass them again. If it does not, the worst case is a season question."""
+        bap.response = _respond([_located()], has_day_range="true")
+        history = (
+            [_user("How can I control aphids in my wheat crop?")]
+            + self._turn("season and days question", "Rabi, 40 days")
+            + self._turn(f"{sa.LOCATION_MARKER} place question", "Agra, Uttar Pradesh")
+        )
+        out = asyncio.run(
+            sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", state="Uttar Pradesh", district="Agra")
+        )
+        assert "which crop" not in out.lower()
+
+
+def sent_query(bap, index):
+    return _sent(bap, index)["message"]["intent"]["item"]["descriptor"]["name"]
