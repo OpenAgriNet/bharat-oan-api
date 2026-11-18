@@ -204,7 +204,8 @@ class TestParse:
 class TestFormat:
     def test_formats_title_and_text(self):
         out = sa.format_advisory_results(
-            [{"title": "Wheat Insect Management", "text": "Advisory: Inspect.\n\nSource: ICAR–DKMA", "section": "full"}],
+            [{"title": "Wheat Insect Management", "text": "Advisory: Inspect.\n\nSource: ICAR–DKMA", "section": "full",
+              "institute": "ICAR–DKMA"}],
             "aphids",
         )
         assert "aphids" in out
@@ -217,7 +218,8 @@ class TestFormat:
 class TestSourceLine:
     def test_strips_the_providers_source_line_and_the_creator_name(self):
         out = sa.format_advisory_results(
-            [{"title": "T", "text": "Advisory: Harvest.\n\nSource: ICAR–DKMA, jak", "section": "full"}], "q"
+            [{"title": "T", "text": "Advisory: Harvest.\n\nSource: ICAR–DKMA, jak", "section": "full",
+              "institute": "ICAR–DKMA"}], "q"
         )
         assert "jak" not in out and "DKMA" not in out
         assert "Source label: ICAR - Kisan Sarathi" in out
@@ -233,14 +235,57 @@ class TestSourceLine:
 
     def test_labels_a_webhook_advisory_with_kisan_sarathi(self):
         out = sa.format_advisory_results(
-            [{"title": "T", "text": TEXT, "section": "full", "origin": "webhook"}], "q"
+            [{"title": "T", "text": TEXT, "section": "full", "origin": "webhook", "institute": "ICAR–DKMA"}], "q"
         )
         assert "Source label: ICAR - Kisan Sarathi" in out
+
+    def test_labels_another_institute_with_its_own_name(self):
+        out = sa.format_advisory_results(
+            [{"title": "T", "text": "Advice.", "section": "full", "origin": "webhook",
+              "institute": "Kerala Agricultural University"}], "q"
+        )
+        assert "Source label: Kerala Agricultural University" in out
+        assert "Kisan Sarathi" not in out
+
+    def test_icarda_is_not_icar(self):
+        assert sa.advisory_source({"institute": "ICARDA"}) == "ICARDA"
+
+    def test_any_institute_naming_icar_is_labelled_kisan_sarathi(self):
+        for name in ("ICAR-IARI", "Central Institute, ICAR", "icar", "Indian Council of Agricultural Research"):
+            assert sa.advisory_source({"institute": name}) == "ICAR - Kisan Sarathi", name
+
+    def test_no_label_and_no_cite_line_when_the_institute_is_unknown(self):
+        out = sa.format_advisory_results([{"title": "T", "text": "Advice.", "section": "full"}], "q")
+        assert "Source label" not in out and "Cite as" not in out and "Kisan Sarathi" not in out
+
+    def test_a_source_line_without_a_comma_is_not_taken_as_the_institute(self):
+        # a record with no institute has a line holding only the creator's name
+        item = _item("c1", text="Advice.\n\nSource: Test Farmer")
+        results, _ = sa.parse_advisory_response(_on_search([item]))
+        assert results[0]["institute"] == ""
+        out = sa.format_advisory_results(results, "q")
+        assert "Test Farmer" not in out and "Cite as" not in out
+
+    def test_institute_comes_from_the_providers_source_line_without_the_creator(self):
+        item = _item("c1", text="Advice.\n\nSource: Kerala Agricultural University, jak")
+        results, _ = sa.parse_advisory_response(_on_search([item]))
+        assert results[0]["institute"] == "Kerala Agricultural University"
+
+    def test_the_cite_line_says_icar_is_cited_alone_only_when_an_icar_advisory_is_present(self):
+        icar = sa.format_advisory_results(
+            [{"title": "T", "text": "A.", "section": "full", "institute": "ICAR–DKMA"}], "q"
+        )
+        other = sa.format_advisory_results(
+            [{"title": "T", "text": "A.", "section": "full", "institute": "Kerala Agricultural University"}], "q"
+        )
+        assert "write only **Source: ICAR - Kisan Sarathi**" in icar
+        assert "write only" not in other
 
     def test_each_advisory_carries_its_own_label_and_the_model_cites_only_the_ones_it_uses(self):
         out = sa.format_advisory_results(
             [
-                {"title": "Wheat Insect Management", "text": TEXT, "section": "full", "origin": "webhook"},
+                {"title": "Wheat Insect Management", "text": TEXT, "section": "full", "origin": "webhook",
+                 "institute": "ICAR–DKMA"},
                 {"title": "coffee_guide_2023_mini", "text": "Spray.", "section": "full", "origin": "docs-pipeline"},
             ],
             "q",

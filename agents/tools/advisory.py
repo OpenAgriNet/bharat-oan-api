@@ -42,8 +42,10 @@ logger = get_logger(__name__)
 
 KNOWLEDGE_ADVISORY_CATEGORY = "knowledge-advisory"
 
-# Source shown to the farmer for advisories from Kisan Sarathi.
+# Source shown to the farmer for advisories whose institute is ICAR (served through Kisan Sarathi).
 ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
+# Whole word, so ICARDA (a different institution) does not match.
+_ICAR_INSTITUTE = re.compile(r"\bICAR\b|Indian Council of Agricultural Research", re.IGNORECASE)
 # The provider's `origin` for an advisory PDF uploaded in docs-pipeline; those cite the PDF's name.
 PDF_ADVISORY_ORIGIN = "docs-pipeline"
 
@@ -247,6 +249,21 @@ def _split_names(value: Optional[str]) -> List[str]:
     return [part.strip() for part in str(value or "").split(",") if part.strip()]
 
 
+def _institute_from_text(text: str) -> str:
+    """Institute from the provider's trailing "Source: institute, creator" line ("" when absent).
+
+    Only the institute is kept: the creator after the last comma is a user name. A line with
+    no comma is not trusted: when a record has no institute the line holds only the creator.
+    """
+    match = _TRAILING_SOURCE.search(text)
+    if not match:
+        return ""
+    line = match.group(0).strip()[len("Source:"):]
+    if "," not in line:
+        return ""
+    return line.rsplit(",", 1)[0].strip()
+
+
 def _advisory_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Map one on_search item to an advisory result dict (None when it has no text)."""
     if not isinstance(item, dict):
@@ -270,6 +287,7 @@ def _advisory_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]
         "chunk_id": (details.get("chunk_id") or item.get("id") or "").strip(),
         "source": (details.get("source") or "").strip(),
         "origin": (details.get("origin") or "").strip().lower(),
+        "institute": (details.get("institute") or "").strip() or _institute_from_text(text),
         "text": text,
         "seasons": parse_chunk_seasons(text),
         # Where the advisory applies. Chunks from a provider without location read as "applies everywhere".
@@ -319,10 +337,17 @@ _TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
 
 
 def advisory_source(result: Dict[str, Any]) -> str:
-    """Source to cite for one advisory: the PDF's name for an uploaded PDF, else ADVISORY_SOURCE."""
+    """Source to cite for one advisory.
+
+    The PDF's name for an uploaded PDF; ICAR - Kisan Sarathi when the institute is ICAR;
+    any other institute under its own name; "" when the institute is unknown.
+    """
     if result.get("origin") == PDF_ADVISORY_ORIGIN and result.get("title"):
         return result["title"]
-    return ADVISORY_SOURCE
+    institute = (result.get("institute") or "").strip()
+    if _ICAR_INSTITUTE.search(institute):
+        return ADVISORY_SOURCE
+    return institute
 
 
 def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
@@ -332,15 +357,23 @@ def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
     institute and a user name, so it is removed here; the answer cites advisory_source instead.
     """
     blocks = []
+    labels = set()
     for r in results:
         text = _TRAILING_SOURCE.sub("", r["text"]).rstrip()
-        blocks.append(f"**{r.get('title') or 'Advisory'}**\n_Source label: {advisory_source(r)}_\n```\n{text}\n```")
-    return (
-        "> Advisory Search Results for `" + query + "`\n\n"
-        + "\n\n----\n\n".join(blocks)
-        + "\n\n> Cite as (in bold): **Source: <source label>** using only the source label(s) of the advisories "
-        "your answer actually uses; do not cite an advisory you did not use."
-    )
+        label = advisory_source(r)
+        if label:
+            labels.add(label)
+        label_line = f"_Source label: {label}_\n" if label else ""
+        blocks.append(f"**{r.get('title') or 'Advisory'}**\n{label_line}```\n{text}\n```")
+    out = "> Advisory Search Results for `" + query + "`\n\n" + "\n\n----\n\n".join(blocks)
+    if labels:
+        out += (
+            "\n\n> Cite as (in bold): **Source: <source label>** using only the source label(s) of the advisories "
+            "your answer actually uses; do not cite an advisory you did not use or one that has no source label."
+        )
+        if ADVISORY_SOURCE in labels:
+            out += f" If your answer uses an advisory labelled {ADVISORY_SOURCE}, write only **Source: {ADVISORY_SOURCE}**."
+    return out
 
 
 def _places_of(result: Dict[str, Any]) -> str:
@@ -710,7 +743,7 @@ async def search_advisory(
 ) -> str:
     """
     Search crop advisories for a farming problem: pests, diseases, symptoms, crop practices
-    and harvesting guidance for a specific crop, from ICAR - Kisan Sarathi.
+    and harvesting guidance for a specific crop, from agricultural institutes (ICAR advisories are served through Kisan Sarathi).
 
     Use this for crop-advisory questions such as "aphids in wheat" or "when to harvest
     sorghum". Search straight away; do not ask the farmer anything first. Do NOT use it for
