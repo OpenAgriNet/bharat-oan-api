@@ -264,12 +264,20 @@ class TestSourceLine:
         results, _ = sa.parse_advisory_response(_on_search([item]))
         assert results[0]["institute"] == "Kerala Agricultural University"
 
+    def test_a_source_line_without_a_comma_is_not_taken_as_the_institute(self):
+        # a record with no institute has a line holding only the creator's name
+        item = _item("c1", text="Advice.\n\nSource: Test Farmer")
+        results, _ = sa.parse_advisory_response(_on_search([item]))
+        assert results[0]["institute"] == ""
+        out = sa.format_advisory_results(results, "q")
+        assert "Test Farmer" not in out and "Cite as" not in out
+
     def test_institute_field_wins_over_the_source_line(self):
         item = _item("c1", text="Advice.\n\nSource: Other, jak", institute="ICAR–DKMA")
         results, _ = sa.parse_advisory_response(_on_search([item]))
         assert results[0]["institute"] == "ICAR–DKMA"
 
-    def test_cites_both_when_pdf_and_kisan_sarathi_advisories_are_returned(self):
+    def test_icar_kisan_sarathi_is_always_cited_alone_when_an_icar_advisory_is_used(self):
         out = sa.format_advisory_results(
             [
                 {"title": "Wheat Insect Management", "text": TEXT, "section": "full", "origin": "webhook",
@@ -280,7 +288,19 @@ class TestSourceLine:
             ],
             "q",
         )
-        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi; coffee_guide_2023_mini**")
+        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
+        assert "coffee_guide_2023_mini**" not in out.split("Cite as")[1]
+
+    def test_other_sources_are_still_listed_when_no_icar_advisory_is_used(self):
+        out = sa.format_advisory_results(
+            [
+                {"title": "coffee_guide_2023_mini", "text": "Spray.", "section": "full", "origin": "docs-pipeline"},
+                {"title": "T", "text": "Advice.", "section": "full", "origin": "webhook",
+                 "institute": "Kerala Agricultural University"},
+            ],
+            "q",
+        )
+        assert out.rstrip().endswith("**Source: coffee_guide_2023_mini; Kerala Agricultural University**")
 
     def test_leaves_text_without_a_source_line_alone(self):
         out = sa.format_advisory_results([{"title": "T", "text": "Advisory: Harvest.", "section": "full"}], "q")

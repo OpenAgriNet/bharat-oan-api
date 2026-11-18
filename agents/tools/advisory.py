@@ -266,12 +266,15 @@ def _split_names(value: Optional[str]) -> List[str]:
 def _institute_from_text(text: str) -> str:
     """Institute from the provider's trailing "Source: institute, creator" line ("" when absent).
 
-    Only the institute is kept: the creator after the last comma is a user name.
+    Only the institute is kept: the creator after the last comma is a user name. A line with
+    no comma is not trusted: when a record has no institute the line holds only the creator.
     """
     match = _TRAILING_SOURCE.search(text)
     if not match:
         return ""
     line = match.group(0).strip()[len("Source:"):]
+    if "," not in line:
+        return ""
     return line.rsplit(",", 1)[0].strip()
 
 
@@ -369,6 +372,9 @@ def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
         text = _TRAILING_SOURCE.sub("", r["text"]).rstrip()
         blocks.append(f"**{r.get('title') or 'Advisory'}**\n```\n{text}\n```")
     sources = list(dict.fromkeys(filter(None, (advisory_source(r) for r in results))))
+    if ADVISORY_SOURCE in sources:
+        # Whenever an ICAR advisory is used, the Source is always exactly this label.
+        sources = [ADVISORY_SOURCE]
     out = "> Advisory Search Results for `" + query + "`\n\n" + "\n\n----\n\n".join(blocks)
     if sources:
         out += f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
