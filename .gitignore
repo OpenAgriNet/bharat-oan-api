@@ -219,3 +219,6 @@ assets/prompts/backup_before_agristack/
 
 # Local backup of files (committed versions) from before the legacy scheme removal
 backups/
+
+# Local model overrides (endpoints and keys); see agents/model_registry.py
+config/models.local.yaml

@@ -16,6 +16,10 @@ from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 _YAML_PATH = Path(__file__).parent.parent / "config" / "models.yaml"
+# Optional, never committed. Anything it declares wins over models.yaml, key by
+# key, so a developer can point a use case at their own endpoint without editing
+# -- and without accidentally committing -- the config the deployments read.
+_LOCAL_YAML_PATH = _YAML_PATH.with_name("models.local.yaml")
 _ENV_RE = re.compile(r"\$\{([^}]+)\}")
 _ERROR_TYPES = {
     "ModelAPIError": ModelAPIError,
@@ -39,6 +43,21 @@ def _resolve_values(obj: Any) -> Any:
     if isinstance(obj, list):
         return [_resolve_values(v) for v in obj]
     return obj
+
+
+def _merge(base: Any, over: Any) -> Any:
+    """Overlay `over` onto `base`.
+
+    Dicts merge key by key so an override can name one field of one alias.
+    Everything else -- lists included -- replaces outright: a half-replaced
+    `aliases` list would route to a model the override never meant to name.
+    """
+    if isinstance(base, dict) and isinstance(over, dict):
+        merged = dict(base)
+        for k, v in over.items():
+            merged[k] = _merge(base[k], v) if k in base else v
+        return merged
+    return over
 
 
 def _require(alias: str, config: dict, key: str) -> str:
@@ -115,6 +134,10 @@ def _build_model(alias: str, config: dict) -> Model:
 class ModelRegistry:
     def __init__(self, path: Path = _YAML_PATH) -> None:
         raw = yaml.safe_load(path.read_text())
+        # Merged before env resolution, so an override can introduce a
+        # ${VAR} of its own and have it expand like any other.
+        if path == _YAML_PATH and _LOCAL_YAML_PATH.exists():
+            raw = _merge(raw, yaml.safe_load(_LOCAL_YAML_PATH.read_text()) or {})
         resolved = _resolve_values(raw)
         self._models_cfg: dict[str, dict] = resolved.get("models", {})
         self._use_cases_cfg: dict[str, dict] = resolved.get("use_cases", {})
