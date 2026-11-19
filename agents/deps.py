@@ -22,6 +22,10 @@ class FarmerContext(BaseModel):
         **Moderation Compliance:** "Valid Agricultural (This is a valid agricultural question.)"
     """
     skills: SkillState = Field(default_factory=SkillState)
+    channel: Literal["chat", "voice"] = Field(
+        default="chat",
+        description="Which API is serving this turn; voice is a Sarvam phone call.",
+    )
     ffs_context: dict[str, Any] = Field(default_factory=dict, exclude=True)
     query: str = Field(description="The user's question.")
     lang_code: str = Field(description="The language code of the user's question.", default='hi')
@@ -36,6 +40,16 @@ class FarmerContext(BaseModel):
     agristack_status: Literal["not_logged_in", "no_consent", "consent"] = Field(
         default="not_logged_in",
         description="AgriStack login state for this session (see assets/prompts/skills/agristack/profile/).",
+    )
+    # Voice calls only.
+    user_id: str = Field(default="", description="Caller's user ID (X-User-ID) for voice telemetry.")
+    end_interaction: bool = Field(
+        default=False,
+        description="Set by submit_feedback when the call is closing.",
+    )
+    feedback_prompt_seen: bool = Field(
+        default=False,
+        description="True only when the previous assistant turn explicitly asked for feedback.",
     )
     npss_used: bool = Field(default=False, description="Whether NPSS image analysis was used in this turn.")
     npss_source_name: Optional[str] = Field(default=None, description="Official NPSS source name.")
@@ -111,6 +125,13 @@ class FarmerContext(BaseModel):
 
     def get_user_message(self):
         """Get the user message for the agrinet agent."""
+        if self.channel == "voice":
+            # The voice prompt locks the call language itself; the saved transcript is
+            # restored by stripping exactly this FFS line (app/voice/history.py).
+            message = self._query_string()
+            if self.ffs_context:
+                message += "\n**FFS workflow:** " + str(self.ffs_context)
+            return message
         strings = [
             self._query_string(),
             self._language_string(),

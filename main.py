@@ -68,6 +68,8 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     print(f"🛑 {settings.app_name} shutting down...")
+    from helpers.langfuse_helper import flush_all
+    flush_all()
 
 # Create FastAPI app with settings
 app = FastAPI(
@@ -112,3 +114,15 @@ app.include_router(telemetry.router, prefix=settings.api_prefix)
 app.include_router(image.router, prefix=settings.api_prefix)
 app.include_router(callback.router, prefix=settings.api_prefix)
 app.include_router(resolver_callback.router, prefix=settings.api_prefix)
+
+# Voice (Sarvam calls): POST {api_prefix}/v1/chat/completions
+from app.voice.completion_telemetry import CompletionTelemetryMiddleware  # noqa: E402
+from app.voice.router import router as voice_router  # noqa: E402
+from helpers.langfuse_helper import LangfuseProjectMiddleware  # noqa: E402
+
+app.include_router(voice_router, prefix=settings.api_prefix)
+VOICE_COMPLETIONS_PATH = f"{settings.api_prefix}{voice_router.prefix}/chat/completions"
+# Outermost, so it also counts the 500 responses the server generates for errors.
+app = CompletionTelemetryMiddleware(app, path=VOICE_COMPLETIONS_PATH)
+# Voice requests trace to the voice Langfuse project, everything else to chat's.
+app = LangfuseProjectMiddleware(app, voice_path=VOICE_COMPLETIONS_PATH)

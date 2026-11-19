@@ -36,7 +36,7 @@ from helpers.langfuse_trace_schema import (
     chat_trace_metadata_strings,
 )
 from helpers.langfuse_tracing import lf_update_current_observation, lf_update_current_span
-from helpers.telemetry import (
+from helpers.telemetry.chat import (
     TelemetryRequest,
     create_chat_answer_event,
     create_chat_error_event,

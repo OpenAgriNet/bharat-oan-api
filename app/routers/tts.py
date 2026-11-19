@@ -8,7 +8,7 @@ import base64
 import time
 from helpers.utils import get_logger
 from app.auth.jwt_auth import get_current_user
-from helpers.telemetry import create_tts_event, TelemetryRequest
+from helpers.telemetry.chat import create_tts_event, TelemetryRequest
 from app.tasks.telemetry import send_telemetry
 
 logger = get_logger(__name__)

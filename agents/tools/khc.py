@@ -74,14 +74,22 @@ _KHC_WORDS = re.compile(
 )
 
 
-def khc_service_note(messages, current_query: str = "") -> str:
+_KHC_NOTE_PROMPTS = {
+    "chat": ("skills/khc/grievances/status_routing", "skills/khc/grievances/service_selected"),
+    # Spoken-ID rules (letters/digits read aloud, "slash") for phone calls.
+    "voice": ("skills/khc/grievances/status_routing_voice", "skills/khc/grievances/service_selected_voice"),
+}
+
+
+def khc_service_note(messages, current_query: str = "", channel: str = "chat") -> str:
     """Always provide status routing, plus a scoped reminder of an earlier KHC choice.
 
     Routing must be available before lazy-loaded workflow rules. Keep explicit KHC choices
     across follow-up turns without treating them as a permanent choice for the whole chat.
     Dynamic system prompts run before the current user message is appended to history.
     """
-    routing = "\n\n" + get_prompt("skills/khc/grievances/status_routing", context={
+    routing_prompt, selected_prompt = _KHC_NOTE_PROMPTS[channel]
+    routing = "\n\n" + get_prompt(routing_prompt, context={
         "status_id_prompt": _STATUS_ID_PROMPT,
         "status_otp_prompt": _STATUS_OTP_PROMPT,
     })
@@ -90,7 +98,7 @@ def khc_service_note(messages, current_query: str = "") -> str:
         turns.append(("farmer", current_query))
     for who, text in turns:
         if who == "farmer" and _KHC_WORDS.search(text):
-            return routing + get_prompt("skills/khc/grievances/service_selected", context={})
+            return routing + get_prompt(selected_prompt, context={})
     return routing
 
 

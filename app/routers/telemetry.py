@@ -11,7 +11,7 @@ from app.models.requests import (
 from app.services.chat_turn_map import read_chat_turn_map
 from app.tasks.telemetry import send_telemetry
 from helpers.langfuse_scores import create_user_feedback_score
-from helpers.telemetry import (
+from helpers.telemetry.chat import (
     TelemetryRequest,
     create_chat_error_event,
     create_chat_feedback_event,

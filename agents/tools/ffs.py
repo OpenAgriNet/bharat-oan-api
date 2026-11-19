@@ -11,7 +11,7 @@ async def _run(ctx, operation, **kwargs):
     name = "ffs_get_entitlement" if operation == "entitlement" else "ffs_" + operation
     service = FFSService(ctx.deps.session_id, ctx.deps.question_id)
     metadata = {"session_id": ctx.deps.session_id, "question_id": ctx.deps.question_id,
-                "channel": "chat", "operation": operation}
+                "channel": getattr(ctx.deps, "channel", "chat"), "operation": operation}
     with observation("tool:" + name, as_type="tool", metadata=metadata) as diagnostic:
         try:
             if "ffs.booking" not in ctx.deps.skills.active:

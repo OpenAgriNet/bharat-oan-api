@@ -8,7 +8,7 @@ from app.auth import jwt_auth
 from app.auth.jwt_auth import get_current_user
 from app.routers import telemetry as telemetry_router
 from app.routers.token import AuthRequest, create_auth_token
-from helpers.telemetry import (
+from helpers.telemetry.chat import (
     TelemetryRequest,
     create_chat_answer_event,
     create_chat_error_event,

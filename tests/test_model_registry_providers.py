@@ -75,3 +75,15 @@ def test_moderation_uses_gemma_with_mini_fallback():
     assert registry.get_use_case_aliases("moderation") == ["gemma_vllm"]
     assert registry.get_default_alias("moderation") == "gemma_vllm"
     assert registry.get_fallback_alias("gemma_vllm") == "azure_gpt54_mini"
+
+
+
+def test_voice_uses_the_same_routing_config_as_chat(monkeypatch):
+    monkeypatch.setenv("AGRINET_PROPORTION_GEMMA_VLLM", "30")
+    monkeypatch.setenv("AGRINET_PROPORTION_AZURE_GPT54_MINI", "70")
+    monkeypatch.setenv("AGRINET_ROUTING_ENABLED", "true")
+    registry = ModelRegistry()
+    for read in ("get_use_case_aliases", "get_use_case_proportions", "get_default_alias",
+                 "get_routing_ttl", "get_timeout", "routing_enabled"):
+        assert getattr(registry, read)("voice") == getattr(registry, read)("agrinet"), read
+    assert registry.get_use_case_proportions("voice") == [30, 70]

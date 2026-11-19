@@ -94,6 +94,30 @@ class Settings(BaseSettings):
     telemetry_auth_token: Optional[str] = os.getenv("TELEMETRY_AUTH_TOKEN")
     telemetry_auth_key: Optional[str] = os.getenv("TELEMETRY_AUTH_KEY")
     telemetry_auth_secret: Optional[str] = os.getenv("TELEMETRY_AUTH_SECRET")
+
+    # Voice (Sarvam phone calls, POST /v1/chat/completions)
+    # Bearer JWT is required unless VOICE_AUTH_ENABLED=false (then a missing token is allowed).
+    voice_auth_enabled: bool = os.getenv("VOICE_AUTH_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
+    # First turn: speak the hold message before the LLM answers.
+    voice_hold_message_enabled: bool = os.getenv("VOICE_HOLD_MESSAGE_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
+    # Any turn: speak the delay message if no answer has started after this many seconds.
+    voice_delay_message_enabled: bool = os.getenv("VOICE_DELAY_MESSAGE_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
+    voice_delay_message_after_seconds: float = float(os.getenv("VOICE_DELAY_MESSAGE_AFTER_SECONDS", "6.0"))
+    voice_history_ttl_seconds: int = int(os.getenv("VOICE_HISTORY_TTL_SECONDS", str(60 * 60)))
+
+    # Voice telemetry: same ingestion endpoint as chat unless VOICE_TELEMETRY_API_URL
+    # overrides it; its own channel and credentials. Voice code reads only these fields.
+    voice_telemetry_api_url: str = (
+        os.getenv("VOICE_TELEMETRY_API_URL")
+        or os.getenv("TELEMETRY_API_URL", "https://dev-vistaar.da.gov.in/observability-service/action/data/v3/telemetry")
+    )
+    voice_telemetry_channel: str = os.getenv("VOICE_TELEMETRY_CHANNEL") or "Bharat Vistaar Voice AI"
+    voice_telemetry_origin: Optional[str] = os.getenv("VOICE_TELEMETRY_ORIGIN") or None
+    voice_telemetry_referer: Optional[str] = os.getenv("VOICE_TELEMETRY_REFERER") or None
+    voice_telemetry_auth_token: Optional[str] = os.getenv("VOICE_TELEMETRY_AUTH_TOKEN") or None
+    voice_telemetry_auth_key: Optional[str] = os.getenv("VOICE_TELEMETRY_AUTH_KEY") or None
+    voice_telemetry_auth_secret: Optional[str] = os.getenv("VOICE_TELEMETRY_AUTH_SECRET") or None
+
     bhashini_api_url: str = ""
     ollama_endpoint_url: Optional[str] = None
     marqo_endpoint_url: Optional[str] = None
@@ -108,6 +132,10 @@ class Settings(BaseSettings):
     langfuse_public_key: Optional[str] = None
     langfuse_secret_key: Optional[str] = None
     langfuse_host: Optional[str] = None
+    # Voice calls report to their own Langfuse project: same LANGFUSE_HOST, these keys
+    # (helpers/langfuse_helper.py). Unset = voice traces go to the chat project.
+    voice_langfuse_public_key: Optional[str] = os.getenv("VOICE_LANGFUSE_PUBLIC_KEY") or None
+    voice_langfuse_secret_key: Optional[str] = os.getenv("VOICE_LANGFUSE_SECRET_KEY") or None
     # Langfuse UI "Env" badge + OTel resource; defaults to app ENVIRONMENT so it matches env: tags in chat traces.
     langfuse_tracing_environment: str = (
         os.getenv("LANGFUSE_TRACING_ENVIRONMENT") or os.getenv("ENVIRONMENT", "production")

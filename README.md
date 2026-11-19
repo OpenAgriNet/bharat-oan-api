@@ -109,6 +109,78 @@ Optional env vars:
 - CALLBACK_AUDIT_TABLE_NAME (default agristack_callback_audit)
 
 
+## Voice API (Sarvam phone calls)
+
+The voice service that used to live in `voice-oan-api` is served from this repo. It
+uses the **same tools** as chat (`agents/tools`), so a new feature is written once.
+
+| Part | Where |
+|---|---|
+| Endpoint Sarvam calls: `POST /api/v1/chat/completions` (unchanged contract: `X-Tenant-ID`, `X-User-ID`, `X-Session-ID`, `X-Language`; replies `{audio, end_interaction, language}`) | `app/voice/router.py` |
+| Voice agent (hold-reply guard, voice prompt) | `agents/voice.py` |
+| Which tools a call can use | `voice` profile in `assets/prompts/manifest.yaml` |
+| Voice base prompt (how to speak, call rules), one per language | `assets/prompts/voice/voice_{lang}.md` + `voice/feature_rules.md` |
+| Feature instructions — **shared with chat** | `assets/prompts/skills/<feature>/` |
+| Call history, welcome turn | `app/voice/history.py`, `assets/voice/welcome_messages.json` |
+| End-of-call feedback tool (voice only) | `agents/tools/feedback.py` |
+| Model weights | `voice` use case in `config/models.yaml` (alias of chat's `agrinet`) |
+
+**Run it.** Chat and voice are served by the same process: the chat routes and
+`POST /api/v1/chat/completions` for Sarvam are always mounted.
+
+**Prompts: different base, same features.** Each channel has its own base prompt —
+chat *writes* (`chat/agrinet_{lang}.md`: markdown, source lines), voice *speaks*
+(`voice/voice_{lang}.md`: no markdown, numbers in words, end-of-call feedback). Feature
+workflows are written once in `skills/<feature>/` and both channels load the same
+files. `voice/feature_rules.md` tells the voice agent how to say written-style feature
+text (no tables, links or source lines; read IDs digit by digit). Skills render with a
+`channel` variable (`chat` or `voice`).
+
+**Adding a feature for both channels.**
+1. Add the tool in `agents/tools` and bind it to a skill in the manifest.
+2. Write the feature instructions in `skills/<feature>/<feature>_{lang}.md` as for chat.
+3. List the skill under both the `chat` and `voice` profiles' `enabled_skills`.
+4. Only if a call needs something different, add it to `skills/<feature>/common.md`
+   inside `{% if channel == "voice" %} ... {% endif %}`. Lines outside that block in
+   `common.md` apply to both channels and every language.
+
+Hide a tool from calls with `disabled_tools` (e.g. `analyze_crop_image`: no photos on a call).
+Voice preloads every enabled skill, so calls never wait on `load_skill`; that makes the
+voice prompt about as large as chat's (~140K characters). If call latency needs it,
+set the `voice` profile's `preloaded_skills` to the common features and let the rest load on demand.
+
+**Telemetry is separate per channel.** `helpers/telemetry/base.py` is only the shared
+event format. Chat builds events in `helpers/telemetry/chat.py` and sends them with
+`app/tasks/telemetry.py` using `TELEMETRY_*`. Voice builds events in
+`helpers/telemetry/voice.py` and sends them with `app/voice/telemetry.py` using only
+`VOICE_TELEMETRY_*` (the URL defaults to the shared `TELEMETRY_API_URL`; the channel is
+voice's own). Langfuse is separate too: voice requests trace to the `VOICE_LANGFUSE_*` project
+and chat to `LANGFUSE_*`, on the same `LANGFUSE_HOST`, inside one process
+(`helpers/langfuse_helper.py`: a request middleware picks the project; voice spans
+use their own tracer provider). Voice payloads (`OE_VOICE_RESPONSE`, `TeleFeedback`, and the
+`VOICE_API` request count for Service Check > Voice) are the same as before, so the
+telemetry processor and dashboard need no change. `tests/test_voice_telemetry.py`
+pins the payloads and checks that neither channel imports the other's telemetry.
+
+**Moving the voice deployment from `voice-oan-api`:**
+
+| `voice-oan-api` | here |
+|---|---|
+| `AUTH_ENABLED` | `VOICE_AUTH_ENABLED` |
+| `TELEMETRY_API_URL` (voice) | nothing: voice uses this service's `TELEMETRY_API_URL` (override with `VOICE_TELEMETRY_API_URL`) |
+| `TELEMETRY_CHANNEL` (voice) | `VOICE_TELEMETRY_CHANNEL` |
+| `VOICE_PROPORTION_*` | removed: calls use chat's `AGRINET_ROUTING_ENABLED` / `AGRINET_PROPORTION_*` |
+| `VOICE_HOLD_*`, `VOICE_DELAY_*` | unchanged |
+| `ffs_enabled` setting | remove `ffs.booking` from the `voice` profile |
+| `AGRINET_GEMMA_MAX_CONCURRENCY` | `on_concurrency_above` on `gemma_vllm` in `config/models.yaml` (shared with chat) |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_BASE_URL` (voice project) | `VOICE_LANGFUSE_PUBLIC_KEY` / `VOICE_LANGFUSE_SECRET_KEY` (host is the shared `LANGFUSE_HOST`) |
+| `MASTER_CATALOG_REDIS_*` | not needed; the scheme catalog is read from this service's Redis |
+| port 8003 | port 8000, same service as chat (point Sarvam at it; the path is unchanged) |
+
+Call history moves to a new Redis key (`{session}_VOICE_HISTORY`), so calls in
+progress at cutover restart from the welcome turn. Odia is `or` inside this repo;
+Sarvam still sends and receives `od`.
+
 ## Delete all Docker volumes (cleanup)
 ```
 docker system prune -a --volumes

@@ -21,7 +21,8 @@ def skill_instructions(name: str, state: SkillState) -> str:
 def render_prompt(state: SkillState, language: str, context: dict) -> str:
     catalog = get_catalog()
     # Templates hide text for skills that are not in the manifest's enabled_skills.
-    context = {**context, 'enabled_skills': state.permitted}
+    # `channel` lets shared skill files add call-only notes ({% if channel == "voice" %}).
+    context = {**context, 'enabled_skills': state.permitted, 'channel': state.agent}
     state.language = language
     state.context = context
     chunks = [catalog.render_global(language, context, state.agent)]

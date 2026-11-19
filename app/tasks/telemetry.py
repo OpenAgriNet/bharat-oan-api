@@ -1,66 +1,34 @@
-import base64
-import hashlib
-import hmac
-import json
 import logging
 from typing import Dict, Optional
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 from app.config import settings
+from helpers.telemetry.auth import build_telemetry_auth_token, build_telemetry_headers
 
 logger = logging.getLogger(__name__)
 
 
 def _get_telemetry_auth_token() -> Optional[str]:
-    if settings.telemetry_auth_token:
-        return settings.telemetry_auth_token
-
-    if not settings.telemetry_auth_key or not settings.telemetry_auth_secret:
+    token = build_telemetry_auth_token(
+        settings.telemetry_auth_token,
+        settings.telemetry_auth_key,
+        settings.telemetry_auth_secret,
+    )
+    if token is None:
         logger.warning("Telemetry auth is not configured; sending telemetry without Authorization header")
-        return None
-
-    header = {"typ": "JWT", "alg": "HS256"}
-    payload = {
-        "iss": settings.telemetry_auth_key,
-        "iat": None,
-        "exp": None,
-        "aud": "",
-        "sub": "",
-    }
-
-    def base64_url_encode(value: Dict) -> str:
-        encoded = json.dumps(value, separators=(",", ":")).encode()
-        return base64.urlsafe_b64encode(encoded).rstrip(b"=").decode()
-
-    unsigned_token = f"{base64_url_encode(header)}.{base64_url_encode(payload)}"
-    signature = hmac.new(
-        settings.telemetry_auth_secret.encode(),
-        unsigned_token.encode(),
-        hashlib.sha256,
-    ).digest()
-    encoded_signature = base64.urlsafe_b64encode(signature).rstrip(b"=").decode()
-
-    return f"{unsigned_token}.{encoded_signature}"
+    return token
 
 
 def _get_telemetry_headers() -> Dict[str, str]:
-    headers = {
-        "Accept": "*/*",
-        "Content-Type": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        "dataType": "json",
-    }
-
+    """Chat channel headers; voice calls use app.voice.telemetry with VOICE_TELEMETRY_* settings."""
+    headers = build_telemetry_headers(
+        origin=settings.telemetry_origin,
+        referer=settings.telemetry_referer,
+    )
     auth_token = _get_telemetry_auth_token()
     if auth_token:
         headers["Authorization"] = f"Bearer {auth_token}"
-
-    if settings.telemetry_origin:
-        headers["Origin"] = settings.telemetry_origin
-    if settings.telemetry_referer:
-        headers["Referer"] = settings.telemetry_referer
-
     return headers
 
 

@@ -75,15 +75,18 @@ class SkillState(BaseModel):
         permitted, initial = self.selection()
         return set(get_catalog().resolve((initial | self.loaded_skills) & permitted))
 
+    def _disabled_tools(self) -> set[str]:
+        return set(get_catalog().manifest.agents[self.agent].disabled_tools)
+
     @property
     def allowed_tools(self) -> set[str]:
         m = get_catalog().manifest
-        return {tool for name in self.permitted for tool in m.skills[name].tools}
+        return {tool for name in self.permitted for tool in m.skills[name].tools} - self._disabled_tools()
 
     @property
     def visible(self) -> set[str]:
         m = get_catalog().manifest
-        return {tool for name in self.active for tool in m.skills[name].tools}
+        return {tool for name in self.active for tool in m.skills[name].tools} - self._disabled_tools()
 
     def restore(self, history: list) -> None:
         permitted = self.permitted

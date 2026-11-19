@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, s
 from app.config import settings
 from app.core.cache import cache
 from app.tasks.telemetry import send_telemetry
-from helpers.telemetry import TelemetryRequest, create_ui_interact_event
+from helpers.telemetry.chat import TelemetryRequest, create_ui_interact_event
 
 router = APIRouter(tags=["agristack-callback"])
 logger = logging.getLogger(__name__)

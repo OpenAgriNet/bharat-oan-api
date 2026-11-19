@@ -68,7 +68,7 @@ use_cases:
     aliases: [gemma_vllm]
     timeout_seconds: 20
 
-  agrinet:
+  agrinet: &agrinet
     routing_enabled: ${AGRINET_ROUTING_ENABLED}
     default_alias: azure_gpt54_mini  # used when routing is disabled or for state repair
     routing_ttl_seconds: 7200        # how long a session's sticky pick lives in Redis
@@ -79,3 +79,7 @@ use_cases:
   suggestions:
     aliases: [azure_gpt54_mini]
     timeout_seconds: 45
+
+  # Phone calls through Sarvam: same models, weights and switches as chat (agrinet).
+  # Only the sticky key differs ({session}_VOICE_ROUTE), so a call keeps its own pick.
+  voice: *agrinet

@@ -11,7 +11,7 @@ from helpers.transcription import (
     detect_audio_language_bhashini,
 )
 from app.auth.jwt_auth import get_current_user
-from helpers.telemetry import create_asr_event, create_ald_event, TelemetryRequest
+from helpers.telemetry.chat import create_asr_event, create_ald_event, TelemetryRequest
 from app.tasks.telemetry import send_telemetry
 from helpers.utils import get_logger
 

@@ -41,10 +41,16 @@ class Skill(Definition):
 
 class AgentConfig(Definition):
     prompt_dir: str
+    # Global prompt file is {prompt_dir}/{prompt_stem}_{language}.md. It holds the
+    # channel's base rules (chat writes, voice speaks); feature workflows come from
+    # the shared skills/ files for every agent.
+    prompt_stem: str = 'agrinet'
     languages: list[str]
     enabled_skills: Selection = 'all'
     preloaded_skills: Selection = 'all'
     skill_variants: dict[str, str] = Field(default_factory=dict)
+    # Tools of enabled skills this agent must never see (e.g. image upload on a phone call).
+    disabled_tools: list[str] = Field(default_factory=list)
 
 
 class EnvironmentConfig(Definition):
@@ -141,15 +147,31 @@ class SkillCatalog:
         summary, _ = self.document(skill_id, language, agent)
         return self.env.from_string(summary).render(**context)
 
+    def common_path(self, skill_id: str) -> str | None:
+        """Language-neutral notes for a skill, shared by every language and channel.
+
+        skills/<area>/<skill>/common.md is appended to the localized instructions. Use
+        {% if channel == "voice" %} ... {% endif %} for call-only details.
+        """
+        relative = f'{self.manifest.skills[skill_id].prompt_dir}/common.md'
+        return relative if self.path(relative).is_file() else None
+
     def render_skill(self, skill_id: str, language: str, context: dict, agent: str = 'chat') -> str:
         _, body = self.document(skill_id, language, agent)
-        return self.env.from_string(body).render(**context)
+        text = self.env.from_string(body).render(**context)
+        common = self.common_path(skill_id)
+        if common:
+            notes = self.env.get_template(common).render(**context).strip()
+            if notes:
+                # Own section, so the notes never read as part of a localized block above.
+                text = text.rstrip() + '\n\n## Shared notes\n\n' + notes
+        return text
 
     def render_global(self, language: str, context: dict, agent: str = 'chat') -> str:
         config = self.manifest.agents[agent]
         if language not in config.languages:
             raise ValueError(f'Unsupported language {language!r} for {agent}')
-        return self.env.get_template(f'{config.prompt_dir}/agrinet_{language}.md').render(**context)
+        return self.env.get_template(f'{config.prompt_dir}/{config.prompt_stem}_{language}.md').render(**context)
 
     def validate(self) -> None:
         m = self.manifest
@@ -188,13 +210,17 @@ class SkillCatalog:
         for variant in config.skill_variants.values():
             if not re.fullmatch(r'[a-z][a-z0-9_]*', variant):
                 raise ValueError(f'Invalid variant: {variant}')
+        if not re.fullmatch(r'[a-z][a-z0-9_]*', config.prompt_stem):
+            raise ValueError(f'Invalid prompt stem: {agent}')
+        if len(config.disabled_tools) != len(set(config.disabled_tools)) or not set(config.disabled_tools) <= self.tools:
+            raise ValueError(f'Unknown or duplicate disabled tool: {agent}')
         self._validate_language_assets(agent, config, enabled)
 
     def _validate_language_assets(self, agent: str, config: AgentConfig, enabled: set[str]) -> None:
         for language in config.languages:
             if not re.fullmatch('[a-z]{2,3}', language):
                 raise ValueError(f'Invalid language: {language}')
-            if not self.path(f'{config.prompt_dir}/agrinet_{language}.md').is_file():
+            if not self.path(f'{config.prompt_dir}/{config.prompt_stem}_{language}.md').is_file():
                 raise ValueError(f'Missing global prompt: {agent}/{language}')
             for skill_id in enabled:
                 self.document(skill_id, language, agent)

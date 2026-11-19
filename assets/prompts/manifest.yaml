@@ -177,3 +177,49 @@ agents:
     - weather.agromet
     - pm_kisan.installments
     - documents.search
+  # Sarvam phone calls (app/voice). Same tools and same skills/ feature instructions
+  # as chat; only the base prompt differs (voice/voice_{lang}.md: speak, don't write).
+  # Skills are rendered with channel="voice", so a feature's common.md can add
+  # call-only notes. Every skill is preloaded: calls never wait on load_skill.
+  # Odia is "or" here; Sarvam sends "od".
+  voice:
+    prompt_dir: voice
+    prompt_stem: voice
+    languages:
+    - bn
+    - en
+    - gu
+    - hi
+    - kn
+    - ml
+    - mr
+    - or
+    - pa
+    - ta
+    - te
+    # Not offered on calls: agristack.profile (needs the web/app login) and crop.icar
+    # (not covered by the voice prompts yet).
+    enabled_skills:
+    - ffs.booking
+    - schemes.information
+    - pm_kisan.status
+    - pm_kisan.grievances
+    - pmfby.status
+    - pmfby.grievances
+    - soil_health.status
+    - smam.status
+    - aif.status
+    - kcc.status
+    - khc.grievances
+    - crop.advice
+    - weather.forecast
+    - location.resolve
+    - mandi.prices
+    - fertilizer.recommendations
+    - seeds.availability
+    - weather.agromet
+    - pm_kisan.installments
+    - documents.search
+    # A call cannot send a photo; the voice prompt points farmers to the NPSS app instead.
+    disabled_tools:
+    - analyze_crop_image

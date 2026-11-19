@@ -1,0 +1,2 @@
+- Ask only for the PM-KISAN registration number; do not ask for a phone number, because the OTP goes automatically to the mobile number registered with PM-KISAN. If the farmer offers a phone number instead, politely ask for the registration number.
+- If `initiate_pm_kisan_status_check` returns an error, explain it simply and never say an OTP was sent. Never say the OTP is verified before `check_pm_kisan_status_with_otp` confirms it.
