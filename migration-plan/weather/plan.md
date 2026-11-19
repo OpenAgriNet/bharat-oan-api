@@ -30,12 +30,21 @@ request is a 500. Interleaved so both forms met the same service conditions:
 | `lat`, `lon` | 0 / 20 |
 | `lat`, `lon`, `date` | 5 / 20 |
 
-This is a defect in `config/mappings/mausamgram/weather-observation.select.yaml`,
+This was a defect in `config/mappings/mausamgram/weather-observation.select.yaml`,
 which sent only lat and lon. The published mapping at tag `0.1.0` — the one the
-adapter actually fetches — is byte-identical to the local file, so the defect
-was live. **A fix is written into the local file and is not yet published**;
-until it is tagged and `MAUSAMGRAM_MAPPING_URL` points at that tag, the adapter
-keeps fetching the broken one.
+adapter actually fetched — was byte-identical to the local file, so the defect
+was live for every request.
+
+**Fixed.** The mapping now derives `date` from the current IST day, and it is
+pushed to helmcharts `mandi-migration-pilot`. Pointing the adapter at it took
+two steps, not one: `MAUSAMGRAM_MAPPING_URL` in `.env`, and then the registered
+binding itself, because `make register-provider` is create-only and leaves an
+existing `ProviderSchema` alone — see open question 6. Confirmed live in the
+adapter log:
+
+```
+GET https://mausamgram.imd.gov.in/nwpapi/get-daily?date=2026-11-19&lat=18.52&lon=73.86 -> 200 OK
+```
 
 **2. The provider is about 25% available.** The second column above is not
 noise — the same request, repeated, succeeds roughly one time in four. The
@@ -272,6 +281,9 @@ the live provider.
 | "what is the weather in Pune" through chat | geocoded, tool called over v2, unavailability relayed honestly, no invented numbers |
 | "what is the weather in London" through chat | asks for an Indian district instead |
 | Mandi, same build | all seven fixed cases unchanged; chat returns the four September dates |
+| `date` fix live | registry repointed; adapter calls `get-daily?date=…&lat=…&lon=…` → 200 OK |
+| 200 carrying zero forecast days | **"Weather service unavailable."** — not "no forecast" |
+| discover `networkId` | sent as `"*"`; select stays `oan.dev`; one round trip each |
 
 The swapped-coordinate row is weaker than it reads. It passes because 73.86 N
 is outside the box, not because anything checks the order. A swap that stays
@@ -284,36 +296,46 @@ contriving. The real outage supplied it.
 
 ---
 
-## The discovery visibility problem
+## Scoping a discover to a catalog audience
 
 Worth recording because it is not weather's problem — it is the next fifteen
-capabilities' problem too.
+capabilities' problem too, and it is easy to misread as a bug.
 
-A catalog carries `visible_to`, a Postgres `text[]`. Discovery matches it
-against the caller's `context.networkId` **as an exact string**, and gives `*`
-no special meaning. Measured on this stack:
+A catalog carries `visible_to`, a Postgres `text[]`. Discovery matches it with
+`WHERE r.visible_to && $1::text[]` — an **array overlap**, not a pattern match.
+`*` is an ordinary element in that array, not a wildcard the query expands. So
+a public catalog literally holds the string `"*"`, and the way to see it is to
+ask for `"*"`. Measured on this stack:
 
 | caller sends | mandi catalog `{oan.dev}` | weather catalog `{*}` |
 |---|---|---|
-| `networkId: oan.dev` | found | **not found** |
-| no `networkId` | not found | found |
+| `networkId: oan.dev` | found | not found |
 | `networkId: "*"` | not found | found |
+| no `networkId` | not found | found |
 | `networkId: other.dev` | not found | not found |
 
-So a catalog published public — which the weather one is, IMD forecast data
-being open — is invisible to every caller that names its own network. That is
-the opposite of what `*` should mean, and **there is no single `networkId` that
-finds both capabilities**.
+Read as overlap, every row is what it should be. `networkId` is not "who I am"
+— `senderId` is that. `networkId` on a discover is **which catalog audience to
+look in**, and a caller that wants the public one says so.
 
-The weather catalog publishes as `{*}` and could not be made otherwise:
+The weather catalog publishes as `{*}`, which is correct for it: IMD forecast
+data is open. It also could not be made otherwise if we wanted to —
 re-publishing keeps the old visibility, a clean delete and re-publish still
 lands on `{*}`, and sending `visibleTo` or `visible_to` in the publish body is
-rejected by the schema as an unknown property.
+rejected by the schema as an unknown property. Worth knowing before a
+capability is published with the wrong audience.
 
-**What the tool does about it.** `_discover_provider` asks once with
-`networkId` and, on an empty answer, asks again without it. Two round trips on
-the public path. The fix belongs in the discovery service — `*` should match
-every network — and the retry is commented for deletion once it does.
+**What the tool does.** `_DISCOVER_NETWORK_ID` defaults to `"*"` and is sent as
+`context.networkId` on discover only. `select` stays on the real network id —
+it is routed by binding key and signed as this node, so an audience selector
+would be meaningless there. One round trip either way.
+
+**The one real gap.** The spec says `context.networkId` is
+`oneOf: string | array` — `beckn.yaml:3088` even works an example of
+discovering across two subnets with the array form. The local network adapter
+rejects the array with HTTP 400. So a tool that wants both a public catalog and
+a scoped one still has to ask twice. Weather does not need this today; a
+capability with a mix of public and private providers will.
 
 ---
 
@@ -341,11 +363,14 @@ result both as NO_DATA. Weather separates them — the adapter returns
 `HTTPStatusError` and says "Weather service unavailable", which is a different
 sentence from "No weather forecast data found".
 
-That separation is only as good as the adapter's error shape, and one gap
-remains: a 200 carrying zero forecast days is still rendered as "no forecast",
-which for a grid model that answers every point in its domain is far more
-likely to be a failure. That is the live `TODO(weather-v2)` in the tool, and
-the current provider outage is exactly the case that would trip it.
+That separation is only as good as the adapter's error shape, and it had one
+gap, since closed: a 200 carrying zero forecast days used to render as "no
+forecast". For a grid model that answers every point in its domain that is far
+more likely to be a failure, so the tool now reports it as unavailable too.
+Only discover can honestly say "not here" — it is the thing that knows the
+domain. Mandi deliberately does **not** do this: a market genuinely can have no
+arrivals on a given day, so an empty answer there is ordinary. The difference
+is the provider, not the protocol.
 
 ---
 
@@ -360,9 +385,15 @@ the current provider outage is exactly the case that would trip it.
 3. **Is the v1 BAP still runnable?** Still unknown. Nobody has started it.
 4. **When will Mausamgram serve data again?** Nothing here can proceed to a
    rendered forecast until it does.
-5. **Who publishes the mapping fix?** The `date` fix is written into the local
-   helmcharts file only. It needs a tag and a `MAUSAMGRAM_MAPPING_URL` bump
-   before the adapter sees it.
+5. ~~**Who publishes the mapping fix?**~~ Done. Pushed to helmcharts
+   `mandi-migration-pilot`, and the registered binding was repointed at it with
+   `scripts/registry_set_mapping.py` — `make register-provider` could not,
+   being create-only. Verified live: the adapter now calls
+   `get-daily?date=…&lat=…&lon=…` and gets 200 instead of 500.
+6. **Should `setup.py` be able to update, not just create?** Right now a
+   changed `.env` silently does nothing on an existing binding, which is a good
+   way to debug a fix that was never loaded. The script added here is a
+   workaround for one field; the registration tool is where it belongs.
 
 *(An earlier question — whether v2 returns one resource with five days or five
 resources — is answered: the mapping returns one resource per forecast day.)*

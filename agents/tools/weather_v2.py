@@ -81,6 +81,12 @@ _OFFER_ID = "offer:weather-observation:mausamgram:open-data"
 # Word-for-word from v1 (weather.py, WeatherResponse.__str__). The skill prompt
 # and the model's behaviour on an empty answer are written against this exact
 # sentence, so it is copied rather than reworded.
+# Said whenever the provider failed to answer, however it failed -- a refused
+# request, a 502 from the adapter, or a 200 carrying no forecast. Deliberately
+# not _NO_DATA: "no forecast for this location" is a claim about the location,
+# and none of these are.
+_UNAVAILABLE = "Weather service unavailable. Please try again later."
+
 _NO_DATA = "No weather forecast data found for the requested location."
 
 # What the mapping emits per parameter, in the order a farmer reads them:
@@ -113,15 +119,44 @@ def _adapter_url(action: str) -> str:
     return base.rstrip("/") + "/" + action
 
 
+# The network a discover is scoped to. Not the same thing as senderId, and for
+# this capability not the same value either.
+#
+# Discovery matches a catalog's visible_to against the networkId the caller
+# sent, as a Postgres array overlap (visible_to && $1::text[]). A catalog
+# published for one network holds that network's id; a PUBLIC catalog holds
+# "*", which is an ordinary element and not a pattern. So "*" is what a caller
+# asks for when it wants public catalogs -- it overlaps {*} and nothing else.
+#
+# Mausamgram's catalog is public, IMD forecast data being open, so weather asks
+# for "*". Mandi's is scoped to oan.dev, so mandi_v2 asks for oan.dev. Measured
+# both ways on this stack; each returns zero under the other's value:
+#
+#     networkId sent    weather {*}    mandi {oan.dev}
+#     "*"               1 resource     0
+#     "oan.dev"         0              1 market
+#
+# The spec allows networkId to be an array, which would let one request name
+# both -- beckn.yaml v2.0.0 has it as oneOf string|array, with a worked example
+# titled "Discover across two subnets using the array form". The adapter in
+# front of us refuses the array with a 400, so that is not available here yet.
+# When it is, this and mandi's value collapse into one list and the split below
+# goes away.
+_DISCOVER_NETWORK_ID = os.getenv("OAN_PUBLIC_NETWORK_ID", "*")
+
+
 def _context(action: str) -> dict:
-    """The v2 envelope. One network id on all three fields: this pilot is a
-    single-network deployment, so sender, receiver and network are the same."""
+    """The v2 envelope. senderId and receiverId are this deployment's own id --
+    the pilot is single-network, so they are the same value. networkId is not:
+    it scopes a discover to a catalog audience. See _DISCOVER_NETWORK_ID."""
     network_id = os.getenv("OAN_NETWORK_ID", "oan.dev")
     return {
         "domain": os.getenv("OAN_DOMAIN", "agriculture"),
         "action": action,
         "version": "2.0.0",
-        "networkId": network_id,
+        # Only discover is scoped by audience. select is routed by binding key
+        # and signed as this node, so it stays on the real network id.
+        "networkId": _DISCOVER_NETWORK_ID if action == "discover" else network_id,
         "senderId": network_id,
         "receiverId": network_id,
         "transactionId": str(uuid.uuid4()),
@@ -180,30 +215,7 @@ async def _discover_provider(
         },
     }
     payload = await _post("discover", body)
-    found = _first_resource(payload)
-    if found:
-        return found
-
-    # Retry without networkId, because discovery matches a catalog's visible_to
-    # against the caller's networkId as an exact string and gives "*" no special
-    # meaning. The consequence, measured on this stack:
-    #
-    #     catalog visible_to   caller networkId=oan.dev   caller omits it
-    #     {oan.dev}  (mandi)   found                      not found
-    #     {*}        (weather) NOT found                  found
-    #
-    # So a catalog published public -- which is what the weather one is, IMD
-    # forecast data being open -- is invisible to every caller that names its
-    # own network, which is the opposite of what "*" should mean. There is no
-    # single networkId that finds both capabilities.
-    #
-    # TODO(weather-v2): this belongs in the discovery service, which should read
-    # "*" as "every network". Until it does, asking twice is what lets one tool
-    # work against both a scoped and a public catalog without knowing in advance
-    # which it is dealing with. Delete this retry once "*" matches.
-    body["context"] = {k: v for k, v in _context("discover").items() if k != "networkId"}
-    logger.info("Weather v2 discover: retrying without networkId (public catalog)")
-    return _first_resource(await _post("discover", body))
+    return _first_resource(payload)
 
 
 def _first_resource(payload: dict) -> Optional[Dict[str, Any]]:
@@ -411,15 +423,27 @@ async def weather_forecast(
 
         days = await _select_forecast(found, latitude, longitude)
         if not days:
-            # TODO(weather-v2): currently indistinguishable from a provider
-            # outage, which is the same gap mandi still carries. A grid model
-            # answers every point in its domain, so an empty answer here is far
-            # more likely to be a failure than a real "no forecast" -- but
-            # nothing in the response says which. Confirm against the adapter's
-            # error shape and split the two.
+            # discover already said this provider covers this point, and a grid
+            # model forecasts every point it covers -- it has no "we don't serve
+            # here" answer, that is what discover is for. So zero days after a
+            # successful discover is the provider failing, not a real absence of
+            # forecast, and it is reported as such rather than as no data.
+            #
+            # This is the case the live provider is in: get-daily answers 200
+            # with fcstday1..5 as empty objects, the mapping drops days that
+            # carry no reading, and the select arrives here with nothing in it.
+            # Calling that "no forecast for your location" would be telling a
+            # farmer something false about their location.
+            #
+            # Mandi deliberately does NOT do this: a market genuinely can have
+            # no arrivals on a given day, so an empty answer there is ordinary.
+            # The difference is the provider, not the protocol.
             logger.warning(
-                f"Weather v2 select returned no forecast days for {latitude},{longitude}"
+                f"Weather v2 select returned no forecast days for {latitude},{longitude}; "
+                "treating as provider failure, not as absence of forecast"
             )
+            return _UNAVAILABLE + await agromet_note(ctx, latitude, longitude)
+
         return _render(days) + await agromet_note(ctx, latitude, longitude)
 
     except httpx.TimeoutException:
@@ -429,7 +453,7 @@ async def weather_forecast(
         logger.error(
             f"Weather v2 request failed: {e.response.status_code} {e.response.text[:500]}"
         )
-        return "Weather service unavailable. Please try again later."
+        return _UNAVAILABLE
     except httpx.RequestError as e:
         logger.error(f"Weather v2 request failed: {e}")
         return f"Weather request failed: {str(e)}"

@@ -13,7 +13,11 @@ changed and why, see [plan.md](plan.md).
 Weather-specific setup, on top of the shared steps:
 
 - `make register-provider PROVIDER=mausamgram` — needs `MAUSAMGRAM_AUTH`, one
-  opaque token IMD issues
+  opaque token IMD issues. Note it registers **create-only**: if the binding
+  already exists it prints "already present" and changes nothing, so a new
+  `MAUSAMGRAM_MAPPING_URL` in `.env` will not take effect. To change the
+  mapping on an existing binding, use
+  [`scripts/registry_set_mapping.py`](../../scripts/registry_set_mapping.py).
 - Publish `helmcharts/quick-start/capability-examples/WeatherObservation/publish/ondemand-mausamgram.json`
 - `docker-compose.pilot.yml` carries `WEATHER_BECKN_VERSION: v2`. Remove it and
   the same questions run on v1 — though v1 needs the old BAP on port 8095.
@@ -69,13 +73,13 @@ To prove it really went over v2:
 ```sh
 docker logs sva_app 2>&1 | grep "Weather v2"
 # Weather v2 discover -> http://network-adapter:9201/consumer/discover
-# Weather v2 discover: retrying without networkId (public catalog)
-# Weather v2 discover -> http://network-adapter:9201/consumer/discover
 # Weather v2 select   -> http://network-adapter:9201/consumer/select
 ```
 
-Three discover lines, not one. The second is the retry the public-catalog
-visibility problem forces — [plan.md](plan.md#the-discovery-visibility-problem).
+One discover, one select. The discover goes out with `networkId: "*"` because
+the weather catalog is published public; select keeps the real network id.
+Why those differ is in
+[plan.md](plan.md#scoping-a-discover-to-a-catalog-audience).
 
 ---
 
@@ -103,12 +107,14 @@ Coordinates directly, for the ones a place name cannot express:
 | Answer | Means |
 |---|---|
 | A forecast | the provider is healthy again — tell someone |
-| `Weather service unavailable. Please try again later.` | the provider failed; the adapter returned `NET_DOWNSTREAM_UNAVAILABLE` |
-| `No weather forecast data found for the requested location.` | discover found no provider, **or** select returned zero days |
+| `Weather service unavailable. Please try again later.` | the provider failed — refused the request, 502'd, or answered 200 with no forecast in it |
+| `No weather forecast data found for the requested location.` | discover found no provider for this point |
 | `Weather request timed out.` | the provider hung rather than erroring |
 
-The third row is doing two jobs, and that is the open bug — see the
-`TODO(weather-v2)` in `agents/tools/weather_v2.py`.
+Rows two and three used to be one message. They are split because they mean
+different things: a grid model forecasts every point it covers, so zero days
+after a successful discover is the provider failing, not a real absence of
+forecast. Only discover can honestly say "not here".
 
 ---
 
@@ -127,10 +133,11 @@ In rough order of likelihood right now:
 2. **The provider is flapping.** Roughly one request in four succeeds. The
    adapter retries three times before giving up, so a run can fail purely on
    luck. Try again.
-3. **The mapping is not sending `date`.** Omitting it is a guaranteed 500. The
-   fix is written into the local helmcharts mapping but **is not published**,
-   and the adapter fetches the published one. Until `MAUSAMGRAM_MAPPING_URL`
-   points at a tag containing the fix, every select 500s.
+3. **The mapping is not sending `date`.** Omitting it is a guaranteed 500.
+   Fixed and published; confirm the adapter picked it up with
+   `docker logs network-adapter | grep get-daily` — the outbound URL must carry
+   `date=`. If it does not, the registry is still pointing at an old mapping
+   file; see the register-provider note at the top.
 4. **Nothing published.** `discover` returns an empty list silently. Check with
    a direct discover call before anything else.
 

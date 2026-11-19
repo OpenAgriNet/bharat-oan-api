@@ -52,10 +52,10 @@ Both are in [mandi/plan.md](mandi/plan.md) with the measurements.
 Weather adds a third, and it is the one that will bite every remaining
 capability:
 
-- **Public catalogs are undiscoverable.** `visible_to` is matched against the
-  caller's `networkId` as an exact string, so a catalog published `{*}` is
-  found only by a caller that omits its network, and a catalog scoped to a
-  network is found only by that network. No single caller context finds both.
-  The weather tool works around it by asking twice. Fix it in the discovery
-  service before sixteen more tools each grow the same retry —
-  [weather/plan.md](weather/plan.md#the-discovery-visibility-problem).
+- **`networkId` on a discover picks the catalog audience, not the caller.**
+  `visible_to` is matched by array overlap, so a public catalog — one published
+  `{*}` — is found by asking for `"*"`, and a scoped one by naming its network.
+  Each tool has to send the audience its providers publish to; weather sends
+  `"*"` because IMD forecast data is open. A capability that needs both at once
+  wants the spec's array form of `networkId`, which the adapter currently
+  refuses — [weather/plan.md](weather/plan.md#scoping-a-discover-to-a-catalog-audience).
