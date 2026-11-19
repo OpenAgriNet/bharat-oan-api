@@ -25,6 +25,10 @@ services:
       # same endpoint -- the consumer adapter branches on the action inside the
       # payload, so discover and select share this base.
       OAN_ADAPTER_URL: http://network-adapter:9201/consumer
+      # The whole point of this file. agents/tools/__init__.py reads it at
+      # import time and binds get_mandi_prices to the v2 module; unset, the
+      # stack runs exactly as production does today.
+      MANDI_BECKN_VERSION: v2
 
   redis:
     image: redis:7-alpine
@@ -42,6 +46,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Geocoding for the full chat path: forward_geocode turns the farmer's place
+  # name into the coordinates get_mandi_prices needs. See docker/photon-proxy.conf
+  # for why this is a proxy rather than Photon itself, and why it is local-only.
+  photon_proxy:
+    image: nginx:alpine
+    container_name: photon_proxy
+    volumes:
+      - ./docker/photon-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [svanetwork]
+    restart: unless-stopped
 
 networks:
   # The base file puts `app` on `svanetwork`, which nothing on this machine
