@@ -1,0 +1,53 @@
+# Mandi v1 -> v2 pilot. Runs this API next to the quick-start stack so the tool
+# can reach the adapter by name instead of through the host.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.pilot.yml up -d
+#
+# Brings up the Redis the app needs (app/core/cache.py) and joins oan-internal,
+# the network helmcharts/quick-start already created -- hence `external: true`:
+# this file attaches to that stack, it does not own it. Start quick-start first.
+services:
+  app:
+    # amd64 only. requirements.lock pins torch as an explicit x86_64 wheel
+    # (torch-2.14.0+cpu-...-manylinux_2_28_x86_64.whl) under --require-hashes
+    # and --only-binary, so there is no arm64 wheel for pip to fall back to and
+    # the build fails outright on Apple Silicon. Rosetta builds and runs it.
+    platform: linux/amd64
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      # REDIS_HOST is deliberately not set here. .env already says sva_redis,
+      # and anything listed here would win over it -- two names for one
+      # container, with the .env one silently dead.
+      #
+      # The adapter, by container name on oan-internal. Both v2 actions are the
+      # same endpoint -- the consumer adapter branches on the action inside the
+      # payload, so discover and select share this base.
+      OAN_ADAPTER_URL: http://network-adapter:9201/consumer
+
+  redis:
+    image: redis:7-alpine
+    container_name: sva_redis
+    # No port published. Only the app talks to it, and it holds chat sessions.
+    networks:
+      svanetwork:
+        # .env dials sva_redis, which is the container name, not the service
+        # name -- Compose only guarantees the service name resolves. Spelled
+        # out so the lookup does not depend on which it happens to register.
+        aliases: [sva_redis]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  # The base file puts `app` on `svanetwork`, which nothing on this machine
+  # creates. Compose merges top-level networks by key and an override cannot
+  # delete one, so instead of fighting that, svanetwork is pointed at the
+  # network quick-start already made. Same network, two names for it.
+  svanetwork:
+    external: true
+    name: oan-internal

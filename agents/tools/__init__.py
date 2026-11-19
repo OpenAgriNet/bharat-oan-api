@@ -4,6 +4,7 @@ Tools for the BharatVistaar AI Agent.
 
 # from agents.tools.search_beckn import search_documents
 
+import os
 from dataclasses import replace
 
 from pydantic_ai import Tool
@@ -63,7 +64,15 @@ from agents.tools.search import (
 from agents.tools.advisory import search_advisory
 from agents.tools.weather import weather_forecast
 from agents.tools.imd_advisory import imd_agromet_advisory
-from agents.tools.mandi import get_mandi_prices
+# Beckn v1 or v2 for mandi, picked at import time. Both modules export the same
+# function name, signature and docstring, so the agent, the skill prompt and the
+# rendered output are identical either way -- only the calls behind it change.
+# Default stays v1 until the v2 path is signed off; see
+# documents/migration-pilot-plan.md.
+if os.getenv("MANDI_BECKN_VERSION", "v1").strip().lower() == "v2":
+    from agents.tools.mandi_v2 import get_mandi_prices
+else:
+    from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
 from agents.tools.maps import reverse_geocode, forward_geocode
 from agents.tools.gfr import (
