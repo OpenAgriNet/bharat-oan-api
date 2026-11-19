@@ -383,8 +383,28 @@ is the provider, not the protocol.
    pack needs a `CloudCover` addition. Still open, still Phase 2b — and now
    blocked twice over, since v1 reads the same dead endpoint.
 3. **Is the v1 BAP still runnable?** Still unknown. Nobody has started it.
-4. **When will Mausamgram serve data again?** Nothing here can proceed to a
-   rendered forecast until it does.
+4. **TODO — re-run weather verification once IMD serves forecast data.**
+   Blocks the one thing this migration has not shown: a forecast rendered from
+   live bytes. Re-measured 2026-11-19, after the `date` fix: 4 of 12 selects
+   answered (and each of those is already the adapter retrying three times),
+   and **all four carried zero forecast days**. The API is reachable and
+   authenticating; `fcstday1..5` come back as empty objects with `lat_r`/`lon_r`
+   null, which reads like model output not loaded behind the API rather than a
+   crashed service. Owned by IMD, not by us — v1 reads the same endpoint and
+   would report the same.
+
+   To close it: re-run [quick-try.md](quick-try.md). If a forecast renders, no
+   code change should be needed. If it renders *wrongly*, the renderer is the
+   suspect — it is the only piece checked against the mapping's documented
+   shape rather than against real bytes.
+
+7. **TODO — the adapter rejects the spec's array form of `networkId`.**
+   `context.networkId` is `oneOf: string | array` (`beckn.yaml:3088`), which
+   even works an example of discovering across two subnets. The local adapter
+   answers HTTP 400 to the array. Weather does not need it — one audience, one
+   string. A capability with both public and private providers will, and
+   without it each such tool has to send two discovers. Worth raising with the
+   adapter team before that happens rather than after.
 5. ~~**Who publishes the mapping fix?**~~ Done. Pushed to helmcharts
    `mandi-migration-pilot`, and the registered binding was repointed at it with
    `scripts/registry_set_mapping.py` — `make register-provider` could not,

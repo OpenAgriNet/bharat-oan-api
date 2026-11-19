@@ -25,7 +25,10 @@ Each capability gets a folder with the same two files.
 
 Weather's tool and network path are done and verified; IMD Mausamgram itself is
 returning no forecast data, so a rendered forecast is the one thing not yet
-shown. Details in [weather/plan.md](weather/plan.md).
+shown. It is not an outage — the API answers, authenticates and echoes the
+coordinates back, but `fcstday1..5` are empty objects. Tracked as open item 4
+in [weather/plan.md](weather/plan.md#open-questions); re-run
+[weather/quick-try.md](weather/quick-try.md) when IMD is serving again.
 
 ## What v2 changes, in one paragraph
 
