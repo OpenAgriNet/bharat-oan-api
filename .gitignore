@@ -222,3 +222,10 @@ backups/
 
 # Local model overrides (endpoints and keys); see agents/model_registry.py
 config/models.local.yaml
+
+# Local agent-tooling state. Scratch databases and session logs written by
+# editor-side tools; machine-specific and of no use to anyone else.
+.claude/
+.claude-flow/
+.swarm/
+ruvector.db
