@@ -62,13 +62,21 @@ from agents.tools.search import (
     search_schemes,
 )
 from agents.tools.advisory import search_advisory
-from agents.tools.weather import weather_forecast
+# Beckn v1 or v2 for weather, picked at import time. Same function name,
+# signature and docstring either way, so the agent and the skill prompt do not
+# change -- but unlike mandi the OUTPUT does: the v2 provider mapping drops
+# fields the v0.1 schema pack cannot hold, so the two versions are not
+# byte-comparable. See migration-plan/weather/plan.md.
+if os.getenv("WEATHER_BECKN_VERSION", "v1").strip().lower() == "v2":
+    from agents.tools.weather_v2 import weather_forecast
+else:
+    from agents.tools.weather import weather_forecast
 from agents.tools.imd_advisory import imd_agromet_advisory
 # Beckn v1 or v2 for mandi, picked at import time. Both modules export the same
 # function name, signature and docstring, so the agent, the skill prompt and the
 # rendered output are identical either way -- only the calls behind it change.
 # Default stays v1 until the v2 path is signed off; see
-# documents/migration-pilot-plan.md.
+# migration-plan/mandi/plan.md.
 if os.getenv("MANDI_BECKN_VERSION", "v1").strip().lower() == "v2":
     from agents.tools.mandi_v2 import get_mandi_prices
 else:

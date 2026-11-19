@@ -9,7 +9,8 @@ migration-plan/
 │   ├── plan.md        what changed, what it cost, what is still open
 │   └── quick-try.md   how to try the mandi use cases
 └── weather/
-    └── plan.md        planned, not started
+    ├── plan.md        what changed, what it cost, what is still open
+    └── quick-try.md   how to try the weather use cases
 ```
 
 Each capability gets a folder with the same two files.
@@ -19,8 +20,12 @@ Each capability gets a folder with the same two files.
 | Capability | Status |
 |---|---|
 | Mandi prices (agmarknet) | **Done** — [plan](mandi/plan.md) · [try it](mandi/quick-try.md) |
-| Weather (mausamgram) | **Planned** — [plan](weather/plan.md) |
+| Weather (mausamgram) | **Built, blocked on the provider** — [plan](weather/plan.md) · [try it](weather/quick-try.md) |
 | The other sixteen | Not started |
+
+Weather's tool and network path are done and verified; IMD Mausamgram itself is
+returning no forecast data, so a rendered forecast is the one thing not yet
+shown. Details in [weather/plan.md](weather/plan.md).
 
 ## What v2 changes, in one paragraph
 
@@ -43,3 +48,14 @@ estimated:
   seventeen tools each grow their own copy.
 
 Both are in [mandi/plan.md](mandi/plan.md) with the measurements.
+
+Weather adds a third, and it is the one that will bite every remaining
+capability:
+
+- **Public catalogs are undiscoverable.** `visible_to` is matched against the
+  caller's `networkId` as an exact string, so a catalog published `{*}` is
+  found only by a caller that omits its network, and a catalog scoped to a
+  network is found only by that network. No single caller context finds both.
+  The weather tool works around it by asking twice. Fix it in the discovery
+  service before sixteen more tools each grow the same retry —
+  [weather/plan.md](weather/plan.md#the-discovery-visibility-problem).

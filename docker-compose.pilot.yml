@@ -29,6 +29,11 @@ services:
       # import time and binds get_mandi_prices to the v2 module; unset, the
       # stack runs exactly as production does today.
       MANDI_BECKN_VERSION: v2
+      # Same switch for weather. Unlike mandi the rendered answer differs
+      # between v1 and v2 -- the v2 provider mapping drops fields the v0.1
+      # schema pack has nowhere to put -- so this is not a transparent swap.
+      # See migration-plan/weather/plan.md.
+      WEATHER_BECKN_VERSION: v2
 
   redis:
     image: redis:7-alpine

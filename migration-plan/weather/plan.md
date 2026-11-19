@@ -1,12 +1,63 @@
 # Weather forecast: v1 -> v2
 
-**Status: planned, not started.**
+**Status: built and wired. Blocked on the provider, not on us.**
+
+The tool, the renderer and the whole network path are done and exercised
+end to end. What cannot be shown is a real forecast, because IMD Mausamgram
+is currently returning no forecast data to anyone — see
+[What the live provider actually does](#what-the-live-provider-actually-does).
 
 Second capability. Provider is IMD Mausamgram (`mausamgram`), capability
 `Weather Observation`.
 
 - Stack setup: [../stack-setup.md](../stack-setup.md)
 - The template this follows: [../mandi/plan.md](../mandi/plan.md)
+
+---
+
+## What the live provider actually does
+
+Measured against `https://mausamgram.imd.gov.in/nwpapi/get-daily` on
+2026-11-19, with the real token. No mock was used at any point.
+
+**1. `date` is required, and the mapping did not send it.**
+
+The provider's own OpenAPI marks `date` optional. It is not. Omit it and every
+request is a 500. Interleaved so both forms met the same service conditions:
+
+| request | 200s |
+|---|---|
+| `lat`, `lon` | 0 / 20 |
+| `lat`, `lon`, `date` | 5 / 20 |
+
+This is a defect in `config/mappings/mausamgram/weather-observation.select.yaml`,
+which sent only lat and lon. The published mapping at tag `0.1.0` — the one the
+adapter actually fetches — is byte-identical to the local file, so the defect
+was live. **A fix is written into the local file and is not yet published**;
+until it is tagged and `MAUSAMGRAM_MAPPING_URL` points at that tag, the adapter
+keeps fetching the broken one.
+
+**2. The provider is about 25% available.** The second column above is not
+noise — the same request, repeated, succeeds roughly one time in four. The
+adapter already retries three times and then gives up.
+
+**3. Even a 200 carries no forecast.** Every successful response had
+`fcstday1..5` as empty objects and `lat_r`/`lon_r` as `null`:
+
+```json
+{"fcstday1":{},"fcstday2":{},"fcstday3":{},"fcstday4":{},"fcstday5":{},
+ "abbreviation":{...},"location":{"lat":18.52,"lon":73.86},
+ "lat_r":null,"lon_r":null}
+```
+
+True for every date tried, every coordinate tried, and for the other two
+endpoints (`get-rtbc`, `get-rtma`) which never answered 200 at all.
+
+**What this means.** Fixing `date` turns a 500 into a 200 that still has no
+numbers in it. So the one thing this migration cannot yet demonstrate is a
+rendered forecast from live data. Everything up to that point is demonstrated.
+Re-run [quick-try.md](quick-try.md) when IMD is serving again; nothing in our
+code needs to change for it to work.
 
 ---
 
@@ -162,55 +213,120 @@ From the mapping's precondition and request half:
 
 ## Steps
 
-Phases 0 and 2 are done — the stack is up and the AI layer works.
+**Phase 0b — register and publish. Done.**
 
-**Phase 0b — register and publish**
+1. `make register-provider PROVIDER=mausamgram` — created the participant, the
+   capability and the binding key
+2. Published `capability-examples/WeatherObservation/publish/ondemand-mausamgram.json`
+   — ACCEPTED, `catalog:weather-observation:mausamgram`, itemCount 1, geometry
+   indexed at 6.5–37.5 N / 68–97.5 E
+3. `discover` returns the one resource for a point inside the domain
 
-1. `make register-provider PROVIDER=mausamgram` — needs `MAUSAMGRAM_AUTH`
-2. Publish `capability-examples/WeatherObservation/publish/ondemand-mausamgram.json`
-3. Confirm `discover` returns the one resource for a point inside the domain
+**Phase 1 — prove the network path, no AI. Done, up to the provider.**
 
-**Phase 1 — prove the network path, no AI**
+4. `select` reaches the live upstream. The adapter log shows the full chain:
+   signature generated for `oan.dev`, base and extended schema validation
+   passed against the v0.1 pack, binding key resolved to
+   `https://mausamgram.imd.gov.in`, mapping compiled, outbound
+   `GET /nwpapi/get-daily`
+5. The provider answers 500. See
+   [What the live provider actually does](#what-the-live-provider-actually-does)
 
-4. `select` with `capability-examples/WeatherObservation/select/select.json`,
-   against the live Mausamgram upstream
-5. Check the five parameters come back grouped as the mapping describes, one
-   resource per forecast day
+So the network path is proven and the provider is not.
 
-**Phase 2b — record the v1 baseline (do not skip)**
+**Phase 2b — record the v1 baseline. Still not done.**
 
-6. Stand up the v1 BAP on port 8095
-7. Record v1 answers for a fixed set of points, through the chat path
-8. **List which fields v1 prints.** This is what tells us whether the dropped
-   fields above are a real loss or a non-issue
+Unchanged and still deferred: it needs the old BAP on port 8095, which is down.
+A warning to this effect is in the module docstring of
+`agents/tools/weather_v2.py`. Note that the baseline is now doubly blocked —
+even with the BAP up, v1 reads the same IMD endpoint, so it would record the
+same empty answer.
 
-This is the step mandi skipped, and it is why mandi can be shown correct but
-cannot be shown unchanged. It is also the only phase with an external
-dependency, so start it first.
+**Phase 3 — swap the tool. Done.**
 
-**Phase 3 — swap the tool**
+6. `agents/tools/weather_v2.py` — same function name, signature and docstring
+7. A renderer written against the v2 shape, unit-checked against the shape the
+   mapping documents, including an unknown parameter, a day with parameters
+   missing, and the empty case
+8. `WEATHER_BECKN_VERSION` in `agents/tools/__init__.py`, default v1
+9. `WEATHER_BECKN_VERSION: v2` in `docker-compose.pilot.yml`
 
-9. `agents/tools/weather_v2.py` — same function name, signature and docstring
-10. A small renderer for the v2 shape
-11. `WEATHER_BECKN_VERSION` flag in `agents/tools/__init__.py`, default v1
-12. Replay the baseline points through both paths and compare field by field
-
-**Phase 4 — review**
-
-13. Write up what a point capability cost against what a list capability cost
+**Phase 4 — review.** Still to write, and worth writing once a forecast has
+actually rendered.
 
 ---
 
-## Test cases to fix before starting
+## What was verified
 
-| Case | Why |
+Run on 2026-11-19 with `WEATHER_BECKN_VERSION: v2`, against the live stack and
+the live provider.
+
+| Case | Result |
 |---|---|
-| A point well inside India | the ordinary case |
-| A point outside the coverage box | discover should return nothing, not an error |
-| A point inside the box but not on land | see note below |
-| Coordinates swapped | must not quietly answer about somewhere else |
-| A place name typed by a farmer, through chat | geocode plus forecast together |
-| Upstream down | must read as unavailable, not as "no forecast" |
+| Pune, Delhi — inside the box | discover returns the resource |
+| Bay of Bengal — inside the box, at sea | discover returns it, as designed |
+| 6.6 N 68.1 E — box corner | discover returns it |
+| London, Singapore — outside the box | discover returns nothing, no error |
+| Coordinates swapped (73.86, 18.52) | lands outside the box, so it misses rather than answering about the wrong place |
+| Provider down | **"Weather service unavailable."** — not "no forecast" |
+| "what is the weather in Pune" through chat | geocoded, tool called over v2, unavailability relayed honestly, no invented numbers |
+| "what is the weather in London" through chat | asks for an Indian district instead |
+| Mandi, same build | all seven fixed cases unchanged; chat returns the four September dates |
+
+The swapped-coordinate row is weaker than it reads. It passes because 73.86 N
+is outside the box, not because anything checks the order. A swap that stays
+inside the box — 20 N 25 E reversed to 25 N 20 E, say — would still be a
+confident answer about the wrong place. Only a provider that reported back the
+cell it used could close that, and `lat_r`/`lon_r` are exactly that field.
+
+The provider-down row is the one case the plan asked for that normally needs
+contriving. The real outage supplied it.
+
+---
+
+## The discovery visibility problem
+
+Worth recording because it is not weather's problem — it is the next fifteen
+capabilities' problem too.
+
+A catalog carries `visible_to`, a Postgres `text[]`. Discovery matches it
+against the caller's `context.networkId` **as an exact string**, and gives `*`
+no special meaning. Measured on this stack:
+
+| caller sends | mandi catalog `{oan.dev}` | weather catalog `{*}` |
+|---|---|---|
+| `networkId: oan.dev` | found | **not found** |
+| no `networkId` | not found | found |
+| `networkId: "*"` | not found | found |
+| `networkId: other.dev` | not found | not found |
+
+So a catalog published public — which the weather one is, IMD forecast data
+being open — is invisible to every caller that names its own network. That is
+the opposite of what `*` should mean, and **there is no single `networkId` that
+finds both capabilities**.
+
+The weather catalog publishes as `{*}` and could not be made otherwise:
+re-publishing keeps the old visibility, a clean delete and re-publish still
+lands on `{*}`, and sending `visibleTo` or `visible_to` in the publish body is
+rejected by the schema as an unknown property.
+
+**What the tool does about it.** `_discover_provider` asks once with
+`networkId` and, on an empty answer, asks again without it. Two round trips on
+the public path. The fix belongs in the discovery service — `*` should match
+every network — and the retry is commented for deletion once it does.
+
+---
+
+## Test cases
+
+| Case | Why | Result |
+|---|---|---|
+| A point well inside India | the ordinary case | pass |
+| A point outside the coverage box | discover should return nothing, not an error | pass |
+| A point inside the box but not on land | see note below | pass — discovers, as designed |
+| Coordinates swapped | must not quietly answer about somewhere else | pass, but weakly — see below |
+| A place name typed by a farmer, through chat | geocode plus forecast together | pass |
+| Upstream down | must read as unavailable, not as "no forecast" | pass, against a real outage |
 
 **On the coverage box:** the published `coverageAreas` polygon is
 68–97.5°E, 6.5–37.5°N — a **rectangle around India, not India's shape**. A
@@ -218,21 +334,35 @@ point in the Bay of Bengal or inside a neighbouring country still falls inside
 it and will discover successfully. To test the outside case, go well clear of
 the box.
 
-The last row is the mandi bug in a different costume. Mandi could not tell a
-provider outage from an empty result and reports both as NO_DATA. Check
-whether the weather path has the same gap **before** writing the tool.
+**On the last row:** this is the mandi bug in a different costume, and weather
+does **not** have it. Mandi reports a provider outage and a genuine empty
+result both as NO_DATA. Weather separates them — the adapter returns
+`NET_DOWNSTREAM_UNAVAILABLE` as a 502, the tool catches it as an
+`HTTPStatusError` and says "Weather service unavailable", which is a different
+sentence from "No weather forecast data found".
+
+That separation is only as good as the adapter's error shape, and one gap
+remains: a 200 carrying zero forecast days is still rendered as "no forecast",
+which for a grid model that answers every point in its domain is far more
+likely to be a failure. That is the live `TODO(weather-v2)` in the tool, and
+the current provider outage is exactly the case that would trip it.
 
 ---
 
 ## Open questions
 
-1. **Does Mausamgram have an empty-result case at all?** A grid model answers
-   every point inside its domain, so possibly not — in which case weather
-   avoids the mandi bug. Confirm in Phase 1.
+1. ~~**Does Mausamgram have an empty-result case at all?**~~ Answered, badly:
+   it is returning empty for everything right now, so the empty case is not
+   hypothetical and cannot currently be told apart from the broken case.
 2. **Does v1's answer include the dropped fields?** Decides whether the schema
-   pack needs a `CloudCover` addition before we switch. Answer it in Phase 2b.
-3. **Is the v1 BAP still runnable?** Everything in Phase 2b depends on it, and
-   nobody has started it during this work.
+   pack needs a `CloudCover` addition. Still open, still Phase 2b — and now
+   blocked twice over, since v1 reads the same dead endpoint.
+3. **Is the v1 BAP still runnable?** Still unknown. Nobody has started it.
+4. **When will Mausamgram serve data again?** Nothing here can proceed to a
+   rendered forecast until it does.
+5. **Who publishes the mapping fix?** The `date` fix is written into the local
+   helmcharts file only. It needs a tag and a `MAUSAMGRAM_MAPPING_URL` bump
+   before the adapter sees it.
 
 *(An earlier question — whether v2 returns one resource with five days or five
 resources — is answered: the mapping returns one resource per forecast day.)*
