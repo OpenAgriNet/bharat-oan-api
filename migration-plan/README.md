@@ -5,9 +5,11 @@ Moving Bharat Vistaar's capabilities from Beckn v1 to v2, one at a time.
 ```
 migration-plan/
 ├── stack-setup.md     how to bring the whole stack up (do this once)
-└── mandi/
-    ├── plan.md        what changed, what it cost, what is still open
-    └── quick-try.md   how to try the mandi use cases
+├── mandi/
+│   ├── plan.md        what changed, what it cost, what is still open
+│   └── quick-try.md   how to try the mandi use cases
+└── weather/
+    └── plan.md        planned, not started
 ```
 
 Each capability gets a folder with the same two files.
@@ -17,7 +19,7 @@ Each capability gets a folder with the same two files.
 | Capability | Status |
 |---|---|
 | Mandi prices (agmarknet) | **Done** — [plan](mandi/plan.md) · [try it](mandi/quick-try.md) |
-| Weather (mausamgram) | Next |
+| Weather (mausamgram) | **Planned** — [plan](weather/plan.md) |
 | The other sixteen | Not started |
 
 ## What v2 changes, in one paragraph
