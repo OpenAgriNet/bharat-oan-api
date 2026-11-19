@@ -10,11 +10,22 @@ any difference between the two runs is the transport, not the model.
     MANDI_BECKN_VERSION=v2 python scripts/pilot_mandi_check.py > v2.txt
     diff v1.txt v2.txt
 
+With no arguments it runs the fixed case list below. Pass arguments to ask one
+question of your own instead:
+
+    python scripts/pilot_mandi_check.py --lat 19.6445 --lon 74.6619 \
+        --place Rahuri --commodity Onion --from 01-09-2026 --to 09-09-2026
+
+Add --show-payloads to print the discover and select bodies that go on the wire
+alongside the answer.
+
 Coordinates are the published markets themselves, because the pilot catalog
 holds only Rahuri and Pune; a farmer's town 99 km away has no coverage in this
 network and would make every case read NO_DATA for the wrong reason.
 """
+import argparse
 import asyncio
+import json
 import os
 from dataclasses import dataclass
 
@@ -59,8 +70,51 @@ CASES = [
 ]
 
 
+def _parse_args():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--lat", type=float, help="latitude, as forward_geocode would return")
+    ap.add_argument("--lon", type=float, help="longitude")
+    ap.add_argument("--place", default="", help="place name the farmer used, e.g. Rahuri")
+    ap.add_argument("--commodity", help="English commodity name, e.g. Onion")
+    ap.add_argument("--from", dest="date_from", help="DD-MM-YYYY; omit for latest available")
+    ap.add_argument("--to", dest="date_to", help="DD-MM-YYYY; only for a range")
+    ap.add_argument("--nearby", action="store_true", help="accept prices from the nearest mandi with data")
+    ap.add_argument("--show-payloads", action="store_true", help="print the bodies sent to the adapter")
+    return ap.parse_args()
+
+
+def _trace_payloads():
+    """Print every request the v2 tool puts on the wire. v1 is left alone --
+    it builds one payload inline and there is nothing to hook."""
+    if VERSION != "v2":
+        print("(--show-payloads only applies to v2)")
+        return
+    import agents.tools.mandi_v2 as v2
+
+    original = v2._post
+
+    async def traced(action, body):
+        print(f"\n----- {action} request -----")
+        print(json.dumps(body, indent=2))
+        return await original(action, body)
+
+    v2._post = traced
+
+
 async def main():
-    for label, kwargs in CASES:
+    args = _parse_args()
+    if args.show_payloads:
+        _trace_payloads()
+
+    if args.lat is not None and args.lon is not None and args.commodity:
+        cases = [("your question", dict(
+            latitude=args.lat, longitude=args.lon, location_name=args.place,
+            commodity_name=args.commodity, price_date=args.date_from,
+            price_date_to=args.date_to, include_nearby_mandis=args.nearby))]
+    else:
+        cases = CASES
+
+    for label, kwargs in cases:
         print(f"\n{'=' * 70}\n{label}\n{'=' * 70}")
         try:
             print(await get_mandi_prices(_Ctx(), **kwargs))
