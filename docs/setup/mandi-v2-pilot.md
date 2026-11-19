@@ -3,7 +3,7 @@
 Brings up one OAN network and this API next to it, then asks a farmer question
 and watches it come back over Beckn v2.
 
-Only mandi moves to v2. Weather and the other fifteen tools still post to the
+Only mandi moves to v2. Weather and sixteen other tools still post to the
 v1 BAP, so they answer only if you have that running too — see
 [What does not work](#what-does-not-work).
 
@@ -171,7 +171,7 @@ Anything after the question is ignored.
 
 ## What does not work
 
-**Weather, advisory, PM-Kisan, PMFBY, SATHI seed and eleven others** still
+**Weather, advisory, PM-Kisan, PMFBY, SATHI seed and twelve others** still
 build a v1 payload and post it to `BAP_ENDPOINT/search`. Without that BAP
 running you get `Connection refused` and the farmer sees "I could not get
 that". Nothing in the v2 work touched them.
