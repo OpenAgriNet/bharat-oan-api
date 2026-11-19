@@ -106,11 +106,31 @@ async def main():
     if args.show_payloads:
         _trace_payloads()
 
-    if args.lat is not None and args.lon is not None and args.commodity:
+    if args.commodity and (args.place or (args.lat is not None and args.lon is not None)):
+        latitude, longitude = args.lat, args.lon
+        if latitude is None or longitude is None:
+            # Geocode the place the same way the chat path does, so a question
+            # asked here and the same question asked through the model land on
+            # the same coordinates. Without this the place name was accepted
+            # and silently ignored, and the run fell through to CASES -- which
+            # looks like an answer, just not to the question that was asked.
+            from agents.tools.maps import locate
+
+            found = await locate(args.place)
+            if not found:
+                raise SystemExit(f"could not geocode {args.place!r}; pass --lat and --lon instead")
+            location, _kind = found
+            latitude, longitude = location.latitude, location.longitude
+            print(f"{args.place} -> {latitude}, {longitude}")
+
         cases = [("your question", dict(
-            latitude=args.lat, longitude=args.lon, location_name=args.place,
+            latitude=latitude, longitude=longitude, location_name=args.place,
             commodity_name=args.commodity, price_date=args.date_from,
             price_date_to=args.date_to, include_nearby_mandis=args.nearby))]
+    elif args.commodity or args.place or args.lat is not None:
+        # Half a question is not a question. Saying so beats running the seven
+        # fixed cases and letting the caller think they were answered.
+        raise SystemExit("need --commodity plus either --place or both --lat and --lon")
     else:
         cases = CASES
 

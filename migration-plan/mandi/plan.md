@@ -1,13 +1,17 @@
-# Migrating Bharat Vistaar from Beckn v1 to v2
+# Mandi prices: v1 -> v2
 
-One plan for the whole network. Mandi prices is done and is written up here as
-the worked example; the same steps apply to the seventeen tools still on v1.
+**Status: done.** Running on the v2 network against the live Agmarknet
+upstream, verified at tool level and through the full chat path.
+
+This is both the record of what mandi cost and the template for the next
+capability — the phases below are written as a recipe because they were walked
+once, not because they were planned well.
+
+- To run it: [quick-try.md](quick-try.md)
+- To set up the stack first: [../stack-setup.md](../stack-setup.md)
 
 Supersedes `documents/migration-pilot-plan.md`, which was written before any of
 this ran and got two things materially wrong. Both corrections are below.
-
-To actually run the migrated stack, see
-[docs/setup/mandi-v2-pilot.md](setup/mandi-v2-pilot.md).
 
 ---
 
@@ -82,16 +86,8 @@ phases 0 and 2 are already done and shared.
 
 ### Phase 0 — network up (once, not per capability)
 
-```sh
-cd helmcharts/quick-start
-cp .env.example .env
-make up-core && make keys && make register-network
-make register-provider PROVIDER=<provider>   # asks for that provider's credentials
-make configure-adapter                       # answer no to cross-network crawling
-curl -s localhost:9201/health
-```
-
-Only `register-provider` repeats per capability.
+See [../stack-setup.md](../stack-setup.md). Only `register-provider` and
+publishing the catalog repeat per capability.
 
 ### Phase 1 — prove the network path with no AI involved
 
@@ -105,9 +101,11 @@ are much harder to read once a model is in the loop.
 
 ### Phase 2 — AI layer against the network (once, not per capability)
 
-5. `config/models.local.yaml` with a real endpoint, routing off
-6. This API plus Redis on the same Docker network as the adapter
-7. **Record baseline answers on the v1 path, before changing anything**
+Model config, keys and compose are in [../stack-setup.md](../stack-setup.md).
+The one step that is **not** shared and must not be skipped:
+
+5. **Record baseline answers on the v1 path, before changing anything.**
+   Mandi skipped this and it is the single gap in its evidence.
 
 ### Phase 3 — swap the tool
 
