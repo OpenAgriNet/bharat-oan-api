@@ -1,11 +1,10 @@
 """Repoint a registered provider action at a different mapping file.
 
-Why this exists: quick-start/bin/setup.py registers create-only. Its
-ensure_binding() returns early the moment the binding key is already present,
-so `make register-provider` can add a ProviderSchema but can never correct one.
-Change a mapping URL in .env, re-run register-provider, and it prints
-"already present" and leaves the old URL live -- which is a quiet way to spend
-an afternoon debugging a fix that was never actually loaded.
+Prefer `make register-provider PROVIDER=... UPDATE=1` in helmcharts: it puts
+the whole row back from .env and prints what moved. Use this instead for a
+mapping that is not what .env says -- trying one out, or correcting a binding
+whose provider is not in .env at all -- and when the registry is reachable only
+from inside the Docker network.
 
 The registry is only reachable from inside the Docker network (port 8081 is
 not published on the host), so run this in a container on oan-internal:

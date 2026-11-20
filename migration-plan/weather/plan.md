@@ -422,10 +422,19 @@ is the provider, not the protocol.
    `scripts/registry_set_mapping.py` — `make register-provider` could not,
    being create-only. Verified live: the adapter now calls
    `get-daily?date=…&lat=…&lon=…` and gets 200 instead of 500.
-6. **Should `setup.py` be able to update, not just create?** Right now a
-   changed `.env` silently does nothing on an existing binding, which is a good
-   way to debug a fix that was never loaded. The script added here is a
-   workaround for one field; the registration tool is where it belongs.
+6. ~~**Should `setup.py` be able to update, not just create?**~~ Done.
+   `register-provider` takes `--update` (`make register-provider
+   PROVIDER=... UPDATE=1`), which PUTs the participant, binding and schema rows
+   back from `.env` and prints every field that moved. Create stays the
+   default, so a plain re-run is still a no-op; without `--update` the skip
+   message now names the flag instead of just saying "already present".
+   A participant carrying signing keys is refused rather than rewritten -- a
+   new key osid would break every signature made with the old id.
+
+   Verified live against the registry: a plain run skipped all three rows, an
+   `--update` run with a matching `.env` reported nothing to correct, and a
+   deliberate path change was written and then reverted, with the stored
+   record keeping exactly the same fields throughout.
 
 *(An earlier question — whether v2 returns one resource with five days or five
 resources — is answered: the mapping returns one resource per forecast day.)*

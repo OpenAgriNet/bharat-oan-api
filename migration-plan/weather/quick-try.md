@@ -13,11 +13,10 @@ changed and why, see [plan.md](plan.md).
 Weather-specific setup, on top of the shared steps:
 
 - `make register-provider PROVIDER=mausamgram` — needs `MAUSAMGRAM_AUTH`, one
-  opaque token IMD issues. Note it registers **create-only**: if the binding
-  already exists it prints "already present" and changes nothing, so a new
-  `MAUSAMGRAM_MAPPING_URL` in `.env` will not take effect. To change the
-  mapping on an existing binding, use
-  [`scripts/registry_set_mapping.py`](../../scripts/registry_set_mapping.py).
+  opaque token IMD issues. It registers **create-only**, so a changed
+  `MAUSAMGRAM_MAPPING_URL` in `.env` does not take effect on a binding that
+  already exists. Add `UPDATE=1` to put the rows back from `.env` and print
+  every field that moves.
 - Publish `helmcharts/quick-start/capability-examples/WeatherObservation/publish/ondemand-mausamgram.json`
 - `docker-compose.pilot.yml` carries `WEATHER_BECKN_VERSION: v2`. Remove it and
   the same questions run on v1 — though v1 needs the old BAP on port 8095.
