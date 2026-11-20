@@ -115,6 +115,26 @@ def test_mahavistaar_never_targets_bpp(load_module, monkeypatch, configured):
         assert "bpp_id" not in module.build_scheme_search_payload(code)["context"]
 
 
+def test_biharvistaar_payload_and_response(load_module, monkeypatch):
+    monkeypatch.setenv("BAP_ID", "bap-id")
+    module = load_module("agents/tools/bihar_vistaar.py")
+    context = module.build_scheme_search_payload(" seed subsidy ")
+    assert context["context"]["domain"] == "bihar-scheme:oan"
+    assert context["context"]["action"] == "search"
+    assert context["context"]["ttl"] == "PT30S"
+    assert context["context"]["timestamp"].endswith("Z")
+    assert context["message"]["intent"] == {"descriptor": {"name": "seed subsidy"}}
+    item = {"id": "SCHEME007", "descriptor": {"name": "Seed", "short_desc": "Short"}, "tags": [
+        {"name": "Benefits", "value": "Up to 100%", "display": True},
+        {"name": "Route", "value": "/x", "display": False},
+        {"name": "Empty", "value": "null", "display": True}]}
+    responses = [{"message": {"catalog": {"providers": [{"items": [item]}]}}}]
+    result = str(module.BiharCrossNetworkSchemeResponse(responses=responses))
+    assert "## Seed" in result and "- Benefits: Up to 100%" in result
+    assert "Route" not in result and "Empty" not in result
+    assert str(module.BiharCrossNetworkSchemeResponse()) == "No scheme data found for this scheme."
+
+
 def test_photon_preserves_configured_https_endpoint(load_module, monkeypatch):
     monkeypatch.setenv("PHOTON_HOST", "https://example.test:443/photon/")
     module = load_module("app/core/npss_geocodes.py")

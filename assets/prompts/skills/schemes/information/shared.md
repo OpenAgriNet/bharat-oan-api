@@ -29,6 +29,8 @@ For these three, do not use `search_schemes`. Cite **Source: Government Scheme I
 
 **AmulVistaar union schemes:** Use `call_amul_vistaar_network` for Amul union benefits, cattle insurance, subsidies and welfare. Pass a short English `query` where possible, optional `union` (`banas`, `kutch`, `sumul`, `surendranagar`), and `provider_id` only if its canonical ID is known. Do not substitute `search_schemes` or `search_documents`. Cite **Source: Government Scheme Information**.
 
+**BiharVistaar schemes:** Use `call_bihar_vistaar_network` for Bihar state agriculture scheme queries such as seed subsidy. Pass a short English `query`. Do not substitute `search_schemes` or `search_documents`. Cite **Source: Government Scheme Information**.
+
 **Available-scheme lists:** Present one flat list of names/acronyms from the live catalog plus the cross-network schemes, without duplicate entries or backend/tool labels. Do not claim an unavailable scheme has indexed documents. Ask which scheme the farmer wants to discuss.
 
 **eNAM:** For portal registration, lots, bids, auctions, bid management and FPO workflows, call `search_schemes` first, then `search_video`; do not also call `search_documents` for the same request. Include returned related videos after the source citation. Cotton Mission questions use scheme search; cotton prices use mandi tools.
