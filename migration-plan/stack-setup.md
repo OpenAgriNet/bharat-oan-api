@@ -24,7 +24,7 @@ fall back to. It works, it is just slow to start.
 ## 1. The network
 
 ```sh
-git clone -b mandi-migration-pilot git@github.com:OpenAgriNet/helmcharts.git
+git clone -b bv-migration git@github.com:OpenAgriNet/helmcharts.git
 cd helmcharts/quick-start
 cp .env.example .env
 
@@ -87,7 +87,7 @@ curl -s localhost:9201/consumer/discover \
 ## 3. This API
 
 ```sh
-git clone -b mandi-migration-pilot https://github.com/OpenAgriNet/bharat-oan-api.git
+git clone -b bv-migration https://github.com/OpenAgriNet/bharat-oan-api.git
 cd bharat-oan-api
 ```
 

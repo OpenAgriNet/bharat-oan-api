@@ -36,7 +36,7 @@ adapter actually fetched — was byte-identical to the local file, so the defect
 was live for every request.
 
 **Fixed.** The mapping now derives `date` from the current IST day, and it is
-pushed to helmcharts `mandi-migration-pilot`. Pointing the adapter at it took
+pushed to helmcharts `bv-migration`. Pointing the adapter at it took
 two steps, not one: `MAUSAMGRAM_MAPPING_URL` in `.env`, and then the registered
 binding itself, because `make register-provider` is create-only and leaves an
 existing `ProviderSchema` alone — see open question 6. Confirmed live in the
@@ -435,7 +435,7 @@ is the provider, not the protocol.
    and `scopedNetworks` (`src/discover/service.go:290`) already takes a list.
    Only the external spec says no.
 5. ~~**Who publishes the mapping fix?**~~ Done. Pushed to helmcharts
-   `mandi-migration-pilot`, and the registered binding was repointed at it with
+   `bv-migration`, and the registered binding was repointed at it with
    `scripts/registry_set_mapping.py` — `make register-provider` could not,
    being create-only. Verified live: the adapter now calls
    `get-daily?date=…&lat=…&lon=…` and gets 200 instead of 500.
