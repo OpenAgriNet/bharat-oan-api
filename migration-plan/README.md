@@ -8,12 +8,14 @@ migration-plan/
 ├── mandi/
 │   ├── plan.md        what changed, what it cost, what is still open
 │   └── quick-try.md   how to try the mandi use cases
-└── weather/
-    ├── plan.md        what changed, what it cost, what is still open
-    └── quick-try.md   how to try the weather use cases
+├── weather/
+├── pmkisan/
+└── pmfby/
 ```
 
-Each capability gets a folder with the same two files.
+Each capability gets a folder with the same two files. Every `plan.md` that
+has unfinished work carries an **`## Open TODOs`** section listing it in one
+place -- read that first when picking a capability back up.
 
 ## Where things stand
 
@@ -21,7 +23,18 @@ Each capability gets a folder with the same two files.
 |---|---|
 | Mandi prices (agmarknet) | **Done** — [plan](mandi/plan.md) · [try it](mandi/quick-try.md) |
 | Weather (mausamgram) | **Built, blocked on the provider** — [plan](weather/plan.md) · [try it](weather/quick-try.md) |
-| The other sixteen | Not started |
+| PM-KISAN — Grievance + SchemeApplication | **Built, proven against a mock only** — [plan](pmkisan/plan.md) · [try it](pmkisan/quick-try.md) · [open TODOs](pmkisan/plan.md#open-todos) |
+| PMFBY — Grievance | **Wired up, provider never reached** — [plan](pmfby/plan.md) · [open TODOs](pmfby/plan.md#open-todos) |
+| The other fourteen | Not started |
+
+Both scheme capabilities ship behind a per-capability flag defaulting to `v1`,
+so nothing above is serving farmers on v2 yet. PM-KISAN is blocked on one
+thing — a run against the real host. PMFBY is blocked on two values nobody has
+given us: its base URL and its login URL.
+
+Four of the open items across the two plans are the same kind of work — gaps
+in the published `Grievance` and `SchemeApplication` packs, not in our code.
+They should be specified as one `v0.2` pack revision rather than piecemeal.
 
 Weather's tool and network path are done and verified; IMD Mausamgram itself is
 returning no forecast data, so a rendered forecast is the one thing not yet

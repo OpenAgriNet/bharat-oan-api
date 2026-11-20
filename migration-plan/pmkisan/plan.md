@@ -452,6 +452,66 @@ soup; v2 renders named fields from the v0.1 pack. One case worth naming —
 not conflate them: empty says "nothing is blocking payment", absent says
 nothing at all.
 
+## Open TODOs
+
+Everything outstanding, in one place, so the next person does not have to
+reconstruct it from the sections above. Nothing here is being worked on now.
+
+### Blocking the flag flip to `v2`
+
+1. **Run both capabilities against the real PM-KISAN host.** Everything so far
+   was proven against `mock-pmkisan`. Four things only the real host can
+   settle, all expanded under Risks:
+   - the envelope parameters — key length, IV handling, padding. The mock
+     agrees with us by construction, so this is the largest single unknown.
+   - the response-field spelling. All five mappings fall back through
+     `Rsponce` / `Responce` / `Status` / `status` because nobody knew which
+     one the portal sends.
+   - the real error bodies, the no-data behaviour, the auth and the rate
+     limits.
+   - the second upstream read on SchemeApplication
+     (`followUpPath: /ChatbotBeneficiaryStatus`).
+
+   Until this runs, the honest claim is "the v2 path works, pending the real
+   provider" — not "PM-KISAN works". `PMKISAN_BECKN_VERSION` stays `v1`.
+
+### Pack gaps — the real host does not fix these
+
+2. **The thirteen grievance types with no v2 category.** Detail, both options
+   and the full table are under "TODO — close the category gap". Not blocking
+   today: `grievance_type` is only read by `pmkisan_submit_grievance`
+   (`v2/pmkisan_grievance.py:313`), which sits behind the disabled return at
+   `:308`. It blocks the day lodging is re-enabled.
+3. **`pmkisan_grievance_status` demands a `filed_on` the farmer may not have.**
+   Live now, on every status check. Detail and both options are under "TODO —
+   let a farmer check a grievance without knowing the date".
+4. **The invented 10-minute OTP validity window.** `grievance.init.yaml:28`
+   hardcodes `$otpWindowMillis := 10 * 60 * 1000` and writes `expiresAt` from
+   it. Nothing in PM-KISAN's reply says ten minutes and the real host will not
+   tell us either — somebody has to ask PM-KISAN. We report it to the farmer
+   as fact. See risk 3.
+
+   Items 2, 3 and 4 are one `v0.2` pack revision, not three. Do them together.
+   PMFBY has two more of the same kind — see `../pmfby/plan.md`, Open TODOs
+   items 5 and 6.
+
+### Not ours to decide
+
+5. **Re-enabling the grievance lodge path.** `pmkisan_submit_grievance` and
+   `pmkisan_grievance_send_otp(purpose="submit_grievance")` return the
+   disabled message on both v1 and v2; the guards carry the same
+   `# ponytail:` note saying what to delete. It is the only one of the five
+   tools that writes to a government system. Whoever switched it off has not
+   been asked why, and this migration deliberately did not lift it. Item 2
+   must close first.
+
+### Smaller, still open
+
+6. **The flag-spelling fallback stays a guess** — risk 2. Proven to work for
+   all four candidates, proven correct for none. Item 1 settles it.
+7. **The stateful flow is unproven on v2's discover/select split** — risk 4.
+   The adapter has the machinery; it has never been run against anything.
+
 ## Risks
 
 1. **The envelope parameters may not match the real service.** Key length, IV
