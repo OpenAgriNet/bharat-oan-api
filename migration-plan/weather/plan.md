@@ -393,6 +393,18 @@ is the provider, not the protocol.
    crashed service. Owned by IMD, not by us — v1 reads the same endpoint and
    would report the same.
 
+   Re-checked 2026-11-20 **calling IMD directly**, no adapter, mapping or
+   Beckn envelope in the path: 6 of 8 calls returned 200 (availability is
+   improving), and every one carried the same empty envelope. The `abbreviation`
+   block — rain, cloud, tmax, tmin, wind — comes back fully populated, so the
+   service is alive and serving its static field dictionary; it is the model
+   output that is missing, and `lat_r`/`lon_r` stay null, meaning it never even
+   snaps the coordinate to a grid cell. Auth is fine: an unauthenticated call
+   gets 401, ours get 200 or 500.
+
+   That rules out everything on our side. Anyone calling this endpoint today
+   gets the same, v1 included.
+
    To close it: re-run [quick-try.md](quick-try.md). If a forecast renders, no
    code change should be needed. If it renders *wrongly*, the renderer is the
    suspect — it is the only piece checked against the mapping's documented
