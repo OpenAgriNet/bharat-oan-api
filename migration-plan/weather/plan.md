@@ -412,28 +412,43 @@ is the provider, not the protocol.
    suspect — it is the only piece checked against the mapping's documented
    shape rather than against real bytes.
 
-7. **TODO — discovery-service rejects the spec's array form of
-   `networkId`, and it is a stale `.env` line.** `context.networkId` is
-   `oneOf: string | array` (`beckn.yaml:3088`), which even works an example of
-   discovering across two subnets. Not the adapter's doing, despite the earlier
-   note here: the adapter accepts the array, signs it and forwards it, and
-   discovery-service answers `SCH_SCHEMA_VALIDATION_FAILED at $.context`. The
-   two validate against different specs —
+7. ~~**Why is the spec's array form of `networkId` refused?**~~ Done, and it
+   was never the adapter. `context.networkId` is `oneOf: string | array`
+   (`beckn.yaml:3088`), which even works an example of discovering across two
+   subnets. The adapter validated the array, signed it and forwarded it;
+   discovery-service answered `SCH_SCHEMA_VALIDATION_FAILED at $.context`,
+   because the two validate against different specs —
 
-   | service | spec it validates against | `networkId` |
+   | service | spec | `networkId` |
    |---|---|---|
-   | network-adapter | `OpenAgriNet/…` `core-v2.1.0-lts` | `oneOf: string \| array` |
-   | discovery-service | `beckn/…` `core-v2.0.0-lts` | `type: string` |
+   | network-adapter | `OpenAgriNet/…` `core-v2.1.0-lts`, from `adapter.yaml` | `oneOf: string \| array` |
+   | discovery-service | `beckn/…` `core-v2.0.0-lts`, from `VALIDATION_SPEC_URL` | `type: string` |
 
-   — because `quick-start/.env` still carries the upstream `BECKN_SPEC_URL`
-   that `docker-compose.yml:387` feeds to `VALIDATION_SPEC_URL`.
-   `.env.example:128` already has the OpenAgriNet one. Copy that line over and
+   A stale `BECKN_SPEC_URL` in `quick-start/.env`, which
+   `docker-compose.yml:387` feeds to `VALIDATION_SPEC_URL`. `.env.example:128`
+   had the OpenAgriNet one all along, so a fresh clone was never affected --
+   only environments carrying a `.env` from before. Corrected there and
    `docker compose up -d discovery-service`.
 
-   Nothing downstream of the validator needs changing: discovery-service's own
-   `beckn.NetworkIDs` (`src/beckn/types.go:32`) already unmarshals either form
-   and `scopedNetworks` (`src/discover/service.go:290`) already takes a list.
-   Only the external spec says no.
+   No code changed anywhere. discovery-service's `beckn.NetworkIDs`
+   (`src/beckn/types.go:32`) already unmarshals either form and
+   `scopedNetworks` (`src/discover/service.go:290`) already takes a list; only
+   the external spec said no. Verified after: `["*"]` returns the same
+   catalogue the string form does, `["*","oan.dev"]` returns the union,
+   `["oan.dev"]` correctly scopes to nothing, and `[]`, `[1]` and `{}` are
+   still refused by the adapter before they travel.
+
+   **How it was found, because the next drift will look the same.** The 400
+   arrives after signing and routing have already succeeded, so it reads as an
+   adapter bug. Tagging each probe with a unique `transactionId` and grepping
+   both containers' logs for it is what settled it: the adapter logged every
+   case, discovery-service logged only the ones it actually rejected. That also
+   explained the confusing two-branch message on `{}` -- "value must be a
+   string; value must be an array" was the adapter listing both `oneOf`
+   branches, on a request discovery-service never saw.
+
+   Nothing asserts that the two services resolve the same spec. See
+   `stack.sh preflight`, which now checks it.
 5. ~~**Who publishes the mapping fix?**~~ Done. Pushed to helmcharts
    `bv-migration`, and the registered binding was repointed at it with
    `scripts/registry_set_mapping.py` — `make register-provider` could not,
