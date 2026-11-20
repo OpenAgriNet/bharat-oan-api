@@ -248,18 +248,48 @@ Credentials go in `.env`, which is gitignored, and nowhere else. If either
 credential has been pasted into a chat, a ticket, or a commit, ask PMFBY to
 rotate it before it is used — see the note under Risks.
 
-### Phase 1 — wire it into quick-start
-Port the `pmfby` block from
-`charts/adapter-service/config/single-adapter/network-adapter-config.yaml` into
-`quick-start/config/adapters/providers/pmfby.yaml.tmpl`, and add `pmfby` to the
-`Grievance` step's `bindingKeys` in the single-adapter template. Add a `pmfby`
-entry to `PROVIDERS` in `bin/setup.py` — two actions on one capability, so it
-follows the multi-capability shape with a single entry. Add the `PMFBY_*` keys
-to `.env` **and placeholders to `.env.example`**. Then
-`make register-provider PROVIDER=pmfby`, then `make check-mappings`.
+### Phase 1 — wire it into quick-start — DONE 2026-11-20
+
+Done in `helmcharts` on `bv-migration`:
+`config/adapters/providers/pmfby.yaml.tmpl` (the `pmfby` auth block, ported
+verbatim from the deployed chart), a `pmfby` entry in `PROVIDERS` in
+`bin/setup.py`, the `PMFBY_*` placeholders in `.env.example`, and
+`PMFBY_ACCESS_UID` / `PMFBY_ACCESS_PWD` passed into both adapter services in
+`docker-compose.yml`.
+
+PM-KISAN and PMFBY answer the same capability, so they share ONE `Grievance`
+step -- the adapter picks per-provider config by binding key from inside a
+step, and a second step with the same id would shadow the first. Provider
+templates therefore split into a head and a body on a `__PROVIDER_CONFIG__
+<StepId>` marker: one template carries the step header, the rest name the step
+they join. `setup.py` groups by step rather than by provider.
 
 This is a port, not a design. The deployed config is the source of truth and
 anything that disagrees with it is a bug here.
+
+#### What the port was verified against
+
+| Check | Result |
+| --- | --- |
+| `make register-provider PROVIDER=pmfby` with placeholders still in `.env` | refuses, names all four keys |
+| Rendered `network-adapter.yaml` | one `Grievance` step, `bindingKeys` = `pmfby\|openagrinet:Grievance,pmkisan\|openagrinet:Grievance,pmkisan\|openagrinet:SchemeApplication` -- same as the deployed chart |
+| Re-render with pmfby absent | byte-identical to the previous config apart from one rewritten comment, so the grouping change is a no-op for existing providers |
+| `support` probe | passes schema, resolves `pmfby\|openagrinet:Grievance`, fetches the mapping, then `NET_DOWNSTREAM_UNAVAILABLE` "after 1 attempt" at the token exchange |
+| `status` probe | same, "after 3 attempts" -- `retryMax: 0` and `retryMax: 2` are both live |
+| The five shipped `capability-examples` PM-KISAN fixtures | all five still answer `on_init` / `on_support` / `on_status` from the real PM-KISAN service |
+
+The probes ran with `PMFBY_BASE_URL` and `PMFBY_TOKEN_URL` set to a host that
+does not resolve, on purpose. Everything we own is proven -- schema, routing,
+mapping fetch, token-header auth wiring. Nothing downstream of the socket is:
+PMFBY has still never answered us.
+
+#### `.env.example` points the mappings at a tag that does not have them
+
+`PMFBY_MAPPING_BASE_URL` in `.env.example` is tag `0.1.0`, copied from the
+`PMKISAN_MAPPING_BASE_URL` line above it. Neither provider's mappings exist at
+that tag -- the first probe failed with a 404 on the mapping fetch. Local
+`.env` points both at the `bv-migration` branch instead. Both example lines
+need correcting when a tag that carries the v2 mappings is cut.
 
 ### Phase 2 — prove the network path, no AI involved
 The same branch's `api-collection/OpenAgriNet.api-collection.json` already
