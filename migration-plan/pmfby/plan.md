@@ -125,11 +125,15 @@ like-for-like move.
 | Pack schemas | `PMFBYCatalog`, `PMFBYStatus`, `PMFBYSupport` published, HTTP 200 |
 | Mappings | both present: `grievance.status.yaml`, `grievance.support.yaml` |
 | `init`/`support`/`status` routing | already routed (`routing-network-adapter-consumer.yaml`) |
-| Adapter provider template | **missing** — no `config/adapters/providers/pmfby.yaml.tmpl` |
+| Helm chart adapter config | **done**, on `feat/137-per-environment-config` — `charts/adapter-service/config/single-adapter/network-adapter-config.yaml:337` binds `pmfby\|openagrinet:Grievance` |
+| Secret slots | **done** — `scripts/secrets.sh:174` defines `provider-pmfby` with `PMFBY_ACCESS_UID` and `PMFBY_ACCESS_PWD`, and `:162` a `pmfbyTokenUrl` |
+| API collection | **done** — the same branch ships publish / discover / support / status requests for PMFBY |
+| quick-start adapter template | **missing** — no `pmfby` in `quick-start/config/adapters/single-adapter/network-adapter.yaml.tmpl` on either branch |
+| quick-start provider template | **missing** — no `config/adapters/providers/pmfby.yaml.tmpl` |
 | `setup.py` `PROVIDERS` entry | **missing** — only `pmkisan` exists |
-| Env keys | **missing** — no `PMFBY_*` in `.env`, and none in `.env.example` either |
-| Mock | **missing** |
-| `capability-examples/Grievance` | **missing** (shared gap with PM-KISAN) |
+| quick-start env keys | **missing** — no `PMFBY_*` in `.env.example` |
+| Real base URL and login URL | **missing from the repo** — the only committed values are `https://example.invalid` in `charts/registry-seed/ci/lint-values.yaml`. They live in the deployment's own values. |
+| `capability-examples/Grievance` | done for PM-KISAN; no PMFBY variants |
 
 The upstream, from the mapping headers, is a PMFBY KRPH API:
 
@@ -140,30 +144,52 @@ The upstream, from the mapping headers, is a PMFBY KRPH API:
 
 "Grievence" is PMFBY's spelling, not a typo in our code, and the mappings say so.
 
-### The provider template should be nearly empty
+### The provider config, which is already written
 
-`pmkisan.yaml.tmpl` is 38 lines of envelope and OTP configuration. PMFBY needs
-none of it — no `envelope`, no `otpEnvelope`, no `otpVerifyPath`, no
-`followUpPath`. It should be the `bindingKeys` / `providerIdAt` /
-`capabilityCodeAt` triple plus `authScheme: none`, unless the real KRPH API
-turns out to want a credential, which we cannot know without reaching it.
+An earlier draft of this document guessed that PMFBY would need
+`authScheme: none`, since its mappings carry no token or header. That guess was
+wrong, and the deployed config says so. From
+`charts/adapter-service/config/single-adapter/network-adapter-config.yaml:344`:
 
-That near-emptiness is exactly why PMFBY is the better first experiment.
+```yaml
+pmfby:
+  authScheme: tokenHeader
+  tokenUrl: "__PMFBY_TOKEN_URL__"
+  tokenUserField: appAccessUID
+  tokenUserEnv: PMFBY_ACCESS_UID
+  tokenSecretField: appAccessPWD
+  tokenSecretEnv: PMFBY_ACCESS_PWD
+  tokenResponseField: responseDynamic.token.Token
+  tokenExpiryField: responseDynamic.token.validTo
+  headerName: Authorization
+```
 
-## Why a mock, and what it is worth
+So the adapter logs in at a PMFBY endpoint with a uid and password, reads a
+token out of the reply, caches it until the reply's own `validTo`, and sends it
+bare in `Authorization`. No envelope, no OTP, no follow-up read — PMFBY is
+still much simpler than PM-KISAN, just not credential-free.
 
-Same reasoning as PM-KISAN, and the same limits — see
-`../pmkisan/plan.md` under "Why a mock, and what a mock is worth". We have no
-PMFBY credentials and no confirmed base URL, so without a stand-in nothing
-downstream of the adapter can be tried at all.
+The work left is porting this block into the quick-start stack, which the same
+branch did not touch. That is the whole reason a PMFBY call at the local
+adapter returns `NET_ENTITY_NOT_FOUND` today.
+
+## Why a mock is no longer the plan
+
+The earlier draft built a mock because we had no credentials and no base URL.
+Both now exist in the deployment. Running against the real staging service is
+the house rule, so Phase 0 becomes "get the two URLs and the two credentials
+into the local stack" rather than "write a stand-in".
+
+A mock stays worth having later, for CI, where reaching a real service on every
+run is not acceptable. It is not a prerequisite for this migration any more.
 
 The swap to the real service later is a registry write
 (`make register-provider PROVIDER=pmfby UPDATE=1`), not a code change, because
 the upstream address lives in the `ProviderSchema` row.
 
-**What the mock proves here:** routing, binding keys, schema validation against
-the real published `PMFBYSupport` and `PMFBYStatus`, both mappings, and the
-v2 tool wiring end to end.
+**What a mock would prove here:** routing, binding keys, schema validation
+against the real published `PMFBYSupport` and `PMFBYStatus`, both mappings, and
+the v2 tool wiring end to end.
 
 **What it does not prove:** anything about the real KRPH API — its field
 spellings, error bodies, no-data behaviour, auth, or rate limits. PMFBY has far
@@ -173,7 +199,11 @@ assumed cipher parameters), so the gap is narrower, but it is the same gap.
 **This cannot be signed off as "PMFBY works"** — only as "the v2 path works,
 pending the real provider."
 
-## The mock
+## The mock — deferred, for CI only
+
+Not a prerequisite any more, now that the real service is reachable. Kept here
+because CI cannot call PMFBY on every run. Build it after the real path is
+proven, so it can be made to lie in the ways the real service actually lies.
 
 `mock-server/mockpmfby`, Go, same shape as `mockimd` (147 lines, standard
 library only, flags for behaviour).
@@ -208,26 +238,41 @@ a finding about the real API and belongs in the open questions, not in the mock.
 
 ## The recipe
 
-### Phase 0 — mock first
-Write `mock-server/mockpmfby`. Build locally. Hit both endpoints with `curl`,
-no adapter in the path. Smaller than PM-KISAN's mock by a wide margin: two
-endpoints, plain JSON, no cryptography.
+### Phase 0 — collect four values
+From whoever deployed `feat/137-per-environment-config`: the PMFBY **base URL**
+and **login URL**, plus `PMFBY_ACCESS_UID` and `PMFBY_ACCESS_PWD`. Staging if
+there is one. None of the four is in the repo; the committed values are
+`https://example.invalid`.
 
-### Phase 1 — wire it in
-Write `config/adapters/providers/pmfby.yaml.tmpl`. Add a `pmfby` entry to
-`PROVIDERS` in `bin/setup.py` — two actions on one capability, so it follows
-the multi-capability shape with a single entry. Add `PMFBY_*` keys to `.env`
-**and to `.env.example`**, since PMFBY has none there today. Compose service
-for the mock. Then `make register-provider PROVIDER=pmfby`, then
-`make check-mappings` before anything else.
+Credentials go in `.env`, which is gitignored, and nowhere else. If either
+credential has been pasted into a chat, a ticket, or a commit, ask PMFBY to
+rotate it before it is used — see the note under Risks.
+
+### Phase 1 — wire it into quick-start
+Port the `pmfby` block from
+`charts/adapter-service/config/single-adapter/network-adapter-config.yaml` into
+`quick-start/config/adapters/providers/pmfby.yaml.tmpl`, and add `pmfby` to the
+`Grievance` step's `bindingKeys` in the single-adapter template. Add a `pmfby`
+entry to `PROVIDERS` in `bin/setup.py` — two actions on one capability, so it
+follows the multi-capability shape with a single entry. Add the `PMFBY_*` keys
+to `.env` **and placeholders to `.env.example`**. Then
+`make register-provider PROVIDER=pmfby`, then `make check-mappings`.
+
+This is a port, not a design. The deployed config is the source of truth and
+anything that disagrees with it is a bug here.
 
 ### Phase 2 — prove the network path, no AI involved
-Write `capability-examples/Grievance/` payloads — publish, discover, support,
-status. They do not exist for any scheme yet, so this work is shared with
-PM-KISAN and should be written to serve both.
+The same branch's `api-collection/OpenAgriNet.api-collection.json` already
+ships PMFBY publish, discover, support and status requests under
+`Grievance / PMFBY`. Replay those against the local adapter rather than writing
+new ones; they carry the field values PMFBY's own team used.
 
-By hand: `support` returns a ticket; `status` reads it back; a ticket that does
-not exist is refused; a record naming a different ticket is refused differently.
+By hand: `support` returns a ticket; `status` reads it back by `case.ticketNo`;
+a ticket that does not exist is refused; a wrong mobile is refused differently.
+A refusal only counts if the code starts with `BIZ_`.
+
+Note that PMFBY `status` keys off `case.ticketNo` and needs no filing date.
+PM-KISAN's `case.filedOn` problem does not arise here.
 
 ### Phase 3 — swap the tools
 Unblocked: the OTP decision above is made.
@@ -261,10 +306,21 @@ against a mock and listing what the real provider could still break.
    weakness rather than fixing one. The two tests named in Phase 3 are what
    stop it eroding; without them a later refactor can drop the gate and
    nothing fails.
-2. **We have never reached the real KRPH API.** No base URL in any `.env`, no
-   credentials, no observed response. `authScheme: none` is an assumption.
-3. **2 of 6 tools.** Easy to overstate what this delivers.
-4. **Still a mock.** Everything in "what it does not prove" applies.
+2. **We have still never reached the real KRPH API.** The config, the auth
+   scheme and the credentials now exist; a response from PMFBY does not. Every
+   field name in both mappings is read off their documentation, not off
+   something observed. `responseDynamic.token.Token` and the `responseCode`
+   `"1"` success test are the two most likely to be wrong.
+3. **`PMFBY_ACCESS_PWD` has been shared in plain text.** It was pasted into a
+   chat thread on 2026-11-20 while handing over the deployment details. Chat
+   history is not a secret store and is usually retained and searchable. Ask
+   PMFBY to reissue the pair before the staging credentials are used for
+   anything that writes — filing a grievance writes. Until then it belongs in
+   `.env` only, never in a values file, a commit, or this document.
+4. **2 of 6 tools.** Easy to overstate what this delivers.
+5. **The two branches disagree.** PMFBY exists in the helm chart and not in
+   quick-start. Whichever is changed next, the other has to follow, and there
+   is nothing that fails when they drift.
 
 ## Not in scope
 
