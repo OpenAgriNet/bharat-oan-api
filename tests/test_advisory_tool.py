@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from pydantic_ai import ModelRetry
 
 from agents.tools import advisory as sa
 
@@ -24,7 +25,7 @@ def _tag(code, value):
 
 
 def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.8321",
-          source="ICAR–DKMA, jak", section="full", crop="Sorghum", doc_id="row-1", location=None):
+          source="ICAR–DKMA, jak", section="full", crop="Sorghum", doc_id="row-1", location=None, origin=None):
     """`location` is an optional dict: match, national, states, districts (provider's per-chunk location tags)."""
     location = location or {}
     location_tags = [] if not location else [
@@ -33,6 +34,7 @@ def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.
         _tag("location-states", ", ".join(location.get("states", []))),
         _tag("location-districts", ", ".join(location.get("districts", []))),
     ]
+    origin_tags = [] if origin is None else [_tag("origin", origin)]
     return {
         "id": chunk_id,
         "descriptor": {"name": title, "code": section, "long_desc": text},
@@ -42,7 +44,7 @@ def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.
                 "list": [
                     _tag("title", title), _tag("crop", crop), _tag("section", section),
                     _tag("score", score), _tag("doc_id", doc_id), _tag("chunk_id", chunk_id),
-                    _tag("source", source), _tag("text", text), *location_tags,
+                    _tag("source", source), _tag("text", text), *location_tags, *origin_tags,
                 ],
             }
         ],
@@ -192,27 +194,106 @@ class TestParse:
         results, _ = sa.parse_advisory_response(_on_search([_item("c1", text="")]))
         assert results == []
 
+    def test_reads_where_each_chunk_came_from(self):
+        results, _ = sa.parse_advisory_response(
+            _on_search([_item("c1", origin="docs-pipeline"), _item("c2", origin="webhook"), _item("c3")])
+        )
+        assert [r["origin"] for r in results] == ["docs-pipeline", "webhook", ""]
+
 
 class TestFormat:
     def test_formats_title_and_text(self):
         out = sa.format_advisory_results(
-            [{"title": "Wheat Insect Management", "text": "Advisory: Inspect.\n\nSource: ICAR–DKMA", "section": "full"}],
+            [{"title": "Wheat Insect Management", "text": "Advisory: Inspect.\n\nSource: ICAR–DKMA", "section": "full",
+              "institute": "ICAR–DKMA"}],
             "aphids",
         )
         assert "aphids" in out
         assert "**Wheat Insect Management**" in out
         # the provider's "Source: institute, creator" line is removed, the fixed source is offered instead
         assert "ICAR–DKMA" not in out
-        assert "Source: ICAR - Kisan Sarathi" in out
+        assert "Source label: ICAR - Kisan Sarathi" in out
 
 
 class TestSourceLine:
     def test_strips_the_providers_source_line_and_the_creator_name(self):
         out = sa.format_advisory_results(
-            [{"title": "T", "text": "Advisory: Harvest.\n\nSource: ICAR–DKMA, jak", "section": "full"}], "q"
+            [{"title": "T", "text": "Advisory: Harvest.\n\nSource: ICAR–DKMA, jak", "section": "full",
+              "institute": "ICAR–DKMA"}], "q"
         )
         assert "jak" not in out and "DKMA" not in out
-        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
+        assert "Source label: ICAR - Kisan Sarathi" in out
+
+    def test_labels_an_advisory_uploaded_as_a_pdf_with_the_pdf_name(self):
+        out = sa.format_advisory_results(
+            [{"title": "coffee_guide_2023_mini", "text": "Spray Bordeaux mixture.", "section": "full",
+              "origin": "docs-pipeline"}],
+            "q",
+        )
+        assert "Source label: coffee_guide_2023_mini" in out
+        assert "Kisan Sarathi" not in out
+
+    def test_labels_a_webhook_advisory_with_kisan_sarathi(self):
+        out = sa.format_advisory_results(
+            [{"title": "T", "text": TEXT, "section": "full", "origin": "webhook", "institute": "ICAR–DKMA"}], "q"
+        )
+        assert "Source label: ICAR - Kisan Sarathi" in out
+
+    def test_labels_another_institute_with_its_own_name(self):
+        out = sa.format_advisory_results(
+            [{"title": "T", "text": "Advice.", "section": "full", "origin": "webhook",
+              "institute": "Kerala Agricultural University"}], "q"
+        )
+        assert "Source label: Kerala Agricultural University" in out
+        assert "Kisan Sarathi" not in out
+
+    def test_icarda_is_not_icar(self):
+        assert sa.advisory_source({"institute": "ICARDA"}) == "ICARDA"
+
+    def test_any_institute_naming_icar_is_labelled_kisan_sarathi(self):
+        for name in ("ICAR-IARI", "Central Institute, ICAR", "icar", "Indian Council of Agricultural Research"):
+            assert sa.advisory_source({"institute": name}) == "ICAR - Kisan Sarathi", name
+
+    def test_no_label_and_no_cite_line_when_the_institute_is_unknown(self):
+        out = sa.format_advisory_results([{"title": "T", "text": "Advice.", "section": "full"}], "q")
+        assert "Source label" not in out and "Cite as" not in out and "Kisan Sarathi" not in out
+
+    def test_a_source_line_without_a_comma_is_not_taken_as_the_institute(self):
+        # a record with no institute has a line holding only the creator's name
+        item = _item("c1", text="Advice.\n\nSource: Test Farmer")
+        results, _ = sa.parse_advisory_response(_on_search([item]))
+        assert results[0]["institute"] == ""
+        out = sa.format_advisory_results(results, "q")
+        assert "Test Farmer" not in out and "Cite as" not in out
+
+    def test_institute_comes_from_the_providers_source_line_without_the_creator(self):
+        item = _item("c1", text="Advice.\n\nSource: Kerala Agricultural University, jak")
+        results, _ = sa.parse_advisory_response(_on_search([item]))
+        assert results[0]["institute"] == "Kerala Agricultural University"
+
+    def test_the_cite_line_says_icar_is_cited_alone_only_when_an_icar_advisory_is_present(self):
+        icar = sa.format_advisory_results(
+            [{"title": "T", "text": "A.", "section": "full", "institute": "ICAR–DKMA"}], "q"
+        )
+        other = sa.format_advisory_results(
+            [{"title": "T", "text": "A.", "section": "full", "institute": "Kerala Agricultural University"}], "q"
+        )
+        assert "write only **Source: ICAR - Kisan Sarathi**" in icar
+        assert "write only" not in other
+
+    def test_each_advisory_carries_its_own_label_and_the_model_cites_only_the_ones_it_uses(self):
+        out = sa.format_advisory_results(
+            [
+                {"title": "Wheat Insect Management", "text": TEXT, "section": "full", "origin": "webhook",
+                 "institute": "ICAR–DKMA"},
+                {"title": "coffee_guide_2023_mini", "text": "Spray.", "section": "full", "origin": "docs-pipeline"},
+            ],
+            "q",
+        )
+        kisan = out.index("Source label: ICAR - Kisan Sarathi")
+        pdf = out.index("Source label: coffee_guide_2023_mini")
+        assert out.index("Wheat Insect Management") < kisan < out.index("coffee_guide_2023_mini**") < pdf
+        assert "using only the source label(s) of the advisories your answer actually uses" in out
 
     def test_leaves_text_without_a_source_line_alone(self):
         out = sa.format_advisory_results([{"title": "T", "text": "Advisory: Harvest.", "section": "full"}], "q")
@@ -773,12 +854,12 @@ class TestPlaceComesFromTheFarmersWords:
     def test_a_place_carried_over_by_the_model_does_not_replace_the_farmers_answer(self, bap):
         bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
         history = (
-            [_user("maize nursery bed, Rabi")]
+            [_user("wheat nursery bed, Rabi")]
             + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q")
             + [_user("Bareilly, Uttar Pradesh")]
         )
         out = asyncio.run(
-            sa.search_advisory(_ctx(history), "maize nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
+            sa.search_advisory(_ctx(history), "wheat nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
         )
         assert _params(_sent(bap, 0))["district_lgd_code"] == "130"
         assert "Tamil Nadu" not in out
@@ -786,12 +867,12 @@ class TestPlaceComesFromTheFarmersWords:
     def test_an_answer_the_lookup_does_not_know_is_named_not_replaced_by_an_earlier_place(self, bap):
         bap.response = _respond([_located(location={**AGRA, "match": "other"})], **NO_DAYS)
         history = (
-            [_user("maize nursery bed, Rabi")]
+            [_user("wheat nursery bed, Rabi")]
             + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q")
             + [_user("dharwad")]
         )
         out = asyncio.run(
-            sa.search_advisory(_ctx(history), "maize nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
+            sa.search_advisory(_ctx(history), "wheat nursery bed", crop="Wheat", season="Rabi", state="Tamil Nadu")
         )
         assert "state_lgd_code" not in bap.requests[0].read().decode()
         assert "I could not match dharwad to a state or district. This is the general advice found for your crop." in out
@@ -874,3 +955,78 @@ class TestPlaceSentenceWording:
             [self._result(["Agra", "Aligarh", "Azamgarh"], ("Uttar Pradesh",), "state_partial")], resolve_place("Uttar Pradesh")
         )
         assert opening == "This advice is for some districts of Uttar Pradesh: Agra, Aligarh and Azamgarh."
+
+
+class TestCropSurvivesTheWholeQuestion:
+    """Crop, then season and days, then place: every step is the real tool output and none may ask for the crop again."""
+
+    @staticmethod
+    def _turn(tool_output, farmer_text):
+        """The messages after one tool question: the tool call, its output, the model's question, the farmer's reply."""
+        return _asked(tool_output) + [_user(farmer_text)]
+
+    def test_the_answer_comes_after_season_days_and_place_without_asking_for_the_crop(self, bap):
+        bap.response = _respond([_located()], has_day_range="true")
+
+        history = [_user("How can I control aphids in my wheat crop?")]
+        first = asyncio.run(sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat"))
+        assert sa.PENDING_MARKER in first and "which season" in first
+        assert "which crop" not in first.lower()
+
+        history += self._turn(first, "Rabi, 40 days")
+        second = asyncio.run(
+            sa.search_advisory(
+                _ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=40
+            )
+        )
+        assert sa.LOCATION_MARKER in second and "state and district" in second
+        assert "which crop" not in second.lower()
+
+        history += self._turn(second, "Agra, Uttar Pradesh")
+        final = asyncio.run(
+            sa.search_advisory(
+                _ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=40,
+                state="Uttar Pradesh", district="Agra",
+            )
+        )
+        assert sa.PENDING_MARKER not in final
+        assert "Scout for aphids" in final and "Source label: ICAR - Kisan Sarathi" in final
+        assert "which crop" not in final.lower()
+        # the last search carried the crop and the place the farmer gave, not a bare query
+        assert _params(_sent(bap, 2))["season"] == "Rabi"
+
+    def test_the_crop_given_late_is_kept_through_the_remaining_questions(self, bap):
+        """The farmer is asked for the crop first, then answers it; the later steps still do not ask for it again."""
+        bap.response = _respond([_located()], has_day_range="true")
+
+        history = [_user("How can I control aphids?")]
+        history += [
+            ModelResponse(parts=[TextPart(content="Could you please tell me which crop you are asking about?")]),
+            _user("Wheat"),
+        ]
+        first = asyncio.run(sa.search_advisory(_ctx(history), "Wheat", crop="Wheat"))
+        assert "which season" in first and "which crop" not in first.lower()
+        assert sent_query(bap, 0) == "Wheat crop advisory"
+
+        history += self._turn(first, "Rabi, 40 days")
+        second = asyncio.run(
+            sa.search_advisory(_ctx(history), "Wheat", crop="Wheat", season="Rabi", days_after_sowing=40)
+        )
+        assert sa.LOCATION_MARKER in second and "which crop" not in second.lower()
+
+    def test_a_model_that_forgets_season_and_days_on_the_last_call_asks_for_them_not_for_the_crop(self, bap):
+        """The prompt tells the model to pass them again. If it does not, the worst case is a season question."""
+        bap.response = _respond([_located()], has_day_range="true")
+        history = (
+            [_user("How can I control aphids in my wheat crop?")]
+            + self._turn("season and days question", "Rabi, 40 days")
+            + self._turn(f"{sa.LOCATION_MARKER} place question", "Agra, Uttar Pradesh")
+        )
+        out = asyncio.run(
+            sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", state="Uttar Pradesh", district="Agra")
+        )
+        assert "which crop" not in out.lower()
+
+
+def sent_query(bap, index):
+    return _sent(bap, index)["message"]["intent"]["item"]["descriptor"]["name"]

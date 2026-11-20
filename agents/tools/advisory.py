@@ -42,8 +42,12 @@ logger = get_logger(__name__)
 
 KNOWLEDGE_ADVISORY_CATEGORY = "knowledge-advisory"
 
-# Source shown to the farmer for every advisory answer.
+# Source shown to the farmer for advisories whose institute is ICAR (served through Kisan Sarathi).
 ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
+# Whole word, so ICARDA (a different institution) does not match.
+_ICAR_INSTITUTE = re.compile(r"\bICAR\b|Indian Council of Agricultural Research", re.IGNORECASE)
+# The provider's `origin` for an advisory PDF uploaded in docs-pipeline; those cite the PDF's name.
+PDF_ADVISORY_ORIGIN = "docs-pipeline"
 
 # Longest value forwarded for crop / season, and the accepted range for days after sowing.
 _MAX_PARAM_LENGTH = 100
@@ -245,6 +249,21 @@ def _split_names(value: Optional[str]) -> List[str]:
     return [part.strip() for part in str(value or "").split(",") if part.strip()]
 
 
+def _institute_from_text(text: str) -> str:
+    """Institute from the provider's trailing "Source: institute, creator" line ("" when absent).
+
+    Only the institute is kept: the creator after the last comma is a user name. A line with
+    no comma is not trusted: when a record has no institute the line holds only the creator.
+    """
+    match = _TRAILING_SOURCE.search(text)
+    if not match:
+        return ""
+    line = match.group(0).strip()[len("Source:"):]
+    if "," not in line:
+        return ""
+    return line.rsplit(",", 1)[0].strip()
+
+
 def _advisory_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Map one on_search item to an advisory result dict (None when it has no text)."""
     if not isinstance(item, dict):
@@ -267,6 +286,8 @@ def _advisory_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]
         "doc_id": (details.get("doc_id") or "").strip(),
         "chunk_id": (details.get("chunk_id") or item.get("id") or "").strip(),
         "source": (details.get("source") or "").strip(),
+        "origin": (details.get("origin") or "").strip().lower(),
+        "institute": (details.get("institute") or "").strip() or _institute_from_text(text),
         "text": text,
         "seasons": parse_chunk_seasons(text),
         # Where the advisory applies. Chunks from a provider without location read as "applies everywhere".
@@ -308,24 +329,51 @@ def parse_advisory_response(data: Dict[str, Any]) -> tuple[List[Dict[str, Any]],
     return [], fallback_ctx
 
 
+def _same_words(a: str, b: str) -> bool:
+    return " ".join(re.findall(r"\w+", a.lower())) == " ".join(re.findall(r"\w+", b.lower()))
+
+
 _TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
+
+
+def advisory_source(result: Dict[str, Any]) -> str:
+    """Source to cite for one advisory.
+
+    The PDF's name for an uploaded PDF; ICAR - Kisan Sarathi when the institute is ICAR;
+    any other institute under its own name; "" when the institute is unknown.
+    """
+    if result.get("origin") == PDF_ADVISORY_ORIGIN and result.get("title"):
+        return result["title"]
+    institute = (result.get("institute") or "").strip()
+    if _ICAR_INSTITUTE.search(institute):
+        return ADVISORY_SOURCE
+    return institute
 
 
 def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
     """Readable block per advisory for the agent.
 
     The provider appends "Source: institute, creator" to each text. That line names the
-    institute and a user name, so it is removed here; the answer cites ADVISORY_SOURCE instead.
+    institute and a user name, so it is removed here; the answer cites advisory_source instead.
     """
     blocks = []
+    labels = set()
     for r in results:
         text = _TRAILING_SOURCE.sub("", r["text"]).rstrip()
-        blocks.append(f"**{r.get('title') or 'Advisory'}**\n```\n{text}\n```")
-    return (
-        "> Advisory Search Results for `" + query + "`\n\n"
-        + "\n\n----\n\n".join(blocks)
-        + f"\n\n> Cite as (in bold): **Source: {ADVISORY_SOURCE}**"
-    )
+        label = advisory_source(r)
+        if label:
+            labels.add(label)
+        label_line = f"_Source label: {label}_\n" if label else ""
+        blocks.append(f"**{r.get('title') or 'Advisory'}**\n{label_line}```\n{text}\n```")
+    out = "> Advisory Search Results for `" + query + "`\n\n" + "\n\n----\n\n".join(blocks)
+    if labels:
+        out += (
+            "\n\n> Cite as (in bold): **Source: <source label>** using only the source label(s) of the advisories "
+            "your answer actually uses; do not cite an advisory you did not use or one that has no source label."
+        )
+        if ADVISORY_SOURCE in labels:
+            out += f" If your answer uses an advisory labelled {ADVISORY_SOURCE}, write only **Source: {ADVISORY_SOURCE}**."
+    return out
 
 
 def _places_of(result: Dict[str, Any]) -> str:
@@ -454,6 +502,28 @@ def format_search_notes(
     return "\n".join(lines)
 
 
+POLITE_ASK = (
+    "Be polite and warm: start the question with \"Could you please tell me\" (in the farmer's language). Never "
+    "say \"I can only answer after you tell me\", \"I need\", \"you must\", \"before I can answer\" or any "
+    "wording that sounds like a condition or an order; do not open with the crop or the topic."
+)
+
+
+# Last thing the model reads in every question result, so it is the freshest instruction when it writes the reply.
+NO_SOURCE_ON_QUESTION = (
+    "\n\n> FINAL RULE: this reply is a question for the farmer, not an answer. It must not contain the word "
+    "\"Source\", \"ICAR\" or \"Kisan Sarathi\", and nothing but the one question."
+)
+
+
+# The tool keeps no memory between calls, so the model must hand over again what the farmer already told it.
+PASS_AGAIN = (
+    " The tool keeps no memory between calls: in that call also pass every season (`season`) and number of days "
+    "since sowing (`days_after_sowing`) the farmer gave earlier in this same question, even if you passed them "
+    "before. If you leave them out, the farmer will be asked for them again."
+)
+
+
 def _join_names(names: List[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
@@ -482,14 +552,17 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
         f"{PENDING_MARKER}\n> Advisory Search Results for `{query}`\n\n"
         "> Advisories were found, but the right one depends on details the farmer has not given. Do not give any "
         "advice yet. Your whole reply is only that one question: no introduction or explanation of why you are "
-        "asking, no repeated sentence, and no Source line. Ask the farmer ONE short, natural question asking "
+        "asking, no repeated sentence, and no Source line. " + POLITE_ASK + " Ask the farmer ONE short, natural question asking "
         + " and ".join(parts)
         + f". Example (use the farmer's crop name instead of \"your crop\" and translate it to the farmer's language): \"{example}\"." + seasons_note
         + " Do not suggest which season it is or say which season the advice is for: the farmer decides."
         " Write it as normal sentences: never put season names in brackets or in a list."
         " When they answer, call `search_advisory` again with the same `query` and `crop` plus their "
         + " and ".join(args)
-        + ". If they say they do not know or do not want to answer, call it again with `answer_now=true`."
+        + "."
+        + PASS_AGAIN
+        + " If they say they do not know or do not want to answer, call it again with `answer_now=true`."
+        + NO_SOURCE_ON_QUESTION
     )
 
 
@@ -501,6 +574,7 @@ def format_season_suggestion(season: str, subject: str, seasons: List[str]) -> s
         f"{season}, and ask whether they would like the advice for {' or '.join(seasons)}. Do not give any advice "
         "yet and do not show a Source line. If they say yes, call `search_advisory` again with the same `query` "
         "and that `season`."
+        + NO_SOURCE_ON_QUESTION
     )
 
 
@@ -510,11 +584,13 @@ def format_location_question(query: str, restate: str = "") -> str:
         f"{PENDING_MARKER}{LOCATION_MARKER}\n> Advisory Search Results for `{query}`\n\n"
         "> These advisories are meant for particular places, and the farmer has not said where they farm. Do not give "
         "any advice yet. Your whole reply is only that one question: no introduction or explanation of why you are "
-        "asking, no repeated sentence, and no Source line. Ask the farmer ONE short, natural question asking their "
+        "asking, no repeated sentence, and no Source line. " + POLITE_ASK + " Ask the farmer ONE short, natural question asking their "
         "state and district. Example (translate it to the farmer's language): \"Could you please tell me which state "
         "and district you are farming in?\" Write it as a normal sentence. When they answer, call `search_advisory` "
-        f"again with the same `query` and `crop`{restate} plus `state` and `district` (the names they gave, in English). "
-        "If they say they do not know or do not want to say, call it again with `answer_now=true`."
+        f"again with the same `query` and `crop`{restate} plus `state` and `district` (the names they gave, in English)."
+        + PASS_AGAIN
+        + " If they say they do not know or do not want to say, call it again with `answer_now=true`."
+        + NO_SOURCE_ON_QUESTION
     )
 
 
@@ -667,7 +743,7 @@ async def search_advisory(
 ) -> str:
     """
     Search crop advisories for a farming problem: pests, diseases, symptoms, crop practices
-    and harvesting guidance for a specific crop, from ICAR - Kisan Sarathi.
+    and harvesting guidance for a specific crop, from agricultural institutes (ICAR advisories are served through Kisan Sarathi).
 
     Use this for crop-advisory questions such as "aphids in wheat" or "when to harvest
     sorghum". Search straight away; do not ask the farmer anything first. Do NOT use it for
@@ -717,6 +793,9 @@ async def search_advisory(
             "The crop is required. If the farmer named a crop, call search_advisory again with `crop`. "
             "If they did not, ask them which crop in one short question, wait for the answer, then search."
         )
+    # The farmer answered the crop question with only the crop: search the crop's general advisory.
+    if _same_words(query, crop_hint):
+        query = f"{crop_hint} crop advisory"
     limit = _clean_top_k(top_k) or 5
 
     results, search_ctx, status, message = await _run_search(
