@@ -364,9 +364,30 @@ worked on now.
    the gate protects the API rather than the agent's conversation flow. Lands
    with the `v0.2` pack work. Detail under the OTP section above. Takes this
    migration from 2 of 6 tools to 4 of 6.
-6. **The mock provider** — CI only, written after the real API has answered,
+6. **PMFBY application status** — `initiate_pmfby_status_check` and
+   `check_pmfby_status_with_otp`, the other two of the six tools. Blocked on
+   `network-specs`, not on anything here: `SchemeApplication/v0.1` defines
+   `PMKISANApplicationCatalog`, `PMKISANApplicationInit` and
+   `PMKISANApplicationStatus`, and nothing else. Grepping every
+   `attributes.yaml` in the repo, the only PMFBY schemas that exist anywhere
+   are `PMFBYCatalog`, `PMFBYOption`, `PMFBYStatus`, `PMFBYSubject` and
+   `PMFBYSupport` — all five in `Grievance/v0.1`.
+
+   What it needs: a `PMFBYApplicationCatalog` / `PMFBYApplicationInit` /
+   `PMFBYApplicationStatus` trio in `SchemeApplication/v0.1`, modelled on the
+   PM-KISAN three but keyed off a policy or application number rather than an
+   `enrolmentId`. `init` issues the OTP challenge, `status` carries the
+   response — the same shape the v1 tool already uses against the BAP
+   (`pmfby_scheme_status.py:513` posts `/init`, `:615` posts `/status`). Then
+   two mappings, a second capability on the `pmfby` participant, and a v2
+   module.
+
+   Both PMFBY pack gaps — this and `PMFBYInit` (item 5) — are the same kind of
+   work and should be specified together. Doing both takes PMFBY from 2 of 6
+   tools to 6 of 6.
+7. **The mock provider** — CI only, written after the real API has answered,
    not before. See "The mock — deferred, for CI only".
-7. **Keep the chart and quick-start in step.** Both now carry PMFBY, but
+8. **Keep the chart and quick-start in step.** Both now carry PMFBY, but
    nothing fails when they drift. See risk 5.
 
 ## Risks
@@ -396,10 +417,8 @@ worked on now.
 
 ## Not in scope
 
-- **PMFBY scheme status** (`initiate_pmfby_status_check`,
-  `check_pmfby_status_with_otp`) — needs PMFBY schemas added to
-  `SchemeApplication/v0.1` first.
-- **Adding `PMFBYInit` to the pack** — the TODO recorded under the OTP
-  decision. A `network-specs` change, batched with the other `v0.2` pack work.
+- **PMFBY application status** and **adding `PMFBYInit` to the pack** — both
+  are `network-specs` changes, batched with the other `v0.2` pack work. Items
+  5 and 6 under Open TODOs.
 - **PM-KISAN** — `../pmkisan/plan.md`.
 - **KnowledgeAdvisory**, by decision, goes last.
