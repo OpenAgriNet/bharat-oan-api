@@ -127,7 +127,7 @@ The one step that is **not** shared and must not be skipped:
 
 ```python
 if os.getenv("MANDI_BECKN_VERSION", "v1").strip().lower() == "v2":
-    from agents.tools.mandi_v2 import get_mandi_prices
+    from agents.tools.v2.mandi import get_mandi_prices
 else:
     from agents.tools.mandi import get_mandi_prices
 ```

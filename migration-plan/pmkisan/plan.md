@@ -268,7 +268,7 @@ Then, by hand, both journeys:
 
 ### Phase 3 — swap the tools
 
-`pmkisan_scheme_status_v2.py` and `pmkisan_grievance_v2.py`, behind the same
+`v2/pmkisan_scheme_status.py` and `v2/pmkisan_grievance.py`, behind the same
 flag pattern mandi and weather use: an env var read at import time in
 `agents/tools/__init__.py`, selecting between two modules that export the same
 function name, signature and docstring, so neither the agent nor the skill
@@ -351,6 +351,57 @@ disabled in production** by `_PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG`, and that
 guard is carried into v2 unchanged. The gap blocks a tool that is already
 switched off. It must be closed before lodging is ever re-enabled.
 
+#### TODO — close the category gap, schema side or adapter side
+
+Owner unassigned. Not blocking today; blocking the day lodging is re-enabled.
+
+The thirteen with nowhere to go:
+
+| v1 code | type |
+|---|---|
+| G014 | `INCORRECTLY_MARKED_AS_DECEASED` |
+| G015 | `INCORRECTLY_MARKED_AS_DECEASED_PREVIOUS_LANDOWNER` |
+| G016 | `INCORRECTLY_MARKED_AS_INELIGIBLE` |
+| G017 | `VOLUNTARY_SURRENDER_BY_MISTAKE` |
+| G018 | `INCORRECTLY_MARKED_UNDER_SUSPECTED_CASES` |
+| G019 | `PROBLEM_WITH_UPDATING_LAND_DETAILS` |
+| G024 | `PENDING_APPROVAL_FOR_INELIGIBILITY_REVOCATION` |
+| G025 | `PENDING_APPROVAL_FOR_SURRENDER_REVOCATION` |
+| G026 | `PENDING_APPROVAL_FOR_UPDATION_OF_MISSING_INFORMATION` |
+| G027 | `PENDING_ACTION_SUSPECTED_SPOUSE_OR_MINOR` |
+| G028 | `PENDING_ACTION_SUSPECTED_INCORRECT_LAND_OR_PREVIOUS_OWNER` |
+| G029 | `CORRUPTION` |
+| G030 | `URGENT` |
+
+**Option A — extend the pack (preferred).** Add the missing headings to the
+`Grievance` category enum on network-specs. This is the real fix: the enum is
+meant to be the network's vocabulary for what a farmer can complain about, and
+a vocabulary that cannot say *corruption* is incomplete, not merely
+inconvenient. Changing a published `v0.1` enum breaks anyone already reading
+it, so this lands as **`v0.2`**, with the pack version bumped in `setup.py`'s
+`PROVIDERS` entry and in the `@context` of every Grievance mapping and
+example.
+
+Note the thirteen are not thirteen new headings. Most collapse: the four
+`INCORRECTLY_MARKED_*` plus `VOLUNTARY_SURRENDER_BY_MISTAKE` are one
+*eligibility wrongly revoked* heading, and the five `PENDING_*` are one
+*approval pending with the district* heading. A realistic ask is four or five
+additions, not thirteen.
+
+**Option B — carry the detail in the adapter (stopgap, not a fix).** File
+under the nearest published heading and preserve the specific type in
+`grievance.description`, or add a provider-side sub-type in
+`grievance.support.yaml`. Cheap, no pack change, and it keeps the farmer's own
+words. But **it does not fix routing** — the desk that receives a grievance is
+chosen by `category.code`, so a corruption report filed under "Payment
+related" still lands on the payments desk with the word *corruption* buried in
+free text. Acceptable only as a bridge with a dated end, and only for the
+headings where the nearest match is genuinely adjacent. Never for `G029`.
+
+Whichever is chosen, `_CATEGORY_CODES` in `v2/pmkisan_grievance.py` is the one
+place to change, and the refusal branch beneath it is deleted as the entries
+are filled in.
+
 **2. `pmkisan_grievance_status` now needs a filing date.** v2 reads *one*
 grievance where v1 listed them all: `PMKISANStatus` requires `case`, and
 `case` requires `filedOn` (the mapping filters
@@ -360,6 +411,36 @@ two versions. The agent has to ask the farmer for the date; it was shown when
 the grievance was submitted. When no record matches, the tool **names the date
 back** rather than leaving the farmer guessing which of the two inputs was
 wrong.
+
+#### TODO — let a farmer check a grievance without knowing the date
+
+Owner unassigned. Live now, on every status check.
+
+The farmer is being asked to produce a date they were shown once, possibly
+weeks ago, possibly read aloud over a phone. v1 never asked. Getting it wrong
+is indistinguishable from having no grievance at all, so the commonest
+outcome of a bad guess is the tool saying *there is no such grievance* to
+someone who has one.
+
+**Option A — make `case` optional in the pack (preferred).** `PMKISANStatus`
+requires `case`, and `case` requires `filedOn`. If `case` were optional, the
+same action could answer *all* grievances for a registration, which is what
+v1 did and what the farmer actually wants. Needs the pack change and a
+provider-side mapping change together: `grievance.status.yaml` currently
+filters `$filter(... = $ca.case.filedOn)[0]`, and would return the list
+unfiltered when no `case` is supplied. Lands with the `v0.2` bump above, so
+**do both category and date in one pack revision** rather than two.
+
+**Option B — remember the date for the farmer (adapter or BV side).** The
+`filedOn` is already returned by `support` at lodging time. Persisting it
+against the registration — in BV, or in the adapter's transaction store —
+would let the tool fill it in. Narrower than it looks: it only helps farmers
+who lodged *through us*, and PM-KISAN grievances filed at the portal or by a
+CSC would still need the date typed in.
+
+Until one of these lands, the tool must keep naming the date back in the
+not-found message, because that is the farmer's only clue that the date — and
+not the registration — was the thing that was wrong.
 
 ### Output differs from v1, by design
 

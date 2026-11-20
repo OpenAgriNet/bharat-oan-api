@@ -74,7 +74,7 @@ container and streams one question through `/api/chat/`.
 To prove it really went over v2:
 
 ```sh
-docker logs sva_app 2>&1 | grep mandi_v2
+docker logs sva_app 2>&1 | grep 'agents.tools.v2.mandi'
 # Mandi v2 discover -> http://network-adapter:9201/consumer/discover
 # Mandi v2 select   -> http://network-adapter:9201/consumer/select
 ```

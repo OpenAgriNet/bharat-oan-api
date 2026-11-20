@@ -34,7 +34,7 @@ than a prompt problem. This is the one to run first.
 docker exec -i -e PYTHONPATH=/app sva_app python - <<'PY'
 import asyncio, logging
 logging.basicConfig(level=logging.INFO)
-from agents.tools.weather_v2 import _discover_provider, _select_forecast
+from agents.tools.v2.weather import _discover_provider, _select_forecast
 
 async def main():
     found = await _discover_provider(18.52, 73.86)      # Pune

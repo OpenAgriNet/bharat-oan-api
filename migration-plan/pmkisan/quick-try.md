@@ -81,7 +81,7 @@ not guess it.
 Check the flag actually took effect before trusting a pass:
 
     from agents.tools import pmkisan_grievance_status
-    assert pmkisan_grievance_status.__module__.endswith("_v2")
+    assert pmkisan_grievance_status.__module__.startswith("agents.tools.v2.")
 
 A silently-missed flag otherwise looks exactly like a green run on v2.
 

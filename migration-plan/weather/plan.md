@@ -247,13 +247,13 @@ So the network path is proven and the provider is not.
 
 Unchanged and still deferred: it needs the old BAP on port 8095, which is down.
 A warning to this effect is in the module docstring of
-`agents/tools/weather_v2.py`. Note that the baseline is now doubly blocked —
+`agents/tools/v2/weather.py`. Note that the baseline is now doubly blocked —
 even with the BAP up, v1 reads the same IMD endpoint, so it would record the
 same empty answer.
 
 **Phase 3 — swap the tool. Done.**
 
-6. `agents/tools/weather_v2.py` — same function name, signature and docstring
+6. `agents/tools/v2/weather.py` — same function name, signature and docstring
 7. A renderer written against the v2 shape, unit-checked against the shape the
    mapping documents, including an unknown parameter, a day with parameters
    missing, and the empty case

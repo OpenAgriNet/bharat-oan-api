@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal, Optional, Tuple
 
 import httpx
 from langfuse import observe
@@ -39,7 +39,7 @@ from agents.tools.pmkisan_grievance import (
     _validate_pmkisan_registration_number,
     generate_transaction_id,
 )
-from agents.tools.pmkisan_scheme_status_v2 import (
+from agents.tools.v2.pmkisan_scheme_status import (
     ACTIVE,
     DRAFT,
     GRIEVANCE_CONTEXT,
@@ -62,9 +62,7 @@ logger = get_logger(__name__)
 _GRIEVANCE_OFFER = "off:pmkisan:grievance"
 _GRIEVANCE_RESOURCE = "res:pmkisan:grievance"
 
-# The ten categories PM-KISAN publishes in its v2 catalog, which the v0.1 schema
-# pack enumerates and the adapter enforces. Anything outside this list is
-# refused with SCH_INVALID_ENUM before it reaches the provider.
+# The v0.1 pack enumerates these; anything else is SCH_INVALID_ENUM.
 _PUBLISHED_CATEGORIES = {
     "G001": "Account number not correct",
     "G002": "Online application pending for approval",
@@ -78,19 +76,9 @@ _PUBLISHED_CATEGORIES = {
     "G010": "Problem in facial-based eKYC",
 }
 
-# The v1 tool's twenty grievance labels carry codes G011-G030, which the v2
-# catalog does not publish and the schema pack rejects outright. The two are
-# different taxonomies, not a renumbering: v1's are specific complaints, v2's
-# are the ten headings the portal's own form offers.
-#
-# Only the seven labels below have a published heading that means the same
-# thing. The other thirteen -- the wrongly-marked-deceased family, the pending-
-# approval family, land-detail and Aadhaar-seeding problems, CORRUPTION and
-# URGENT -- have no equivalent, and filing one of them under a heading that
-# merely sounds close would route a real complaint to the wrong desk. A farmer
-# reporting corruption must not be filed under "Payment related". So they are
-# refused with the reason said out loud, and the gap stays visible until the
-# pack publishes categories that cover them.
+# The seven of v1's twenty labels with an equivalent heading above. The other
+# thirteen are refused rather than filed under a near-enough one; why, and what
+# it would take to close the gap, is in migration-plan/pmkisan/plan.md.
 _CATEGORY_CODES = {
     "LATEST_INSTALMENT_NOT_RECEIVED": "G003",
     "PREVIOUS_INSTALMENTS_NOT_RECEIVED": "G003",
@@ -100,6 +88,25 @@ _CATEGORY_CODES = {
     "PENDING_APPROVAL_FOR_SELF_REGISTRATION": "G002",
     "PROBLEM_WITH_SEEDING_AADHAAR_IN_BANK_ACCOUNT": "G001",
 }
+
+def category_for(grievance_type: str) -> Tuple[str, str]:
+    """(category code, refusal to read to the farmer). Exactly one is non-empty.
+
+    Module level rather than inline in pmkisan_submit_grievance, because that
+    function returns the disabled message on its first line and everything below
+    it is unreachable. This gate would otherwise ship having never run.
+    """
+    code = _CATEGORY_CODES.get(grievance_type)
+    if code:
+        return code, ""
+    headings = "\n".join(f"- {name}" for name in _PUBLISHED_CATEGORIES.values())
+    return "", (
+        "PM-KISAN does not currently accept this kind of grievance through "
+        "this service. It accepts complaints under these headings only:\n"
+        f"{headings}\n"
+        "For anything else, please use the PM-KISAN helpline or portal."
+    )
+
 
 _OTP_SENT_MSG = "An OTP has been sent to the mobile number registered with PM-KISAN."
 
@@ -131,9 +138,11 @@ def _iso_date(value: str) -> str:
     text = to_ascii_digits(value or "").strip()
     if not text:
         return ""
-    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
-        return text
-    for pattern in ("%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
+    # Every branch goes through strptime, including the already-ISO one: a date
+    # like 2026-13-45 is the right shape and no day at all, and sending it would
+    # come back as "no grievance filed on that date" -- a wrong answer, not an
+    # error the farmer can act on.
+    for pattern in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
         try:
             return datetime.strptime(text, pattern).strftime("%Y-%m-%d")
         except ValueError:
@@ -219,15 +228,18 @@ async def pmkisan_grievance_send_otp(
 
     Args:
         reg_no: PM-KISAN registration number used for OTP.
-        phone_number: Optional registered mobile number to include in the OTP payload.
+        phone_number: Not used on v2 and not worth asking the farmer for. The
+            Grievance capability has no field for a mobile number -- sending one
+            is SCH_FIELD_NOT_ALLOWED -- and PM-KISAN texts the number already
+            registered against reg_no. Kept only so the v1 and v2 signatures
+            match.
         purpose: Whether the OTP is for grievance submission or status check.
 
     Returns:
         OTP send confirmation or service error.
     """
     # ponytail: Remove this block to re-enable submit grievance OTP flow.
-    # Carried over from v1 unchanged: the stop is a product decision, not a
-    # transport one, and lifting it here would re-enable lodging on v2 only.
+    # Carried over from v1 unchanged; lifting it here would enable lodging on v2 only.
     if purpose == "submit_grievance":
         return _PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG
 
@@ -286,7 +298,7 @@ async def pmkisan_submit_grievance(
             "URGENT". Map the farmer's free-text complaint to the closest matching value
             from this list; never invent a new label.
         otp: 4-digit OTP received on the registered mobile.
-        phone_number: Optional registered mobile number to include in OTP verification.
+        phone_number: Not used on v2. See pmkisan_grievance_send_otp.
         raw: If True, return the raw response body.
 
     Returns:
@@ -303,16 +315,9 @@ async def pmkisan_submit_grievance(
             raise ModelRetry(
                 f'Invalid grievance type: "{grievance_type}". Please select from: "{choices}".'
             )
-        category_code = _CATEGORY_CODES.get(grievance_type)
-        if not category_code:
-            # Said plainly rather than filed under a near-enough heading.
-            headings = "\n".join(f"- {name}" for name in _PUBLISHED_CATEGORIES.values())
-            return (
-                "PM-KISAN does not currently accept this kind of grievance through "
-                "this service. It accepts complaints under these headings only:\n"
-                f"{headings}\n"
-                "For anything else, please use the PM-KISAN helpline or portal."
-            )
+        category_code, refusal = category_for(grievance_type)
+        if refusal:
+            return refusal
 
         if not grievance_description or len(grievance_description.strip()) < 10:
             raise ModelRetry(
@@ -335,8 +340,7 @@ async def pmkisan_submit_grievance(
                 "beckn_version": "v2",
             }
         )
-        # support carries its payload on message.support.channels, not on a
-        # contract -- the one PM-KISAN action that does.
+        # The one PM-KISAN action carrying its payload on channels, not a contract.
         body = {
             "context": build_context("support", transaction_id),
             "message": {
@@ -380,8 +384,7 @@ async def pmkisan_submit_grievance(
             lines.append(f"Grievance ID: {case['ticketNo']}")
         if case.get("filedOn"):
             lines.append(f"Grievance Date: {_display_date(case['filedOn'])}")
-            # The date is how the scheme finds this complaint again, so the
-            # farmer is told to keep it rather than left to work that out.
+            # The date is how the scheme finds this complaint again.
             lines.append(
                 "Please keep this date -- it is needed to check the grievance later."
             )
@@ -419,7 +422,7 @@ async def pmkisan_grievance_status(
         reg_no: PM-KISAN registration number used for OTP verification and status lookup.
         raw: If True, return raw HTTP body (pretty JSON when possible).
         otp: 4-digit OTP received on the registered mobile.
-        phone_number: Optional registered mobile number to include in OTP verification.
+        phone_number: Not used on v2. See pmkisan_grievance_send_otp.
         filed_on: The date the grievance was filed, as DD-MM-YYYY. PM-KISAN identifies a
             grievance by its filing date, so this is required. Ask the farmer for it; it
             was shown when the grievance was submitted. Do not guess it.
@@ -465,9 +468,7 @@ async def pmkisan_grievance_status(
         if response.status_code != 200:
             code, _ = adapter_error(response)
             if code == "BIZ_GENERIC_ERROR":
-                # The commonest refusal by far is a filing date that matches no
-                # record, so name the date back rather than leave the farmer
-                # guessing which of the two inputs was wrong.
+                # Almost always a filing date matching no record, so name it back.
                 logger.info(
                     f"No PM-KISAN grievance for {reg_no_clean} filed on {filed_on_iso}"
                 )

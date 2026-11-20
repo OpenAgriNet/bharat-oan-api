@@ -14,6 +14,11 @@ a second call for the data; v2 carries the OTP inside the status request and the
 provider adapter verifies it before fetching, so a wrong OTP and a missing
 registration both come back as one refusal on one call.
 
+A bad OTP is returned rather than raised. v1 let ModelRetry escape, where the
+catch-all re-wrapped it as "Unexpected error ..."; here the message reaches the
+farmer as written. This is the third behavioural difference, and the reason the
+two versions cannot be diffed blind.
+
 The output is NOT byte-comparable with v1. v1 rendered whatever tag soup the
 gateway returned; v2 gets named fields out of the v0.1 schema pack and renders
 them here, so the two versions must be read side by side rather than diffed.
@@ -56,9 +61,7 @@ SCHEME = {"code": "PM-KISAN"}
 _APPLICATION_OFFER = "off:pmkisan:application-status"
 _APPLICATION_RESOURCE = "res:pmkisan:application-status"
 
-# A commitment carries its own lifecycle state. DRAFT while the OTP is still
-# being asked for; ACTIVE once it stands for something the provider can be
-# asked about. The schema pack rejects a commitment without one.
+# DRAFT while the OTP is still being asked for, ACTIVE once it is spent.
 DRAFT = "DRAFT"
 ACTIVE = "ACTIVE"
 
@@ -154,8 +157,6 @@ def explain_failure(response: httpx.Response, what: str) -> str:
     if code.startswith("BIZ_") and message:
         return message
     if code.startswith("SCH_"):
-        # A schema rejection means we built the request wrong; the farmer can do
-        # nothing about it, so it is logged loudly and reported plainly.
         return f"PM-KISAN {what} could not be completed. Please try again later."
     return f"PM-KISAN {what} is temporarily unavailable. Please try again later."
 
@@ -265,7 +266,10 @@ def format_application(attributes: Dict[str, Any]) -> str:
     if ekyc:
         lines.append(f"eKYC: {ekyc}")
 
-    blockers = application.get("blockers") or []
+    # Three states, not two: a list of blockers, an empty list (PM-KISAN
+    # checked and found none), and no key at all (the follow-up read failed,
+    # ADR-0005). A null is the third, not the second. See plan.md.
+    blockers = application.get("blockers")
     if blockers:
         lines.append("")
         lines.append("Payment is currently blocked by:")
@@ -273,10 +277,7 @@ def format_application(attributes: Dict[str, Any]) -> str:
             name = (blocker.get("name") or blocker.get("code") or "").strip()
             if name:
                 lines.append(f"- {name}")
-    elif "blockers" in application:
-        # Present and empty is PM-KISAN saying it checked and found nothing,
-        # which is worth telling the farmer. Absent means the follow-up read
-        # failed (ADR-0005) and we must not claim anything either way.
+    elif blockers == []:
         lines.append("")
         lines.append("Nothing is blocking payment.")
 

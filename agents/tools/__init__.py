@@ -7,22 +7,28 @@ Tools for the BharatVistaar AI Agent.
 import os
 from dataclasses import replace
 
+
+def _beckn_v2(capability: str) -> bool:
+    """True when <CAPABILITY>_BECKN_VERSION asks for v2. Read at import time.
+
+    Each capability flips on its own and stays on v1 until its v2 path is
+    signed off. For every one migrated so far the OUTPUT changed and not just
+    the transport, so the two versions cannot be diffed blind; what each one
+    changed is written up in migration-plan/.
+    """
+    return os.getenv(f"{capability}_BECKN_VERSION", "v1").strip().lower() == "v2"
+
 from pydantic_ai import Tool
 from helpers.gemma_schema import gemma_compatible
 from agents.tools.ffs import ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, ffs_find_shops, ffs_create_booking
 
 from agents.tools.amul_vistaar import call_amul_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
-# Beckn v1 or v2 for PM-KISAN, picked at import time. Both capabilities move
-# together behind one flag, because they share an OTP: a farmer who asked for
-# one on v1 cannot spend it on v2. Same function names and signatures either
-# way, with one exception -- pmkisan_grievance_status takes a filing date on v2,
-# because v2 reads one grievance rather than listing them all. The OUTPUT
-# differs on every one of them: v1 rendered the gateway's tag soup, v2 renders
-# named fields from the v0.1 pack. Default stays v1 until the v2 path is signed
-# off; see migration-plan/pmkisan/plan.md.
-if os.getenv("PMKISAN_BECKN_VERSION", "v1").strip().lower() == "v2":
-    from agents.tools.pmkisan_scheme_status_v2 import (
+# PM-KISAN's two capabilities move together on one flag: they share an OTP, so
+# a farmer who asked for one on v1 cannot spend it on v2. One signature differs
+# -- pmkisan_grievance_status takes a filing date on v2.
+if _beckn_v2("PMKISAN"):
+    from agents.tools.v2.pmkisan_scheme_status import (
         initiate_pm_kisan_status_check,
         check_pm_kisan_status_with_otp,
     )
@@ -36,8 +42,8 @@ from agents.tools.pmfby_scheme_status import (
     check_pmfby_status_with_otp,
 )
 from agents.tools.shc_scheme_status import check_shc_status
-if os.getenv("PMKISAN_BECKN_VERSION", "v1").strip().lower() == "v2":
-    from agents.tools.pmkisan_grievance_v2 import (
+if _beckn_v2("PMKISAN"):
+    from agents.tools.v2.pmkisan_grievance import (
         pmkisan_grievance_send_otp,
         pmkisan_submit_grievance,
         pmkisan_grievance_status,
@@ -83,23 +89,16 @@ from agents.tools.search import (
     search_schemes,
 )
 from agents.tools.advisory import search_advisory
-# Beckn v1 or v2 for weather, picked at import time. Same function name,
-# signature and docstring either way, so the agent and the skill prompt do not
-# change -- but unlike mandi the OUTPUT does: the v2 provider mapping drops
-# fields the v0.1 schema pack cannot hold, so the two versions are not
-# byte-comparable. See migration-plan/weather/plan.md.
-if os.getenv("WEATHER_BECKN_VERSION", "v1").strip().lower() == "v2":
-    from agents.tools.weather_v2 import weather_forecast
+# Unlike mandi, weather's v2 output differs: the provider mapping drops fields
+# the v0.1 pack cannot hold. See migration-plan/weather/plan.md.
+if _beckn_v2("WEATHER"):
+    from agents.tools.v2.weather import weather_forecast
 else:
     from agents.tools.weather import weather_forecast
 from agents.tools.imd_advisory import imd_agromet_advisory
-# Beckn v1 or v2 for mandi, picked at import time. Both modules export the same
-# function name, signature and docstring, so the agent, the skill prompt and the
-# rendered output are identical either way -- only the calls behind it change.
-# Default stays v1 until the v2 path is signed off; see
-# migration-plan/mandi/plan.md.
-if os.getenv("MANDI_BECKN_VERSION", "v1").strip().lower() == "v2":
-    from agents.tools.mandi_v2 import get_mandi_prices
+# The one capability whose v2 output is byte-identical to v1.
+if _beckn_v2("MANDI"):
+    from agents.tools.v2.mandi import get_mandi_prices
 else:
     from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity

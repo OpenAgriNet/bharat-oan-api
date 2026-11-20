@@ -31,7 +31,7 @@ from dataclasses import dataclass
 
 VERSION = os.getenv("MANDI_BECKN_VERSION", "v1").strip().lower()
 if VERSION == "v2":
-    from agents.tools.mandi_v2 import get_mandi_prices
+    from agents.tools.v2.mandi import get_mandi_prices
 else:
     from agents.tools.mandi import get_mandi_prices
 
@@ -89,7 +89,7 @@ def _trace_payloads():
     if VERSION != "v2":
         print("(--show-payloads only applies to v2)")
         return
-    import agents.tools.mandi_v2 as v2
+    import agents.tools.v2.mandi as v2
 
     original = v2._post
 
