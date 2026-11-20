@@ -332,10 +332,12 @@ would be meaningless there. One round trip either way.
 
 **The one real gap.** The spec says `context.networkId` is
 `oneOf: string | array` — `beckn.yaml:3088` even works an example of
-discovering across two subnets with the array form. The local network adapter
-rejects the array with HTTP 400. So a tool that wants both a public catalog and
-a scoped one still has to ask twice. Weather does not need this today; a
-capability with a mix of public and private providers will.
+discovering across two subnets with the array form. The array gets HTTP 400
+here, but not from the adapter: discovery-service validates against a different
+spec and rejects it. Config, not code — see open item 7. Until that is
+corrected a tool that wants both a public catalog and a scoped one has to ask
+twice. Weather does not need this today; a capability with a mix of public and
+private providers will.
 
 ---
 
@@ -410,13 +412,28 @@ is the provider, not the protocol.
    suspect — it is the only piece checked against the mapping's documented
    shape rather than against real bytes.
 
-7. **TODO — the adapter rejects the spec's array form of `networkId`.**
-   `context.networkId` is `oneOf: string | array` (`beckn.yaml:3088`), which
-   even works an example of discovering across two subnets. The local adapter
-   answers HTTP 400 to the array. Weather does not need it — one audience, one
-   string. A capability with both public and private providers will, and
-   without it each such tool has to send two discovers. Worth raising with the
-   adapter team before that happens rather than after.
+7. **TODO — discovery-service rejects the spec's array form of
+   `networkId`, and it is a stale `.env` line.** `context.networkId` is
+   `oneOf: string | array` (`beckn.yaml:3088`), which even works an example of
+   discovering across two subnets. Not the adapter's doing, despite the earlier
+   note here: the adapter accepts the array, signs it and forwards it, and
+   discovery-service answers `SCH_SCHEMA_VALIDATION_FAILED at $.context`. The
+   two validate against different specs —
+
+   | service | spec it validates against | `networkId` |
+   |---|---|---|
+   | network-adapter | `OpenAgriNet/…` `core-v2.1.0-lts` | `oneOf: string \| array` |
+   | discovery-service | `beckn/…` `core-v2.0.0-lts` | `type: string` |
+
+   — because `quick-start/.env` still carries the upstream `BECKN_SPEC_URL`
+   that `docker-compose.yml:387` feeds to `VALIDATION_SPEC_URL`.
+   `.env.example:128` already has the OpenAgriNet one. Copy that line over and
+   `docker compose up -d discovery-service`.
+
+   Nothing downstream of the validator needs changing: discovery-service's own
+   `beckn.NetworkIDs` (`src/beckn/types.go:32`) already unmarshals either form
+   and `scopedNetworks` (`src/discover/service.go:290`) already takes a list.
+   Only the external spec says no.
 5. ~~**Who publishes the mapping fix?**~~ Done. Pushed to helmcharts
    `mandi-migration-pilot`, and the registered binding was repointed at it with
    `scripts/registry_set_mapping.py` — `make register-provider` could not,
