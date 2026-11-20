@@ -283,13 +283,15 @@ does not resolve, on purpose. Everything we own is proven -- schema, routing,
 mapping fetch, token-header auth wiring. Nothing downstream of the socket is:
 PMFBY has still never answered us.
 
-#### `.env.example` points the mappings at a tag that does not have them
+#### The mapping tag was wrong, and is fixed
 
-`PMFBY_MAPPING_BASE_URL` in `.env.example` is tag `0.1.0`, copied from the
-`PMKISAN_MAPPING_BASE_URL` line above it. Neither provider's mappings exist at
-that tag -- the first probe failed with a 404 on the mapping fetch. Local
-`.env` points both at the `bv-migration` branch instead. Both example lines
-need correcting when a tag that carries the v2 mappings is cut.
+The first probe failed with a 404 on the mapping fetch:
+`PMFBY_MAPPING_BASE_URL` in `.env.example` was tag `0.1.0`, copied from the
+`PMKISAN_MAPPING_BASE_URL` line above it, and neither provider's mappings
+exist at that tag. Tag `0.2.0` carries all seven -- five pmkisan, two pmfby --
+and each one is byte-identical to the working copy in
+`quick-start/config/mappings/`. Both lines now point there, in `.env.example`
+and in `.env`.
 
 ### Phase 2 — prove the network path, no AI involved
 The same branch's `api-collection/OpenAgriNet.api-collection.json` already
@@ -329,6 +331,44 @@ a decision recorded here: acceptable loss, or a gap in the pack.
 `quick-try.md`, plus an open-questions section stating that this was proven
 against a mock and listing what the real provider could still break.
 
+## Open TODOs
+
+Everything that is blocked or deferred, in one place. Nothing here is being
+worked on now.
+
+### Blocking the end-to-end run
+
+1. **The real PMFBY base URL and login URL.** Not in either repo — the only
+   committed value is `https://example.invalid` in
+   `charts/registry-seed/ci/lint-values.yaml`. Ask whoever deployed
+   `feat/137-per-environment-config` for the registry-seed values file.
+   Staging if there is one. Until these arrive
+   `make register-provider PROVIDER=pmfby` refuses, by design, and the local
+   registry holds an unreachable placeholder host.
+2. **Reissue `PMFBY_ACCESS_UID` / `PMFBY_ACCESS_PWD`.** The password was
+   pasted in plain text into a chat thread on 2026-11-20. Ask PMFBY for a new
+   pair before the credentials are used for anything that writes — filing a
+   grievance writes. See risk 3.
+### Blocked on the above
+
+3. **Phase 2 — replay the branch's API collection** against the local adapter.
+   Needs item 1. Nothing about PMFBY's actual responses is known until this runs,
+   so every field name in both mappings is still unverified — see risk 2.
+4. **Phase 3 — write `agents/tools/v2/pmfby_grievance.py`.** Not technically
+   blocked, but writing it before item 3 means writing against guessed
+   response shapes.
+
+### Deferred by decision
+
+5. **Push the OTP challenge into the pack** — a `PMFBYInit` in `Grievance`, so
+   the gate protects the API rather than the agent's conversation flow. Lands
+   with the `v0.2` pack work. Detail under the OTP section above. Takes this
+   migration from 2 of 6 tools to 4 of 6.
+6. **The mock provider** — CI only, written after the real API has answered,
+   not before. See "The mock — deferred, for CI only".
+7. **Keep the chart and quick-start in step.** Both now carry PMFBY, but
+   nothing fails when they drift. See risk 5.
+
 ## Risks
 
 1. **The OTP gate stays client-side.** Decided, not a regression — v1 does
@@ -348,9 +388,11 @@ against a mock and listing what the real provider could still break.
    anything that writes — filing a grievance writes. Until then it belongs in
    `.env` only, never in a values file, a commit, or this document.
 4. **2 of 6 tools.** Easy to overstate what this delivers.
-5. **The two branches disagree.** PMFBY exists in the helm chart and not in
-   quick-start. Whichever is changed next, the other has to follow, and there
-   is nothing that fails when they drift.
+5. **The chart and quick-start can drift.** Both carry PMFBY now, but the
+   quick-start copy was ported by hand from
+   `charts/adapter-service/config/single-adapter/network-adapter-config.yaml`
+   and nothing checks that they still agree. Whichever is changed next, the
+   other has to follow.
 
 ## Not in scope
 
