@@ -1,10 +1,11 @@
 # PMFBY: v1 -> v2, against a mock provider
 
 PMFBY (Pradhan Mantri Fasal Bima Yojana — crop insurance) shares the
-`Grievance` plugin and pack with PM-KISAN. It is proposed as the **first**
-capability to prove over v2's `init`/`support`/`status` actions, ahead of
-PM-KISAN, because its grievance path has no OTP and no encryption. See
-`../pmkisan/plan.md` for why that ordering was raised.
+`Grievance` plugin and pack with PM-KISAN, which is migrated and documented in
+`../pmkisan/plan.md`. PMFBY follows it rather than preceding it, as an earlier
+draft of this document proposed: that draft argued PMFBY should go first
+because its grievance path has no OTP and no encryption, and the OTP half of
+that is wrong — see the OTP section below.
 
 This document exists to say which of PMFBY's six tools can actually move, and
 the honest answer is **two**. The other four have no v2 schema to move to.
@@ -46,48 +47,74 @@ the OTP tool names as needing a check. Having now read them: they are real OTP
 tools, they work, and they are exactly the ones with nowhere to go. The count
 is 2, not 4, and the comparison I drew was wrong.
 
-## The OTP discrepancy, which is the real decision here
+## The OTP gate — decided 2026-11-20
 
-v1 and v2 disagree about whether filing a PMFBY grievance needs an OTP, and
-they disagree in the direction that matters.
+**Decision: keep what v1 does today, and carry the remaining gap as a TODO.**
+Both grievance tools move. The OTP check stays exactly where it already is.
 
-**v1 requires one.** `initiate_pmfby_grievance_otp` sends a 6-digit OTP to the
-registered mobile. `check_pmfby_grievance_otp` verifies it via BAP `/status`
-and will not pass without `otp_verified` plus a real policy response. Its
-docstring is explicit: *"Do not ask for application number or complaint details
-before OTP is verified"* and *"Do not proceed to collect grievance details
-unless this tool returns OTP verified."* `pmfby_submit_grievance` takes `otp`
-as its first argument.
+### A correction to what this section said first
 
-**v2 does not.** `grievance.support.yaml` says *"Files a grievance; no OTP."*
-`PMFBYSupport` requires `informationMode, scheme.code, provider.id,
-provider.descriptor.name, enrolmentId, applicantMobile, cropYear, season,
-grievance.description` — and nothing resembling a challenge. A grep across both
-PMFBY mappings for token, auth, header, encrypt or envelope returns nothing.
-
-So a straight migration of `pmfby_submit_grievance` means **anyone who knows a
+I wrote that migrating `pmfby_submit_grievance` means *"anyone who knows a
 farmer's mobile number, application number, year and season can file a
-grievance in their name.** Today they would also need an OTP sent to that
-farmer's phone.
+grievance in their name"*, where today they would also need an OTP. The first
+half is true of v2. The second half is not true of v1, and it changes the
+decision.
 
-This is not a thing to decide while writing a mock. Three ways out, in the
-order I would argue for them:
+**v1 never sends the OTP to PMFBY.** `PMfbyGrievanceInitRequest`
+(`agents/tools/pmfby_grievance.py:434`) has no OTP field, and neither does the
+`/init` body its `get_payload` builds — the tags are request_type, phone,
+complaint_date, receipt_source_id, the two category ids, year, season,
+application_no, description. What `pmfby_submit_grievance`
+(`agents/tools/pmfby_grievance.py:785`) does is call
+`_verify_pmfby_otp_with_bap` first — a *separate* `/status` round-trip — and
+return early if it comes back unverified.
 
-1. **Add `PMFBYInit` to the pack** and keep the OTP. Honest, matches v1
-   behaviour, and the pack's own rule says *"a new scheme or a new call is an
-   addition and never an edit"* — so it is designed to accept this. Cost: a
-   `network-specs` change and a third mapping. This is the option I would take.
-2. **Ship `pmfby_grievance_status` only**, leave filing on v1. Smallest, safest,
-   proves the v2 path, regresses nothing. Delivers 1 tool.
-3. **Accept the drop.** Only with someone's explicit sign-off, named in this
-   file. Do not do this quietly because the mapping already says "no OTP" — that
-   line records a design decision whose rationale nobody here has seen.
+The gate is a check our own tool runs before it files. PMFBY does not enforce
+it, on either version. So `grievance.support.yaml`'s *"Files a grievance; no
+OTP"* is not describing a v2 regression. It describes what v1 sends too.
 
-**Nothing in Phase 3 ships until this is answered.** Phases 0–2 are unaffected
-and can proceed now, because the network path is the same either way.
+### What the decision means in practice
 
-Note that `pmfby_grievance_status` has no such problem. Its docstring says
-*"No OTP is required for status lookup"* and v2 agrees. That one is a clean
+The v2 tool keeps the gate by doing what the v1 tool does: verify, then file.
+`_verify_pmfby_otp_with_bap` is a v1 `/status` call and stays on v1 — it has
+nowhere else to go, since the pack has no `PMFBYInit`. The two OTP tools the
+farmer actually talks to stay on v1 for the same reason. Only the filing call
+itself becomes v2 `support`.
+
+That means the v2 path is **no weaker than the v1 path**, which is the bar the
+decision sets. It does not mean the gate is strong. Anyone posting straight at
+the adapter skips it — but they skip the v1 BAP `/init` the same way. The
+weakness is the status quo, not something this migration introduces.
+
+The mapping needs nothing new from us for this. `grievance.support.yaml`
+defaults `ticketCategoryID` to `3`, `ticketSubCategoryID` to `10` and
+`receiptSourceID` to `134306`, which are the same three constants v1 hardcodes
+at `agents/tools/pmfby_grievance.py:33-35`, and it derives `complaintDate`
+itself. Every field v1 sends has a home.
+
+### TODO — move the gate off the client and into the network
+
+The honest version of this is a `PMFBYInit` in the `Grievance` pack: `init`
+issues a `challenge`, `support` carries `challenge.response`, and the provider
+adapter verifies before it calls KRPH. That is how PM-KISAN's v2 grievance path
+works today, and it is the only version where the OTP protects the API rather
+than protecting our agent's conversation flow.
+
+Doing it would also give `initiate_pmfby_grievance_otp` and
+`check_pmfby_grievance_otp` a v2 target, taking this migration from 2 of 6
+tools to 4 of 6. It is a `network-specs` addition, so it lands with the other
+pack work — see the `v0.2` items in `../pmkisan/plan.md`.
+
+Until then, two things must stay true, and both belong in the v2 tool's tests:
+
+- `pmfby_submit_grievance` calls `_verify_pmfby_otp_with_bap` before it builds
+  the `support` body, and returns the failure message unchanged when it fails.
+- The OTP argument keeps its position and validation. A v2 signature that
+  quietly makes `otp` optional is the regression I was worried about, arriving
+  by a different route.
+
+Note that `pmfby_grievance_status` has none of this. Its docstring says *"No
+OTP is required for status lookup"* and v2 agrees. That one is a clean
 like-for-like move.
 
 ## What exists and what is missing
@@ -203,13 +230,21 @@ By hand: `support` returns a ticket; `status` reads it back; a ticket that does
 not exist is refused; a record naming a different ticket is refused differently.
 
 ### Phase 3 — swap the tools
-**Blocked on the OTP decision above.**
+Unblocked: the OTP decision above is made.
 
-`pmfby_grievance_status` can go regardless: new `pmfby_grievance_v2.py` behind
-`PMFBY_BECKN_VERSION`, read at import time in `agents/tools/__init__.py`, same
-function name, signature and docstring, defaulting to `v1`.
+`agents/tools/v2/pmfby_grievance.py`, behind `PMFBY_BECKN_VERSION` via
+`_beckn_v2("PMFBY")` in `agents/tools/__init__.py`, defaulting to `v1`. Same
+function names, signatures and docstrings as the v1 twins. Both tools move:
 
-`pmfby_submit_grievance` goes only once the OTP question is answered.
+- `pmfby_grievance_status` — `/search` becomes `status`. Like-for-like.
+- `pmfby_submit_grievance` — `/init` becomes `support`, with
+  `_verify_pmfby_otp_with_bap` imported from the v1 module and called first,
+  unchanged. Two tests pin that: one that a bad OTP never reaches the adapter,
+  one that `otp` is still a required first argument.
+
+`initiate_pmfby_grievance_otp` and `check_pmfby_grievance_otp` stay imported
+from the v1 module on both flag settings. They have no v2 target and the v2
+filing path depends on them.
 
 Expect output differences, as with weather — the pack's `comesBack` list is
 what survives, and v1 returns whatever the portal sent. Each dropped field gets
@@ -221,9 +256,11 @@ against a mock and listing what the real provider could still break.
 
 ## Risks
 
-1. **The OTP gate.** Migrating `pmfby_submit_grievance` as the pack currently
-   stands is a security regression. This is the top risk and it is a decision,
-   not a bug.
+1. **The OTP gate stays client-side.** Decided, not a regression — v1 does
+   not send the OTP downstream either — but it means the v2 path inherits a
+   weakness rather than fixing one. The two tests named in Phase 3 are what
+   stop it eroding; without them a later refactor can drop the gate and
+   nothing fails.
 2. **We have never reached the real KRPH API.** No base URL in any `.env`, no
    credentials, no observed response. `authScheme: none` is an assumption.
 3. **2 of 6 tools.** Easy to overstate what this delivers.
@@ -234,7 +271,7 @@ against a mock and listing what the real provider could still break.
 - **PMFBY scheme status** (`initiate_pmfby_status_check`,
   `check_pmfby_status_with_otp`) — needs PMFBY schemas added to
   `SchemeApplication/v0.1` first.
-- **Adding `PMFBYInit` to the pack** — the likely answer to the OTP question,
-  but a `network-specs` change that should be decided on its own.
+- **Adding `PMFBYInit` to the pack** — the TODO recorded under the OTP
+  decision. A `network-specs` change, batched with the other `v0.2` pack work.
 - **PM-KISAN** — `../pmkisan/plan.md`.
 - **KnowledgeAdvisory**, by decision, goes last.
