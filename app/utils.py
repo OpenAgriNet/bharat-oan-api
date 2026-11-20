@@ -1,3 +1,4 @@
+import json
 from typing import List
 from app.core.cache import cache  # Import cache instance from core
 from helpers.utils import get_logger
@@ -283,11 +284,11 @@ def group_convos(history: List[ModelMessage]):
     return convos
 
 def convo_token_usage(convo: list[ModelMessage]) -> int:
-    tokens = 0
-    for msg in convo:
-        if getattr(msg, "kind", "") == "response" and getattr(msg, "usage", None):
-            tokens += msg.usage.total_tokens
-    return tokens
+    # Size of the turn's own messages. A response's usage.total_tokens also counts the whole system
+    # prompt and tool definitions (~64k tokens here), which made every turn exceed the history budget
+    # and dropped all history after the first turn. ~4 UTF-8 bytes per token is close enough for a
+    # budget (bytes, not characters, so Indic scripts aren't undercounted).
+    return len(json.dumps(to_jsonable_python(convo), ensure_ascii=False).encode("utf-8")) // 4
 
 def trim_history(
     history: List[ModelMessage],

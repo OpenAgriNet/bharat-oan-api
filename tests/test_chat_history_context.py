@@ -67,7 +67,7 @@ def test_trimming_keeps_tool_pairs_without_reviving_first_turn_snapshot():
                         ModelResponse(parts=[ToolCallPart('lookup', {}, tool_call_id=f'call-{index}')]),
                         ModelRequest(parts=[ToolReturnPart('lookup', {'result': index}, tool_call_id=f'call-{index}')]),
                         ModelResponse(parts=[TextPart(f'answer {index}')], usage=RequestUsage(input_tokens=10))])
-    trimmed = utils.trim_history(utils.clean_chat_history(history), max_tokens=20)
+    trimmed = utils.trim_history(utils.clean_chat_history(history), max_tokens=1500)  # ~590 estimated tokens per turn
     serialized = json.dumps(to_jsonable_python(trimmed))
     assert '**FFS workflow:**' not in serialized
     assert 'turn 0' in serialized and 'turn 2' in serialized and 'turn 1' not in serialized
