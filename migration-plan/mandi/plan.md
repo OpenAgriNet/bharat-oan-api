@@ -175,12 +175,28 @@ on the next capability; they are environment, not capability-specific:
 4. `discover` returns an empty list until the catalog is published, and nothing
    says so.
 
-**One real bug, still open.** Agmarknet answers a date with no arrivals with
-HTTP 400; no mapping rule reads that as an empty result, so the adapter reports
-the upstream as unreachable and returns 502 `NET_DOWNSTREAM_UNAVAILABLE`. v1
-gave the farmer `NO_DATA` for the same question, so the tool now swallows that
-one NACK code to stay comparable. It is lossy — a genuine outage also reads as
-`NO_DATA`. The fix belongs in the MandiPrice select action mapping.
+**One real bug, still open, and it needs the adapter.** Agmarknet answers a
+date with no arrivals with HTTP 400; the adapter reports the upstream as
+unreachable and returns 502 `NET_DOWNSTREAM_UNAVAILABLE`. v1 gave the farmer
+`NO_DATA` for the same question, so the tool now swallows that one NACK code to
+stay comparable. It is lossy — a genuine outage also reads as `NO_DATA`.
+
+This paragraph used to end "the fix belongs in the MandiPrice select action
+mapping". That was wrong, and reading the adapter settled it. Anything outside
+2xx fails at the HTTP step before a response mapping is reached, and the
+upstream body — the part that distinguishes "no arrivals" from "we are down" —
+is deliberately logged and dropped, because a failure body can carry a stack
+trace or an internal hostname (`beckn-onix` `http.go:143`). `ActionPlan`
+(`model.go:114`) has `Method`, `Path`, `Mappings`, `TimeoutMs` and `RetryMax`
+and no field for an acceptable non-2xx status, so there is nowhere to declare
+that 400 means empty here.
+
+So closing this is an adapter change and a new image — either an
+acceptable-status list on `ActionPlan`, or handing the upstream body to the
+response mapping on a declared status. Both are `beckn-onix` work, and neither
+is something this repo can ship. Until then the swallow stays, and every
+occurrence is logged at warning with the adapter's own text so the two cases
+can be told apart after the fact.
 
 **One gap in the evidence.** No v1 baseline was recorded, because the v1 BAP on
 `host.docker.internal:8095` was not running. Phase 2 step 7 exists precisely to

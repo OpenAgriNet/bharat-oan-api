@@ -215,9 +215,18 @@ def _is_empty_result_nack(response: httpx.Response) -> bool:
     question, so swallowing it here keeps the two versions comparable.
 
     This is a workaround and it is lossy: a genuine provider outage now reads
-    as NO_DATA too. The fix belongs in the MandiPrice select action mapping,
-    which should map that upstream 400 to an empty resource list. Until it
-    does, every occurrence is logged at warning with the adapter's own text.
+    as NO_DATA too. Every occurrence is logged at warning with the adapter's
+    own text, so the two cases are at least distinguishable after the fact.
+
+    The mapping cannot fix this, though an earlier version of this comment said
+    it could. The adapter abandons the call before any mapping runs: anything
+    outside 2xx returns an error from the HTTP step, and the upstream body --
+    the part that says "No data available" rather than "we are down" -- is
+    logged and dropped on purpose, because a failure body can carry a stack
+    trace or an internal hostname (beckn-onix http.go:143). ActionPlan has no
+    field for an acceptable non-2xx status either (model.go:114), so there is
+    nowhere to say "400 here means empty". Lifting this needs an adapter change
+    and a new image, not a mapping edit.
     """
     if response.status_code != 502:
         return False

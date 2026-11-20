@@ -407,6 +407,20 @@ is the provider, not the protocol.
    That rules out everything on our side. Anyone calling this endpoint today
    gets the same, v1 included.
 
+   Re-checked again later the same day, and the endpoint had changed mood
+   entirely: three selects in a row came back 502 after the adapter's three
+   attempts each, and a direct call to the same point and date — no adapter in
+   the path — 500'd 6 times out of 6, minutes after the run above had answered
+   6 of 8. So the failure moves on a timescale of minutes, and anything
+   measured here is a snapshot of IMD's day, not of our stack.
+
+   One thing that run did settle. The adapter sends
+   `?date=…&lat=…&lon=…` while the probe sent `?lat=…&lon=…&date=…`, which
+   briefly looked like it might explain why a select 500'd on a point the probe
+   had just got 200 for. It does not: alternating the two orders against the
+   live endpoint, both answered 0 of 6. The upstream had simply gone down
+   between the two runs.
+
    To close it: re-run [quick-try.md](quick-try.md). If a forecast renders, no
    code change should be needed. If it renders *wrongly*, the renderer is the
    suspect — it is the only piece checked against the mapping's documented

@@ -61,9 +61,24 @@ discovery to `0.2.0`. On the `0.0.1` images named in `dev.env` the adapter dies
 at boot with `unrecognized step: checkCrossNetworkRequester` — a config step
 that build does not have.
 
-Every `*_MAPPING_URL` must point at a tag that exists in the published
+Every `*_MAPPING_URL` must point at a ref that exists in the published
 helmcharts repo. One that 404s breaks every select for that capability, and
-nothing in the error names the mapping.
+nothing in the error names the mapping — the call fails at mapping-fetch time
+with `NET_INTERNAL_ERROR`.
+
+Some of ours point at a **branch** rather than a tag, which makes renaming that
+branch a silent outage: the registry row stays valid, the adapter still routes,
+and only the select breaks. Renaming `mandi-migration-pilot` to `bv-migration`
+did exactly this to mausamgram, and nothing caught it until a request was tried
+by hand. There is now a check for it:
+
+```
+make check-mappings      # fetches every registered mapping URL, read-only
+```
+
+It fails naming the binding and the URL. Repair is the `*_MAPPING_URL` line in
+`.env`, then `make register-provider PROVIDER=<name> UPDATE=1`. Run it after
+any branch work.
 
 ---
 
