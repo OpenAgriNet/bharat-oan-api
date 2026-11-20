@@ -13,20 +13,41 @@ from agents.tools.ffs import ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, 
 
 from agents.tools.amul_vistaar import call_amul_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
-from agents.tools.pmkisan_scheme_status import (
-    initiate_pm_kisan_status_check,
-    check_pm_kisan_status_with_otp,
-)
+# Beckn v1 or v2 for PM-KISAN, picked at import time. Both capabilities move
+# together behind one flag, because they share an OTP: a farmer who asked for
+# one on v1 cannot spend it on v2. Same function names and signatures either
+# way, with one exception -- pmkisan_grievance_status takes a filing date on v2,
+# because v2 reads one grievance rather than listing them all. The OUTPUT
+# differs on every one of them: v1 rendered the gateway's tag soup, v2 renders
+# named fields from the v0.1 pack. Default stays v1 until the v2 path is signed
+# off; see migration-plan/pmkisan/plan.md.
+if os.getenv("PMKISAN_BECKN_VERSION", "v1").strip().lower() == "v2":
+    from agents.tools.pmkisan_scheme_status_v2 import (
+        initiate_pm_kisan_status_check,
+        check_pm_kisan_status_with_otp,
+    )
+else:
+    from agents.tools.pmkisan_scheme_status import (
+        initiate_pm_kisan_status_check,
+        check_pm_kisan_status_with_otp,
+    )
 from agents.tools.pmfby_scheme_status import (
     initiate_pmfby_status_check,
     check_pmfby_status_with_otp,
 )
 from agents.tools.shc_scheme_status import check_shc_status
-from agents.tools.pmkisan_grievance import (
-    pmkisan_grievance_send_otp,
-    pmkisan_submit_grievance,
-    pmkisan_grievance_status,
-)
+if os.getenv("PMKISAN_BECKN_VERSION", "v1").strip().lower() == "v2":
+    from agents.tools.pmkisan_grievance_v2 import (
+        pmkisan_grievance_send_otp,
+        pmkisan_submit_grievance,
+        pmkisan_grievance_status,
+    )
+else:
+    from agents.tools.pmkisan_grievance import (
+        pmkisan_grievance_send_otp,
+        pmkisan_submit_grievance,
+        pmkisan_grievance_status,
+    )
 from agents.tools.smam_scheme_status import check_smam_scheme_status
 from agents.tools.pmfby_grievance import (
     initiate_pmfby_grievance_otp,
