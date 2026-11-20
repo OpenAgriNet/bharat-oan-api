@@ -482,6 +482,24 @@ is the provider, not the protocol.
    deliberate path change was written and then reverted, with the stored
    record keeping exactly the same fields throughout.
 
+8. **TODO — `select` is returning 502 `NET_DOWNSTREAM_UNAVAILABLE`. Deferred
+   on 2026-11-20, to take up later.** Three selects in a row failed this way,
+   each after the adapter's three attempts, and a direct call to IMD with no
+   adapter in the path 500'd 6 times out of 6 in the same minutes. So the 502
+   is the adapter reporting the upstream accurately, not a fault in our path:
+   discover still returns the resource, the binding still routes, and the
+   mapping URL still resolves (`make check-mappings`).
+
+   Nothing to fix here while that holds. What it blocks is telling this apart
+   from the *other* weather failure — question 4's empty-but-200 — because
+   right now neither state can be observed for long enough to compare. When IMD
+   is serving again, check which of the two is actually left before changing
+   anything.
+
+   Re-test with three selects and `docker logs network-adapter`: if the
+   outbound `get-daily` call returns 200, the 502 is ours and the error path is
+   the suspect; if it returns 500, it is still IMD.
+
 *(An earlier question — whether v2 returns one resource with five days or five
 resources — is answered: the mapping returns one resource per forecast day.)*
 
