@@ -276,17 +276,23 @@ def _sathi_answer(on_select: dict) -> dict:
 
 def _accumulate_lots(lots: List[dict]) -> Dict[str, Dict[str, Any]]:
     dealer_acc: Dict[str, Dict[str, Any]] = {}
+    skipped_rows = lots_with_skips = 0
     for lot in lots:
         variety = str(lot.get("variety_name") or "").strip() or "(unknown variety)"
         rows = lot.get("available_at") or []
         empty = [r.get("dealer_id") for r in rows if _num(r.get("bags"), True) <= 0]
         if empty:
-            logger.info(
-                f"SATHI seed v2 lot {lot.get('lot_number')} ({variety}): "
-                f"skipped dealers {empty}, no bags in stock"
-            )
+            skipped_rows += len(empty)
+            lots_with_skips += 1
+            logger.debug(f"SATHI seed v2 lot {lot.get('lot_number')} ({variety}): skipped dealers {empty}")
         for row in rows:
             _accumulate_dealer(dealer_acc, {"value": row}, variety)
+    if skipped_rows:
+        # One line per search: a large district has hundreds of lots, and one line each drowns the log.
+        logger.info(
+            f"SATHI seed v2 skipped {skipped_rows} dealer rows with no bags in stock, "
+            f"across {lots_with_skips} of {len(lots)} lots"
+        )
     return dealer_acc
 
 

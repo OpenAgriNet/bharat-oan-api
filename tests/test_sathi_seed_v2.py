@@ -1,8 +1,10 @@
 import asyncio
 import json
+import logging
 from types import SimpleNamespace
 
 import httpx
+
 import pytest
 
 from agents.tools import sathi_seed as v1
@@ -184,6 +186,20 @@ def test_zero_bag_dealer_rows_are_dropped(adapter):
     result = _search()
     assert "Krishi Kendra" in result
     assert "Empty Shop" not in result
+
+
+def test_empty_dealer_rows_are_logged_once_per_search_with_totals(adapter, caplog):
+    adapter.select = _on_select(data=[
+        _lot("Indrayani", [_dealer("D1", "Krishi Kendra", 10), _dealer("D8", "Empty One", 0)]),
+        _lot("Tilak", [_dealer("D9", "Empty Two", 0), _dealer("D7", "Empty Three", 0)]),
+        _lot("Samrudhi", [_dealer("D1", "Krishi Kendra", 5)]),
+    ])
+    with caplog.at_level(logging.INFO, logger="agents.tools.v2.sathi_seed"):
+        _search()
+    skipped = [r for r in caplog.records if r.levelno == logging.INFO and "no bags in stock" in r.getMessage()]
+    assert len(skipped) == 1
+    assert "skipped 3 dealer rows" in skipped[0].getMessage()
+    assert "across 2 of 3 lots" in skipped[0].getMessage()
 
 
 def test_no_stock_status_returns_v1_data_not_available_text(adapter):
