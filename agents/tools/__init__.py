@@ -107,11 +107,15 @@ from agents.tools.gfr import (
     gfr_get_crop_registries,
     gfr_get_recommendations,
 )
-from agents.tools.sathi_seed import (
-    get_sathi_crop_groups,
-    list_sathi_crops_in_group,
-    search_sathi_seed_availability,
-)
+# v2 reads crops from the network catalog, so SATHI's master-API tools are v1 only.
+if _beckn_v2("SATHI"):
+    from agents.tools.v2.sathi_seed import list_sathi_crops, search_sathi_seed_availability
+else:
+    from agents.tools.sathi_seed import (
+        get_sathi_crop_groups,
+        list_sathi_crops_in_group,
+        search_sathi_seed_availability,
+    )
 from agents.tools.npss import analyze_crop_image
 from agents.tools.agristack import (
     get_agristack_farmer_location,
@@ -122,6 +126,29 @@ from agents.tools.agristack import (
 
 async def _gemma_schema(ctx, tool_def):
     return replace(tool_def, parameters_json_schema=gemma_compatible(tool_def.parameters_json_schema))
+
+
+if _beckn_v2("SATHI"):
+    _SATHI_CROP_TOOLS = [
+        Tool(
+            list_sathi_crops,
+            takes_ctx=True,
+            strict=False,
+        ),
+    ]
+else:
+    _SATHI_CROP_TOOLS = [
+        Tool(
+            get_sathi_crop_groups,
+            takes_ctx=False,
+            strict=False,
+        ),
+        Tool(
+            list_sathi_crops_in_group,
+            takes_ctx=False,
+            strict=False,
+        ),
+    ]
 
 
 TOOLS = [
@@ -340,16 +367,7 @@ TOOLS = [
         takes_ctx=True,
         strict=False,
     ),
-    Tool(
-        get_sathi_crop_groups,
-        takes_ctx=False,
-        strict=False,
-    ),
-    Tool(
-        list_sathi_crops_in_group,
-        takes_ctx=False,
-        strict=False,
-    ),
+    *_SATHI_CROP_TOOLS,
     Tool(
         search_sathi_seed_availability,
         takes_ctx=True,

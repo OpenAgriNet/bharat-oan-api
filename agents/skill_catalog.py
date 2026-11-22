@@ -1,5 +1,7 @@
 """Manifest and localized skill assets, independent of the agent framework."""
 from functools import lru_cache
+import logging
+import os
 from pathlib import Path
 import re
 from typing import Literal
@@ -7,6 +9,8 @@ from typing import Literal
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, ConfigDict, Field
 import yaml
+
+logger = logging.getLogger(__name__)
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / 'assets/prompts'
 Selection = Literal['all'] | list[str]
@@ -37,6 +41,9 @@ class Skill(Definition):
     prompt_dir: str
     tools: list[str]
     requires: list[str] = Field(default_factory=list)
+    # A skill that stands in for another while an env var holds a value, e.g. "SATHI_BECKN_VERSION=v2".
+    replaces: str | None = None
+    enabled_by: str | None = None
 
 
 class AgentConfig(Definition):
@@ -69,11 +76,54 @@ def select(value: Selection, available: set[str], label: str) -> set[str]:
     return set(value)
 
 
+def _env_condition_holds(condition: str) -> bool:
+    name, _, wanted = condition.partition('=')
+    return os.getenv(name.strip(), '').strip().lower() == wanted.strip().lower()
+
+
+def _swap_in(selection: Selection, old: str, new: str) -> Selection:
+    return selection if selection == 'all' else [new if name == old else name for name in selection]
+
+
+def _replace_skill(manifest: Manifest, old: str, new: str) -> Manifest:
+    skills = {}
+    for name, skill in manifest.skills.items():
+        if name == old:
+            skills[new] = manifest.skills[new]
+        elif name != new:
+            skills[name] = skill
+    agents = {name: config.model_copy(update={
+        'enabled_skills': _swap_in(config.enabled_skills, old, new),
+        'preloaded_skills': _swap_in(config.preloaded_skills, old, new)})
+        for name, config in manifest.agents.items()}
+    return manifest.model_copy(update={'skills': skills, 'agents': agents})
+
+
+def _drop_skill(manifest: Manifest, name: str) -> Manifest:
+    return manifest.model_copy(update={'skills': {k: v for k, v in manifest.skills.items() if k != name}})
+
+
+def apply_skill_replacements(manifest: Manifest) -> Manifest:
+    """Each skill with ``replaces`` takes that skill's place when its env condition holds, else disappears."""
+    for name, skill in list(manifest.skills.items()):
+        if skill.replaces is None:
+            continue
+        if skill.replaces not in manifest.skills or not skill.enabled_by or '=' not in skill.enabled_by:
+            raise ValueError(f'{name} needs an existing skill in replaces and NAME=value in enabled_by')
+        if _env_condition_holds(skill.enabled_by):
+            logger.info('Skill %s replaces %s because %s', name, skill.replaces, skill.enabled_by)
+            manifest = _replace_skill(manifest, skill.replaces, name)
+        else:
+            logger.info('Skill %s is off because %s does not hold; keeping %s', name, skill.enabled_by, skill.replaces)
+            manifest = _drop_skill(manifest, name)
+    return manifest
+
+
 class SkillCatalog:
     def __init__(self, root: Path = PROMPT_DIR):
         self.root = root.resolve()
-        self.manifest = Manifest.model_validate(yaml.load(
-            (self.root / 'manifest.yaml').read_text(), Loader=UniqueKeysLoader))
+        self.manifest = apply_skill_replacements(Manifest.model_validate(yaml.load(
+            (self.root / 'manifest.yaml').read_text(), Loader=UniqueKeysLoader)))
         self.env = Environment(loader=FileSystemLoader(self.root), autoescape=False)
         # Default for direct renders; render_prompt passes the session's enabled skills.
         self.env.globals['enabled_skills'] = set(self.manifest.skills)
