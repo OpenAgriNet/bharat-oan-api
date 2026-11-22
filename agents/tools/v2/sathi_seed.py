@@ -1,0 +1,402 @@
+"""SATHI seed availability over Beckn v2: discover the district, select its stock.
+Rendering reuses v1's helpers so both versions answer with the same text."""
+import os
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+import httpx
+from dotenv import load_dotenv
+from langfuse import observe
+from pydantic_ai.tools import RunContext
+
+from agents.deps import FarmerContext
+from agents.tools.sathi_seed import (
+    MAX_SATHI_DEALERS_IN_SEARCH,
+    _accumulate_dealer,
+    _format_dealer_details,
+    _num,
+    _seed_availability_data_not_available_response,
+)
+from app.config import DEFAULT_HTTP_TIMEOUT
+from helpers.langfuse_tracing import lf_update_current_observation
+from helpers.utils import get_logger
+
+load_dotenv()
+
+logger = get_logger(__name__)
+
+# Branch URLs until the SATHI schemas are published; swap here when they move.
+AGRICULTURE_RESOURCE_CONTEXT = (
+    "https://raw.githubusercontent.com/OpenAgriNet/network-specs/bv-features/"
+    "schema/AgricultureResource/v0.2/context.jsonld"
+)
+_PROVIDER_PAYLOAD_CONTEXT = (
+    "https://raw.githubusercontent.com/OpenAgriNet/helmcharts/feat/agriculture-resource-sathi/"
+    "quick-start/config/schemas/provider-payload/context.jsonld"
+)
+_SCHEMA_TYPE = "openagrinet:AgricultureResource"
+_PROVIDER_PAYLOAD_TYPE = "ProviderOperationPayload"
+_OPERATION_REF = (
+    "https://openagrinet.github.io/network-specs/api/external/sathi/stock/v0.2/openapi.yaml"
+    "#/paths/~1inv-apis~1stock~1getSeedAvailability/post"
+)
+
+# discover returns no offer; this is the id the working select carried.
+_OFFER_ID = "offer:sathi-stock"
+_SEED_CLASS = "CERTIFIED I"
+_SATHI_OK_STATUS = 200
+
+# The select copies only these from the discovered resource; the crop list and
+# district polygon are discover-only and make the request needlessly large.
+_SELECT_RESOURCE_FIELDS = ("@context", "@type", "informationMode", "subjectCategories", "actions")
+
+# Word-for-word from v1 and its skill prompt.
+_OUTSIDE_COVERAGE = (
+    "SATHI seed information is currently available only for Maharashtra. "
+    "Would you like to check a district in Maharashtra instead?"
+)
+_SERVICE_ERROR = "Seed availability service returned an error. Please try again later."
+_TIMED_OUT = "Seed availability request timed out. Please try again later."
+_UNREACHABLE = "Could not reach seed availability service. Please try again later."
+_UNEXPECTED = "Unexpected error while fetching seed availability. Please try again later."
+
+
+def _adapter_url(action: str) -> str:
+    base = os.getenv("OAN_ADAPTER_URL", "http://network-adapter:9201/consumer")
+    return base.rstrip("/") + "/" + action
+
+
+def _context(action: str, transaction_id: str) -> dict:
+    """The v2 envelope. Single-network pilot, so sender and receiver match."""
+    network_id = os.getenv("OAN_NETWORK_ID", "oan.dev")
+    context = {
+        "domain": os.getenv("OAN_DOMAIN", "agriculture"),
+        "action": action,
+        "version": "2.0.0",
+        # SATHI's catalog is public, so discover must ask the "*" audience.
+        "networkId": os.getenv("OAN_PUBLIC_NETWORK_ID", "*") if action == "discover" else network_id,
+        "senderId": network_id,
+        "receiverId": network_id,
+        "transactionId": transaction_id,
+        "messageId": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+        "schemaContext": [f"{AGRICULTURE_RESOURCE_CONTEXT}#{_SCHEMA_TYPE}"],
+    }
+    if action == "select":
+        context["bppUri"] = f"https://{network_id}"
+    return context
+
+
+async def _post(action: str, body: dict) -> dict:
+    url = _adapter_url(action)
+    logger.info(f"SATHI seed v2 {action} -> {url}")
+    async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
+        response = await client.post(url, json=body)
+    response.raise_for_status()
+    return response.json()
+
+
+def _discover_body(latitude: float, longitude: float, transaction_id: str) -> dict:
+    return {
+        "context": _context("discover", transaction_id),
+        "message": {
+            "intent": {
+                "filters": {
+                    "type": "jsonpath",
+                    "expression": (
+                        "$.catalogs[*].resources[*] ? ("
+                        f'@.resourceAttributes.actions[*].operationRef == "{_OPERATION_REF}")'
+                    ),
+                },
+                "spatial": [
+                    {
+                        "op": "S_INTERSECTS",
+                        "targets": "$.catalogs[*].resources[*].resourceAttributes.coverageAreas[*]",
+                        # GeoJSON is [longitude, latitude].
+                        "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
+                        "quantifier": "ANY",
+                    }
+                ],
+            }
+        },
+    }
+
+
+async def _discover_districts(
+    latitude: float, longitude: float, transaction_id: str
+) -> List[Dict[str, Any]]:
+    """Every SATHI district resource covering the point, each with its catalog provider."""
+    payload = await _post("discover", _discover_body(latitude, longitude, transaction_id))
+    found = []
+    for catalog in payload.get("message", {}).get("catalogs", []) or []:
+        provider = catalog.get("provider") or {}
+        for resource in catalog.get("resources", []) or []:
+            found.append({"resource": resource, "provider": provider})
+    logger.info(
+        f"SATHI seed v2 discover at {latitude},{longitude} matched "
+        f"{[f['resource'].get('id') for f in found]}"
+    )
+    return found
+
+
+def _area(resource: dict, level: str) -> dict:
+    for area in (resource.get("resourceAttributes") or {}).get("coverageAreas") or []:
+        if area.get("areaLevel") == level:
+            return area
+    return {}
+
+
+def _location_label(resource: dict) -> str:
+    names = (_area(resource, "District").get("areaName"), _area(resource, "State").get("areaName"))
+    return ", ".join(n for n in names if n)
+
+
+def _crops(resource: dict) -> List[Dict[str, str]]:
+    subjects = (resource.get("resourceAttributes") or {}).get("agricultureSubjects") or []
+    return [s.get("descriptor") or {} for s in subjects if (s.get("descriptor") or {}).get("code")]
+
+
+def _ask_which_district(found: List[Dict[str, Any]]) -> str:
+    names = ", ".join(_area(f["resource"], "District").get("areaName") or "" for f in found)
+    return (
+        f"This location falls in more than one SATHI district: {names}. "
+        "Ask the farmer which of these districts they are in, then call this tool again with "
+        "the same latitude and longitude and district set to the chosen name."
+    )
+
+
+def _same_name(a: Optional[str], b: Optional[str]) -> bool:
+    return (a or "").strip().casefold() == (b or "").strip().casefold()
+
+
+def _district_named(found: List[Dict[str, Any]], district: Optional[str]) -> Optional[Dict[str, Any]]:
+    """The one candidate whose district name matches, or None."""
+    names = [_area(f["resource"], "District").get("areaName") for f in found]
+    matches = [f for f in found if _same_name(_area(f["resource"], "District").get("areaName"), district)]
+    if len(matches) != 1:
+        logger.info(f"SATHI seed v2 district {district!r} matched {len(matches)} of candidates {names}")
+        return None
+    logger.info(f"SATHI seed v2 chose {matches[0]['resource'].get('id')} for district {district!r} from {names}")
+    return matches[0]
+
+
+def _warn_if_district_disagrees(found: Dict[str, Any], district: Optional[str]) -> None:
+    discovered = _area(found["resource"], "District").get("areaName")
+    if district and not _same_name(discovered, district):
+        logger.info(
+            f"SATHI seed v2 ignoring district {district!r}: discover found only {discovered!r}, using that"
+        )
+
+
+def _single_district_or_reply(
+    found: List[Dict[str, Any]], latitude: float, longitude: float, district: Optional[str]
+):
+    """The one district resource, or the text to return when there is not exactly one."""
+    if not found:
+        logger.info(f"SATHI seed v2 found no district at {latitude},{longitude}; outside SATHI coverage")
+        return None, _OUTSIDE_COVERAGE
+    if len(found) == 1:
+        _warn_if_district_disagrees(found[0], district)
+        return found[0], None
+    chosen = _district_named(found, district) if district else None
+    if chosen:
+        return chosen, None
+    logger.info(
+        f"SATHI seed v2 point {latitude},{longitude} is in {len(found)} districts "
+        f"{[f['resource'].get('id') for f in found]}; asking the farmer which one"
+    )
+    return None, _ask_which_district(found)
+
+
+def _crop_list_text(resource: dict) -> str:
+    district = _area(resource, "District").get("areaName") or ""
+    state = _area(resource, "State").get("areaName") or ""
+    lines = [
+        f"SATHI crops for district {district}, state {state}.",
+        "Pick the crop_code for search_sathi_seed_availability yourself; "
+        "never show crop codes to the farmer, only crop names.",
+        "",
+    ]
+    lines += [f"{crop['code']}: {crop.get('name') or ''}" for crop in _crops(resource)]
+    return "\n".join(lines)
+
+
+def _select_resource_attributes(resource: dict) -> dict:
+    attrs = resource.get("resourceAttributes") or {}
+    return {field: attrs[field] for field in _SELECT_RESOURCE_FIELDS if field in attrs}
+
+
+def _select_body(found: Dict[str, Any], crop_code: str, transaction_id: str) -> dict:
+    resource = found["resource"]
+    resource_id = resource.get("id")
+    return {
+        "context": _context("select", transaction_id),
+        "message": {
+            "contract": {
+                "status": {"code": "ACTIVE", "name": "active"},
+                "commitments": [
+                    {
+                        "status": {"descriptor": {"code": "ACTIVE", "name": "active"}},
+                        "resources": [
+                            {
+                                "id": resource_id,
+                                "quantity": {"count": 1},
+                                "resourceAttributes": _select_resource_attributes(resource),
+                            }
+                        ],
+                        "offer": {
+                            "id": _OFFER_ID,
+                            "resourceIds": [resource_id],
+                            "provider": found["provider"],
+                        },
+                        "commitmentAttributes": {
+                            "@context": _PROVIDER_PAYLOAD_CONTEXT,
+                            "@type": _PROVIDER_PAYLOAD_TYPE,
+                            "operationRef": _OPERATION_REF,
+                            "payload": {
+                                "cropCode": crop_code,
+                                "seedClass": _SEED_CLASS,
+                                "stateCode": _area(resource, "State").get("areaCode"),
+                                "districtCode": _area(resource, "District").get("areaCode"),
+                            },
+                        },
+                    }
+                ],
+            }
+        },
+    }
+
+
+def _sathi_answer(on_select: dict) -> dict:
+    """SATHI's own response, carried untouched inside the first commitment."""
+    commitments = ((on_select.get("message") or {}).get("contract") or {}).get("commitments") or [{}]
+    return (commitments[0].get("commitmentAttributes") or {}).get("payload") or {}
+
+
+def _accumulate_lots(lots: List[dict]) -> Dict[str, Dict[str, Any]]:
+    dealer_acc: Dict[str, Dict[str, Any]] = {}
+    for lot in lots:
+        variety = str(lot.get("variety_name") or "").strip() or "(unknown variety)"
+        rows = lot.get("available_at") or []
+        empty = [r.get("dealer_id") for r in rows if _num(r.get("bags"), True) <= 0]
+        if empty:
+            logger.info(
+                f"SATHI seed v2 lot {lot.get('lot_number')} ({variety}): "
+                f"skipped dealers {empty}, no bags in stock"
+            )
+        for row in rows:
+            _accumulate_dealer(dealer_acc, {"value": row}, variety)
+    return dealer_acc
+
+
+def _render_answer(answer: dict, location: str, crop_code: str) -> str:
+    status = _num(answer.get("statusCode"), True)
+    lots = answer.get("data") if isinstance(answer.get("data"), list) else []
+    if status != _SATHI_OK_STATUS or not lots:
+        logger.warning(
+            f"SATHI seed v2 no data for crop {crop_code} in {location}: "
+            f"statusCode={answer.get('statusCode')} message={answer.get('message')!r} lots={len(lots)}"
+        )
+        return _seed_availability_data_not_available_response(location)
+
+    dealer_acc = _accumulate_lots(lots)
+    if not dealer_acc:
+        logger.info(f"SATHI seed v2 crop {crop_code} in {location}: {len(lots)} lots but no dealer with stock")
+        return (
+            f"No dealers with stock found for this crop in {location}, crop {crop_code}.\n\n"
+            "**Source: SATHI**"
+        )
+    return _format_dealer_details(
+        dealer_acc, location, include_source_footer=True, max_dealers=MAX_SATHI_DEALERS_IN_SEARCH
+    )
+
+
+def _crop_not_offered_text(crop_code: str, location: str) -> str:
+    return (
+        f"Crop code {crop_code} is not in the SATHI crop list for {location}. "
+        "Call list_sathi_crops for this location and pick a crop_code from that list."
+    )
+
+
+def _transport_failure_text(error: Exception) -> str:
+    if isinstance(error, httpx.TimeoutException):
+        logger.error("SATHI seed v2 request timed out")
+        return _TIMED_OUT
+    if isinstance(error, httpx.HTTPStatusError):
+        logger.error(
+            f"SATHI seed v2 adapter returned {error.response.status_code}: {error.response.text[:500]}"
+        )
+        return _SERVICE_ERROR
+    if isinstance(error, httpx.RequestError):
+        logger.error(f"SATHI seed v2 request failed: {error}")
+        return _UNREACHABLE
+    logger.exception("SATHI seed v2 failed unexpectedly")
+    return _UNEXPECTED
+
+
+@observe(name="tool:list_sathi_crops", as_type="tool")
+async def list_sathi_crops(
+    ctx: RunContext[FarmerContext],
+    latitude: float,
+    longitude: float,
+    district: Optional[str] = None,
+) -> str:
+    """SATHI crops for the district at ``latitude``, ``longitude``; pick crop_code for search_sathi_seed_availability.
+
+    Pass ``district`` only when this tool asked which district the farmer is in.
+    """
+    transaction_id = str(uuid.uuid4())
+    try:
+        lf_update_current_observation(
+            input={"latitude": latitude, "longitude": longitude, "district": district},
+            metadata={"tool": "sathi.crop_list", "beckn_version": "v2", "transaction_id": transaction_id},
+        )
+        found = await _discover_districts(latitude, longitude, transaction_id)
+        district, reply = _single_district_or_reply(found, latitude, longitude, district)
+        if reply:
+            return reply
+        return _crop_list_text(district["resource"])
+    except Exception as e:
+        return _transport_failure_text(e)
+
+
+@observe(name="tool:search_sathi_seed_availability", as_type="tool")
+async def search_sathi_seed_availability(
+    ctx: RunContext[FarmerContext],
+    crop_code: str,
+    latitude: float,
+    longitude: float,
+    district: Optional[str] = None,
+) -> str:
+    """SATHI certified seed dealers with stock for ``crop_code`` at ``latitude``, ``longitude``.
+
+    Returns dealer names, district, contact, aggregated bags/quintals, variety labels, and
+    **Source: SATHI**. Dealer rows are capped when the catalog is very large.
+    Pass ``district`` only when this tool asked which district the farmer is in.
+    """
+    cc = (crop_code or "").strip().upper()
+    if not cc:
+        return "crop_code is required from the SATHI crop list."
+
+    transaction_id = str(uuid.uuid4())
+    try:
+        lf_update_current_observation(
+            input={"crop_code": cc, "latitude": latitude, "longitude": longitude, "district": district},
+            metadata={"tool": "sathi.seed_availability", "beckn_version": "v2", "transaction_id": transaction_id},
+        )
+        found = await _discover_districts(latitude, longitude, transaction_id)
+        district, reply = _single_district_or_reply(found, latitude, longitude, district)
+        if reply:
+            return reply
+
+        resource = district["resource"]
+        location = _location_label(resource)
+        if cc not in {str(c["code"]).upper() for c in _crops(resource)}:
+            logger.info(f"SATHI seed v2 refused crop {cc}: not offered for {resource.get('id')}")
+            return _crop_not_offered_text(cc, location)
+
+        on_select = await _post("select", _select_body(district, cc, transaction_id))
+        return _render_answer(_sathi_answer(on_select), location, cc)
+    except Exception as e:
+        return _transport_failure_text(e)
