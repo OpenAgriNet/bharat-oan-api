@@ -55,12 +55,24 @@ else:
         pmkisan_grievance_status,
     )
 from agents.tools.smam_scheme_status import check_smam_scheme_status
+# Only two of PMFBY's four grievance tools have a v2 target. The two OTP tools
+# stay on v1 whatever the flag says, because the Grievance pack has no
+# PMFBYInit for them to become -- and the v2 submit calls the same v1 OTP check
+# the v1 submit does, so the gate survives the switch.
 from agents.tools.pmfby_grievance import (
     initiate_pmfby_grievance_otp,
     check_pmfby_grievance_otp,
-    pmfby_grievance_status,
-    pmfby_submit_grievance,
 )
+if _beckn_v2("PMFBY"):
+    from agents.tools.v2.pmfby_grievance import (
+        pmfby_grievance_status,
+        pmfby_submit_grievance,
+    )
+else:
+    from agents.tools.pmfby_grievance import (
+        pmfby_grievance_status,
+        pmfby_submit_grievance,
+    )
 # AIF's four tools move together on one flag: all four share one OTP and one
 # session, so a farmer who verified on v1 cannot spend that session on v2.
 if _beckn_v2("AIF"):
