@@ -18,11 +18,15 @@ from app.config import DEFAULT_HTTP_TIMEOUT
 from agents.deps import FarmerContext
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
+from app.services.session_state import register_section, remember
 from pydantic_ai.tools import RunContext
 
 logger = get_logger(__name__)
 
 SmamSearchType = Literal["application_no", "mobile"]
+
+# search_type + search_value once an application was found (the status itself is not kept).
+STATE = register_section("smam")
 
 
 class Descriptor(BaseModel):
@@ -223,6 +227,15 @@ class SmamStatusRequest(BaseModel):
         }
 
 
+def _found(parsed: SmamStatusApiResponse) -> bool:
+    """True when a response carries application data (same test as the rendered status)."""
+    for rsp in parsed.responses:
+        status = _flatten_catalog_tag_values(rsp.message.catalog).get("status", "")
+        if (not status or status.lower() == "success") and rsp.message.catalog.providers:
+            return True
+    return False
+
+
 def _strip_leading_country_or_zero(digits: str) -> str:
     """Normalize Indian mobile digits: strip leading `91` or `0` when applicable."""
     n = len(digits)
@@ -329,6 +342,8 @@ async def check_smam_scheme_status(
             )
 
             parsed = SmamStatusApiResponse.model_validate(data)
+            if _found(parsed):
+                remember(ctx, STATE, search_type=search_type, search_value=normalized)
             out = str(parsed)
             lf_update_current_observation(
                 metadata={

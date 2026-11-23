@@ -16,6 +16,8 @@ from agents.tools.agristack import get_agristack_link
 from agents.model_registry import get_registry
 from agents.moderation import moderation_agent
 from app.config import settings
+from app.services.session_state import save_changed_state
+from agents.skills import restore_loaded_skills
 from app.core.npss_followup import find_pending_npss_image_url
 from app.services.model_routing import ModelRouteDecision, get_model_router
 from app.services.chat_turn_map import write_chat_turn_map
@@ -27,7 +29,7 @@ from app.utils import (
     clean_chat_history,
     filter_thinking_from_history,
     format_message_pairs,
-    trim_history,
+    build_model_history,
     update_message_history,
 )
 from helpers.langfuse_trace_schema import (
@@ -307,6 +309,7 @@ async def _finalize_chat_turn(
         len(messages),
     )
     await update_message_history(ctx.session_id, messages)
+    await save_changed_state(ctx.deps)
 
     await _flush_langfuse()
 
@@ -451,7 +454,7 @@ async def stream_chat_messages(
     longitude: Optional[float] = None,
     qid: str = "",
     current_user: Optional[dict] = None,
-    ffs_context: Optional[dict] = None,
+    session_state: Optional[dict] = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator for streaming chat messages."""
     history = clean_chat_history(history)
@@ -524,7 +527,7 @@ async def stream_chat_messages(
                 latitude is not None and longitude is not None,
             )
             deps = FarmerContext(
-                ffs_context=ffs_context or {},
+                session_state=session_state or {},
                 query=query,
                 lang_code=target_lang,
                 session_id=session_id,
@@ -538,7 +541,8 @@ async def stream_chat_messages(
                 ),
             )
 
-            deps.skills.restore(history)
+            deps.skills.restore(history)  # sessions saved before skills moved into session state
+            restore_loaded_skills(deps)
             message_pairs = "\n\n".join(format_message_pairs(history, 3))
             logger.info("Message pairs: %s", message_pairs)
             pending_npss_image_url = find_pending_npss_image_url(history)
@@ -567,9 +571,10 @@ async def stream_chat_messages(
                 pending_npss_image_url=pending_npss_image_url,
             )
 
-            trimmed_history = trim_history(history, max_tokens=64_000)
+            trimmed_history = build_model_history(
+                history, tool_turns=settings.history_tool_turns, max_tokens=64_000,
+                conversation_tokens=settings.history_conversation_tokens, min_turns=settings.history_min_turns)
             logger.info("Trimmed history length: %s messages", len(trimmed_history))
-            trimmed_history = filter_thinking_from_history(trimmed_history)
 
             chunk_queue: asyncio.Queue[str | None] = asyncio.Queue()
             defer_npss_output = bool(is_image_analysis or pending_npss_image_url)

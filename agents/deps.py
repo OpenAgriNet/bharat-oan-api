@@ -2,6 +2,7 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 from langcodes import Language
 from agents.skill_policy import SkillState
+from app.services.session_state import SESSION_STATE_LABEL, render_state
 
 
 class FarmerContext(BaseModel):
@@ -22,7 +23,9 @@ class FarmerContext(BaseModel):
         **Moderation Compliance:** "Valid Agricultural (This is a valid agricultural question.)"
     """
     skills: SkillState = Field(default_factory=SkillState)
-    ffs_context: dict[str, Any] = Field(default_factory=dict, exclude=True)
+    # Sections saved by tools (app.services.session_state); tools update it through remember().
+    session_state: dict[str, dict[str, Any]] = Field(default_factory=dict, exclude=True)
+    session_state_changed: set[str] = Field(default_factory=set, exclude=True)
     query: str = Field(description="The user's question.")
     lang_code: str = Field(description="The language code of the user's question.", default='hi')
     session_id: str = Field(description="The session ID for the conversation.")
@@ -109,6 +112,11 @@ class FarmerContext(BaseModel):
             )
         return None
 
+    def _session_state_string(self):
+        """Facts tools saved in earlier turns, so old tool results need not be resent."""
+        text = render_state(self.session_state)
+        return f"{SESSION_STATE_LABEL} {text}" if text else None
+
     def get_user_message(self):
         """Get the user message for the agrinet agent."""
         strings = [
@@ -117,6 +125,6 @@ class FarmerContext(BaseModel):
             self._moderation_string(),
             self._location_context_string(),
             self._agristack_context_string(),
-            ("**FFS workflow:** " + str(self.ffs_context)) if self.ffs_context else None,
+            self._session_state_string(),
         ]
         return "\n".join([x for x in strings if x])

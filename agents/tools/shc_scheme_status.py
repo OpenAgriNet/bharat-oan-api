@@ -17,6 +17,7 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.inject_pdf_header import inject
+from app.services.session_state import register_section, remember
 from markdownify import MarkdownConverter
 load_dotenv()
 
@@ -104,6 +105,9 @@ def html_to_md_no_images(html_content):
 # Constants
 API_BASE_URL = os.getenv("API_BASE_URL")
 FILE_TTL = 10 * 60  # 10 minutes in seconds
+
+# phone_number + cycle once a card was returned (the report itself is not kept).
+STATE = register_section("shc")
 
 logger = get_logger(__name__)
 
@@ -572,12 +576,13 @@ async def check_shc_status(
         str: Detailed soil health card information
     """
     try:
-        payload = SHCStatusRequest(
+        request = SHCStatusRequest(
             cycle=cycle,
             phone_number=phone_number,
             session_id=ctx.deps.session_id,
             question_id=ctx.deps.question_id,
-        ).get_payload()
+        )
+        payload = request.get_payload()
         lf_update_current_observation(
             metadata={
                 "tool": "shc.status",
@@ -597,6 +602,8 @@ async def check_shc_status(
                 return f"Soil health card status service unavailable. Status code: {response.status_code}"
             
             scheme_response = SHCStatusResponse.model_validate(response.json())
+            if scheme_response._has_valid_data():
+                remember(ctx, STATE, phone_number=request.phone_number[-10:], cycle=cycle.strip())
             
             # Cache HTML content and replace URLs
             modified_response = await cache_html_and_replace_urls(scheme_response, phone_number, cycle)

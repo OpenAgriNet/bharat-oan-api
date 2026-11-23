@@ -19,6 +19,7 @@ from rapidfuzz import fuzz
 
 from agents.deps import FarmerContext
 from agents.tools.chat_place import is_state_point, named_place, remember_place
+from app.services.session_state import register_section, remember
 from agents.tools.maps import locate
 from app.config import DEFAULT_HTTP_TIMEOUT
 from app.core.cache import cache
@@ -60,8 +61,12 @@ CATEGORY_WORDS = {
 }
 
 # One IMD mention per conversation: set when a note is added or the advisory is shared.
-MENTIONED_NAMESPACE = "imd-agromet-mentioned"
-MENTIONED_TTL_SECONDS = 24 * 3600
+# Internal flag; hidden from the model.
+IMD = register_section("imd", view=lambda state: None)
+
+
+def _mentioned(ctx) -> bool:
+    return bool((ctx.deps.session_state.get(IMD) or {}).get("mentioned"))
 
 
 async def _location_keys(latitude: float, longitude: float) -> Optional[List[str]]:
@@ -129,7 +134,7 @@ async def _coords(ctx: RunContext[FarmerContext], latitude: Optional[float], lon
     """The given point, else the last place the farmer named in this chat, else the browser location."""
     if latitude is not None and longitude is not None:
         return latitude, longitude
-    return await named_place(ctx.deps.session_id) or (ctx.deps.latitude, ctx.deps.longitude)
+    return await named_place(ctx) or (ctx.deps.latitude, ctx.deps.longitude)
 
 
 def _district_names(data: dict) -> str:
@@ -309,7 +314,7 @@ async def _point(ctx: RunContext[FarmerContext], place: Optional[str], latitude:
         if not found or found[0].latitude is None:
             raise _Stop(f"No place called '{place}' was found. Ask the farmer for the district name.")
         location, kind = found
-        await remember_place(ctx.deps.session_id, location.latitude, location.longitude, kind)
+        await remember_place(ctx, place, location.latitude, location.longitude, kind)
         if kind == "state":
             raise _Stop(STATE_ONLY)
         return location.latitude, location.longitude
@@ -317,7 +322,7 @@ async def _point(ctx: RunContext[FarmerContext], place: Optional[str], latitude:
     if lat is None or lon is None:
         raise _Stop("Location not available. Ask the farmer to share their location, or their village or "
                     "district name and call this tool with it as `place`.")
-    if await is_state_point(ctx.deps.session_id, lat, lon):
+    if await is_state_point(ctx, lat, lon):
         raise _Stop(STATE_ONLY)
     return lat, lon
 
@@ -364,7 +369,7 @@ async def _answer(ctx: RunContext[FarmerContext], data: dict, crop: Optional[str
     not_found = ", ".join(missing) or None
     if choose:  # a group such as "fish": let the farmer choose
         return _available_crops(districts, data, chosen, missing=not_found)
-    await cache.set(ctx.deps.session_id, True, ttl=MENTIONED_TTL_SECONDS, namespace=MENTIONED_NAMESPACE)
+    remember(ctx, IMD, mentioned=True)
     others = [r for r in rows if r not in chosen]
     return _format_advisory(districts, data, chosen, ctx.deps.lang_code or "en", others, not_found)
 
@@ -400,7 +405,7 @@ NO_MENTION = "\n\n[IMD agromet advisory note] Do not mention or offer the IMD ag
 
 async def _offer_line(ctx: RunContext[FarmerContext], lat: float, lon: float, query: Optional[str]) -> Optional[str]:
     """The one-line offer when a current advisory exists for the point (and covers the queried crop), else None."""
-    if await cache.get(ctx.deps.session_id, namespace=MENTIONED_NAMESPACE):
+    if _mentioned(ctx):
         return None
     keys = await _location_keys(lat, lon)
     if not keys:
@@ -440,7 +445,7 @@ async def agromet_note(
     lat, lon = await _coords(ctx, latitude, longitude)
     if lat is None or lon is None or not resolver_configured() or not IMD_DB_URL:
         return NO_MENTION
-    if await is_state_point(ctx.deps.session_id, lat, lon):
+    if await is_state_point(ctx, lat, lon):
         return NO_MENTION
     try:
         line = await _offer_line(ctx, lat, lon, query)
@@ -449,8 +454,5 @@ async def agromet_note(
         return NO_MENTION
     if not line:
         return NO_MENTION
-    try:
-        await cache.set(ctx.deps.session_id, True, ttl=MENTIONED_TTL_SECONDS, namespace=MENTIONED_NAMESPACE)
-    except Exception as exc:  # the note is still correct; only the once-per-conversation guard is lost
-        logger.warning(f"IMD advisory mention flag not saved: {exc}")
+    remember(ctx, IMD, mentioned=True)
     return f"\n\n[IMD agromet advisory note] {line} Do not add anything else about it."

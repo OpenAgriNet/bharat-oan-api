@@ -538,7 +538,7 @@ def test_all_language_prompts_include_khc_rules():
     from agents.skill_policy import SkillState
 
     for language in ("en", "hi", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te"):
-        prompt = render_prompt(SkillState(), language, context={
+        prompt = render_prompt(SkillState(preloaded_skills="all"), language, context={
             "today_date": "x", "crop_season": "x", "last_weekday_table": "",
             "vector_scheme_count": 0, "vector_schemes_bullets": "", "vector_schemes_identifiers": "",
         })

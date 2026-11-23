@@ -185,7 +185,7 @@ def test_real_loop_exposes_supporting_tools_on_next_step():
 ])
 def test_scheme_grievances_do_not_load_other_schemes(skill, own, other):
     """A scheme loads its own tools only: KHC is a separate skill so production can switch it off."""
-    state = SkillState(enabled_skills=[skill])
+    state = SkillState(enabled_skills=[skill], preloaded_skills='all')
     assert own in state.visible
     assert other not in state.visible
     assert 'register_khc_grievance' not in state.visible

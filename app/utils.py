@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import List, Optional
 from app.core.cache import cache  # Import cache instance from core
 from helpers.utils import get_logger
 from copy import deepcopy
@@ -66,7 +66,7 @@ async def update_message_history(session_id: str, all_messages: List[ModelMessag
 
 
 def _strip_saved_chat_context(text: str) -> str:
-    """Remove our legacy conversation wrapper and generated one-line FFS snapshot."""
+    """Remove our legacy conversation wrapper and generated one-line FFS/session-state snapshots."""
     if text.startswith("**Conversation**\n\n"):
         _, separator, current = text.partition("\n\n---\n\n")
         if separator:
@@ -75,7 +75,7 @@ def _strip_saved_chat_context(text: str) -> str:
     before, language, after = text.rpartition("\n**Selected Language:** ")
     if language:
         after = "".join(line for line in after.splitlines(keepends=True)
-                        if not line.startswith("**FFS workflow:** "))
+                        if not line.startswith(("**FFS workflow:** ", "**Session state")))
         text = before + language + after
     return text
 
@@ -332,3 +332,109 @@ def trim_history(
     logger.info(f"Trimmed history: {total_tokens} tokens (max: {max_tokens})")
 
     return trimmed
+
+
+TOOL_PART_KINDS = ("tool-call", "tool-return", "retry-prompt")
+
+
+def split_turns(history: List[ModelMessage]) -> List[List[ModelMessage]]:
+    """One list per farmer turn: the user prompt, the agent's tool calls/results and its answer."""
+    return group_convos(history)
+
+
+def last_user_message(history: List[ModelMessage]) -> Optional[str]:
+    for message in reversed(history or []):
+        for part in reversed(message.parts):
+            if getattr(part, "part_kind", "") == "user-prompt":
+                return part.content if isinstance(part.content, str) else str(part.content)
+    return None
+
+
+def keep_tool_results(history: List[ModelMessage], last_n_turns: int) -> List[ModelMessage]:
+    """Keep tool calls/results only in the last n turns; earlier turns keep their prompt and answer text.
+
+    Calls and results are dropped together, so the history stays valid for the model API.
+    """
+    turns = split_turns(history)
+    cut = max(len(turns) - last_n_turns, 0)
+    kept: List[ModelMessage] = []
+    for index, turn in enumerate(turns):
+        if index >= cut:
+            kept.extend(turn)
+            continue
+        for message in turn:
+            parts = [p for p in message.parts if getattr(p, "part_kind", "") not in TOOL_PART_KINDS]
+            if len(parts) == len(message.parts):
+                kept.append(message)
+            elif parts:
+                copy = deepcopy(message)
+                copy.parts = parts
+                kept.append(copy)
+    return kept
+
+
+def estimate_tokens(value) -> int:
+    """Gemma-token estimate that does not undercount Indic scripts.
+
+    Measured on chat text: English ~3.8 characters per token, Hindi ~3.4, Punjabi ~2.2. Counting ASCII as 4
+    characters and everything else as 2 characters per token stays at or above the real count.
+    """
+    text = value if isinstance(value, str) else json.dumps(to_jsonable_python(value), ensure_ascii=False)
+    ascii_chars = sum(1 for ch in text if ord(ch) < 128)
+    return ascii_chars // 4 + (len(text) - ascii_chars) // 2
+
+
+def _turn_tokens(turn: List[ModelMessage]) -> int:
+    return sum(estimate_tokens(getattr(p, "args", None) if getattr(p, "part_kind", "") == "tool-call"
+                               else getattr(p, "content", ""))
+               for message in turn for p in message.parts
+               if getattr(p, "part_kind", "") not in ("system-prompt", "thinking"))
+
+
+def recent_turns(history: List[ModelMessage], max_tokens: int, min_turns: int) -> List[ModelMessage]:
+    """Newest turns within max_tokens of conversation, but never fewer than min_turns.
+
+    Only conversation counts, not the stored system prompt. The first message's system-prompt part is always
+    kept (alone, if its turn is dropped) because the agent replaces it with the current dynamic prompt.
+    """
+    turns = split_turns(history)
+    kept: List[List[ModelMessage]] = []
+    total = 0
+    for turn in reversed(turns):
+        tokens = _turn_tokens(turn)
+        if len(kept) >= min_turns and total + tokens > max_tokens:
+            break
+        kept.insert(0, turn)
+        total += tokens
+    messages = [m for turn in kept for m in turn]
+    if turns and kept and kept[0] is not turns[0]:
+        system = [p for p in turns[0][0].parts if getattr(p, "part_kind", "") == "system-prompt"]
+        if system:
+            first = deepcopy(turns[0][0])
+            first.parts = system
+            messages.insert(0, first)
+    return messages
+
+
+def build_model_history(
+    history: List[ModelMessage],
+    *,
+    tool_turns: Optional[int] = None,
+    max_tokens: int = 64_000,
+    conversation_tokens: Optional[int] = None,
+    min_turns: int = 3,
+) -> List[ModelMessage]:
+    """History sent to the model.
+
+    tool_turns=None resends every kept turn's tool results (bh-dev behaviour). A number keeps tool results only
+    for that many latest turns; what later turns need from older tools comes from session state instead.
+    conversation_tokens set: keep the newest turns within that many conversation tokens (at least min_turns);
+    otherwise bh-dev's trim to max_tokens.
+    """
+    if tool_turns is not None:
+        history = keep_tool_results(history, tool_turns)
+    if conversation_tokens is not None:
+        history = recent_turns(history, conversation_tokens, min_turns)
+    else:
+        history = trim_history(history, max_tokens=max_tokens)
+    return filter_thinking_from_history(history)

@@ -42,7 +42,7 @@ def test_registry_covers_all_tools_with_shared_bindings():
 
 @pytest.mark.parametrize('language', LANGUAGES)
 def test_all_loaded_hides_discovery_and_contains_all_instructions(language):
-    state = SkillState()
+    state = SkillState(preloaded_skills='all')
     actual = render_prompt(state, language, CONTEXT)
     assert state.visible == ENABLED_TOOLS
     assert '## Available skills' not in actual
@@ -174,7 +174,8 @@ def test_explicit_broken_dependency_rejected(tmp_path):
 def test_agent_variants_replace_both_summary_and_body(tmp_path):
     def change(m, root):
         m['agents']['voice'] = {**copy.deepcopy(m['agents']['chat']), 'enabled_skills': ['mandi.prices'],
-                                'languages': ['en'], 'skill_variants': {'mandi.prices': 'voice'}}
+                                'languages': ['en'], 'skill_variants': {'mandi.prices': 'voice'},
+                                'preloaded_skills': 'all'}
         folder = root / 'skills/mandi/prices/voice'
         folder.mkdir()
         (folder / 'prices_en.md').write_text('---\nsummary: Spoken mandi prices\n---\nVoice instructions only\n')

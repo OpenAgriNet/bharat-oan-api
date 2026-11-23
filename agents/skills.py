@@ -5,6 +5,10 @@ from pydantic_ai import ModelRetry, RunContext, Tool
 
 from agents.skill_catalog import get_catalog
 from agents.skill_policy import SkillState
+from app.services.session_state import register_section, remember
+
+# Skills loaded with load_skill. Hidden from the model: the system prompt already carries their instructions.
+SKILLS = register_section('skills', view=lambda state: None)
 
 
 def skill_instructions(name: str, state: SkillState) -> str:
@@ -30,6 +34,9 @@ def render_prompt(state: SkillState, language: str, context: dict) -> str:
     pending = state.permitted - active
     if 'ffs.booking' in pending:
         chunks.append(catalog.env.get_template('skills/ffs/booking/routing.md').render(**context))
+    if 'khc.grievances' in pending and context.get('khc_service_note'):
+        # KHC status routing must hold before its workflow is loaded (see khc_service_note).
+        chunks.append(context['khc_service_note'].strip())
     if pending:
         summaries = [f'- {name}: {catalog.render_summary(name, language, context, state.agent)}'
                      for name in catalog.manifest.skills if name in pending]
@@ -63,8 +70,15 @@ async def load_skill(ctx: RunContext[Any], skill: str) -> dict:
     # Render everything before mutating state: a bad dependency must not partially load.
     instructions = '\n\n'.join(skill_instructions(name, state) for name in newly_loaded)
     state.loaded_skills.update(newly_loaded)
+    remember(ctx, SKILLS, loaded=sorted(state.loaded_skills))
     return {'skill': skill, 'loaded': True, 'instructions': instructions,
             'loaded_skills': newly_loaded, 'loaded_tools': sorted(catalog.tools_for({skill}))}
+
+
+def restore_loaded_skills(deps: Any) -> None:
+    """Skills loaded in earlier turns, from session state (the system prompt then includes their instructions)."""
+    saved = (deps.session_state.get(SKILLS) or {}).get('loaded') or []
+    deps.skills.loaded_skills |= set(saved) & deps.skills.permitted
 
 
 SKILL_LOADER = Tool(load_skill, takes_ctx=True, sequential=True, strict=False)

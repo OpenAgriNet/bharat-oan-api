@@ -178,3 +178,19 @@ agents:
     - weather.agromet
     - pm_kisan.installments
     - documents.search
+    # Loaded from the first turn; other enabled skills load on demand with load_skill.
+    # Chosen from production tool calls over 14 days (2026-11-09..23, ~227k traces): the most used skills,
+    # plus PM-KISAN and document search always (product decision). Rarely used or large skills
+    # (KHC, FFS, AgriStack, ICAR, AIF, KCC, SMAM, soil health, PMFBY grievances, seeds, fertilizer,
+    # IMD agromet) load when needed.
+    preloaded_skills:
+    - pm_kisan.status       # 34.1k calls
+    - pm_kisan.grievances   # 16.5k
+    - pm_kisan.installments # release note, no tools; PM-KISAN always
+    - documents.search      # 5.3k, always
+    - schemes.information   # 24.8k
+    - crop.advice           # 6.2k
+    - mandi.prices          # 5.1k
+    - location.resolve      # 3.9k, required by weather/mandi
+    - pmfby.status          # 2.5k
+    - weather.forecast      # 1.3k

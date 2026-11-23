@@ -23,8 +23,12 @@ from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
+from app.services.session_state import register_section, remember
 
 logger = get_logger(__name__)
+
+# Shared with pmfby_scheme_status. phone_number is kept exactly as passed: it keys the OTP transaction id.
+SESSION_SECTION = register_section("pmfby")
 
 # --------------------------------------------------------------------------------------
 # Constants
@@ -44,6 +48,8 @@ _OTP_FAILURE_SUBSTRINGS = (
     "otp mismatch",
     "incorrect otp",
 )
+
+_NO_GRIEVANCE_STATUS = "No grievance status found for this ticket."
 
 _OTP_ERROR_DESCRIPTOR_CODES = frozenset(
     {"invalid_otp", "farmer_id_not_found", "error", "not_found"}
@@ -526,10 +532,8 @@ class InitResponseItem(BaseModel):
 class InitResponse(BaseModel):
     responses: List[InitResponseItem] = []
 
-    def format_grievance_result(self) -> str:
-        if not self.responses:
-            return "PMFBY grievance service returned no response. Please try again."
-
+    def grievance_response(self) -> Optional[Dict[str, str]]:
+        """Displayed key/values of the first `grievance-response` tag of a submit response (None if absent)."""
         for r in self.responses:
             order = (r.message.order if r.message and r.message.order else None) if r.message else None
             if not order or not order.tags:
@@ -546,29 +550,37 @@ class InitResponse(BaseModel):
                     if not li.display or not li.descriptor or not li.descriptor.code or li.value is None:
                         continue
                     kv[str(li.descriptor.code)] = str(li.value)
+                return kv
+        return None
 
-                status = kv.get("status")
-                ticket_no = kv.get("ticket-no") or kv.get("ticket_no")
-                ticket_id = kv.get("ticket-id") or kv.get("ticket_id")
-                message = kv.get("message")
+    def format_grievance_result(self) -> str:
+        if not self.responses:
+            return "PMFBY grievance service returned no response. Please try again."
 
-                parts: List[str] = []
-                if status:
-                    parts.append(f"Status: {status}")
-                if ticket_no:
-                    parts.append(f"Ticket Number: {ticket_no}")
-                if ticket_id:
-                    parts.append(f"Ticket ID: {ticket_id}")
-                if message:
-                    parts.append(f"Message: {message}")
-                return "\n".join(parts) if parts else "PMFBY grievance submitted. Please note the ticket details shared by the system."
+        kv = self.grievance_response()
+        if kv is None:
+            return "PMFBY grievance submitted, but ticket details were not found in the response."
 
-        return "PMFBY grievance submitted, but ticket details were not found in the response."
+        status = kv.get("status")
+        ticket_no = kv.get("ticket-no") or kv.get("ticket_no")
+        ticket_id = kv.get("ticket-id") or kv.get("ticket_id")
+        message = kv.get("message")
+
+        parts: List[str] = []
+        if status:
+            parts.append(f"Status: {status}")
+        if ticket_no:
+            parts.append(f"Ticket Number: {ticket_no}")
+        if ticket_id:
+            parts.append(f"Ticket ID: {ticket_id}")
+        if message:
+            parts.append(f"Message: {message}")
+        return "\n".join(parts) if parts else "PMFBY grievance submitted. Please note the ticket details shared by the system."
 
     def format_status_result(self) -> str:
         """Format grievance status from `/search` (`on_search` / `status_grievance`) responses."""
         if not self.responses:
-            return "No grievance status found for this ticket."
+            return _NO_GRIEVANCE_STATUS
 
         lines: List[str] = []
         skip_codes = {"responseDynamic", "request_type"}
@@ -599,7 +611,7 @@ class InitResponse(BaseModel):
 
         if lines:
             return "\n".join(lines)
-        return "No grievance status found for this ticket."
+        return _NO_GRIEVANCE_STATUS
 
 
 # --------------------------------------------------------------------------------------
@@ -628,6 +640,7 @@ def initiate_pmfby_grievance_otp(ctx: RunContext[FarmerContext], phone_number: s
         if response.status_code != 200:
             return f"PMFBY OTP init service unavailable. Status code: {response.status_code}"
 
+        remember(ctx, SESSION_SECTION, phone_number=phone_number, grievance_otp_step="sent", grievance_otp=None)
         return "OTP has been sent to the registered mobile number. Please share the 6-digit OTP to proceed with grievance lodging."
 
     except httpx.TimeoutException:
@@ -674,6 +687,9 @@ def check_pmfby_grievance_otp(
         )
         if not verified:
             return message
+        # pmfby_submit_grievance verifies the same OTP again, so keep it until submit has run.
+        remember(ctx, SESSION_SECTION, phone_number=phone_number, grievance_otp_step="verified",
+                 grievance_otp=_validate_otp(otp))
         return (
             "OTP verified. Please share your PMFBY application number, "
             "crop season and year, and your complaint details."
@@ -741,7 +757,10 @@ def pmfby_grievance_status(
         except json.JSONDecodeError:
             return "PMFBY grievance status service returned a non-JSON response. Please try again."
 
-        return InitResponse.model_validate(response_json).format_status_result()
+        result = InitResponse.model_validate(response_json).format_status_result()
+        if result != _NO_GRIEVANCE_STATUS:
+            remember(ctx, SESSION_SECTION, phone_number=phone_number, ticket_no=ticket)
+        return result
 
     except httpx.TimeoutException:
         return "PMFBY grievance status request timed out. Please try again later."
@@ -790,6 +809,7 @@ def pmfby_submit_grievance(
             season=raw_season,
         )
         if not verified:
+            remember(ctx, SESSION_SECTION, grievance_otp_step=None, grievance_otp=None)  # rejected/expired
             return otp_message
 
         if not application_no or not str(application_no).strip():
@@ -812,6 +832,7 @@ def pmfby_submit_grievance(
         ).get_payload()
 
         url = _bap_url("init")
+        remember(ctx, SESSION_SECTION, grievance_otp=None)  # consumed by this submit
         response = _post_json_logged(url, payload, "[PMFBY_GRIEVANCE_SUBMIT]")
 
         if response.status_code != 200:
@@ -826,7 +847,13 @@ def pmfby_submit_grievance(
         except json.JSONDecodeError:
             return "PMFBY grievance submitted, but the service returned a non-JSON response."
 
-        return InitResponse.model_validate(response_json).format_grievance_result()
+        result = InitResponse.model_validate(response_json)
+        kv = result.grievance_response() or {}
+        ticket_no = kv.get("ticket-no") or kv.get("ticket_no")
+        if ticket_no:
+            remember(ctx, SESSION_SECTION, grievance_otp_step=None, application_no=application_no.strip(),
+                     year=request_year.strip(), season=raw_season, ticket_no=ticket_no)
+        return result.format_grievance_result()
 
     except httpx.TimeoutException:
         return "PMFBY grievance request timed out. Please try again later."

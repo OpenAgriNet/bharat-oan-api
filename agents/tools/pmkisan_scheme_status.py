@@ -13,8 +13,12 @@ import re
 import os
 from langfuse import observe
 from helpers.langfuse_tracing import lf_update_current_observation
+from app.services.session_state import register_section, remember
 
 logger = get_logger(__name__)
+
+# Shared with pmkisan_grievance: identifiers the provider accepted and the OTP step of each flow.
+SESSION_SECTION = register_section("pmkisan")
 
 # -----------------------
 # Basic Models (Shared)
@@ -398,6 +402,26 @@ class SchemeStatusResponse(BaseModel):
         
         return "\n".join(lines) if lines else "No scheme status data available."
 
+def is_otp_verified(response_model: SchemeStatusResponse) -> bool:
+    """True when the /status response shows the OTP was accepted (shared with pmkisan_grievance)."""
+    for response_item in response_model.responses or []:
+        order = response_item.message.order
+        if (order.state or "").upper() == "COMPLETED":
+            return True
+
+        for fulfillment in order.fulfillments or []:
+            descriptor = fulfillment.state.descriptor if fulfillment.state else None
+            if not descriptor:
+                continue
+
+            code = (descriptor.code or "").lower()
+            short_desc = (descriptor.short_desc or "").lower()
+            if code == "completed" or "otp verified" in short_desc:
+                return True
+
+    return False
+
+
 # -----------------------
 # Request Model for Status
 # -----------------------
@@ -538,6 +562,11 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str =
         try:
             response_json = response.json()
             scheme_response = SchemeInitResponse.model_validate(response_json)
+            if scheme_response.responses:
+                if reg_no:
+                    remember(ctx, SESSION_SECTION, reg_no=reg_no, status_otp_step="sent")
+                else:
+                    remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step="sent")
             return str(scheme_response)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response from scheme init API: {e}. Response text: {response_text[:200]}")
@@ -636,6 +665,11 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
         try:
             response_json = response.json()
             scheme_response = SchemeStatusResponse.model_validate(response_json)
+            if is_otp_verified(scheme_response):
+                if reg_no:
+                    remember(ctx, SESSION_SECTION, reg_no=reg_no, status_otp_step="verified")
+                else:
+                    remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step="verified")
             return str(scheme_response)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response from scheme status API: {e}. Response text: {response_text[:200]}")
