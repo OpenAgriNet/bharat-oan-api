@@ -240,8 +240,7 @@ sudo docker logs --since 10m --timestamps --follow sva_app 2>&1 | \
 
 The existing conversation input/output retains its existing chat behavior.
 
-`prompt:master_catalog_redis_check` is a preparation span with catalogue metadata
-and counts, not a tool call dumping the full multilingual prompt. The chat agent
+The chat agent
 span keeps its explicitly recorded final answer instead of serializing the
 internal completed-run object. Telemetry setup, update or handler errors must
 not change a business result.

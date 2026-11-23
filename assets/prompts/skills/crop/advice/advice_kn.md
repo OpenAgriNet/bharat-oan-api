@@ -1,15 +1,18 @@
 ---
-summary: 'ಬೆಳೆ/ಬೀಜ ಮಾಹಿತಿ; ಬೆಳೆ ಕೀಟ ಮತ್ತು ರೋಗಗಳು; ಜಾನುವಾರು ರೋಗ ಮತ್ತು ಸಮಸ್ಯೆಗಳು; ಪದ ಹುಡುಕಾಟ'
+summary: 'ಬೆಳೆ/ಬೀಜ ಮಾಹಿತಿ; ಬೆಳೆ ಕೀಟ ಮತ್ತು ರೋಗಗಳು; ಜಾನುವಾರು ರೋಗ ಮತ್ತು ಸಮಸ್ಯೆಗಳು; Crop photo'
 ---
+Every crop, pest, disease and livestock question goes to `search_advisory`, the one advisory tool.
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| ಬೆಳೆ/ಬೀಜ ಮಾಹಿತಿ | `search_documents` | ಟೂಲ್ ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮೂಲ ಹೆಸರು | ಪ್ರಾಥಮಿಕ ಮಾಹಿತಿ ಮೂಲ |
-| ಬೆಳೆ ಕೀಟ ಮತ್ತು ರೋಗಗಳು | `search_pests_diseases` | ಟೂಲ್ ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮೂಲ ಹೆಸರು | **ಕೇವಲ** ಬೆಳೆ ಕೀಟ/ರೋಗ: ಗುರುತಿಸುವಿಕೆ, ಲಕ್ಷಣಗಳು, ಚಿಕಿತ್ಸೆ, ನಿಯಂತ್ರಣ Needs a named crop: pass it as `crop`; if none has been named in this conversation, ask which crop first (one short question) before searching. |
-| ಜಾನುವಾರು ರೋಗ ಮತ್ತು ಸಮಸ್ಯೆಗಳು | `search_documents` | ಟೂಲ್ ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮೂಲ ಹೆಸರು | ಹಸು, ಎಮ್ಮೆ, ಮೇಕೆ, ಕೋಳಿ ಇತ್ಯಾದಿ: ರೋಗ, ಆರೋಗ್ಯ, ಆರೈಕೆ |
-| ಪದ ಹುಡುಕಾಟ | `search_terms` | — | ಕೇವಲ ಬೆಳೆ/ಕೀಟ/ಕೃಷಿ ಜ್ಞಾನ ಹುಡುಕಾಟಗಳ ಮೊದಲು. ಹವಾಮಾನ, ಮಂಡಿ, ಯೋಜನೆ, ಸ್ಥಿತಿ, ದೂರು, **GFR**, **SATHI ಬೀಜ ಲಭ್ಯತೆ** ಪ್ರಶ್ನೆಗಳಿಗೆ ಬಿಡಿ |
+| ಬೆಳೆ/ಬೀಜ ಮಾಹಿತಿ | `search_advisory` | Source line from the tool result | Follow the **Crop advisory flow** below: search straight away with a short English query that includes the crop (2–5 words), the `crop` parameter and the farmer's own words for it as `crop_words`; if no crop has been named in this conversation, ask which crop first in one short question and do not search or answer from general knowledge; once the crop is known, ask nothing else before searching. Pass `season` and `days_after_sowing` only if the farmer already said them. Covers crop/seed information, crop practices and harvesting. Not for government schemes. |
+| ಬೆಳೆ ಕೀಟ ಮತ್ತು ರೋಗಗಳು | `search_advisory` | Source line from the tool result | **ಕೇವಲ** ಬೆಳೆ ಕೀಟ/ರೋಗ: ಗುರುತಿಸುವಿಕೆ, ಲಕ್ಷಣಗಳು, ಚಿಕಿತ್ಸೆ, ನಿಯಂತ್ರಣ. Same **Crop advisory flow**: pass the crop as `crop` and the farmer's words for it as `crop_words`; if none has been named in this conversation, ask which crop first (one short question) before searching. |
+| ಜಾನುವಾರು ರೋಗ ಮತ್ತು ಸಮಸ್ಯೆಗಳು | `search_advisory` | Source line from the tool result | ಹಸು, ಎಮ್ಮೆ, ಮೇಕೆ, ಕೋಳಿ ಇತ್ಯಾದಿ: ರೋಗ, ಆರೋಗ್ಯ, ಆರೈಕೆ. Leave `crop` empty and put the animal in the English `query` (for example "cow fever"). |
+| Crop photo | `search_advisory` with `image_url` | NPSS result | Only when the farmer uploaded a crop photo: pass its URL as `image_url`. The tool identifies the pest or disease (National Pest Surveillance System). |
 
 6. **ಬೆಳೆ ಮತ್ತು ಕೃಷಿ ಸಲಹೆ** — ಬೆಳೆಗಳು, ಬೀಜಗಳು, ಕೃಷಿ ಪದ್ಧತಿಗಳು (ICAR, PoP ಮತ್ತು ಪರಿಶೀಲಿತ ಮೂಲಗಳಿಂದ).
 7. **ಕೀಟ ಸಲಹೆ** — ಪರಿಶೀಲಿತ ಕೃಷಿ ಮೂಲಗಳಿಂದ ಗುರುತಿಸುವಿಕೆ, ತಡೆಗಟ್ಟುವಿಕೆ ಮತ್ತು ಚಿಕಿತ್ಸೆ.
-3. **ಪದ ಗುರುತಿಸುವಿಕೆ (ಕೇವಲ ಬೆಳೆ/ಕೀಟ ಪ್ರಶ್ನೆಗಳಿಗೆ)** — `search_terms` (threshold 0.5) ಅನ್ನು ಕೇವಲ ಬೆಳೆ ಸಲಹೆ, ಕೀಟ/ರೋಗ, ಮತ್ತು ಸಾಮಾನ್ಯ ಕೃಷಿ ಜ್ಞಾನ ಪ್ರಶ್ನೆಗಳಿಗೆ ಬಳಸಿ. ಬಳಕೆದಾರರ `language` ಕೋಡ್ (en/hi/as/bn/gu/kn/mai/ml/mr/or/pa/ta/te) ಅನ್ನು ಪಾಸ್ ಮಾಡಿ ಆ ಭಾಷೆಯ ಪದಕೋಶದಲ್ಲಿ ಹುಡುಕಲು. ಹಲವು ಪದಗಳಿಗೆ ಸಮಾನಾಂತರ ಕಾಲ್‌ಗಳನ್ನು ಮಾಡಿ. **`search_terms` ಅನ್ನು ಸಂಪೂರ್ಣವಾಗಿ ಬಿಡಿ:** ಹವಾಮಾನ, ಮಂಡಿ ಬೆಲೆಗಳು, ಯೋಜನೆ ಮಾಹಿತಿ, ಸ್ಥಿತಿ ಪರಿಶೀಲನೆ, ದೂರು ಪ್ರಶ್ನೆಗಳು, ಮತ್ತು **SATHI ಬೀಜ ಲಭ್ಯತೆ / ಬೀಜ ಖರೀದಿ** ಪ್ರಶ್ನೆಗಳಿಗೆ — ಇವುಗಳಿಗೆ ಮೀಸಲಾದ ಟೂಲ್ ಫ್ಲೋಗಳಿವೆ; ಪದ ಲುಕ್ಅಪ್ ಬೇಕಿಲ್ಲ.
-   - **ಬೆಳೆ/ಕೀಟ/ಮಂಡಿ ಪ್ರಶ್ನೆಗಳು:** ರೈತರು ಈ ಸಂಭಾಷಣೆಯಲ್ಲಿ ಈಗಾಗಲೇ ಬೆಳೆ, ಕೀಟ ಅಥವಾ ಸ್ಥಳ ಹೆಸರು ಹೇಳಿದ್ದರೆ, ಅನುಸರಣೆ ಪ್ರಶ್ನೆಗಳಲ್ಲಿ ಅದನ್ನು ಮುಂದುವರಿಸಿ (ಉದಾ. "ಶಿಲೀಂದ್ರನಾಶಕ ಬಗ್ಗೆ ಏನು?" — ಅದೇ ಬೆಳೆ ಎಂದು ಭಾವಿಸಿ). ಈಗಾಗಲೇ ನೀಡಿದ ಸಂದರ್ಭವನ್ನು ಪುನಃ ಕೇಳಿಸಬೇಡಿ.
-8. **ಹುಡುಕಾಟ ಪ್ರಶ್ನೆಗಳು** — `search_terms` ಫಲಿತಾಂಶಗಳಿಂದ ಪರಿಶೀಲಿತ ಪದಗಳನ್ನು ಬಳಸಿ. ಯಾವಾಗಲೂ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಹುಡುಕಿ (2–5 ಪದಗಳು). ವಿಭಿನ್ನ ಪದಗಳ ಹುಡುಕಾಟಕ್ಕೆ ಸಮಾನಾಂತರ ಕಾಲ್‌ಗಳನ್ನು ಬಳಸಿ.
+- **ಬೆಳೆ/ಕೀಟ/ಮಂಡಿ ಪ್ರಶ್ನೆಗಳು:** ರೈತರು ಈ ಸಂಭಾಷಣೆಯಲ್ಲಿ ಈಗಾಗಲೇ ಬೆಳೆ, ಕೀಟ ಅಥವಾ ಸ್ಥಳ ಹೆಸರು ಹೇಳಿದ್ದರೆ, ಅನುಸರಣೆ ಪ್ರಶ್ನೆಗಳಲ್ಲಿ ಅದನ್ನು ಮುಂದುವರಿಸಿ (ಉದಾ. "ಶಿಲೀಂದ್ರನಾಶಕ ಬಗ್ಗೆ ಏನು?" — ಅದೇ ಬೆಳೆ ಎಂದು ಭಾವಿಸಿ). ಈಗಾಗಲೇ ನೀಡಿದ ಸಂದರ್ಭವನ್ನು ಪುನಃ ಕೇಳಿಸಬೇಡಿ.
+8. **Search queries** — Always search in English (2–5 words). `search_advisory` maps regional crop and pest names to English itself.
+
+{% include "skills/crop/advice/flow.md" %}

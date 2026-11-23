@@ -2,7 +2,6 @@
 Tools for the BharatVistaar AI Agent.
 """
 
-# from agents.tools.search_beckn import search_documents
 
 import os
 from dataclasses import replace
@@ -22,8 +21,6 @@ from pydantic_ai import Tool
 from helpers.gemma_schema import gemma_compatible
 from agents.tools.ffs import ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, ffs_find_shops, ffs_create_booking
 
-from agents.tools.amul_vistaar import call_amul_vistaar_network
-from agents.tools.maha_vistaar import call_maha_vistaar_network
 # PM-KISAN's two capabilities move together on one flag: they share an OTP, so
 # a farmer who asked for one on v1 cannot spend it on v2. One signature differs
 # -- pmkisan_grievance_status takes a filing date on v2.
@@ -126,13 +123,7 @@ from agents.tools.khc import (
     check_khc_grievance_status,
     register_khc_grievance,
 )
-from agents.tools.terms import search_terms
-from agents.tools.search import (
-    search_documents,
-    search_video,
-    search_pests_diseases,
-    search_schemes,
-)
+from agents.tools.search import search_schemes
 from agents.tools.advisory import search_advisory
 # Unlike mandi, weather's v2 output differs: the provider mapping drops fields
 # the v0.1 pack cannot hold. See migration-plan/weather/plan.md.
@@ -161,7 +152,6 @@ else:
         list_sathi_crops_in_group,
         search_sathi_seed_availability,
     )
-from agents.tools.npss import analyze_crop_image
 from agents.tools.agristack import (
     get_agristack_farmer_location,
     get_agristack_farmer_crops,
@@ -202,16 +192,6 @@ TOOLS = [
     Tool(ffs_get_entitlement, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
     Tool(ffs_find_shops, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
     Tool(ffs_create_booking, takes_ctx=True, sequential=True, strict=False, prepare=_gemma_schema),
-    Tool(
-        call_amul_vistaar_network,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        call_maha_vistaar_network,
-        takes_ctx=True,
-        strict=False,
-    ),
     Tool(
         initiate_pm_kisan_status_check, 
         takes_ctx=True,
@@ -348,32 +328,12 @@ TOOLS = [
         strict=False,
     ),
     Tool(
-        search_terms,
-        takes_ctx=False,
-        strict=False,
-    ),
-    Tool(
-        search_documents,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
         search_schemes,
         takes_ctx=True,
         strict=False,
     ),
     Tool(
         search_advisory,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        search_video,
-        takes_ctx=False,
-        strict=False,
-    ),
-    Tool(
-        search_pests_diseases,
         takes_ctx=True,
         strict=False,
     ),
@@ -415,11 +375,6 @@ TOOLS = [
     *_SATHI_CROP_TOOLS,
     Tool(
         search_sathi_seed_availability,
-        takes_ctx=True,
-        strict=False,
-    ),
-    Tool(
-        analyze_crop_image,
         takes_ctx=True,
         strict=False,
     ),

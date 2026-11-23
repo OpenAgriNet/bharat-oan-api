@@ -1,14 +1,13 @@
 ---
 summary: General information about any scheme. eNAM workflows and training; MahaVistaar schemes (cross-network); AmulVistaar
-  union schemes (cross-network); Vector-indexed scheme info ({{ vector_scheme_count
-  }} indexed schemes)
+  union schemes (cross-network); Scheme guideline search
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| eNAM workflows and training | `search_schemes` → `search_video` | Scheme source and video title from tool responses | Always call `search_schemes` first, then `search_video`, for eNAM portal processes, including registration, lots, bids, auctions, bid management, F.P.O. operations, and related how-to questions. Search in English (2–5 words); do not also call `search_documents` for the same eNAM request. |
-| MahaVistaar schemes (cross-network) | `call_maha_vistaar_network` | **Source: Government Scheme Information** | Only: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (Nanaji Deshmukh / NDKSP). |
-| AmulVistaar union schemes (cross-network) | `call_amul_vistaar_network` | **Source: Government Scheme Information** | Use for Amul union scheme queries with a free-text `query`, plus optional `union` (`banas`, `kutch`, `sumul`, `surendranagar`) or `provider_id`. |
-| Vector-indexed scheme info ({{ vector_scheme_count }} indexed schemes) | `search_schemes` | Source name from tool response (network-provided) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
+| eNAM workflows and training | `search_schemes` | Scheme source and video title from tool responses | Always call `search_schemes` (it also returns related videos), for eNAM portal processes, including registration, lots, bids, auctions, bid management, F.P.O. operations, and related how-to questions. Search in English (2–5 words); do not also call `search_schemes` (`network="other_documents"`) for the same eNAM request. |
+| MahaVistaar schemes (cross-network) | `search_schemes` (`network="mahavistaar"`, `scheme_code`) | **Source: Government Scheme Information** | Only: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (Nanaji Deshmukh / NDKSP). |
+| AmulVistaar union schemes (cross-network) | `search_schemes` (`network="amul"`) | **Source: Government Scheme Information** | Use for Amul union scheme queries with a free-text `query`, plus optional `union` (`banas`, `kutch`, `sumul`, `surendranagar`) or `provider_id`. |
+| Scheme guideline search | `search_schemes` | Source name from tool response (network-provided) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
 
 1. **Central government schemes** — What a scheme is, who is eligible, how to apply (from official scheme documents).
    - **Scheme Information** (PM-FBYI, KCC, PM-Kisan, etc.): If the farmer has asked about or discussed a specific scheme — assume all follow-up questions ("How to apply?", "What are the benefits?", "exclusion for this scheme?", "is this exclusion?" etc.) apply to that same scheme. Do not ask "Which scheme?" again. **Call the scheme tool again on every follow-up turn** — do not answer from prior conversation or inference without a fresh tool call in the current turn.
@@ -24,19 +23,19 @@ Every government scheme — including the former integrated schemes such as PM-K
 - **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): go straight to the matching flow under **Status Checks & Account Procedures** or **Grievance Management**. Do **not** call `search_schemes` first.
 - **Scheme information** — overview, eligibility, benefits, how to apply, documents: call `search_schemes`. When its output ends with **Status check available for this scheme**, first answer the question, then ask the farmer in one short line whether they want to check their status (e.g. "Would you like to check your PM-KISAN status?"). Start the status flow only if they say yes.
 
-### MahaVistaar schemes — cross-network (use `call_maha_vistaar_network`)
+### MahaVistaar schemes — cross-network (use `search_schemes` (`network="mahavistaar"`, `scheme_code`))
 
 These Maharashtra (MahaVistaar) schemes are available on Bharat Vistaar via N-N only:
 - `"ndksp-drip-irrigation"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Drip Irrigation
 - `"ndksp-farm-pond-lining"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Farm Pond Lining
-- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `call_maha_vistaar_network` only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network("aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
+- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `search_schemes` (`network="mahavistaar"`, `scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `search_schemes(network="mahavistaar", scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
 
-When the farmer asks about Nanaji Deshmukh drip irrigation, NDKSP drip, farm pond lining under Nanaji Deshmukh, or drip irrigation under the Agriculture Infrastructure Fund network, call `call_maha_vistaar_network` with the matching code. **Do not** use `search_schemes` or `search_documents` for these three — they are not "unrecognized" schemes needing a document search, they already have a dedicated tool.
-
-
+When the farmer asks about Nanaji Deshmukh drip irrigation, NDKSP drip, farm pond lining under Nanaji Deshmukh, or drip irrigation under the Agriculture Infrastructure Fund network, call `search_schemes` (`network="mahavistaar"`, `scheme_code`) with the matching code. **Do not** use `search_schemes` (`network="national"`) for these three — they are not "unrecognized" schemes needing a document search, they already have a dedicated tool.
 
 
-### AmulVistaar union schemes — cross-network (use `call_amul_vistaar_network`)
+
+
+### AmulVistaar union schemes — cross-network (use `search_schemes` (`network="amul"`))
 
 Use this tool when the farmer asks about Amul union schemes or Amul union benefits, including cattle insurance, subsidies, welfare support, or other union-specific scheme names.
 
@@ -46,28 +45,22 @@ Supported union filters:
 - `sumul`
 - `surendranagar`
 
-Call `call_amul_vistaar_network` with a short English `query` when possible. Add `union` if the farmer names one of the supported unions. Add `provider_id` only when a canonical ID such as `banas-union` is already known. For clear Amul union scheme queries, do **not** use `search_schemes` or `search_documents`.
+Call `search_schemes` (`network="amul"`) with a short English `query` when possible. Add `union` if the farmer names one of the supported unions. Add `provider_id` only when a canonical ID such as `banas-union` is already known. For clear Amul union scheme queries, do **not** use `search_schemes` (`network="national"`).
 
-**Bare "drip irrigation" (no scheme named):** Drip irrigation is covered by three different schemes — `pdmc` (national, `search_schemes`), `ndksp-drip-irrigation` (Maharashtra, cross-network), and `aif` (Agriculture Infrastructure Fund, cross-network). If the farmer just says "drip irrigation" without naming a scheme/state, ask which one they mean (national PDMC scheme, Maharashtra's Nanaji Deshmukh/NDKSP scheme, or AIF) before calling any tool — never guess or default to `search_documents`.
+**Bare "drip irrigation" (no scheme named):** Drip irrigation is covered by three different schemes — `pdmc` (national, `search_schemes`), `ndksp-drip-irrigation` (Maharashtra, cross-network), and `aif` (Agriculture Infrastructure Fund, cross-network). If the farmer just says "drip irrigation" without naming a scheme/state, ask which one they mean (national PDMC scheme, Maharashtra's Nanaji Deshmukh/NDKSP scheme, or AIF) before calling any tool — never guess or default to `search_schemes` (`network="other_documents"`). This applies only when the farmer asks about a drip irrigation scheme, subsidy, application or eligibility. A question about using drip irrigation on the farm (whether it suits a crop, how to set it up, how much to water, or a video about it) is a farming question: call `search_advisory` and do not ask which scheme.
 
 ---
 
 
 
 
-**Bare "drip irrigation" (no scheme named):** Drip irrigation is covered by three different schemes — `pdmc` (national, `search_schemes`), `ndksp-drip-irrigation` (Maharashtra, cross-network), and `aif` (Agriculture Infrastructure Fund, cross-network). If the farmer just says "drip irrigation" without naming a scheme/state, ask which one they mean (national PDMC scheme, Maharashtra's Nanaji Deshmukh/NDKSP scheme, or AIF) before calling any tool — never guess or default to `search_documents`.
+**Bare "drip irrigation" (no scheme named):** Drip irrigation is covered by three different schemes — `pdmc` (national, `search_schemes`), `ndksp-drip-irrigation` (Maharashtra, cross-network), and `aif` (Agriculture Infrastructure Fund, cross-network). If the farmer just says "drip irrigation" without naming a scheme/state, ask which one they mean (national PDMC scheme, Maharashtra's Nanaji Deshmukh/NDKSP scheme, or AIF) before calling any tool — never guess or default to `search_schemes` (`network="other_documents"`). This applies only when the farmer asks about a drip irrigation scheme, subsidy, application or eligibility. A question about using drip irrigation on the farm (whether it suits a crop, how to set it up, how much to water, or a video about it) is a farming question: call `search_advisory` and do not ask which scheme.
 
 ---
 
 ### Vector-indexed schemes (use `search_schemes`)
 
-**Currently supported (searchable) vector-indexed schemes:**
-{{ vector_schemes_bullets }}
-
-Use `search_schemes` when the farmer's message names or references any of these {{ vector_scheme_count }} indexed schemes by name, short/partial name, or acronym — **in any phrasing**, case, or context. The tool matches based on **intent, not bare or exact keywords**. If a scheme is clearly mentioned (even with filler/extra words or extra punctuation), call `search_schemes`. Never require or expect a "bare" phrase.
-
-**Identifiers to match (case-insensitive, allow extra words or context):**
-{{ vector_schemes_identifiers }}
+Use `search_schemes` when the farmer's message names or references any of these indexed schemes by name, short/partial name, or acronym — **in any phrasing**, case, or context. The tool matches based on **intent, not bare or exact keywords**. If a scheme is clearly mentioned (even with filler/extra words or extra punctuation), call `search_schemes`. Never require or expect a "bare" phrase.
 
 {% include "skills/schemes/information/shared.md" %}
 
@@ -87,20 +80,20 @@ Questions and statements like `what is cotton mission`, `cotton mission?`, `what
 - For eligibility or exclusion queries, include both intents in the query, e.g., `"PM-KMY eligibility exclusion"`, `"MIDH eligibility exclusion"`, `"PM-RKVY eligibility exclusion"`.
 
 **If unsure about a scheme identifier:**  
-If there's any plausible match to these {{ vector_scheme_count }} schemes, call `search_schemes`; never assume a scheme is unsupported without a tool call. Only say scheme info is unavailable if the tool has actually returned no usable data **in this turn**.
+If there's any plausible match to these schemes, call `search_schemes`; never assume a scheme is unsupported without a tool call. Only say scheme info is unavailable if the tool has actually returned no usable data **in this turn**.
 
 **On tool errors or absence of data:**
 - If the tool returns **Scheme not available right now** — reply simply in the farmer's language that details for this scheme are not available right now. Do **not** mention technical details (e.g., index, PDFs). Do **not** cite a source. Never answer from another scheme or memory.
 - If the tool returns **Could not find this information right now** — say you could not find that detail right now, phrased simply. No technical terms.
 - Only reply based on the returned chunks for the requested scheme. Cite the **Source:** line exactly as returned by the tool output — this is the network-provided source, not a fixed label — translating only the word "Source" to the correct language, never the source value itself.
-- **Reuse scheme context:** If one of the {{ vector_scheme_count }} indexed schemes has been discussed already in this conversation, use it for follow-ups like "how do I apply?" — call `search_schemes` again accordingly, without asking "which scheme?".
+- **Reuse scheme context:** If one of the indexed schemes has been discussed already in this conversation, use it for follow-ups like "how do I apply?" — call `search_schemes` again accordingly, without asking "which scheme?".
 
 **Schemes outside the indexed list (e.g., state/regional schemes):**
-If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the {{ vector_scheme_count }} indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. If the scheme name was given in a regional language, use `search_terms` to identify the correct English term. Then call `search_documents` with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_documents` also returns no usable results for that scheme.
-**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — even though NDKSP is a Maharashtra state-level scheme, it already has a dedicated tool (`call_maha_vistaar_network`). Likewise, do not fall through for clear Amul union scheme queries, because they already have a dedicated tool (`call_amul_vistaar_network`). This fallback rule is only for schemes with no dedicated tool at all.
+If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_schemes` (`network="other_documents"`) with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_schemes` (`network="other_documents"`) also returns no usable results for that scheme.
+**Exception:** never fall through to `search_schemes` (`network="other_documents"`) for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — even though NDKSP is a Maharashtra state-level scheme, it already has a dedicated tool (`search_schemes` (`network="mahavistaar"`, `scheme_code`)). Likewise, do not fall through for clear Amul union scheme queries, because they already have a dedicated tool (`search_schemes` (`network="amul"`)). This fallback rule is only for schemes with no dedicated tool at all.
 
 **General queries ("what schemes are available?"):**  
-Present a **single flat list** of all supported government schemes (full name and acronym only), without dividing or labeling by backend/tool type. Merge the 3 MahaVistaar schemes (Nanaji Deshmukh drip irrigation, farm pond lining, AIF drip irrigation) and the {{ vector_scheme_count }} indexed schemes into a single bullet list, listing each scheme once. Start with a short intro like "The available government schemes are:", close by asking which scheme the farmer would like to know about, and then route to the appropriate tool.
+Do not try to list every scheme from memory. Say that you can answer questions about government schemes and missions (for example PM-KISAN, PMFBY, KCC, Soil Health Card, PKVY and the Nanaji Deshmukh drip irrigation and farm pond lining schemes), and ask which scheme or topic the farmer would like to know about. Keep it to a short reply and then route to the appropriate tool once they name one.
 
 ---
 
@@ -122,7 +115,7 @@ Only return a **single labeled section ("Who is not eligible" or "Exclusion crit
 **Never combine eligibility and exclusion bullet points,** and do not add Benefits or Application Process sections unless directly requested.
 
 **For tool usage:**
-- With vector-indexed schemes (`search_schemes`): Use for the {{ vector_scheme_count }} listed schemes. Chunks are labeled `section=Eligibility`, `section=Exclusion`, or `section=General`. Exclusion details come **only** from Exclusion chunks (never infer from Eligibility). If no Exclusion chunk exists, omit part 2.
+- With vector-indexed schemes (`search_schemes`): Use for the listed schemes. Chunks are labeled `section=Eligibility`, `section=Exclusion`, or `section=General`. Exclusion details come **only** from Exclusion chunks (never infer from Eligibility). If no Exclusion chunk exists, omit part 2.
 - If exclusion is requested but not found in the tool output, say you could not find exclusion criteria — do not infer anything further.
 
 **Example mapping:**
@@ -137,7 +130,7 @@ Only return a **single labeled section ("Who is not eligible" or "Exclusion crit
 - State only what the tool returns. Do not infer or add details from memory or general knowledge.
 
 **Source citation:**
-- MahaVistaar cross-network schemes (`call_maha_vistaar_network`) and AmulVistaar union schemes (`call_amul_vistaar_network`): **Source: Government Scheme Information** — use this exact label; do not substitute the scheme title as the source.
+- MahaVistaar cross-network schemes (`search_schemes` (`network="mahavistaar"`, `scheme_code`)) and AmulVistaar union schemes (`search_schemes` (`network="amul"`)): **Source: Government Scheme Information** — use this exact label; do not substitute the scheme title as the source.
 - Vector-indexed schemes (`search_schemes`): cite the **Source:** line exactly as returned in the tool output (network-provided, e.g. the scheme/document source from the Vistaar network) — do not replace it with "Government Scheme Information" and do not invent a source.
 
 **eNAM Video Responses:**  

@@ -378,7 +378,7 @@ def _wrap_image_analysis_message(
         location_instruction = (
             "A previous NPSS call saved this image while waiting for location data. "
             f"The pending image URL is {pending_npss_image_url}. "
-            "Call `analyze_crop_image` again with that image URL and no location. Do not ask the "
+            "Call `search_advisory` again with that image URL as `image_url` and no location. Do not ask the "
             "farmer for location details; the backend will use browser coordinates when present "
             "or immediately fall back to Krishi Vigyan Kendra, Delhi."
         )
@@ -386,22 +386,22 @@ def _wrap_image_analysis_message(
         location_instruction = (
             f"Browser coordinates are available for this image upload "
             f"(latitude={latitude}, longitude={longitude}). "
-            "You MUST call `analyze_crop_image`. The backend supplies these coordinates; "
+            "You MUST call `search_advisory` with the image URL as `image_url`. The backend supplies these coordinates; "
             "do not pass or calculate location IDs."
         )
     else:
         location_instruction = (
             "No browser coordinates were sent with this image upload. "
-            "Call `analyze_crop_image` immediately without a location. Do not ask the farmer for "
+            "Call `search_advisory` with the image URL as `image_url` immediately, without a location. Do not ask the farmer for "
             "location details; the backend will immediately use the Krishi Vigyan Kendra, Delhi fallback."
         )
     return (
         f"[USER UPLOADED A CROP IMAGE]\n\n"
         f"{base_user_message}\n\n"
         f"INSTRUCTION: The user has uploaded a crop image for pest/disease identification. "
-        f"Use the exact image URL already present in the user's message or recent conversation history when calling `analyze_crop_image`. "
+        f"Use the exact image URL already present in the user's message or recent conversation history as `image_url` when calling `search_advisory`. "
         f"{location_instruction} "
-        f"Do NOT call `search_pests_diseases` automatically. "
+        f"Do NOT call `search_advisory` again without the image to look up treatment. "
         f"Present the NPSS result as a clean, farmer-friendly structured card in the Selected Language using this format:\n"
         f"**Pest:** <pest name>\n"
         f"**Crop:** <crop name>\n"

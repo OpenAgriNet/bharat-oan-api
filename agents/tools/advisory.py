@@ -1,19 +1,19 @@
 """
-Crop advisory search through the Beckn network (BAP /search, category knowledge-advisory).
+Crop and livestock advisory search through the Knowledge Provider (POST /search, search_profile advisory).
 
-The provider searches advisory chunks that docs-pipeline stores in Qdrant and answers with
-an on_search catalog whose items carry `chunk-details` tags: title, crop, section, score,
-doc_id, chunk_id, source, text (text already ends with a "Source:" line).
+The one advisory tool: every crop, pest, disease and livestock question goes to KP, and a crop photo goes to
+NPSS for pest/disease identification. Regional crop/pest words are mapped to their English glossary term first.
+
+KP filters advisory passages on the crop and boosts season, days after sowing and the farmer's
+place. Each hit carries text (already ending with a "Source:" line), doc_id, chunk_id, section,
+location_match and the advisory's LGD places; `advisory_search` carries the search status.
 
 Flow: search first (no questions), then inspect the returned chunks. Every chunk text starts
 with a header line such as `Crop: Wheat | Problem type: Pest | Season: Rabi,Kharif`; the season is
 read from it. When the farmer named a season that none of the chunks cover, the tool searches once
 more (crop + season + days) and, if that finds nothing either, offers the seasons that do exist.
 """
-import os
 import re
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -22,8 +22,10 @@ from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
-from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
-from app.config import DEFAULT_HTTP_TIMEOUT
+from agents.tools.imd_advisory import agromet_note
+from agents.tools.npss import analyze_crop_image
+from agents.tools.terms import to_english
+from helpers import knowledge_provider
 from helpers.advisory_pending import (
     LOCATION_MARKER,
     PENDING_MARKER,
@@ -31,6 +33,8 @@ from helpers.advisory_pending import (
     answer_chain,
     farmer_gave_days,
     farmer_gave_season,
+    describe_turns,
+    farmer_named_crop,
     farmer_wrote,
     may_answer_now,
 )
@@ -42,8 +46,12 @@ logger = get_logger(__name__)
 
 KNOWLEDGE_ADVISORY_CATEGORY = "knowledge-advisory"
 
-# Source shown to the farmer for every advisory answer.
+# Source shown to the farmer for advisories from Kisan Sarathi.
 ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
+# The provider's `origin` for an advisory PDF uploaded in docs-pipeline; those cite the PDF's name.
+PDF_ADVISORY_ORIGIN = "docs-pipeline"
+# Crop of the coffee PDF advisories. They carry no season, sowing stage or place, so they are answered at once.
+COFFEE_CROP = "coffee"
 
 # Longest value forwarded for crop / season, and the accepted range for days after sowing.
 _MAX_PARAM_LENGTH = 100
@@ -128,6 +136,11 @@ def _crop_eq(chunk_crop: str, crop: str) -> bool:
     return bool(a) and bool(b) and (a == b or a in b or b in a)
 
 
+def is_coffee_pdf(result: Dict[str, Any]) -> bool:
+    """True for a coffee chunk from an uploaded PDF (provider `origin` docs-pipeline, crop Coffee)."""
+    return result.get("origin") == PDF_ADVISORY_ORIGIN and _crop_eq(result.get("crop") or "", COFFEE_CROP)
+
+
 def relevant_for_crop(results: List[Dict[str, Any]], crop_hint: str, query: str) -> tuple[List[Dict[str, Any]], str]:
     """Keep the chunks that are about the farmer's crop. Returns (chunks, crop name for a re-query filter).
 
@@ -149,37 +162,8 @@ def relevant_for_crop(results: List[Dict[str, Any]], crop_hint: str, query: str)
 # Request / response
 # ---------------------------------------------------------------------------
 
-def _search_params_tag(
-    crop: str,
-    days_after_sowing: Optional[int],
-    season: str = "",
-    top_k: Optional[int] = None,
-    state_lgd_code: Optional[int] = None,
-    district_lgd_code: Optional[int] = None,
-) -> List[Dict[str, Any]]:
-    """`search_params` tag group the provider reads: crop, days_after_sowing, season, top_k and the farmer's
-    place as LGD codes (only when the farmer gave one)."""
-    entries = []
-    for code, value in (
-        ("crop", crop),
-        ("days_after_sowing", days_after_sowing),
-        ("season", season),
-        ("top_k", top_k),
-        ("state_lgd_code", state_lgd_code),
-        ("district_lgd_code", district_lgd_code),
-    ):
-        if value is None or value == "":
-            continue
-        entries.append({"descriptor": {"code": code}, "value": str(value)})
-    if not entries:
-        return []
-    return [{"descriptor": {"code": "search_params"}, "list": entries}]
-
-
 def build_advisory_search_payload(
     query: str,
-    session_id: str = "",
-    question_id: str = "",
     crop: str = "",
     days_after_sowing: Optional[int] = None,
     season: str = "",
@@ -187,144 +171,105 @@ def build_advisory_search_payload(
     state_lgd_code: Optional[int] = None,
     district_lgd_code: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Beckn /search body for advisory document search (knowledge-advisory).
+    """KP /search body for the advisory profile.
 
-    `crop`, `days_after_sowing`, `season`, `top_k` and the farmer's place as `state_lgd_code` /
-    `district_lgd_code` travel in `item.tags` (group `search_params`). The provider filters on `crop` and
-    only boosts `season`, days and the place.
+    The farmer's situation travels in `advisory`: KP filters on `crop` and only boosts `season`,
+    `days_after_sowing` and the place (`state_lgd_code` / `district_lgd_code`).
     """
-    now = datetime.now(timezone.utc)
-    item: Dict[str, Any] = {"descriptor": {"name": query}}
-    tags = _search_params_tag(
-        _clean_param(crop),
-        _clean_days(days_after_sowing),
-        _clean_param(season),
-        _clean_top_k(top_k),
-        state_lgd_code,
-        district_lgd_code,
-    )
-    if tags:
-        item["tags"] = tags
-    return {
-        "context": {
-            "domain": "schemes:vistaar",
-            "action": "search",
-            "version": "1.1.0",
-            "bap_id": os.getenv("BAP_ID"),
-            "bap_uri": os.getenv("BAP_URI"),
-            "bpp_id": os.getenv("BPP_ID"),
-            "bpp_uri": os.getenv("BPP_URI"),
-            "transaction_id": str(uuid.uuid4()),
-            "message_id": str(uuid.uuid4()),
-            "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
-            "ttl": "PT10M",
-            "location": {
-                "country": {"code": "IND"},
-                "city": {"code": "*"},
-            },
-            "tags": {
-                "session_id": session_id,
-                "question_id": question_id,
-            },
-        },
-        "message": {
-            "intent": {
-                "category": {
-                    "descriptor": {
-                        "code": KNOWLEDGE_ADVISORY_CATEGORY,
-                        "name": KNOWLEDGE_ADVISORY_CATEGORY,
-                    }
-                },
-                "item": item,
-            }
-        },
+    advisory = {
+        key: value
+        for key, value in (
+            ("crop", _clean_param(crop)),
+            ("season", _clean_param(season)),
+            ("days_after_sowing", _clean_days(days_after_sowing)),
+            ("state_lgd_code", state_lgd_code),
+            ("district_lgd_code", district_lgd_code),
+        )
+        if value is not None and value != ""
     }
+    body: Dict[str, Any] = {"query": query, "search_profile": "advisory"}
+    top_k = _clean_top_k(top_k)
+    if top_k:
+        body["top_k"] = top_k
+    if advisory:
+        body["advisory"] = advisory
+    return body
 
 
-def _split_names(value: Optional[str]) -> List[str]:
-    return [part.strip() for part in str(value or "").split(",") if part.strip()]
+def _advisory_result_from_hit(hit: Dict[str, Any], score: float, crop: str) -> Optional[Dict[str, Any]]:
+    """Map one KP hit to an advisory result dict (None when it has no text).
 
-
-def _advisory_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Map one on_search item to an advisory result dict (None when it has no text)."""
-    if not isinstance(item, dict):
+    `crop` is the crop KP filtered on; without one, the hit's first crop key is used.
+    """
+    if not isinstance(hit, dict):
         return None
-    details = _item_chunk_details_map(item)
-    desc = item.get("descriptor") if isinstance(item.get("descriptor"), dict) else {}
-
-    text = (details.get("text") or desc.get("long_desc") or "").strip()
+    text = str(hit.get("text") or "").strip()
     if not text:
         return None
-    try:
-        score = float(details.get("score") or 0)
-    except (TypeError, ValueError):
-        score = 0.0
+    place = hit.get("advisory") if isinstance(hit.get("advisory"), dict) else {}
+    crop_keys = hit.get("crop_keys") if isinstance(hit.get("crop_keys"), list) else []
     return {
-        "title": (details.get("title") or desc.get("name") or "").strip(),
-        "crop": (details.get("crop") or "").strip(),
-        "section": (details.get("section") or "").strip().lower(),
+        "title": str(hit.get("title_en") or hit.get("name_en") or hit.get("title") or "").strip(),
+        "crop": crop or (str(crop_keys[0]) if crop_keys else ""),
+        "section": str(hit.get("section") or "").strip().lower(),
         "score": score,
-        "doc_id": (details.get("doc_id") or "").strip(),
-        "chunk_id": (details.get("chunk_id") or item.get("id") or "").strip(),
-        "source": (details.get("source") or "").strip(),
+        "doc_id": str(hit.get("doc_id") or "").strip(),
+        "chunk_id": str(hit.get("chunk_id") or hit.get("_id") or "").strip(),
+        "source": str(hit.get("origin") or "").strip(),
+        "origin": str(hit.get("origin") or "").strip().lower(),
         "text": text,
         "seasons": parse_chunk_seasons(text),
-        # Where the advisory applies. Chunks from a provider without location read as "applies everywhere".
-        "location_match": (details.get("location_match") or "not_requested").strip().lower(),
-        "location_national": (details.get("location_national") or "true").strip().lower() != "false",
-        "location_states": _split_names(details.get("location_states")),
-        "location_districts": _split_names(details.get("location_districts")),
+        # Where the advisory applies. Passages indexed without places read as "applies everywhere".
+        "location_match": str(hit.get("location_match") or "not_requested").strip().lower(),
+        "location_national": place.get("location_national", True) is not False,
+        "location_states": [str(n) for n in place.get("location_state_names") or [] if n],
+        "location_districts": [str(n) for n in place.get("location_district_names") or [] if n],
     }
 
 
 def parse_advisory_response(data: Dict[str, Any]) -> tuple[List[Dict[str, Any]], Dict[str, str]]:
-    """Parse the BAP client /search response into (advisory results, search-context map)."""
-    responses = data.get("responses") if isinstance(data, dict) else None
-    if not isinstance(responses, list) or not responses:
+    """Parse the KP /search response into (advisory results, search-context map)."""
+    if not isinstance(data, dict):
         return [], {}
+    search_ctx = knowledge_provider.context_strings(data.get("advisory_search"))
+    crop = search_ctx.get("crop", "")
+    results = []
+    for hit in data.get("hits") or []:
+        parsed = _advisory_result_from_hit(hit, knowledge_provider.hit_score(hit, data) if isinstance(hit, dict) else 0.0, crop)
+        if parsed:
+            results.append(parsed)
+    return results, search_ctx
 
-    fallback_ctx: Dict[str, str] = {}
-    for rsp in responses:
-        if not isinstance(rsp, dict):
-            continue
-        message = rsp.get("message") if isinstance(rsp.get("message"), dict) else {}
-        catalog = message.get("catalog") if isinstance(message.get("catalog"), dict) else {}
-        if not catalog:
-            continue
 
-        ctx = _catalog_search_context_map(catalog)
-        results: List[Dict[str, Any]] = []
-        for prov in catalog.get("providers") or []:
-            if not isinstance(prov, dict):
-                continue
-            for item in prov.get("items") or []:
-                parsed = _advisory_result_from_item(item)
-                if parsed:
-                    results.append(parsed)
-        if results:
-            return results, ctx
-        if not fallback_ctx:
-            fallback_ctx = ctx
-    return [], fallback_ctx
+def _same_words(a: str, b: str) -> bool:
+    return " ".join(re.findall(r"\w+", a.lower())) == " ".join(re.findall(r"\w+", b.lower()))
 
 
 _TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
+
+
+def advisory_source(result: Dict[str, Any]) -> str:
+    """Source to cite for one advisory: the PDF's name for an uploaded PDF, else ADVISORY_SOURCE."""
+    if result.get("origin") == PDF_ADVISORY_ORIGIN and result.get("title"):
+        return result["title"]
+    return ADVISORY_SOURCE
 
 
 def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
     """Readable block per advisory for the agent.
 
     The provider appends "Source: institute, creator" to each text. That line names the
-    institute and a user name, so it is removed here; the answer cites ADVISORY_SOURCE instead.
+    institute and a user name, so it is removed here; the answer cites advisory_source instead.
     """
     blocks = []
     for r in results:
         text = _TRAILING_SOURCE.sub("", r["text"]).rstrip()
         blocks.append(f"**{r.get('title') or 'Advisory'}**\n```\n{text}\n```")
+    sources = list(dict.fromkeys(advisory_source(r) for r in results))
     return (
         "> Advisory Search Results for `" + query + "`\n\n"
         + "\n\n----\n\n".join(blocks)
-        + f"\n\n> Cite as (in bold): **Source: {ADVISORY_SOURCE}**"
+        + f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
     )
 
 
@@ -454,6 +399,13 @@ def format_search_notes(
     return "\n".join(lines)
 
 
+POLITE_ASK = (
+    "Be polite and warm: start the question with \"Could you please tell me\" (in the farmer's language). Never "
+    "say \"I can only answer after you tell me\", \"I need\", \"you must\", \"before I can answer\" or any "
+    "wording that sounds like a condition or an order; do not open with the crop or the topic."
+)
+
+
 def _join_names(names: List[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
@@ -482,7 +434,7 @@ def format_details_question(seasons: List[str], need_season: bool, need_days: bo
         f"{PENDING_MARKER}\n> Advisory Search Results for `{query}`\n\n"
         "> Advisories were found, but the right one depends on details the farmer has not given. Do not give any "
         "advice yet. Your whole reply is only that one question: no introduction or explanation of why you are "
-        "asking, no repeated sentence, and no Source line. Ask the farmer ONE short, natural question asking "
+        "asking, no repeated sentence, and no Source line. " + POLITE_ASK + " Ask the farmer ONE short, natural question asking "
         + " and ".join(parts)
         + f". Example (use the farmer's crop name instead of \"your crop\" and translate it to the farmer's language): \"{example}\"." + seasons_note
         + " Do not suggest which season it is or say which season the advice is for: the farmer decides."
@@ -504,13 +456,24 @@ def format_season_suggestion(season: str, subject: str, seasons: List[str]) -> s
     )
 
 
+def format_crop_question(query: str, crops: List[str]) -> str:
+    """Result when no crop was given and the advisories found are about several crops: ask which one."""
+    return (
+        f"{PENDING_MARKER}\n> Advisory Search Results for `{query}`\n\n"
+        f"> The advisories found are for different crops ({_join_names(crops)}), and the farmer has not said which "
+        "crop. Do not give any advice yet. Your whole reply is only one short, natural question asking which crop "
+        "(translate it to the farmer's language), with no Source line. " + POLITE_ASK + " When they answer, call "
+        "`search_advisory` again with the same `query` plus `crop` and `crop_words`."
+    )
+
+
 def format_location_question(query: str, restate: str = "") -> str:
     """Result when the advisories depend on the farmer's place and they have not given it: ask for it."""
     return (
         f"{PENDING_MARKER}{LOCATION_MARKER}\n> Advisory Search Results for `{query}`\n\n"
         "> These advisories are meant for particular places, and the farmer has not said where they farm. Do not give "
         "any advice yet. Your whole reply is only that one question: no introduction or explanation of why you are "
-        "asking, no repeated sentence, and no Source line. Ask the farmer ONE short, natural question asking their "
+        "asking, no repeated sentence, and no Source line. " + POLITE_ASK + " Ask the farmer ONE short, natural question asking their "
         "state and district. Example (translate it to the farmer's language): \"Could you please tell me which state "
         "and district you are farming in?\" Write it as a normal sentence. When they answer, call `search_advisory` "
         f"again with the same `query` and `crop`{restate} plus `state` and `district` (the names they gave, in English). "
@@ -519,31 +482,20 @@ def format_location_question(query: str, restate: str = "") -> str:
 
 
 async def _post_search(payload: Dict[str, Any]) -> tuple[Optional[Dict[str, Any]], str]:
-    """POST the search to the BAP; returns (response data, error message for the agent)."""
-    bap_endpoint = os.getenv("BAP_ENDPOINT")
-    if not bap_endpoint:
-        logger.error("BAP_ENDPOINT is not set")
+    """POST the search to KP; returns (response data, error message for the agent)."""
+    if not knowledge_provider.search_url():
+        logger.error("KNOWLEDGE_PROVIDER_URL is not set")
         return None, "Advisory search service is not configured. Please try again later."
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                bap_endpoint.rstrip("/") + "/search", json=payload, timeout=DEFAULT_HTTP_TIMEOUT
-            )
+        return await knowledge_provider.search(payload), ""
+    except knowledge_provider.KnowledgeProviderError as exc:
+        logger.error("Advisory search failed: %s", exc)
     except httpx.HTTPError as exc:
         logger.error("Advisory search request failed: %s", exc)
-        return None, "Advisory search service is unavailable. Please try again later."
-    if response.status_code != 200:
-        logger.error("Advisory search returned status %s", response.status_code)
-        return None, "Advisory search service is unavailable. Please try again later."
-    try:
-        return response.json(), ""
-    except ValueError:
-        logger.error("Advisory search returned a non-JSON body")
-        return None, "Advisory search returned an unexpected response. Please try again later."
+    return None, "Advisory search service is unavailable. Please try again later."
 
 
 def _log_results(
-    transaction_id: str,
     results: List[Dict[str, Any]],
     search_ctx: Dict[str, str],
     status: str,
@@ -553,7 +505,6 @@ def _log_results(
         metadata={
             "tool": "advisory.search",
             "category": KNOWLEDGE_ADVISORY_CATEGORY,
-            "transaction_id": transaction_id,
             "network_status": status or None,
             "location_status": search_ctx.get("location_status") or None,
             "has_day_range": search_ctx.get("has_day_range") or None,
@@ -588,11 +539,9 @@ async def _run_search(
     requery: bool = False,
     place: Optional[Place] = None,
 ) -> tuple[Optional[List[Dict[str, Any]]], Dict[str, str], str, str]:
-    """One BAP search. Returns (results or None on a transport error, search context, status, message/error)."""
+    """One KP search. Returns (results or None on a transport error, search context, status, message/error)."""
     payload = build_advisory_search_payload(
         query=query,
-        session_id=ctx.deps.session_id,
-        question_id=ctx.deps.question_id,
         crop=crop,
         days_after_sowing=days,
         season=season,
@@ -600,12 +549,11 @@ async def _run_search(
         state_lgd_code=place.state_code if place else None,
         district_lgd_code=place.district_code if place else None,
     )
-    transaction_id = payload["context"]["transaction_id"]
     lf_update_current_observation(
         input={"query": query, "crop": crop or None, "days_after_sowing": days, "season": season or None, "top_k": top_k,
                "state_lgd_code": place.state_code if place else None,
                "district_lgd_code": place.district_code if place else None},
-        metadata={"tool": "advisory.search", "category": KNOWLEDGE_ADVISORY_CATEGORY, "transaction_id": transaction_id},
+        metadata={"tool": "advisory.search", "category": KNOWLEDGE_ADVISORY_CATEGORY},
     )
     data, error = await _post_search(payload)
     if data is None:
@@ -613,7 +561,7 @@ async def _run_search(
     results, search_ctx = parse_advisory_response(data)
     status = str(search_ctx.get("status") or "").strip().lower()
     message = str(search_ctx.get("message") or "").strip()
-    _log_results(transaction_id, results, search_ctx, status, requery=requery)
+    _log_results(results, search_ctx, status, requery=requery)
     return results, search_ctx, status, message
 
 
@@ -656,7 +604,7 @@ def _farmer_place(
 async def search_advisory(
     ctx: RunContext[FarmerContext],
     query: str,
-    crop: str,
+    crop: Optional[str] = None,
     days_after_sowing: Optional[int] = None,
     season: Optional[str] = None,
     location: Optional[str] = None,
@@ -664,23 +612,27 @@ async def search_advisory(
     answer_now: bool = False,
     state: Optional[str] = None,
     district: Optional[str] = None,
+    crop_words: Optional[str] = None,
+    image_url: Optional[str] = None,
 ) -> str:
     """
-    Search crop advisories for a farming problem: pests, diseases, symptoms, crop practices
-    and harvesting guidance for a specific crop, from ICAR - Kisan Sarathi.
+    Search farming advisories: crop pests, diseases, symptoms, crop and seed practices, harvesting, and
+    livestock (cattle, buffalo, goat, poultry ...) health and care. Also identifies a pest or disease from
+    an uploaded crop photo.
 
-    Use this for crop-advisory questions such as "aphids in wheat" or "when to harvest
-    sorghum". Search straight away; do not ask the farmer anything first. Do NOT use it for
-    government scheme questions (use search_schemes) or for weather, mandi prices or status checks.
+    Use this for every crop, pest, disease or livestock question, such as "aphids in wheat", "when to
+    harvest sorghum" or "my cow has fever". Search straight away; do not ask the farmer anything first
+    except the crop when a crop question names none. Do NOT use it for government scheme questions (use
+    search_schemes) or for weather, mandi prices or status checks.
 
-    The tool looks at the advisories it finds. If they depend on the season, the sowing stage or the
-    farmer's place and the farmer has not said it, the tool tells you to ask ONE short question; ask it,
+    The tool looks at the advisories it finds. If they depend on the crop, the season, the sowing stage or
+    the farmer's place and the farmer has not said it, the tool tells you to ask ONE short question; ask it,
     then call again.
 
     Args:
-        query: The farming problem in *English*, 2-5 words, including the crop (required)
-        crop: The crop in English (for example "Wheat") (required). If the farmer has not said which crop,
-            do not call this tool: ask which crop first.
+        query: The farming problem in *English*, 2-5 words, including the crop or animal (required)
+        crop: The crop in English (for example "Wheat"), only if the farmer named it in this question.
+            Leave empty for livestock questions. For a crop question that names no crop, ask which crop first.
         days_after_sowing: Whole number of days since the farmer sowed the crop, if the farmer said it.
         season: Rabi, Kharif or Zaid, if the farmer said it (also in the first message).
         location: A place the farmer mentioned that is not clearly a state or district (a village, a town),
@@ -690,11 +642,20 @@ async def search_advisory(
             (or do not want to say): the tool then answers without asking again.
         state: The farmer's state in English (for example "Uttar Pradesh"), only if the farmer said it.
         district: The farmer's district in English (for example "Agra"), only if the farmer said it.
+        crop_words: The farmer's own words naming the crop, exactly as written in their message for this
+            question (any language), for example "गेहूं". The crop must come from the farmer's current
+            question, never from an earlier question in the chat.
+        image_url: The URL of a crop photo the farmer uploaded. When given, the photo is analysed for a pest
+            or disease (National Pest Surveillance System) and the other arguments are not used.
 
     Returns:
         Advisory text with a "Search notes" line; or an instruction to ask the farmer one question; or an
-        offer of the seasons that are available; or a message saying nothing was found.
+        offer of the seasons that are available; or a message saying nothing was found; or, for a photo,
+        the NPSS identification.
     """
+    if image_url and image_url.strip():
+        return await analyze_crop_image(ctx, image_url)
+    query = to_english(query)
     days = _clean_days(days_after_sowing)
     season_value = normalize_season(season)
     # Hard guards: details only the farmer can give are ignored when the conversation does not show them.
@@ -711,12 +672,28 @@ async def search_advisory(
     # model may not carry a place over from earlier in the chat.
     place, named_place = _farmer_place(ctx, state, district, location)
     location_value = named_place
-    crop_hint = _clean_param(crop)
-    if not crop_hint:
-        raise ModelRetry(
-            "The crop is required. If the farmer named a crop, call search_advisory again with `crop`. "
-            "If they did not, ask them which crop in one short question, wait for the answer, then search."
+    # Option C: a crop the model passes must be in the farmer's words for this question. No crop is allowed
+    # (livestock); a crop question without one is caught after the search, when the results span several crops.
+    raw_crop = _clean_param(crop)
+    crop_hint = to_english(raw_crop)
+    words = _clean_param(crop_words)
+    if crop_hint and not (farmer_named_crop(ctx, crop_hint, words) or farmer_named_crop(ctx, raw_crop, words)):
+        logger.info(
+            "search_advisory: crop %r is not in the farmer's words for this question; turns (* = ended with a "
+            "search_advisory question): %s",
+            crop_hint, describe_turns(ctx, crop_hint),
         )
+        said = (answer_chain(ctx) or [("", False)])[-1][0].strip()
+        raise ModelRetry(
+            f"The crop `{crop_hint}` is not in the farmer's words for this question. Their message is: \"{said}\". "
+            "Read it again. If it names a crop (in any language), call search_advisory again with that crop as "
+            "`crop` and the farmer's exact words for it as `crop_words`; do not ask which crop. Only if it names "
+            "no crop at all, do not search: ask which crop in one short question, with no advice and no Source "
+            "line, and search when they answer."
+        )
+    # The farmer answered the crop question with only the crop: search the crop's general advisory.
+    if crop_hint and _same_words(query, crop_hint):
+        query = f"{crop_hint} crop advisory"
     limit = _clean_top_k(top_k) or 5
 
     results, search_ctx, status, message = await _run_search(
@@ -728,6 +705,15 @@ async def search_advisory(
         return _no_results_message(query, status, message)
 
     chunks, crop_name = relevant_for_crop(results, crop_hint, query)
+    found_crops = list(dict.fromkeys(r["crop"] for r in chunks if r.get("crop")))
+    if not crop_name and len(found_crops) > 1:
+        return format_crop_question(query, found_crops)
+    coffee_pdf = [r for r in chunks if is_coffee_pdf(r)]
+    if coffee_pdf:
+        # Generic answer: a coffee PDF is not tied to a season, sowing stage or place, so ask the farmer nothing.
+        # Chunk-level season/place are blanked so no re-query, suggestion or place sentence is triggered.
+        generic = [{**r, "seasons": [], "location_national": True} for r in coffee_pdf]
+        return _answer(generic, {**search_ctx, "has_day_range": "false"}, query, limit, None, "") + await agromet_note(ctx, query=query)
     seen = list(results)  # every chunk looked at, for the seasons offered later
     season_ok = [r for r in chunks if season_matches(r, season_value)] if season_value else chunks
 
@@ -766,7 +752,7 @@ async def search_advisory(
             f", `days_after_sowing`={days}" if days is not None else ""
         )
         return format_location_question(query, restate)
-    return _answer(season_ok, search_ctx, query, limit, days, named_place, place)
+    return _answer(season_ok, search_ctx, query, limit, days, named_place, place) + await agromet_note(ctx, query=query)
 
 
 def _answer(

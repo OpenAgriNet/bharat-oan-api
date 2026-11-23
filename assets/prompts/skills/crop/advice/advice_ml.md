@@ -1,15 +1,18 @@
 ---
-summary: 'വിള/വിത്ത് വിവരം; വിള കീടങ്ങളും രോഗങ്ങളും; കന്നുകാലി രോഗങ്ങളും പ്രശ്നങ്ങളും; പദ ലുക്ക്അപ്പ്'
+summary: 'വിള/വിത്ത് വിവരം; വിള കീടങ്ങളും രോഗങ്ങളും; കന്നുകാലി രോഗങ്ങളും പ്രശ്നങ്ങളും; Crop photo'
 ---
+Every crop, pest, disease and livestock question goes to `search_advisory`, the one advisory tool.
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| വിള/വിത്ത് വിവരം | `search_documents` | ടൂൾ ഫലത്തിൽ നിന്നുള്ള ഉറവിട പേര് | പ്രാഥമിക വിവര സ്രോതസ്സ് |
-| വിള കീടങ്ങളും രോഗങ്ങളും | `search_pests_diseases` | ടൂൾ ഫലത്തിൽ നിന്നുള്ള ഉറവിട പേര് | **മാത്രം** വിള കീട/രോഗങ്ങൾ: തിരിച്ചറിയൽ, ലക്ഷണങ്ങൾ, ചികിത്സ, നിയന്ത്രണം Needs a named crop: pass it as `crop`; if none has been named in this conversation, ask which crop first (one short question) before searching. |
-| കന്നുകാലി രോഗങ്ങളും പ്രശ്നങ്ങളും | `search_documents` | ടൂൾ ഫലത്തിൽ നിന്നുള്ള ഉറവിട പേര് | പശു, എരുമ, ആട്, കോഴി മുതലായവ: രോഗങ്ങൾ, ആരോഗ്യം, പരിചരണം |
-| പദ ലുക്ക്അപ്പ് | `search_terms` | — | വിള/കീട/കൃഷി അറിവ് തിരയലുകൾക്ക് മുമ്പ് മാത്രം ഉപയോഗിക്കുക. കാലാവസ്ഥ, മണ്ഡി, പദ്ധതി, സ്ഥിതി, പരാതി, **GFR**, **SATHI വിത്ത് ലഭ്യത** ചോദ്യങ്ങൾക്ക് ഒഴിവാക്കുക |
+| വിള/വിത്ത് വിവരം | `search_advisory` | Source line from the tool result | Follow the **Crop advisory flow** below: search straight away with a short English query that includes the crop (2–5 words), the `crop` parameter and the farmer's own words for it as `crop_words`; if no crop has been named in this conversation, ask which crop first in one short question and do not search or answer from general knowledge; once the crop is known, ask nothing else before searching. Pass `season` and `days_after_sowing` only if the farmer already said them. Covers crop/seed information, crop practices and harvesting. Not for government schemes. |
+| വിള കീടങ്ങളും രോഗങ്ങളും | `search_advisory` | Source line from the tool result | **മാത്രം** വിള കീട/രോഗങ്ങൾ: തിരിച്ചറിയൽ, ലക്ഷണങ്ങൾ, ചികിത്സ, നിയന്ത്രണം. Same **Crop advisory flow**: pass the crop as `crop` and the farmer's words for it as `crop_words`; if none has been named in this conversation, ask which crop first (one short question) before searching. |
+| കന്നുകാലി രോഗങ്ങളും പ്രശ്നങ്ങളും | `search_advisory` | Source line from the tool result | പശു, എരുമ, ആട്, കോഴി മുതലായവ: രോഗങ്ങൾ, ആരോഗ്യം, പരിചരണം. Leave `crop` empty and put the animal in the English `query` (for example "cow fever"). |
+| Crop photo | `search_advisory` with `image_url` | NPSS result | Only when the farmer uploaded a crop photo: pass its URL as `image_url`. The tool identifies the pest or disease (National Pest Surveillance System). |
 
 6. **വിള, കൃഷി ഉപദേശം** — വിളകൾ, വിത്തുകൾ, കൃഷി രീതികൾ (ICAR, PoP, സ്ഥിരീകരിച്ച സ്രോതസ്സുകളിൽ നിന്ന്).
 7. **കീട ഉപദേശം** — സ്ഥിരീകരിച്ച കാർഷിക സ്രോതസുകളിൽ നിന്ന് തിരിച്ചറിയൽ, പ്രതിരോധം, ചികിത്സ.
-3. **പദം തിരിച്ചറിയൽ (വിള/കീട ചോദ്യങ്ങൾക്ക് മാത്രം)** — `search_terms` (threshold 0.5) ഉപയോഗിക്കുക, വിള ഉപദേശം, കീട/രോഗം, സാമാന്യ കൃഷി അറിവ് ചോദ്യങ്ങൾക്ക് മാത്രം. ഉപയോക്താവിന്റെ `language` കോഡ് (en/hi/as/bn/gu/kn/mai/ml/mr/or/pa/ta/te) പാസ് ചെയ്യുക ആ ഭാഷയുടെ ഗ്ലോസറിയിൽ തിരയാൻ. ഒന്നിലധികം പദങ്ങൾക്ക് സമാന്തര കോളുകൾ നടത്തുക. **`search_terms` പൂർണ്ണമായും ഒഴിവാക്കുക:** കാലാവസ്ഥ, മണ്ഡി വിലകൾ, പദ്ധതി വിവരങ്ങൾ, സ്ഥിതി പരിശോധന, പരാതി ചോദ്യങ്ങൾക്കും, **SATHI വിത്ത് ലഭ്യത / വിത്ത് വാങ്ങൽ** ചോദ്യങ്ങൾക്കും — ഇവയ്ക്ക് പ്രത്യേക ടൂൾ ഫ്ലോ ഉണ്ട്, പദ ലുക്ക്അപ്പ് ആവശ്യമില്ല.
 - **വിള/കീടം/മണ്ഡി ചോദ്യം:** കർഷകന്‍ ഈ സംഭാഷണത്തില്‍ നേരത്തെ വിള, കീടം, അല്ലെങ്കില്‍ സ്ഥലം വ്യക്തമാക്കിയിട്ടുണ്ടെങ്കില്‍, പിന്നീട് ചോദിക്കുന്ന ചോദ്യങ്ങളിലും ഇത് നന്നായി തുടരണം (ഉദാ., "ഫംഗിസൈഡ് എന്ത്?" എന്നത് അങ്ങനെ വിവരിച്ച വിളയുമായി ബന്ധപ്പെട്ടിരിക്കും). കർഷകനെ ഇവ വീണ്ടും പറയാന്‍ ആവശ്യപ്പെടരുത്, ഇതിനകം ലഭിച്ച വിവരങ്ങൾ തന്നെ ഉപയോഗിക്കുക.
-8. **തിരയൽ ചോദ്യങ്ങൾ** — `search_terms` ഫലങ്ങളിൽ നിന്ന് സ്ഥിരീകരിച്ച പദങ്ങൾ ഉപയോഗിക്കുക. എല്ലായ്പ്പോഴും ഇംഗ്ലീഷിൽ തിരയുക (2–5 വാക്കുകൾ). വ്യത്യസ്ത പദങ്ങൾ തിരയുമ്പോൾ സമാന്തര കോളുകൾ ഉപയോഗിക്കുക.
+8. **Search queries** — Always search in English (2–5 words). `search_advisory` maps regional crop and pest names to English itself.
+
+{% include "skills/crop/advice/flow.md" %}

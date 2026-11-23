@@ -23,8 +23,6 @@ pytestmark = pytest.mark.skipif(os.environ.get('FFS_LIVE_CLOSING_TEST') != '1',
 def test_confirmed_and_waitlisted_closing_is_neutral(setup, monkeypatch, language, waitlisted):
     import agents.agrinet as module
     monkeypatch.setattr(models, 'ALLOW_MODEL_REQUESTS', True)
-    monkeypatch.setattr(module, 'format_vector_schemes_prompt_block', lambda: {
-        'vector_scheme_count':1, 'vector_schemes_bullets':'FFS', 'vector_schemes_identifiers':'ffs'})
 
     class Transport(httpx.AsyncBaseTransport):
         def __init__(self):

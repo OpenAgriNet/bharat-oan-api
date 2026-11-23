@@ -425,7 +425,6 @@ async def analyze_crop_image(
         location: Deprecated compatibility argument. Typed locations are ignored.
     Returns:
         str: Diagnosis result from NPSS including pest name, crop, pathogen class, and description.
-        Do NOT call `search_pests_diseases` automatically after this tool.
 
     Browser coordinates are authoritative when present. Without coordinates, the
     backend immediately uses the KVK Delhi fallback and continues analysis.

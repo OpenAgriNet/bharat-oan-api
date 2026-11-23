@@ -85,15 +85,15 @@ def test_legacy_aliases_restore_only_complete_nonempty_tool_bindings(group, pref
     assert 'pm_kisan.installments' not in state.loaded_skills  # No tools to recover from old history.
 
 
-def test_documents_shared_by_two_workflows_load_once():
-    state = SkillState(enabled_skills=['crop.advice', 'schemes.information'], preloaded_skills=[])
+def test_a_dependency_shared_by_two_workflows_loads_once():
+    state = SkillState(enabled_skills=['weather.forecast', 'mandi.prices'], preloaded_skills=[])
     skills.render_prompt(state, 'hi', CONTEXT)
     ctx = SimpleNamespace(deps=SimpleNamespace(skills=state))
-    first = asyncio.run(skills.load_skill(ctx, 'crop.advice'))
-    second = asyncio.run(skills.load_skill(ctx, 'schemes.information'))
-    assert first['loaded_skills'] == ['documents.search', 'crop.advice']
-    assert second['loaded_skills'] == ['schemes.information']
-    assert skills.render_prompt(state, 'hi', CONTEXT).count('### Document search') == 1
+    first = asyncio.run(skills.load_skill(ctx, 'weather.forecast'))
+    second = asyncio.run(skills.load_skill(ctx, 'mandi.prices'))
+    assert first['loaded_skills'] == ['location.resolve', 'weather.forecast']
+    assert second['loaded_skills'] == ['mandi.prices']
+    assert skills.render_prompt(state, 'hi', CONTEXT).count('स्थान नाम ↔ कोऑर्डिनेट्स') == 1
 
 
 @pytest.mark.parametrize('requires,error', [
@@ -129,11 +129,11 @@ def test_environment_tools_cannot_be_reenabled_through_dependency(tmp_path):
 
 def test_transitive_diamond_dependencies(tmp_path):
     def diamond(m, root):
-        m['skills']['location.resolve']['requires'] = ['documents.search']
+        m['skills']['location.resolve']['requires'] = ['soil_health.status']
         m['skills']['mandi.prices']['requires'] = ['weather.forecast', 'location.resolve']
     cat = temporary_catalog(tmp_path, diamond)
     order = cat.resolve({'mandi.prices'})
-    assert order == ['documents.search', 'location.resolve', 'weather.forecast', 'mandi.prices']
+    assert order == ['soil_health.status', 'location.resolve', 'weather.forecast', 'mandi.prices']
 
 
 def test_failed_render_does_not_partially_load(monkeypatch):
