@@ -452,6 +452,16 @@ soup; v2 renders named fields from the v0.1 pack. One case worth naming —
 not conflate them: empty says "nothing is blocking payment", absent says
 nothing at all.
 
+## Discovery
+
+Both tools used to carry `PROVIDER` and the resource ids as constants. Each
+module now has its own `_discover_*` function -- the same shape `mandi.py` and
+`weather.py` use -- and posts what the catalog returns, filtered by
+`@type` and `scheme.code` -- the code matters because PMFBY publishes
+`openagrinet:Grievance` too. Verified live: the catalog answers
+`res:pmkisan:application-status` and `res:pmkisan:grievance`, and both
+journeys still run end to end. See [../discovery.md](../discovery.md).
+
 ## Open TODOs
 
 Everything outstanding, in one place, so the next person does not have to

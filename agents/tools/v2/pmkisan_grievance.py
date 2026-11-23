@@ -23,6 +23,7 @@ migration-plan/pmkisan/plan.md.
 from __future__ import annotations
 
 import re
+import uuid
 from datetime import datetime
 from typing import Any, Dict, Literal, Optional, Tuple
 
@@ -44,8 +45,8 @@ from agents.tools.v2.pmkisan_scheme_status import (
     DRAFT,
     GRIEVANCE_CONTEXT,
     GRIEVANCE_TYPE,
-    PROVIDER,
     SCHEME,
+    _first_resource,
     adapter_error,
     build_context,
     clean_otp,
@@ -59,8 +60,45 @@ from helpers.utils import get_logger, to_ascii_digits
 
 logger = get_logger(__name__)
 
+# discover returns no offers, so this stays a constant; the provider and the
+# resource id come off the wire.
 _GRIEVANCE_OFFER = "off:pmkisan:grievance"
-_GRIEVANCE_RESOURCE = "res:pmkisan:grievance"
+
+_UNAVAILABLE_MSG = (
+    "The PM-KISAN grievance desk is not available right now. "
+    "Please try again later."
+)
+
+
+async def _discover_grievance() -> Optional[Dict[str, Any]]:
+    """The PM-KISAN grievance resource, with its catalog provider.
+
+    The scheme code is not a nicety here: PMFBY publishes openagrinet:Grievance
+    too, so matching on @type alone reaches the wrong desk.
+    """
+    body = {
+        "context": build_context("discover", str(uuid.uuid4())),
+        "message": {
+            "intent": {
+                "filters": {
+                    "type": "jsonpath",
+                    "expression": (
+                        "$.catalogs[*].resources[*] ? ("
+                        f'@.resourceAttributes."@type" == "{GRIEVANCE_TYPE}" && '
+                        f'@.resourceAttributes.scheme.code == "{SCHEME["code"]}")'
+                    ),
+                }
+            }
+        },
+    }
+    response = await post_action("discover", body)
+    if response.status_code != 200:
+        logger.error(
+            f"PM-KISAN v2 grievance discover failed: HTTP {response.status_code} "
+            f"{response.text[:300]}"
+        )
+        return None
+    return _first_resource(response.json())
 
 # The v0.1 pack enumerates these; anything else is SCH_INVALID_ENUM.
 _PUBLISHED_CATEGORIES = {
@@ -192,13 +230,17 @@ async def _send_grievance_otp(ctx: RunContext[FarmerContext], reg_no: str, purpo
             "beckn_version": "v2",
         }
     )
+    found = await _discover_grievance()
+    if not found:
+        logger.warning("PM-KISAN v2 discover found no grievance catalog")
+        return _UNAVAILABLE_MSG
     body = commitment_envelope(
         "init",
         transaction_id,
         DRAFT,
         _grievance_attributes(reg_no),
         _GRIEVANCE_OFFER,
-        _GRIEVANCE_RESOURCE,
+        found,
     )
     response = await post_action("init", body)
     if response.status_code != 200:
@@ -340,6 +382,10 @@ async def pmkisan_submit_grievance(
                 "beckn_version": "v2",
             }
         )
+        found = await _discover_grievance()
+        if not found:
+            logger.warning("PM-KISAN v2 discover found no grievance catalog")
+            return _UNAVAILABLE_MSG
         # The one PM-KISAN action carrying its payload on channels, not a contract.
         body = {
             "context": build_context("support", transaction_id),
@@ -348,7 +394,7 @@ async def pmkisan_submit_grievance(
                     "channels": [
                         {
                             **_grievance_attributes(reg_no_clean),
-                            "provider": PROVIDER,
+                            "provider": found["provider"],
                             "grievance": {
                                 "category": {"code": category_code},
                                 "description": grievance_description.strip(),
@@ -456,13 +502,17 @@ async def pmkisan_grievance_status(
         attributes = _grievance_attributes(reg_no_clean)
         attributes["case"] = {"filedOn": filed_on_iso}
         attributes["challenge"] = {"response": {"method": "OTP", "value": otp_clean}}
+        found = await _discover_grievance()
+        if not found:
+            logger.warning("PM-KISAN v2 discover found no grievance catalog")
+            return _UNAVAILABLE_MSG
         body = commitment_envelope(
             "status",
             transaction_id,
             ACTIVE,
             attributes,
             _GRIEVANCE_OFFER,
-            _GRIEVANCE_RESOURCE,
+            found,
         )
         response = await post_action("status", body)
         if response.status_code != 200:

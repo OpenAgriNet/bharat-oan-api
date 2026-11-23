@@ -33,7 +33,7 @@ import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 from langfuse import observe
@@ -72,14 +72,27 @@ def grievance_context() -> str:
 SCHEME_APPLICATION_TYPE = "openagrinet:SchemeApplication"
 GRIEVANCE_TYPE = "openagrinet:Grievance"
 
-PROVIDER = {"id": "aif", "descriptor": {"name": "Agriculture Infrastructure Fund"}}
 SCHEME = {"code": "AIF"}
 SOURCE_LINE = "**Source:** AIF Portal"
 
+# Which catalog audience to discover in -- not who we are, senderId is that.
+# visibleTo is matched by array overlap and AIF's catalog carries "*", so "*"
+# is what finds it. Same selector weather, mandi and sathi use.
+_DISCOVER_NETWORK_ID = os.getenv("OAN_PUBLIC_NETWORK_ID", "*")
+
+# Every AIF catalog resource carries one of these descriptor codes. @type is
+# openagrinet:AgricultureResource on both, so it cannot tell them apart.
+_LOAN_CODE = "aif-loan-status"
+_TICKETS_CODE = "aif-support-tickets"
+
+# discover returns catalogs and resources, never offers, so these stay
+# constants. The provider and the resource ids come off the wire.
 _LOAN_OFFER = "off:aif:loan-status"
-_LOAN_RESOURCE = "res:aif:loan-status"
 _TICKETS_OFFER = "off:aif:tickets"
-_TICKETS_RESOURCE = "res:aif:tickets"
+
+_UNAVAILABLE_MSG = (
+    "The AIF portal is not available right now. Please try again later."
+)
 
 DRAFT = "DRAFT"
 ACTIVE = "ACTIVE"
@@ -105,7 +118,7 @@ def build_context(action: str, transaction_id: str) -> Dict[str, Any]:
         "domain": os.getenv("OAN_DOMAIN", "agriculture"),
         "action": action,
         "version": "2.0.0",
-        "networkId": network_id,
+        "networkId": _DISCOVER_NETWORK_ID if action == "discover" else network_id,
         "senderId": network_id,
         "receiverId": network_id,
         "transactionId": transaction_id,
@@ -120,9 +133,14 @@ def commitment_envelope(
     state: str,
     attributes: Dict[str, Any],
     offer_id: str,
-    resource_id: str,
+    found: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """The one contract-with-one-commitment shape every AIF action uses."""
+    """The one contract-with-one-commitment shape every AIF action uses.
+
+    `found` is what a _discover_* call returned: the catalog's provider and the
+    resource it published.
+    """
+    resource_id = found["resource"]["id"]
     return {
         "context": build_context(action, transaction_id),
         "message": {
@@ -133,7 +151,7 @@ def commitment_envelope(
                         "status": {"descriptor": {"code": state}},
                         "offer": {
                             "id": offer_id,
-                            "provider": PROVIDER,
+                            "provider": found["provider"],
                             "resourceIds": [resource_id],
                         },
                         "resources": [{"id": resource_id, "quantity": {"count": 1}}],
@@ -205,6 +223,70 @@ def commitment_attributes(response: httpx.Response) -> Dict[str, Any]:
 # --------------------------------------------------------------------------------------
 # Input handling
 # --------------------------------------------------------------------------------------
+
+async def _discover(descriptor_code: str, action: str, what: str) -> Optional[Dict[str, Any]]:
+    """The AIF resource for a capability, with its catalog provider.
+
+    AIF publishes both capabilities as openagrinet:AgricultureResource, so
+    @type cannot tell them apart; the descriptor code can, which is how
+    sathi_seed finds its own resources.
+    """
+    body = {
+        "context": build_context("discover", str(uuid.uuid4())),
+        "message": {
+            "intent": {
+                "filters": {
+                    "type": "jsonpath",
+                    "expression": (
+                        "$.catalogs[*].resources[*] ? ("
+                        f'@.descriptor.code == "{descriptor_code}")'
+                    ),
+                }
+            }
+        },
+    }
+    response = await post_action("discover", body)
+    if response.status_code != 200:
+        logger.error(
+            f"AIF v2 {what} discover failed: HTTP {response.status_code} "
+            f"{response.text[:300]}"
+        )
+        return None
+    found = _first_resource(response.json())
+    if found and not _offers(found, action):
+        logger.error(
+            f"AIF v2 {found['resource'].get('id')} does not advertise {action}; "
+            f"catalog offers {[a.get('action') for a in _actions(found)]}"
+        )
+        return None
+    return found
+
+
+def _first_resource(payload: dict) -> Optional[Dict[str, Any]]:
+    """Nothing to rank: AIF publishes one resource per capability."""
+    for catalog in (payload.get("message") or {}).get("catalogs") or []:
+        provider = catalog.get("provider") or {}
+        for resource in catalog.get("resources") or []:
+            return {"resource": resource, "provider": provider}
+    return None
+
+
+def _actions(found: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return (found["resource"].get("resourceAttributes") or {}).get("actions") or []
+
+
+def _offers(found: Dict[str, Any], action: str) -> bool:
+    """Whether the published resource advertises the action about to be sent."""
+    return any(entry.get("action") == action for entry in _actions(found))
+
+
+async def _discover_loan(action: str) -> Optional[Dict[str, Any]]:
+    return await _discover(_LOAN_CODE, action, "loan")
+
+
+async def _discover_tickets(action: str) -> Optional[Dict[str, Any]]:
+    return await _discover(_TICKETS_CODE, action, "tickets")
+
 
 def numeric(value: str) -> str:
     """Normalises regional-script digits; "" when it is not a plain run of digits."""
@@ -353,13 +435,17 @@ async def initiate_aif_otp(ctx: RunContext[FarmerContext], beneficiary_id: str) 
                 "beckn_version": "v2",
             }
         )
+        found = await _discover_loan("init")
+        if not found:
+            logger.warning("AIF v2 discover found no loan catalog")
+            return _UNAVAILABLE_MSG
         body = commitment_envelope(
             "init",
             transaction_id,
             DRAFT,
             scheme_attributes(beneficiary_id),
             _LOAN_OFFER,
-            _LOAN_RESOURCE,
+            found,
         )
         response = await post_action("init", body)
         if response.status_code != 200:
@@ -424,6 +510,10 @@ async def verify_aif_otp(
                 "beckn_version": "v2",
             }
         )
+        found = await _discover_loan("init")
+        if not found:
+            logger.warning("AIF v2 discover found no loan catalog")
+            return _UNAVAILABLE_MSG
         body = commitment_envelope(
             "init",
             transaction_id,
@@ -433,7 +523,7 @@ async def verify_aif_otp(
                 challenge={"response": {"method": "OTP", "value": otp_clean}},
             ),
             _LOAN_OFFER,
-            _LOAN_RESOURCE,
+            found,
         )
         response = await post_action("init", body)
         if response.status_code != 200:
@@ -490,6 +580,10 @@ async def check_aif_loan_status(
                 "beckn_version": "v2",
             }
         )
+        found = await _discover_loan("status")
+        if not found:
+            logger.warning("AIF v2 discover found no loan catalog")
+            return _UNAVAILABLE_MSG
         body = commitment_envelope(
             "status",
             transaction_id,
@@ -498,7 +592,7 @@ async def check_aif_loan_status(
                 beneficiary_id, loanApplicationNumber=loan_application_number
             ),
             _LOAN_OFFER,
-            _LOAN_RESOURCE,
+            found,
         )
         response = await post_action("status", body)
         if response.status_code != 200:
@@ -545,13 +639,17 @@ async def check_aif_grievance_status(
                 "beckn_version": "v2",
             }
         )
+        found = await _discover_tickets("status")
+        if not found:
+            logger.warning("AIF v2 discover found no tickets catalog")
+            return _UNAVAILABLE_MSG
         body = commitment_envelope(
             "status",
             transaction_id,
             ACTIVE,
             grievance_attributes(beneficiary_id),
             _TICKETS_OFFER,
-            _TICKETS_RESOURCE,
+            found,
         )
         response = await post_action("status", body)
         if response.status_code != 200:

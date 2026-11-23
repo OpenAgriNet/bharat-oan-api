@@ -5,6 +5,7 @@ Moving Bharat Vistaar's capabilities from Beckn v1 to v2, one at a time.
 ```
 migration-plan/
 ├── stack-setup.md     how to bring the whole stack up (do this once)
+├── discovery.md       how a tool finds out who serves a capability
 ├── mandi/
 │   ├── plan.md        what changed, what it cost, what is still open
 │   └── quick-try.md   how to try the mandi use cases
@@ -28,8 +29,13 @@ place -- read that first when picking a capability back up.
 | PM-KISAN — Grievance + SchemeApplication | **Built, proven against a mock only** — [plan](pmkisan/plan.md) · [try it](pmkisan/quick-try.md) · [open TODOs](pmkisan/plan.md#open-todos) |
 | PMFBY — Grievance | **Wired up, provider never reached** — [plan](pmfby/plan.md) · [open TODOs](pmfby/plan.md#open-todos) |
 | SATHI seed availability | **Built, verified end to end locally** — [plan](sathi/plan.md) · [try it](sathi/quick-try.md) · [open TODOs](sathi/plan.md#open-todos) |
-| AIF — loan status + grievance status | **Built, proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
+| AIF — loan status + grievance status | **Built, catalog published, discoverable; proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
 | The other twelve | Not started |
+
+Cutting across all of them: the scheme tools used to carry the provider and
+resource ids as constants and now ask `discover` for them — what that changed,
+how AIF publishes as `AgricultureResource/v0.2`, and why mandi silently
+returned no prices until 2026-11-23, is in [discovery.md](discovery.md).
 
 Both scheme capabilities ship behind a per-capability flag defaulting to `v1`,
 so nothing above is serving farmers on v2 yet. PM-KISAN is blocked on one
@@ -59,7 +65,9 @@ v1 sent a single `/search` to a provider the tool had hardcoded in its
 environment. v2 splits that into `discover` — which providers can serve this
 question, near here — and `select`, the live call to one of them. Both go to
 the same consumer-adapter endpoint, which branches on the action in the
-payload. Who to call becomes the network's answer rather than an env var.
+payload. Who to call becomes the network's answer rather than an env var --
+though the scheme tools only started taking that answer in November 2026; see
+[discovery.md](discovery.md).
 
 ## Read this before starting the next one
 

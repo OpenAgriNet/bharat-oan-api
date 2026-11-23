@@ -286,6 +286,18 @@ Steps 2 and 3 are independent and can run together.
    fix SATHI's published path at the same time or the first provider to use it
    calls the wrong URL.
 4. **PM-KISAN and PMFBY to v0.2** is its own piece of work, scoped above.
+6. ~~**AIF is not in the catalog.**~~ Resolved on 2026-11-23. AIF publishes as
+   `AgricultureResource/v0.2`, which carries no `@context` `const`, so it
+   publishes cleanly from the raw `bv-migration` branch where
+   `SchemeApplication/v0.2` could not. Both capabilities are one catalog with
+   two resources told apart by `descriptor.code`; see
+   [../discovery.md](../discovery.md#how-aif-publishes). The catalog lives at
+   `helmcharts/quick-start/capability-examples/AgricultureResource/publish/ondemand-aif.json`
+   and in the API collection under **AIF - loan and grievance status**.
+
+   Still open underneath it: the `operationRef`s name `openapi.yaml` while only
+   `openapi-draft.yaml` exists, so those URLs 404. The v0.2 pattern forbids the
+   `-draft` name, and `aif.py` never fetches them, so the journey works.
 
 ## Verified, and what it took
 

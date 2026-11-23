@@ -67,6 +67,12 @@ _MAX_MARKETS_TRIED = 2
 _IST_OFFSET = "+05:30"
 
 
+# Which catalog audience to discover in -- not who we are, senderId is that.
+# visibleTo is matched by array overlap and the agmarknet catalog carries no
+# audience, so "*" is what finds it. Same selector weather and sathi use.
+_DISCOVER_NETWORK_ID = os.getenv("OAN_PUBLIC_NETWORK_ID", "*")
+
+
 def _adapter_url(action: str) -> str:
     base = os.getenv("OAN_ADAPTER_URL", "http://network-adapter:9201/consumer")
     return base.rstrip("/") + "/" + action
@@ -80,7 +86,7 @@ def _context(action: str) -> dict:
         "domain": os.getenv("OAN_DOMAIN", "agriculture"),
         "action": action,
         "version": "2.0.0",
-        "networkId": network_id,
+        "networkId": _DISCOVER_NETWORK_ID if action == "discover" else network_id,
         "senderId": network_id,
         "receiverId": network_id,
         "transactionId": str(uuid.uuid4()),

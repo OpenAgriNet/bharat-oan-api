@@ -55,11 +55,12 @@ GRIEVANCE_CONTEXT = (
 )
 GRIEVANCE_TYPE = "openagrinet:Grievance"
 
-PROVIDER = {"id": "pmkisan", "descriptor": {"name": "PM-KISAN"}}
 SCHEME = {"code": "PM-KISAN"}
 
+# discover returns catalogs and resources, never offers, so this one stays a
+# constant -- the same reason weather.py keeps _OFFER_ID. The provider and the
+# resource id come off the wire.
 _APPLICATION_OFFER = "off:pmkisan:application-status"
-_APPLICATION_RESOURCE = "res:pmkisan:application-status"
 
 # DRAFT while the OTP is still being asked for, ACTIVE once it is spent.
 DRAFT = "DRAFT"
@@ -67,6 +68,10 @@ ACTIVE = "ACTIVE"
 
 _OTP_SENT_MSG = (
     "An OTP has been sent to the mobile number registered with PM-KISAN."
+)
+_UNAVAILABLE_MSG = (
+    "PM-KISAN application status is not available right now. "
+    "Please try again later."
 )
 _NO_IDENTIFIER_MSG = (
     "Please provide either a PM Kisan registration number or a registered phone "
@@ -106,10 +111,15 @@ def commitment_envelope(
     state: str,
     attributes: Dict[str, Any],
     offer_id: str,
-    resource_id: str,
+    found: Dict[str, Any],
     contract_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """The one contract-with-one-commitment shape every PM-KISAN action uses."""
+    """The one contract-with-one-commitment shape every PM-KISAN action uses.
+
+    `found` is what _discover_application returned: the catalog's provider and
+    the resource it published.
+    """
+    resource_id = found["resource"]["id"]
     return {
         "context": build_context(action, transaction_id),
         "message": {
@@ -120,7 +130,7 @@ def commitment_envelope(
                         "status": {"descriptor": {"code": state}},
                         "offer": {
                             "id": offer_id,
-                            "provider": PROVIDER,
+                            "provider": found["provider"],
                             "resourceIds": [resource_id],
                         },
                         "resources": [{"id": resource_id, "quantity": {"count": 1}}],
@@ -168,6 +178,46 @@ async def post_action(action: str, body: Dict[str, Any]) -> httpx.Response:
         response = await client.post(url, json=body)
     logger.info(f"PM-KISAN v2 {action} <- {response.status_code}")
     return response
+
+
+async def _discover_application() -> Optional[Dict[str, Any]]:
+    """The PM-KISAN application-status resource, with its catalog provider.
+
+    Matching on @type alone would return every scheme publishing
+    SchemeApplication, so the scheme code is half of the match.
+    """
+    body = {
+        "context": build_context("discover", str(uuid.uuid4())),
+        "message": {
+            "intent": {
+                "filters": {
+                    "type": "jsonpath",
+                    "expression": (
+                        "$.catalogs[*].resources[*] ? ("
+                        f'@.resourceAttributes."@type" == "{SCHEME_APPLICATION_TYPE}" && '
+                        f'@.resourceAttributes.scheme.code == "{SCHEME["code"]}")'
+                    ),
+                }
+            }
+        },
+    }
+    response = await post_action("discover", body)
+    if response.status_code != 200:
+        logger.error(
+            f"PM-KISAN v2 discover failed: HTTP {response.status_code} "
+            f"{response.text[:300]}"
+        )
+        return None
+    return _first_resource(response.json())
+
+
+def _first_resource(payload: dict) -> Optional[Dict[str, Any]]:
+    """Nothing to rank: PM-KISAN publishes one resource for this capability."""
+    for catalog in (payload.get("message") or {}).get("catalogs") or []:
+        provider = catalog.get("provider") or {}
+        for resource in catalog.get("resources") or []:
+            return {"resource": resource, "provider": provider}
+    return None
 
 
 def commitment_attributes(response: httpx.Response) -> Dict[str, Any]:
@@ -321,13 +371,17 @@ async def initiate_pm_kisan_status_check(
                 "beckn_version": "v2",
             }
         )
+        found = await _discover_application()
+        if not found:
+            logger.warning("PM-KISAN v2 discover found no application-status catalog")
+            return _UNAVAILABLE_MSG
         body = commitment_envelope(
             "init",
             transaction_id,
             DRAFT,
             applicant_attributes(reg_no, phone_number),
             _APPLICATION_OFFER,
-            _APPLICATION_RESOURCE,
+            found,
         )
         response = await post_action("init", body)
         if response.status_code != 200:
@@ -391,13 +445,17 @@ async def check_pm_kisan_status_with_otp(
         )
         attributes = applicant_attributes(reg_no, phone_number)
         attributes["challenge"] = {"response": {"method": "OTP", "value": otp_clean}}
+        found = await _discover_application()
+        if not found:
+            logger.warning("PM-KISAN v2 discover found no application-status catalog")
+            return _UNAVAILABLE_MSG
         body = commitment_envelope(
             "status",
             transaction_id,
             ACTIVE,
             attributes,
             _APPLICATION_OFFER,
-            _APPLICATION_RESOURCE,
+            found,
         )
         response = await post_action("status", body)
         if response.status_code != 200:
