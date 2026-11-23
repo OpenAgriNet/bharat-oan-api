@@ -10,7 +10,8 @@ migration-plan/
 │   └── quick-try.md   how to try the mandi use cases
 ├── weather/
 ├── pmkisan/
-└── pmfby/
+├── pmfby/
+└── sathi/
 ```
 
 Each capability gets a folder with the same two files. Every `plan.md` that
@@ -25,7 +26,8 @@ place -- read that first when picking a capability back up.
 | Weather (mausamgram) | **Built, blocked on the provider** — [plan](weather/plan.md) · [try it](weather/quick-try.md) |
 | PM-KISAN — Grievance + SchemeApplication | **Built, proven against a mock only** — [plan](pmkisan/plan.md) · [try it](pmkisan/quick-try.md) · [open TODOs](pmkisan/plan.md#open-todos) |
 | PMFBY — Grievance | **Wired up, provider never reached** — [plan](pmfby/plan.md) · [open TODOs](pmfby/plan.md#open-todos) |
-| The other fourteen | Not started |
+| SATHI seed availability | **Built, verified end to end locally** — [plan](sathi/plan.md) · [try it](sathi/quick-try.md) · [open TODOs](sathi/plan.md#open-todos) |
+| The other thirteen | Not started |
 
 Both scheme capabilities ship behind a per-capability flag defaulting to `v1`,
 so nothing above is serving farmers on v2 yet. PM-KISAN is blocked on one

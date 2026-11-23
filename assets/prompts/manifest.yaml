@@ -119,6 +119,16 @@ skills:
     - search_sathi_seed_availability
     requires:
     - location.resolve
+  # Stands in for seeds.availability on Beckn v2; never listed in enabled_skills.
+  seeds.availability_v2:
+    prompt_dir: skills/seeds/availability_v2
+    tools:
+    - list_sathi_crops
+    - search_sathi_seed_availability
+    requires:
+    - location.resolve
+    replaces: seeds.availability
+    enabled_by: SATHI_BECKN_VERSION=v2
   agristack.profile:
     prompt_dir: skills/agristack/profile
     tools:

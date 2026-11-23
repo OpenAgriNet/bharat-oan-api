@@ -9,10 +9,14 @@ import tarfile
 from jinja2 import DictLoader, Environment
 import pytest
 
-from agents.skill_catalog import PROMPT_DIR, get_catalog
+import yaml
+
+from agents.skill_catalog import PROMPT_DIR, Manifest, get_catalog
 from agents.skill_policy import SkillState
 from agents.skills import render_prompt, skill_instructions
 from tests.test_skills import CONTEXT, LANGUAGES
+
+ALL_SKILLS = Manifest.model_validate(yaml.safe_load((PROMPT_DIR / 'manifest.yaml').read_text())).skills
 
 
 def test_inventory_and_language_coverage():
@@ -20,11 +24,10 @@ def test_inventory_and_language_coverage():
     assert len(LANGUAGES) == 13
     expected = {}
     for agent, config in cat.manifest.agents.items():
-        # Every catalogued skill keeps its translations, even when bh-main leaves it out of enabled_skills.
-        roots = set(cat.manifest.skills)
-        names = cat.resolve(roots)
-        for name in names:
-            folder = cat.path(cat.manifest.skills[name].prompt_dir)
+        # Every catalogued skill keeps its translations, even when bh-main leaves it out of enabled_skills
+        # or a flag swaps it out for its replacement.
+        for name, skill in ALL_SKILLS.items():
+            folder = cat.path(skill.prompt_dir)
             stem = folder.name
             variant = config.skill_variants.get(name)
             if variant:
