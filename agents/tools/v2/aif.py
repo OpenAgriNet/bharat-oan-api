@@ -367,10 +367,15 @@ async def initiate_aif_otp(ctx: RunContext[FarmerContext], beneficiary_id: str) 
 
         issued = (commitment_attributes(response).get("challenge") or {}).get("issued") or {}
         length = issued.get("length") or 6
-        return (
+        lines = [
             "An OTP has been sent to the mobile number registered with AIF. "
             f"Please share the {length}-digit OTP to continue."
-        )
+        ]
+        # The prompt tells the agent to read the masked number back to the farmer,
+        # so a farmer with two phones knows which one to check.
+        if issued.get("sentTo"):
+            lines.append(f"Registered mobile: {issued['sentTo']}")
+        return "\n".join(lines)
 
     except httpx.TimeoutException:
         logger.error("AIF v2 init timed out")

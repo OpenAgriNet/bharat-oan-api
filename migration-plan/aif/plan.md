@@ -310,6 +310,27 @@ beneficiary id — a different beneficiary never reaches the verified session in
 the first place. Both refusals are correct and both tell the farmer to verify
 again.
 
+The whole journey then ran through the agent itself — moderation, the real
+model picking its own tools, three turns of history — not by calling the four
+functions. The model called `initiate_aif_otp`, asked for the OTP, then
+`verify_aif_otp` and `check_aif_loan_status`, and answered a follow-up about
+tickets with `check_aif_grievance_status` on the session already bought. With
+`parallel_tool_calls` on it sometimes fires a status call in the same batch as
+the first `initiate_aif_otp`; that call is refused for want of a session and
+the farmer sees only the OTP prompt. The ordering rule is in the skill prompt,
+not in the tools, and it is the same on v1.
+
+That run found one gap. The skill prompt tells the agent to read the masked
+mobile back to the farmer, and v1's tool returns a `Registered mobile:` line
+for it — the v0.2 `init` mapping was dropping AIF's `MobileNumber`, so v2 had
+nothing to read. The mapping now carries it as `challenge.issued.sentTo` and
+the tool prints the same line v1 does. AIF masks the number itself, so no full
+mobile travels.
+
+The eleven requests in the collection's **AIF - loan and grievance status**
+folder cover the same ground for anyone without a Python shell: three registry
+reads, the four-call journey on one `transactionId`, and four refusals.
+
 Two things had to change that the plan above did not anticipate.
 
 **The v0.2 packs rejected every operational payload.** The base spec's

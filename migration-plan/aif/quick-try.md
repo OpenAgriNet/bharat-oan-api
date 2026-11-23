@@ -45,6 +45,24 @@ found, and an even `beneficiaryId` has no support tickets.
 
 ## The journey, by hand
 
+### Through Postman
+
+`api-collection/OpenAgriNet.api-collection.json` has an **AIF - loan and
+grievance status** folder: the three registry reads, the four-call journey, and
+four refusals. Run the folder top to bottom — request 1 sets
+`aif-transactionId` and the rest reuse it.
+
+    newman run ../api-collection/OpenAgriNet.api-collection.json \
+      -e ../api-collection/environments/OpenAgriNet.api.local-environment.json \
+      --folder "AIF - loan and grievance status" \
+      --env-var aif-schema-base=http://spec-files/schema
+
+`aif-schema-base` is the same stopgap as `EXTRA_SCHEMA_DOMAINS` and goes the
+same day. `aif-networkId` is `oan.dev`, not the `net-a.oan.dev` the other
+folders use, because AIF is served by the single adapter.
+
+### By curl
+
 Four bodies ship with the stack:
 
     capability-examples/SchemeApplication/init/init-aif.json           send the OTP
@@ -65,7 +83,9 @@ it. Out of order, or with a fresh id, `status` is refused with "this request
 needs a verified session and there is none" — which is the system working.
 
 1. `init` with no `challenge` → AIF sends an OTP. You get back
-   `challenge.issued` and the commitment stays `DRAFT`.
+   `challenge.issued` and the commitment stays `DRAFT`. `issued.sentTo` carries
+   the mobile AIF already masked (`XXXXXX1134`), so a farmer with two phones is
+   told which one to check.
 2. `init` with `challenge.response.value: "123456"` → the commitment goes
    `ACTIVE` and carries `applicant.name`. **The token is not in the answer**
    and never will be: it lives in Redis against the transaction, and putting
@@ -132,6 +152,15 @@ verifies once and both status tools work for the rest of the conversation.
 Asking about a *different* beneficiary gets a different transaction id, so it
 is refused and the farmer is told to verify again. That is deliberate: a chat
 session must not be a key to someone else's loan.
+
+Driven by the agent rather than by hand, a farmer who gives the beneficiary ID
+and the loan number in one sentence still gets the OTP step: the model calls
+`initiate_aif_otp`, asks for the OTP, then spends it on `verify_aif_otp` and
+the status tool on the next turn. With `parallel_tool_calls` on, the model
+sometimes fires a status call alongside the first `initiate_aif_otp`. It is
+refused — there is no session yet — and the farmer sees only the OTP prompt.
+The ordering rule lives in `assets/prompts/skills/aif/status/`, not in the
+tools, and it is the same on v1.
 
 Two refusals never reach AIF — the tool checks them first, because AIF rejects
 both outright: a beneficiary ID or loan number that is not plain digits, and
