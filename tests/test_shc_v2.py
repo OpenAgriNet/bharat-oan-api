@@ -10,6 +10,7 @@ from pydantic_ai import ModelRetry
 
 import agents.tools
 from agents.tools import shc_scheme_status as v1
+from agents.tools.v2 import provider_openapi
 from agents.tools.v2 import shc_scheme_status as shc
 
 OPERATION_REF = (
@@ -98,7 +99,7 @@ def adapter(monkeypatch):
     monkeypatch.setenv("OAN_NETWORK_ID", "oan.test")
     monkeypatch.delenv("OAN_PUBLIC_NETWORK_ID", raising=False)
     monkeypatch.setattr(shc, "lf_update_current_observation", lambda **kwargs: None)
-    monkeypatch.setattr("agents.tools.v2.sathi_seed._OPENAPI_CACHE", {})
+    monkeypatch.setattr(provider_openapi, "_OPENAPI_CACHE", {})
     monkeypatch.setattr(v1, "generate_file_hash", lambda phone, cycle: "fixedhash")
     monkeypatch.setattr(v1, "API_BASE_URL", "http://api.test")
 
@@ -108,12 +109,10 @@ def adapter(monkeypatch):
     monkeypatch.setattr(v1.cache, "set", no_cache)
     fake = FakeAdapter()
     real_client = httpx.AsyncClient
-    for module in (shc, "agents.tools.v2.sathi_seed"):
-        target = module if not isinstance(module, str) else importlib.import_module(module)
-        monkeypatch.setattr(
-            target.httpx, "AsyncClient",
-            lambda **kwargs: real_client(transport=httpx.MockTransport(fake), **kwargs),
-        )
+    monkeypatch.setattr(
+        httpx, "AsyncClient",
+        lambda **kwargs: real_client(transport=httpx.MockTransport(fake), **kwargs),
+    )
     return fake
 
 

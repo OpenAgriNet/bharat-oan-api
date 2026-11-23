@@ -14,13 +14,13 @@ from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
 from agents.tools.shc_scheme_status import Descriptor, Item, MediaResource, Provider, format_phone_number
-from agents.tools.v2.sathi_seed import (
-    AGRICULTURE_RESOURCE_CONTEXT,
+from agents.tools.v2.provider_openapi import (
     SchemaUnavailable,
-    _openapi_document,
-    _select_operation_ref,
+    openapi_document,
     request_schema,
+    select_operation_ref,
 )
+from agents.tools.v2.sathi_seed import AGRICULTURE_RESOURCE_CONTEXT
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger
@@ -112,8 +112,8 @@ async def _discover_reports_resource(transaction_id: str) -> Optional[Dict[str, 
 
 async def _report_query(resource: dict) -> str:
     """SHC's GraphQL query, the const its OpenAPI fixes for the select request."""
-    url, _, pointer = _select_operation_ref(resource).partition("#")
-    schema = request_schema(await _openapi_document(url), pointer)
+    url, _, pointer = select_operation_ref(resource).partition("#")
+    schema = request_schema(await openapi_document(url), pointer)
     query = (schema["properties"].get("query") or {}).get("const")
     if not query:
         raise SchemaUnavailable(f"{url}: the select request has no const query")

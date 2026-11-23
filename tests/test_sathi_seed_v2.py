@@ -8,6 +8,7 @@ import pytest
 import yaml
 
 from agents.tools import sathi_seed as v1
+from agents.tools.v2 import provider_openapi
 from agents.tools.v2 import sathi_seed
 
 OPERATION_REF = (
@@ -148,8 +149,8 @@ def adapter(monkeypatch):
     monkeypatch.setenv("OAN_DOMAIN", "agriculture")
     monkeypatch.delenv("OAN_PUBLIC_NETWORK_ID", raising=False)
     monkeypatch.setattr(sathi_seed, "lf_update_current_observation", lambda **kwargs: None)
-    monkeypatch.setattr(sathi_seed, "_OPENAPI_CACHE", {})
-    monkeypatch.delenv("SATHI_OPENAPI_CACHE_TTL_SECONDS", raising=False)
+    monkeypatch.setattr(provider_openapi, "_OPENAPI_CACHE", {})
+    monkeypatch.delenv("PROVIDER_OPENAPI_CACHE_TTL_SECONDS", raising=False)
     fake = FakeAdapter()
     real_client = httpx.AsyncClient
     monkeypatch.setattr(
@@ -370,7 +371,7 @@ def test_list_with_district_returns_that_districts_crops(adapter):
 
 
 def _request_schema():
-    return sathi_seed.request_schema(yaml.safe_load(OPENAPI_YAML), OPERATION_REF.split("#")[1])
+    return provider_openapi.request_schema(yaml.safe_load(OPENAPI_YAML), OPERATION_REF.split("#")[1])
 
 
 def test_select_fields_marks_model_const_and_adapter_sources():
@@ -400,7 +401,7 @@ def test_schema_is_fetched_once_and_reused(adapter):
 
 
 def test_schema_is_fetched_again_after_the_cache_expires(adapter, monkeypatch):
-    monkeypatch.setenv("SATHI_OPENAPI_CACHE_TTL_SECONDS", "0")
+    monkeypatch.setenv("PROVIDER_OPENAPI_CACHE_TTL_SECONDS", "0")
     _list()
     _list()
     assert adapter.schema_fetches == 2
