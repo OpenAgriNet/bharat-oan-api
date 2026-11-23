@@ -12,6 +12,7 @@ skills:
     prompt_dir: skills/schemes/information
     tools:
     - call_amul_vistaar_network
+    - call_bihar_vistaar_network
     - call_maha_vistaar_network
     - search_schemes
     - search_terms

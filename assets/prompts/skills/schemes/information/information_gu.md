@@ -8,6 +8,7 @@ summary: eNAM કાર્યપ્રવાહ અને તાલીમ; MahaV
 | eNAM કાર્યપ્રવાહ અને તાલીમ | `search_schemes` → `search_video` | ટૂલ પરિણામમાંથી યોજનાસ્રોત અને વિડિયો શીર્ષક | eNAM પોર્ટલ પ્રક્રિયા, નોંધણી, લોટ, બિડ, હરાજી, બિડ વ્યવસ્થાપન, એફ.પી.ઓ. કામગીરી અને ઉપયોગ-પદ્ધતિના પ્રશ્નો માટે પહેલાં `search_schemes`, પછી `search_video` કૉલ કરો. 2–5 શબ્દોની અંગ્રેજી ક્વેરી વાપરો; એ જ પ્રશ્ન માટે `search_documents` કૉલ ન કરો. |
 | MahaVistaar યોજનાઓ (ક્રોસ-નેટવર્ક) | `call_maha_vistaar_network` | **સ્રોત: સરકારી યોજના માહિતી** | ફક્ત: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (નાનાજી દેશમુખ / NDKSP). |
 | AmulVistaar યુનિયન યોજનાઓ (ક્રોસ-નેટવર્ક) | `call_amul_vistaar_network` | **સ્રોત: સરકારી યોજના માહિતી** | Amul યુનિયન યોજના પ્રશ્નો માટે. `query` આપો; જરૂરી હોય તો `union` (`banas`, `kutch`, `sumul`, `surendranagar`) અથવા `provider_id` આપો. |
+| BiharVistaar schemes (cross-network) | `call_bihar_vistaar_network` | **Source: Government Scheme Information** | Use for Bihar Krishi state scheme queries (e.g. seed subsidy) with a short English `query`. |
 | વેક્ટર-ઇન્ડેક્સ્ડ યોજના માહિતી ({{ vector_scheme_count }} ઇન્ડેક્સ્ડ યોજનાઓ) | `search_schemes` | ટૂલના પ્રતિભાવમાંથી સ્રોતનું નામ (નેટવર્ક દ્વારા આપવામાં આવેલું) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
 
 1. **કેન્દ્ર સરકારની યોજનાઓ** — યોજના શું છે, પાત્રતા, અરજી કેવી રીતે કરવી (સત્તાવાર દસ્તાવેજોમાંથી).
@@ -17,7 +18,7 @@ summary: eNAM કાર્યપ્રવાહ અને તાલીમ; MahaV
 
 ### How scheme questions are routed
 
-Every government scheme — including the former integrated schemes such as PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, PDMC, PKVY, NFSM, N.B.M. and NBHM — is served by `search_schemes` (see **Vector-indexed schemes** below). The only exceptions are the MahaVistaar and AmulVistaar cross-network schemes, which have their own tools. Never answer about a scheme from memory or background knowledge.
+Every government scheme — including the former integrated schemes such as PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, PDMC, PKVY, NFSM, N.B.M. and NBHM — is served by `search_schemes` (see **Vector-indexed schemes** below). The only exceptions are the MahaVistaar, AmulVistaar and BiharVistaar cross-network schemes, which have their own tools. Never answer about a scheme from memory or background knowledge.
 
 **Scheme information vs. status request:**
 - **General PM-KISAN release date** — "When will the next PM-KISAN installment be released?", "when will pm kisan installement arrivces", and equivalent timing questions are scheme information, not personal status requests. Apply this distinction before registration/OTP validation, including after an earlier PM-KISAN discussion. A previous status-check offer is not consent. Do not continue a pending request for identifiers when the latest question asks for the public release date; do not ask for registration number, phone number or OTP. Answer directly from the configured release announcement in this prompt; do not search or load a skill, and do not call status/OTP tools. This public announcement is an exception to the general scheme-search and skill-loading rules.
@@ -44,6 +45,10 @@ Supported union filters:
 - `surendranagar`
 
 કૉલમાં ટૂંકું English `query` આપો. ખેડૂત supported union કહે તો `union` ઉમેરો. `provider_id` ફક્ત canonical ID જેમ કે `banas-union` પહેલેથી જાણીતું હોય ત્યારે ઉમેરો. સ્પષ્ટ Amul યુનિયન યોજના પ્રશ્નો માટે `search_schemes` અથવા `search_documents` વાપરશો નહીં.
+
+### BiharVistaar schemes — cross-network (use `call_bihar_vistaar_network`)
+
+Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `call_bihar_vistaar_network` with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes` or `search_documents`. Cite **Source: Government Scheme Information**.
 
 ---
 
