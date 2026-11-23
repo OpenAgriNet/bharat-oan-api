@@ -73,7 +73,7 @@ Expect, per question: `discover at … matched [...]`, `request fields from …`
 | `matched [two ids]` with no `chose` | the bot will ask which district |
 | `corrected stateCode 'Maharashtra' to code 27` | the model passed a name; the tool fixed it |
 | `skipped N dealer rows with no bags in stock` | normal; v1 drops them too |
-| `fetching OpenAPI …` failing | `operationRef` in the catalog is unreachable; the farmer sees the service-error text |
+| `Fetching provider OpenAPI …` failing | `operationRef` in the catalog is unreachable; the farmer sees the service-error text |
 
 ## Switching back to v1
 
