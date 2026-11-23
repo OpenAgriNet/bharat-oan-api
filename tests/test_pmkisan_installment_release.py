@@ -27,25 +27,22 @@ def search(load_module, monkeypatch):
         monkeypatch.setitem(sys.modules, name, SimpleNamespace(**attributes))
     schemes = load_module("helpers/scheme_qdrant_search.py")
     monkeypatch.setitem(sys.modules, "helpers.scheme_qdrant_search", schemes)
-    monkeypatch.setenv("BAP_ENDPOINT", "https://example.test")
+    monkeypatch.setenv("KNOWLEDGE_PROVIDER_URL", "https://example.test")
+    # A cached service-account token, so the only POST is the search itself.
+    from helpers import knowledge_provider
+    monkeypatch.setattr(knowledge_provider, "_token", "tok")
+    monkeypatch.setattr(knowledge_provider, "_token_expires_at", float("inf"))
     return load_module("agents/tools/search.py")
 
 
 def network_response(scheme, *, hits=True, status="success", resolved=True):
-    context = {"status": status}
-    if resolved:
-        context["resolved-scheme-code"] = scheme
-    return {"responses": [{"message": {"catalog": {
-        "tags": [{
-            "descriptor": {"code": "search-context"},
-            "list": [{"descriptor": {"code": key}, "value": value}
-                     for key, value in context.items()],
-        }],
-        "providers": [{"items": [{
-            "id": "chunk-1",
-            "descriptor": {"code": scheme, "name": scheme, "long_desc": "Scheme details"},
-        }] if hits else []}],
-    }}}]}
+    """A KP /search response for the scheme profile."""
+    return {
+        "effective_config": {"ranking_score_field": "_scheme_score"},
+        "hits": [{"_id": "chunk-1", "chunk_id": "chunk-1", "scheme_code": scheme, "scheme_name": scheme,
+                  "text": "Scheme details", "_scheme_score": 0.8}] if hits else [],
+        "scheme_search": {"status": status, "resolved_scheme_code": scheme if resolved else None},
+    }
 
 
 def run_search(search, monkeypatch, response, query="PM-KISAN 24th installment release date"):
@@ -78,7 +75,8 @@ def test_search_does_not_append_system_announcement(search, monkeypatch, scheme,
     assert "23rd" not in result and "20 June 2026" not in result
     assert post.call_args.args[0] == "https://example.test/search"
     # Plain semantic search: no scheme code filter is sent.
-    assert "code" not in post.call_args.kwargs["json"]["message"]["intent"]["item"]["descriptor"]
+    assert post.call_args.kwargs["json"]["search_profile"] == "scheme"
+    assert "document_code" not in post.call_args.kwargs["json"]
 
 
 @pytest.mark.parametrize("response", [
@@ -98,7 +96,7 @@ def test_search_failures_do_not_claim_release(search, monkeypatch, response):
 
 
 def test_missing_endpoint_does_not_claim_release(search, monkeypatch):
-    monkeypatch.delenv("BAP_ENDPOINT")
+    monkeypatch.delenv("KNOWLEDGE_PROVIDER_URL")
     result, post = run_search(search, monkeypatch, httpx.Response(200))
     assert "not configured" in result
     post.assert_not_called()

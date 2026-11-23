@@ -1,8 +1,8 @@
 ## basic setup packages
 wheel==0.47.0
-setuptools==83.0.0
+setuptools==82.0.1
 
-httpx_oauth==0.17.0
+httpx_oauth==0.16.1
 Jinja2==3.1.6 # For template rendering
 
 # for data/DB

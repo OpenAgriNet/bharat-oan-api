@@ -1,19 +1,16 @@
 """
-Crop advisory search through the Beckn network (BAP /search, category knowledge-advisory).
+Crop advisory search through the Knowledge Provider (POST /search, search_profile advisory).
 
-The provider searches advisory chunks that docs-pipeline stores in Qdrant and answers with
-an on_search catalog whose items carry `chunk-details` tags: title, crop, section, score,
-doc_id, chunk_id, source, text (text already ends with a "Source:" line).
+KP filters advisory passages on the crop and boosts season, days after sowing and the farmer's
+place. Each hit carries text (already ending with a "Source:" line), doc_id, chunk_id, section,
+location_match and the advisory's LGD places; `advisory_search` carries the search status.
 
 Flow: search first (no questions), then inspect the returned chunks. Every chunk text starts
 with a header line such as `Crop: Wheat | Problem type: Pest | Season: Rabi,Kharif`; the season is
 read from it. When the farmer named a season that none of the chunks cover, the tool searches once
 more (crop + season + days) and, if that finds nothing either, offers the seasons that do exist.
 """
-import os
 import re
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -22,8 +19,7 @@ from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
-from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
-from app.config import DEFAULT_HTTP_TIMEOUT
+from helpers import knowledge_provider
 from helpers.advisory_pending import (
     LOCATION_MARKER,
     PENDING_MARKER,
@@ -160,37 +156,8 @@ def relevant_for_crop(results: List[Dict[str, Any]], crop_hint: str, query: str)
 # Request / response
 # ---------------------------------------------------------------------------
 
-def _search_params_tag(
-    crop: str,
-    days_after_sowing: Optional[int],
-    season: str = "",
-    top_k: Optional[int] = None,
-    state_lgd_code: Optional[int] = None,
-    district_lgd_code: Optional[int] = None,
-) -> List[Dict[str, Any]]:
-    """`search_params` tag group the provider reads: crop, days_after_sowing, season, top_k and the farmer's
-    place as LGD codes (only when the farmer gave one)."""
-    entries = []
-    for code, value in (
-        ("crop", crop),
-        ("days_after_sowing", days_after_sowing),
-        ("season", season),
-        ("top_k", top_k),
-        ("state_lgd_code", state_lgd_code),
-        ("district_lgd_code", district_lgd_code),
-    ):
-        if value is None or value == "":
-            continue
-        entries.append({"descriptor": {"code": code}, "value": str(value)})
-    if not entries:
-        return []
-    return [{"descriptor": {"code": "search_params"}, "list": entries}]
-
-
 def build_advisory_search_payload(
     query: str,
-    session_id: str = "",
-    question_id: str = "",
     crop: str = "",
     days_after_sowing: Optional[int] = None,
     season: str = "",
@@ -198,126 +165,74 @@ def build_advisory_search_payload(
     state_lgd_code: Optional[int] = None,
     district_lgd_code: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Beckn /search body for advisory document search (knowledge-advisory).
+    """KP /search body for the advisory profile.
 
-    `crop`, `days_after_sowing`, `season`, `top_k` and the farmer's place as `state_lgd_code` /
-    `district_lgd_code` travel in `item.tags` (group `search_params`). The provider filters on `crop` and
-    only boosts `season`, days and the place.
+    The farmer's situation travels in `advisory`: KP filters on `crop` and only boosts `season`,
+    `days_after_sowing` and the place (`state_lgd_code` / `district_lgd_code`).
     """
-    now = datetime.now(timezone.utc)
-    item: Dict[str, Any] = {"descriptor": {"name": query}}
-    tags = _search_params_tag(
-        _clean_param(crop),
-        _clean_days(days_after_sowing),
-        _clean_param(season),
-        _clean_top_k(top_k),
-        state_lgd_code,
-        district_lgd_code,
-    )
-    if tags:
-        item["tags"] = tags
-    return {
-        "context": {
-            "domain": "schemes:vistaar",
-            "action": "search",
-            "version": "1.1.0",
-            "bap_id": os.getenv("BAP_ID"),
-            "bap_uri": os.getenv("BAP_URI"),
-            "bpp_id": os.getenv("BPP_ID"),
-            "bpp_uri": os.getenv("BPP_URI"),
-            "transaction_id": str(uuid.uuid4()),
-            "message_id": str(uuid.uuid4()),
-            "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
-            "ttl": "PT10M",
-            "location": {
-                "country": {"code": "IND"},
-                "city": {"code": "*"},
-            },
-            "tags": {
-                "session_id": session_id,
-                "question_id": question_id,
-            },
-        },
-        "message": {
-            "intent": {
-                "category": {
-                    "descriptor": {
-                        "code": KNOWLEDGE_ADVISORY_CATEGORY,
-                        "name": KNOWLEDGE_ADVISORY_CATEGORY,
-                    }
-                },
-                "item": item,
-            }
-        },
+    advisory = {
+        key: value
+        for key, value in (
+            ("crop", _clean_param(crop)),
+            ("season", _clean_param(season)),
+            ("days_after_sowing", _clean_days(days_after_sowing)),
+            ("state_lgd_code", state_lgd_code),
+            ("district_lgd_code", district_lgd_code),
+        )
+        if value is not None and value != ""
     }
+    body: Dict[str, Any] = {"query": query, "search_profile": "advisory"}
+    top_k = _clean_top_k(top_k)
+    if top_k:
+        body["top_k"] = top_k
+    if advisory:
+        body["advisory"] = advisory
+    return body
 
 
-def _split_names(value: Optional[str]) -> List[str]:
-    return [part.strip() for part in str(value or "").split(",") if part.strip()]
+def _advisory_result_from_hit(hit: Dict[str, Any], score: float, crop: str) -> Optional[Dict[str, Any]]:
+    """Map one KP hit to an advisory result dict (None when it has no text).
 
-
-def _advisory_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Map one on_search item to an advisory result dict (None when it has no text)."""
-    if not isinstance(item, dict):
+    `crop` is the crop KP filtered on; without one, the hit's first crop key is used.
+    """
+    if not isinstance(hit, dict):
         return None
-    details = _item_chunk_details_map(item)
-    desc = item.get("descriptor") if isinstance(item.get("descriptor"), dict) else {}
-
-    text = (details.get("text") or desc.get("long_desc") or "").strip()
+    text = str(hit.get("text") or "").strip()
     if not text:
         return None
-    try:
-        score = float(details.get("score") or 0)
-    except (TypeError, ValueError):
-        score = 0.0
+    place = hit.get("advisory") if isinstance(hit.get("advisory"), dict) else {}
+    crop_keys = hit.get("crop_keys") if isinstance(hit.get("crop_keys"), list) else []
     return {
-        "title": (details.get("title") or desc.get("name") or "").strip(),
-        "crop": (details.get("crop") or "").strip(),
-        "section": (details.get("section") or "").strip().lower(),
+        "title": str(hit.get("title_en") or hit.get("name_en") or hit.get("title") or "").strip(),
+        "crop": crop or (str(crop_keys[0]) if crop_keys else ""),
+        "section": str(hit.get("section") or "").strip().lower(),
         "score": score,
-        "doc_id": (details.get("doc_id") or "").strip(),
-        "chunk_id": (details.get("chunk_id") or item.get("id") or "").strip(),
-        "source": (details.get("source") or "").strip(),
-        "origin": (details.get("origin") or "").strip().lower(),
+        "doc_id": str(hit.get("doc_id") or "").strip(),
+        "chunk_id": str(hit.get("chunk_id") or hit.get("_id") or "").strip(),
+        "source": str(hit.get("origin") or "").strip(),
+        "origin": str(hit.get("origin") or "").strip().lower(),
         "text": text,
         "seasons": parse_chunk_seasons(text),
-        # Where the advisory applies. Chunks from a provider without location read as "applies everywhere".
-        "location_match": (details.get("location_match") or "not_requested").strip().lower(),
-        "location_national": (details.get("location_national") or "true").strip().lower() != "false",
-        "location_states": _split_names(details.get("location_states")),
-        "location_districts": _split_names(details.get("location_districts")),
+        # Where the advisory applies. Passages indexed without places read as "applies everywhere".
+        "location_match": str(hit.get("location_match") or "not_requested").strip().lower(),
+        "location_national": place.get("location_national", True) is not False,
+        "location_states": [str(n) for n in place.get("location_state_names") or [] if n],
+        "location_districts": [str(n) for n in place.get("location_district_names") or [] if n],
     }
 
 
 def parse_advisory_response(data: Dict[str, Any]) -> tuple[List[Dict[str, Any]], Dict[str, str]]:
-    """Parse the BAP client /search response into (advisory results, search-context map)."""
-    responses = data.get("responses") if isinstance(data, dict) else None
-    if not isinstance(responses, list) or not responses:
+    """Parse the KP /search response into (advisory results, search-context map)."""
+    if not isinstance(data, dict):
         return [], {}
-
-    fallback_ctx: Dict[str, str] = {}
-    for rsp in responses:
-        if not isinstance(rsp, dict):
-            continue
-        message = rsp.get("message") if isinstance(rsp.get("message"), dict) else {}
-        catalog = message.get("catalog") if isinstance(message.get("catalog"), dict) else {}
-        if not catalog:
-            continue
-
-        ctx = _catalog_search_context_map(catalog)
-        results: List[Dict[str, Any]] = []
-        for prov in catalog.get("providers") or []:
-            if not isinstance(prov, dict):
-                continue
-            for item in prov.get("items") or []:
-                parsed = _advisory_result_from_item(item)
-                if parsed:
-                    results.append(parsed)
-        if results:
-            return results, ctx
-        if not fallback_ctx:
-            fallback_ctx = ctx
-    return [], fallback_ctx
+    search_ctx = knowledge_provider.context_strings(data.get("advisory_search"))
+    crop = search_ctx.get("crop", "")
+    results = []
+    for hit in data.get("hits") or []:
+        parsed = _advisory_result_from_hit(hit, knowledge_provider.hit_score(hit, data) if isinstance(hit, dict) else 0.0, crop)
+        if parsed:
+            results.append(parsed)
+    return results, search_ctx
 
 
 def _same_words(a: str, b: str) -> bool:
@@ -550,31 +465,20 @@ def format_location_question(query: str, restate: str = "") -> str:
 
 
 async def _post_search(payload: Dict[str, Any]) -> tuple[Optional[Dict[str, Any]], str]:
-    """POST the search to the BAP; returns (response data, error message for the agent)."""
-    bap_endpoint = os.getenv("BAP_ENDPOINT")
-    if not bap_endpoint:
-        logger.error("BAP_ENDPOINT is not set")
+    """POST the search to KP; returns (response data, error message for the agent)."""
+    if not knowledge_provider.search_url():
+        logger.error("KNOWLEDGE_PROVIDER_URL is not set")
         return None, "Advisory search service is not configured. Please try again later."
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                bap_endpoint.rstrip("/") + "/search", json=payload, timeout=DEFAULT_HTTP_TIMEOUT
-            )
+        return await knowledge_provider.search(payload), ""
+    except knowledge_provider.KnowledgeProviderError as exc:
+        logger.error("Advisory search failed: %s", exc)
     except httpx.HTTPError as exc:
         logger.error("Advisory search request failed: %s", exc)
-        return None, "Advisory search service is unavailable. Please try again later."
-    if response.status_code != 200:
-        logger.error("Advisory search returned status %s", response.status_code)
-        return None, "Advisory search service is unavailable. Please try again later."
-    try:
-        return response.json(), ""
-    except ValueError:
-        logger.error("Advisory search returned a non-JSON body")
-        return None, "Advisory search returned an unexpected response. Please try again later."
+    return None, "Advisory search service is unavailable. Please try again later."
 
 
 def _log_results(
-    transaction_id: str,
     results: List[Dict[str, Any]],
     search_ctx: Dict[str, str],
     status: str,
@@ -584,7 +488,6 @@ def _log_results(
         metadata={
             "tool": "advisory.search",
             "category": KNOWLEDGE_ADVISORY_CATEGORY,
-            "transaction_id": transaction_id,
             "network_status": status or None,
             "location_status": search_ctx.get("location_status") or None,
             "has_day_range": search_ctx.get("has_day_range") or None,
@@ -619,11 +522,9 @@ async def _run_search(
     requery: bool = False,
     place: Optional[Place] = None,
 ) -> tuple[Optional[List[Dict[str, Any]]], Dict[str, str], str, str]:
-    """One BAP search. Returns (results or None on a transport error, search context, status, message/error)."""
+    """One KP search. Returns (results or None on a transport error, search context, status, message/error)."""
     payload = build_advisory_search_payload(
         query=query,
-        session_id=ctx.deps.session_id,
-        question_id=ctx.deps.question_id,
         crop=crop,
         days_after_sowing=days,
         season=season,
@@ -631,12 +532,11 @@ async def _run_search(
         state_lgd_code=place.state_code if place else None,
         district_lgd_code=place.district_code if place else None,
     )
-    transaction_id = payload["context"]["transaction_id"]
     lf_update_current_observation(
         input={"query": query, "crop": crop or None, "days_after_sowing": days, "season": season or None, "top_k": top_k,
                "state_lgd_code": place.state_code if place else None,
                "district_lgd_code": place.district_code if place else None},
-        metadata={"tool": "advisory.search", "category": KNOWLEDGE_ADVISORY_CATEGORY, "transaction_id": transaction_id},
+        metadata={"tool": "advisory.search", "category": KNOWLEDGE_ADVISORY_CATEGORY},
     )
     data, error = await _post_search(payload)
     if data is None:
@@ -644,7 +544,7 @@ async def _run_search(
     results, search_ctx = parse_advisory_response(data)
     status = str(search_ctx.get("status") or "").strip().lower()
     message = str(search_ctx.get("message") or "").strip()
-    _log_results(transaction_id, results, search_ctx, status, requery=requery)
+    _log_results(results, search_ctx, status, requery=requery)
     return results, search_ctx, status, message
 
 
