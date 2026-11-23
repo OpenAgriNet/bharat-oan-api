@@ -61,12 +61,22 @@ from agents.tools.pmfby_grievance import (
     pmfby_grievance_status,
     pmfby_submit_grievance,
 )
-from agents.tools.aif import (
-    initiate_aif_otp,
-    verify_aif_otp,
-    check_aif_loan_status,
-    check_aif_grievance_status,
-)
+# AIF's four tools move together on one flag: all four share one OTP and one
+# session, so a farmer who verified on v1 cannot spend that session on v2.
+if _beckn_v2("AIF"):
+    from agents.tools.v2.aif import (
+        initiate_aif_otp,
+        verify_aif_otp,
+        check_aif_loan_status,
+        check_aif_grievance_status,
+    )
+else:
+    from agents.tools.aif import (
+        initiate_aif_otp,
+        verify_aif_otp,
+        check_aif_loan_status,
+        check_aif_grievance_status,
+    )
 from agents.tools.kcc import (
     initiate_kcc_otp,
     check_kcc_application_status,

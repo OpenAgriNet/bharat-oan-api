@@ -11,7 +11,8 @@ migration-plan/
 ├── weather/
 ├── pmkisan/
 ├── pmfby/
-└── sathi/
+├── sathi/
+└── aif/
 ```
 
 Each capability gets a folder with the same two files. Every `plan.md` that
@@ -27,7 +28,8 @@ place -- read that first when picking a capability back up.
 | PM-KISAN — Grievance + SchemeApplication | **Built, proven against a mock only** — [plan](pmkisan/plan.md) · [try it](pmkisan/quick-try.md) · [open TODOs](pmkisan/plan.md#open-todos) |
 | PMFBY — Grievance | **Wired up, provider never reached** — [plan](pmfby/plan.md) · [open TODOs](pmfby/plan.md#open-todos) |
 | SATHI seed availability | **Built, verified end to end locally** — [plan](sathi/plan.md) · [try it](sathi/quick-try.md) · [open TODOs](sathi/plan.md#open-todos) |
-| The other thirteen | Not started |
+| AIF — loan status + grievance status | **Built, proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
+| The other twelve | Not started |
 
 Both scheme capabilities ship behind a per-capability flag defaulting to `v1`,
 so nothing above is serving farmers on v2 yet. PM-KISAN is blocked on one
@@ -37,6 +39,12 @@ given us: its base URL and its login URL.
 Four of the open items across the two plans are the same kind of work — gaps
 in the published `Grievance` and `SchemeApplication` packs, not in our code.
 They should be specified as one `v0.2` pack revision rather than piecemeal.
+AIF has now started that revision: both v0.2 packs gained an
+`x-oan-schema-by-action` entry pointing `init`/`status`/`support` at a
+permissive call schema, because as published they validate a catalog and
+reject every operational payload. That change is not pushed, and the v0.2
+packs are not published at all — see
+[aif/quick-try.md](aif/quick-try.md#before-you-start).
 
 Weather's tool and network path are done and verified; IMD Mausamgram itself is
 returning no forecast data, so a rendered forecast is the one thing not yet
