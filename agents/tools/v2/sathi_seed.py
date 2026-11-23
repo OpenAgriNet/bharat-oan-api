@@ -31,25 +31,14 @@ AGRICULTURE_RESOURCE_CONTEXT = (
     "https://raw.githubusercontent.com/OpenAgriNet/network-specs/bv-features/"
     "schema/AgricultureResource/v0.2/context.jsonld"
 )
-_PROVIDER_PAYLOAD_CONTEXT = (
-    "https://raw.githubusercontent.com/OpenAgriNet/helmcharts/feat/agriculture-resource-sathi/"
-    "quick-start/config/schemas/provider-payload/context.jsonld"
-)
 _SCHEMA_TYPE = "openagrinet:AgricultureResource"
-_PROVIDER_PAYLOAD_TYPE = "ProviderOperationPayload"
-_OPERATION_REF = (
-    "https://openagrinet.github.io/network-specs/api/external/sathi/stock/v0.2/openapi.yaml"
-    "#/paths/~1inv-apis~1stock~1getSeedAvailability/post"
-)
+# Every SATHI district resource in the catalog carries this descriptor code.
+_SATHI_STOCK_CODE = "sathi-stock"
 
 # discover returns no offer; this is the id the working select carried.
 _OFFER_ID = "offer:sathi-stock"
 _SEED_CLASS = "CERTIFIED I"
 _SATHI_OK_STATUS = 200
-
-# The select copies only these from the discovered resource; the crop list and
-# district polygon are discover-only and make the request needlessly large.
-_SELECT_RESOURCE_FIELDS = ("@context", "@type", "informationMode", "subjectCategories", "actions")
 
 # Word-for-word from v1 and its skill prompt.
 _OUTSIDE_COVERAGE = (
@@ -106,7 +95,7 @@ def _discover_body(latitude: float, longitude: float, transaction_id: str) -> di
                     "type": "jsonpath",
                     "expression": (
                         "$.catalogs[*].resources[*] ? ("
-                        f'@.resourceAttributes.actions[*].operationRef == "{_OPERATION_REF}")'
+                        f'@.descriptor.code == "{_SATHI_STOCK_CODE}")'
                     ),
                 },
                 "spatial": [
@@ -222,9 +211,16 @@ def _crop_list_text(resource: dict) -> str:
     return "\n".join(lines)
 
 
-def _select_resource_attributes(resource: dict) -> dict:
-    attrs = resource.get("resourceAttributes") or {}
-    return {field: attrs[field] for field in _SELECT_RESOURCE_FIELDS if field in attrs}
+def _sathi_request(resource: dict, crop_code: str) -> dict:
+    """SATHI's own request fields, sent inside the resource; the adapter adds the API key."""
+    return {
+        "@context": AGRICULTURE_RESOURCE_CONTEXT,
+        "@type": _SCHEMA_TYPE,
+        "cropCode": crop_code,
+        "seedClass": _SEED_CLASS,
+        "stateCode": _area(resource, "State").get("areaCode"),
+        "districtCode": _area(resource, "District").get("areaCode"),
+    }
 
 
 def _select_body(found: Dict[str, Any], crop_code: str, transaction_id: str) -> dict:
@@ -242,24 +238,13 @@ def _select_body(found: Dict[str, Any], crop_code: str, transaction_id: str) -> 
                             {
                                 "id": resource_id,
                                 "quantity": {"count": 1},
-                                "resourceAttributes": _select_resource_attributes(resource),
+                                "resourceAttributes": _sathi_request(resource, crop_code),
                             }
                         ],
                         "offer": {
                             "id": _OFFER_ID,
                             "resourceIds": [resource_id],
                             "provider": found["provider"],
-                        },
-                        "commitmentAttributes": {
-                            "@context": _PROVIDER_PAYLOAD_CONTEXT,
-                            "@type": _PROVIDER_PAYLOAD_TYPE,
-                            "operationRef": _OPERATION_REF,
-                            "payload": {
-                                "cropCode": crop_code,
-                                "seedClass": _SEED_CLASS,
-                                "stateCode": _area(resource, "State").get("areaCode"),
-                                "districtCode": _area(resource, "District").get("areaCode"),
-                            },
                         },
                     }
                 ],
@@ -269,9 +254,10 @@ def _select_body(found: Dict[str, Any], crop_code: str, transaction_id: str) -> 
 
 
 def _sathi_answer(on_select: dict) -> dict:
-    """SATHI's own response, carried untouched inside the first commitment."""
+    """SATHI's own response fields, carried in the first resource of the first commitment."""
     commitments = ((on_select.get("message") or {}).get("contract") or {}).get("commitments") or [{}]
-    return (commitments[0].get("commitmentAttributes") or {}).get("payload") or {}
+    resources = commitments[0].get("resources") or [{}]
+    return resources[0].get("resourceAttributes") or {}
 
 
 def _accumulate_lots(lots: List[dict]) -> Dict[str, Dict[str, Any]]:

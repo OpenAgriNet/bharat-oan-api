@@ -11,9 +11,10 @@ from agents.tools import sathi_seed as v1
 from agents.tools.v2 import sathi_seed
 
 OPERATION_REF = (
-    "https://openagrinet.github.io/network-specs/api/external/sathi/stock/v0.2/openapi.yaml"
+    "https://raw.githubusercontent.com/OpenAgriNet/network-specs/bv-features/api/external/sathi/stock/v0.2/openapi.yaml"
     "#/paths/~1inv-apis~1stock~1getSeedAvailability/post"
 )
+SATHI_STOCK_FILTER = '$.catalogs[*].resources[*] ? (@.descriptor.code == "sathi-stock")'
 LAT, LON = 20.0, 73.8
 MAHARASHTRA_ONLY = (
     "SATHI seed information is currently available only for Maharashtra. "
@@ -24,6 +25,7 @@ MAHARASHTRA_ONLY = (
 def _resource(district_code="487", district_name="Nashik"):
     return {
         "id": f"res-sathi-stock:27:{district_code}",
+        "descriptor": {"code": "sathi-stock", "name": f"SATHI seed stock - {district_name}"},
         "resourceAttributes": {
             "@context": sathi_seed.AGRICULTURE_RESOURCE_CONTEXT,
             "@type": "openagrinet:AgricultureResource",
@@ -78,8 +80,12 @@ def _lot(variety, dealers):
 
 
 def _on_select(status_code=200, message="Success", data=None):
-    payload = {"statusCode": status_code, "status": "x", "message": message, "data": data or []}
-    return {"message": {"contract": {"commitments": [{"commitmentAttributes": {"payload": payload}}]}}}
+    answer = {
+        "@context": sathi_seed.AGRICULTURE_RESOURCE_CONTEXT,
+        "@type": "openagrinet:AgricultureResource",
+        "statusCode": status_code, "status": "x", "message": message, "data": data or [],
+    }
+    return {"message": {"contract": {"commitments": [{"resources": [{"resourceAttributes": answer}]}]}}}
 
 
 class FakeAdapter:
@@ -143,7 +149,7 @@ def test_discover_asks_the_public_catalog_with_lon_lat_point(adapter):
     spatial = body["message"]["intent"]["spatial"][0]
     assert spatial["op"] == "S_INTERSECTS"
     assert spatial["geometry"] == {"type": "Point", "coordinates": [LON, LAT]}
-    assert OPERATION_REF in body["message"]["intent"]["filters"]["expression"]
+    assert body["message"]["intent"]["filters"]["expression"] == SATHI_STOCK_FILTER
 
 
 def test_select_carries_resource_type_provider_descriptor_and_four_codes(adapter):
@@ -153,18 +159,14 @@ def test_select_carries_resource_type_provider_descriptor_and_four_codes(adapter
     assert body["context"]["bppUri"] == "https://oan.test"
     assert body["context"]["transactionId"] == adapter.bodies["discover"]["context"]["transactionId"]
     commitment = body["message"]["contract"]["commitments"][0]
-    attrs = commitment["resources"][0]["resourceAttributes"]
-    assert attrs["@type"] == "openagrinet:AgricultureResource"
-    assert "agricultureSubjects" not in attrs
-    assert "coverageAreas" not in attrs
-    assert commitment["offer"]["provider"] == PROVIDER
-    assert commitment["offer"]["resourceIds"] == ["res-sathi-stock:27:487"]
-    operation = commitment["commitmentAttributes"]
-    assert operation["@type"] == "ProviderOperationPayload"
-    assert operation["operationRef"] == OPERATION_REF
-    assert operation["payload"] == {
+    assert commitment["resources"][0]["resourceAttributes"] == {
+        "@context": sathi_seed.AGRICULTURE_RESOURCE_CONTEXT,
+        "@type": "openagrinet:AgricultureResource",
         "cropCode": "C001", "seedClass": "CERTIFIED I", "stateCode": "27", "districtCode": "487",
     }
+    assert commitment["offer"]["provider"] == PROVIDER
+    assert commitment["offer"]["resourceIds"] == ["res-sathi-stock:27:487"]
+    assert "commitmentAttributes" not in commitment
 
 
 def test_select_never_sends_an_api_key(adapter):
@@ -281,14 +283,14 @@ def _search_in(district, crop_code="C001"):
 def test_named_district_picks_that_district_among_two(adapter):
     adapter.discover = _two_districts()
     _search_in("Pune")
-    payload = adapter.bodies["select"]["message"]["contract"]["commitments"][0]["commitmentAttributes"]["payload"]
+    payload = adapter.bodies["select"]["message"]["contract"]["commitments"][0]["resources"][0]["resourceAttributes"]
     assert payload["districtCode"] == "490"
 
 
 def test_named_district_matches_ignoring_case_and_whitespace(adapter):
     adapter.discover = _two_districts()
     _search_in("  pune ")
-    payload = adapter.bodies["select"]["message"]["contract"]["commitments"][0]["commitmentAttributes"]["payload"]
+    payload = adapter.bodies["select"]["message"]["contract"]["commitments"][0]["resources"][0]["resourceAttributes"]
     assert payload["districtCode"] == "490"
 
 
@@ -310,7 +312,7 @@ def test_multi_district_reply_asks_to_call_again_with_district(adapter):
 
 def test_single_discovered_district_wins_over_a_different_name(adapter):
     _search_in("Pune")
-    payload = adapter.bodies["select"]["message"]["contract"]["commitments"][0]["commitmentAttributes"]["payload"]
+    payload = adapter.bodies["select"]["message"]["contract"]["commitments"][0]["resources"][0]["resourceAttributes"]
     assert payload["districtCode"] == "487"
 
 
