@@ -573,7 +573,8 @@ async def stream_chat_messages(
 
             trimmed_history = build_model_history(
                 history, tool_turns=settings.history_tool_turns, max_tokens=64_000,
-                conversation_tokens=settings.history_conversation_tokens, min_turns=settings.history_min_turns)
+                conversation_tokens=settings.history_conversation_tokens, min_turns=settings.history_min_turns,
+                stub_old_results=settings.history_old_tool_results == "stub")
             logger.info("Trimmed history length: %s messages", len(trimmed_history))
 
             chunk_queue: asyncio.Queue[str | None] = asyncio.Queue()

@@ -80,6 +80,9 @@ class Settings(BaseSettings):
         int(os.getenv("HISTORY_CONVERSATION_TOKENS")) if os.getenv("HISTORY_CONVERSATION_TOKENS", "").strip() else None
     )
     history_min_turns: int = int(os.getenv("HISTORY_MIN_TURNS", "3"))
+    # Older turns beyond HISTORY_TOOL_TURNS: "drop" removes their tool calls and results; "stub" keeps the calls
+    # and replaces each result with a short placeholder.
+    history_old_tool_results: str = os.getenv("HISTORY_OLD_TOOL_RESULTS", "drop").strip().lower()
 
     # Cache Configuration
     default_cache_ttl: int = 60 * 60 * 24  # 24 hours

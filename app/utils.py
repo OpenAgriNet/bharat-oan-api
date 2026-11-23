@@ -350,10 +350,16 @@ def last_user_message(history: List[ModelMessage]) -> Optional[str]:
     return None
 
 
-def keep_tool_results(history: List[ModelMessage], last_n_turns: int) -> List[ModelMessage]:
-    """Keep tool calls/results only in the last n turns; earlier turns keep their prompt and answer text.
+OLD_TOOL_RESULT_STUB = "[Earlier result not repeated. Facts needed later are in the session state.]"
 
-    Calls and results are dropped together, so the history stays valid for the model API.
+
+def keep_tool_results(history: List[ModelMessage], last_n_turns: int, stub: bool = False) -> List[ModelMessage]:
+    """Keep tool results only in the last n turns; earlier turns keep their prompt and answer text.
+
+    stub=False drops older tool calls and results together. stub=True keeps older tool calls (small) and
+    replaces each result with a short placeholder, so the history still shows that earlier answers came from
+    tools; without that, the model tends to repeat earlier tool-backed wording ("OTP sent") without calling the
+    tool. Either way every call keeps a matching return, so the history stays valid for the model API.
     """
     turns = split_turns(history)
     cut = max(len(turns) - last_n_turns, 0)
@@ -361,6 +367,17 @@ def keep_tool_results(history: List[ModelMessage], last_n_turns: int) -> List[Mo
     for index, turn in enumerate(turns):
         if index >= cut:
             kept.extend(turn)
+            continue
+        if stub:
+            for message in turn:
+                if not any(getattr(p, "part_kind", "") == "tool-return" for p in message.parts):
+                    kept.append(message)
+                    continue
+                copy = deepcopy(message)
+                for part in copy.parts:
+                    if getattr(part, "part_kind", "") == "tool-return":
+                        part.content = OLD_TOOL_RESULT_STUB
+                kept.append(copy)
             continue
         for message in turn:
             parts = [p for p in message.parts if getattr(p, "part_kind", "") not in TOOL_PART_KINDS]
@@ -423,6 +440,7 @@ def build_model_history(
     max_tokens: int = 64_000,
     conversation_tokens: Optional[int] = None,
     min_turns: int = 3,
+    stub_old_results: bool = False,
 ) -> List[ModelMessage]:
     """History sent to the model.
 
@@ -432,7 +450,7 @@ def build_model_history(
     otherwise bh-dev's trim to max_tokens.
     """
     if tool_turns is not None:
-        history = keep_tool_results(history, tool_turns)
+        history = keep_tool_results(history, tool_turns, stub=stub_old_results)
     if conversation_tokens is not None:
         history = recent_turns(history, conversation_tokens, min_turns)
     else:

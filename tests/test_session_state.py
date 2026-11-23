@@ -199,3 +199,12 @@ def test_loaded_skills_come_back_from_session_state():
     restore_loaded_skills(later)
     assert "khc.grievances" in later.skills.active
     assert session_state.render_state(later.session_state) == ""  # hidden from the model
+
+
+def test_stub_mode_keeps_old_calls_with_placeholder_results():
+    kept = utils.build_model_history(_history(), tool_turns=0, conversation_tokens=10000, stub_old_results=True)
+    calls = [p.tool_call_id for m in kept for p in m.parts if p.part_kind == "tool-call"]
+    returns = [p for m in kept for p in m.parts if p.part_kind == "tool-return"]
+    assert calls == [p.tool_call_id for p in returns] == ["c0", "c1", "c2"]
+    assert all(p.content == utils.OLD_TOOL_RESULT_STUB for p in returns)
+    assert "result 1" not in str([p.content for p in returns])
