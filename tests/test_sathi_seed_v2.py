@@ -4,8 +4,8 @@ import logging
 from types import SimpleNamespace
 
 import httpx
-
 import pytest
+import yaml
 
 from agents.tools import sathi_seed as v1
 from agents.tools.v2 import sathi_seed
@@ -15,6 +15,29 @@ OPERATION_REF = (
     "#/paths/~1inv-apis~1stock~1getSeedAvailability/post"
 )
 SATHI_STOCK_FILTER = '$.catalogs[*].resources[*] ? (@.descriptor.code == "sathi-stock")'
+OPENAPI_YAML = """
+openapi: 3.1.1
+paths:
+  /inv-apis/stock/getSeedAvailability:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SathiStockRequest'
+components:
+  schemas:
+    SathiStockRequest:
+      type: object
+      properties:
+        cropCode: {type: [integer, string]}
+        seedClass: {const: CERTIFIED I}
+        stateCode: {type: [integer, string]}
+        districtCode: {type: [integer, string]}
+        apiKey: {type: string, writeOnly: true}
+      required: [cropCode, seedClass, stateCode, districtCode, apiKey]
+"""
 LAT, LON = 20.0, 73.8
 MAHARASHTRA_ONLY = (
     "SATHI seed information is currently available only for Maharashtra. "
@@ -92,9 +115,13 @@ class FakeAdapter:
     def __init__(self, discover=None, select=None):
         self.discover = discover if discover is not None else _on_discover(_resource())
         self.select = select if select is not None else _on_select()
+        self.openapi = OPENAPI_YAML
+        self.schema_fetches = 0
         self.bodies = {}
 
     def __call__(self, request):
+        if request.method == "GET":
+            return self._serve_openapi(request)
         action = request.url.path.rsplit("/", 1)[-1]
         self.bodies[action] = json.loads(request.content)
         answer = getattr(self, action)
@@ -104,6 +131,15 @@ class FakeAdapter:
             return answer
         return httpx.Response(200, json=answer)
 
+    def _serve_openapi(self, request):
+        assert str(request.url) == OPERATION_REF.split("#")[0]
+        self.schema_fetches += 1
+        if isinstance(self.openapi, Exception):
+            raise self.openapi
+        if isinstance(self.openapi, httpx.Response):
+            return self.openapi
+        return httpx.Response(200, text=self.openapi)
+
 
 @pytest.fixture
 def adapter(monkeypatch):
@@ -112,6 +148,8 @@ def adapter(monkeypatch):
     monkeypatch.setenv("OAN_DOMAIN", "agriculture")
     monkeypatch.delenv("OAN_PUBLIC_NETWORK_ID", raising=False)
     monkeypatch.setattr(sathi_seed, "lf_update_current_observation", lambda **kwargs: None)
+    monkeypatch.setattr(sathi_seed, "_OPENAPI_CACHE", {})
+    monkeypatch.delenv("SATHI_OPENAPI_CACHE_TTL_SECONDS", raising=False)
     fake = FakeAdapter()
     real_client = httpx.AsyncClient
     monkeypatch.setattr(
@@ -121,8 +159,16 @@ def adapter(monkeypatch):
     return fake
 
 
-def _search(crop_code="C001"):
-    return asyncio.run(sathi_seed.search_sathi_seed_availability(SimpleNamespace(), crop_code, LAT, LON))
+def _fields(crop="C001", state="27", district="487", **extra):
+    return {"cropCode": crop, "stateCode": state, "districtCode": district, **extra}
+
+
+def _search(fields=None):
+    return asyncio.run(sathi_seed.search_sathi_seed_availability(SimpleNamespace(), fields or _fields(), LAT, LON))
+
+
+def _sent_fields(adapter):
+    return adapter.bodies["select"]["message"]["contract"]["commitments"][0]["resources"][0]["resourceAttributes"]
 
 
 def _list():
@@ -153,7 +199,7 @@ def test_discover_asks_the_public_catalog_with_lon_lat_point(adapter):
 
 
 def test_select_carries_resource_type_provider_descriptor_and_four_codes(adapter):
-    _search("c001")
+    _search(_fields(crop="c001"))
     body = adapter.bodies["select"]
     assert body["context"]["networkId"] == "oan.test"
     assert body["context"]["bppUri"] == "https://oan.test"
@@ -211,7 +257,7 @@ def test_no_stock_status_returns_v1_data_not_available_text(adapter):
 
 def test_all_zero_bag_lots_return_v1_no_dealers_text(adapter):
     adapter.select = _on_select(data=[_lot("Indrayani", [_dealer("D1", "Krishi Kendra", 0)])])
-    assert _search("c001") == (
+    assert _search(_fields(crop="c001")) == (
         "No dealers with stock found for this crop in Nashik, Maharashtra, crop C001.\n\n"
         "**Source: SATHI**"
     )
@@ -231,7 +277,7 @@ def test_point_in_two_districts_lists_both_and_does_not_select(adapter):
 
 
 def test_crop_code_not_in_district_list_is_refused_without_select(adapter):
-    result = _search("Z999")
+    result = _search(_fields(crop="Z999"))
     assert "Z999" in result
     assert "select" not in adapter.bodies
 
@@ -276,22 +322,22 @@ def _two_districts():
     return _on_discover(_resource("466", "Ahilyanagar"), _resource("490", "Pune"))
 
 
-def _search_in(district, crop_code="C001"):
-    return asyncio.run(sathi_seed.search_sathi_seed_availability(SimpleNamespace(), crop_code, LAT, LON, district))
+def _search_in(district, fields=None):
+    return asyncio.run(
+        sathi_seed.search_sathi_seed_availability(SimpleNamespace(), fields or _fields(), LAT, LON, district)
+    )
 
 
 def test_named_district_picks_that_district_among_two(adapter):
     adapter.discover = _two_districts()
-    _search_in("Pune")
-    payload = adapter.bodies["select"]["message"]["contract"]["commitments"][0]["resources"][0]["resourceAttributes"]
-    assert payload["districtCode"] == "490"
+    _search_in("Pune", _fields(district="490"))
+    assert _sent_fields(adapter)["districtCode"] == "490"
 
 
 def test_named_district_matches_ignoring_case_and_whitespace(adapter):
     adapter.discover = _two_districts()
-    _search_in("  pune ")
-    payload = adapter.bodies["select"]["message"]["contract"]["commitments"][0]["resources"][0]["resourceAttributes"]
-    assert payload["districtCode"] == "490"
+    _search_in("  pune ", _fields(district="490"))
+    assert _sent_fields(adapter)["districtCode"] == "490"
 
 
 def test_unmatched_district_name_lists_candidates_without_select(adapter):
@@ -312,8 +358,7 @@ def test_multi_district_reply_asks_to_call_again_with_district(adapter):
 
 def test_single_discovered_district_wins_over_a_different_name(adapter):
     _search_in("Pune")
-    payload = adapter.bodies["select"]["message"]["contract"]["commitments"][0]["resources"][0]["resourceAttributes"]
-    assert payload["districtCode"] == "487"
+    assert _sent_fields(adapter)["districtCode"] == "487"
 
 
 def test_list_with_district_returns_that_districts_crops(adapter):
@@ -322,3 +367,93 @@ def test_list_with_district_returns_that_districts_crops(adapter):
     assert "district Pune" in result
     assert "Ahilyanagar" not in result
     assert "C001: Paddy" in result
+
+
+def _request_schema():
+    return sathi_seed.request_schema(yaml.safe_load(OPENAPI_YAML), OPERATION_REF.split("#")[1])
+
+
+def test_select_fields_marks_model_const_and_adapter_sources():
+    specs = sathi_seed.select_fields(_resource(), _request_schema())
+    assert {name: spec.source for name, spec in specs.items()} == {
+        "cropCode": "model", "seedClass": "const", "stateCode": "model", "districtCode": "model", "apiKey": "adapter",
+    }
+    assert specs["seedClass"].value == "CERTIFIED I"
+    assert specs["cropCode"].required
+
+
+def test_list_shows_request_fields_the_model_fills(adapter):
+    result = _list()
+    assert "Request fields" in result
+    assert "cropCode" in result
+    assert "27 (Maharashtra)" in result
+    assert "487 (Nashik)" in result
+    assert "seedClass" not in result
+    assert "apiKey" not in result
+    assert "never show crop codes to the farmer" in result
+
+
+def test_schema_is_fetched_once_and_reused(adapter):
+    _list()
+    _search()
+    assert adapter.schema_fetches == 1
+
+
+def test_schema_is_fetched_again_after_the_cache_expires(adapter, monkeypatch):
+    monkeypatch.setenv("SATHI_OPENAPI_CACHE_TTL_SECONDS", "0")
+    _list()
+    _list()
+    assert adapter.schema_fetches == 2
+
+
+def test_schema_fetch_failure_returns_service_error_and_is_not_cached(adapter):
+    adapter.openapi = httpx.Response(503, text="down")
+    assert _list() == "Seed availability service returned an error. Please try again later."
+    adapter.openapi = OPENAPI_YAML
+    assert "Request fields" in _list()
+    assert adapter.schema_fetches == 2
+
+
+def test_unparseable_schema_returns_service_error_without_select(adapter):
+    adapter.openapi = "openapi: [unclosed"
+    assert _search() == "Seed availability service returned an error. Please try again later."
+    assert "select" not in adapter.bodies
+
+
+def test_const_field_is_set_by_the_tool_over_the_models_value(adapter):
+    _search(_fields(seedClass="TRUTHFUL"))
+    assert _sent_fields(adapter)["seedClass"] == "CERTIFIED I"
+
+
+def test_write_only_field_from_the_model_is_dropped(adapter):
+    _search(_fields(apiKey="model-made-this-up"))
+    assert "apiKey" not in _sent_fields(adapter)
+
+
+def test_missing_required_field_is_rejected_without_select(adapter):
+    fields = _fields()
+    del fields["districtCode"]
+    assert "districtCode" in _search(fields)
+    assert "select" not in adapter.bodies
+
+
+def test_unknown_field_is_rejected_without_select(adapter):
+    assert "colour" in _search(_fields(colour="red"))
+    assert "select" not in adapter.bodies
+
+
+def test_wrong_value_type_is_rejected_without_select(adapter):
+    assert "cropCode" in _search(_fields(crop=["C001"]))
+    assert "select" not in adapter.bodies
+
+
+def test_state_and_district_names_are_corrected_to_their_codes(adapter):
+    _search(_fields(state="maharashtra", district=" Nashik "))
+    assert _sent_fields(adapter)["stateCode"] == "27"
+    assert _sent_fields(adapter)["districtCode"] == "487"
+
+
+def test_wrong_district_code_is_rejected_without_select(adapter):
+    result = _search(_fields(district="999"))
+    assert "487" in result
+    assert "select" not in adapter.bodies

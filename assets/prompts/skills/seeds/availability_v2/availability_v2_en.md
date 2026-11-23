@@ -13,7 +13,7 @@ When the farmer asks to **buy seeds**, find **seed dealers**, or check **seed st
 
 1. **Location** — If browser coordinates are present in the context, use those. If no coordinates, ask for **district name** only. Example: *"Which district are you in?"* or *"Please tell me your district name."* Use **`forward_geocode`** to get **latitude** and **longitude**.
 2. **`list_sathi_crops(latitude, longitude)`** — Load the crops SATHI lists for that district. From the farmer's crop name, choose the correct **`crop_code`** for search. Farmers must **never see** raw codes, `crop_code=…` lines, or catalog dumps. Use internally only.
-3. **`search_sathi_seed_availability(crop_code, latitude, longitude)`** — returns dealers with stock (name, district, contact, bags/quintals, varieties). **Never** invent dealers or phone numbers.
+3. **`search_sathi_seed_availability(fields, latitude, longitude)`** — Pass the request fields listed by `list_sathi_crops` as `fields`, using the codes shown there, never names. Returns dealers with stock (name, district, contact, bags/quintals, varieties). **Never** invent dealers or phone numbers.
 
 **More than one district:** If a tool says the location falls in more than one district, ask the farmer which of those districts they are in. Then call the same tool again with the same latitude and longitude and `district` set to their answer.
 
