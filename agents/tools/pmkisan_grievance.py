@@ -538,7 +538,8 @@ async def _verify_pm_kisan_otp(
         return f"OTP verification failed. {_format_http_response_raw(response)}"
 
     if is_otp_verified(response_model):
-        remember(ctx, SESSION_SECTION, reg_no=reg_no_clean, grievance_otp_step="verified")
+        # Verified and used within this call; the next grievance call needs a new OTP.
+        remember(ctx, SESSION_SECTION, reg_no=reg_no_clean, grievance_otp_step=None)
         return None
 
     response_summary = str(response_model).strip()

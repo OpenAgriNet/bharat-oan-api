@@ -54,7 +54,7 @@ def test_status_otp_sent_then_verified(post):
     assert state(ctx) == {"phone_number": PHONE, "status_otp_step": "sent"}
 
     pmfby_scheme_status.check_pmfby_status_with_otp(ctx, "123456", PHONE, "policy_status", "2025", "Kharif")
-    assert state(ctx) == {"phone_number": PHONE, "status_otp_step": "verified", "year": "2025", "season": "Kharif"}
+    assert state(ctx) == {"phone_number": PHONE, "year": "2025", "season": "Kharif"}
     assert "123456" not in str(ctx.deps.session_state)
 
 
@@ -137,3 +137,11 @@ def test_grievance_status_records_ticket_only_when_found(post):
     out = pmfby_grievance.pmfby_grievance_status(ctx, PHONE, "T-1")
     assert "Status: Open" in out
     assert state(ctx) == {"phone_number": PHONE, "ticket_no": "T-1"}
+
+
+def test_status_otp_sent_when_provider_returns_its_own_text(post):
+    """Production and the eval provider answer init with a readable 'OTP Sent' order, not an empty body."""
+    ctx = make_ctx()
+    post += [httpx.Response(200, json=POLICY)]
+    pmfby_scheme_status.initiate_pmfby_status_check(ctx, PHONE)
+    assert state(ctx) == {"phone_number": PHONE, "status_otp_step": "sent"}

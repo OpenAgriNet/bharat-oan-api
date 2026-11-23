@@ -666,10 +666,12 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
             response_json = response.json()
             scheme_response = SchemeStatusResponse.model_validate(response_json)
             if is_otp_verified(scheme_response):
+                # Status returned: this OTP is used up, so no step stays open (a stale "verified" step
+                # invites the model to treat a later, different OTP as already verified).
                 if reg_no:
-                    remember(ctx, SESSION_SECTION, reg_no=reg_no, status_otp_step="verified")
+                    remember(ctx, SESSION_SECTION, reg_no=reg_no, status_otp_step=None)
                 else:
-                    remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step="verified")
+                    remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step=None)
             return str(scheme_response)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response from scheme status API: {e}. Response text: {response_text[:200]}")

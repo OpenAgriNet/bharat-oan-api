@@ -542,6 +542,9 @@ def initiate_pmfby_status_check(ctx: RunContext[FarmerContext], phone_number: st
             resp_str = str(scheme_response)
             # Return actual API response so user sees errors (e.g. phone not registered, invalid number)
             if resp_str and resp_str != "No data available.":
+                # The provider's own text (e.g. "OTP Sent") without error codes means the OTP went out.
+                if scheme_response._has_valid_data():
+                    remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step="sent")
                 return resp_str
             # Empty/minimal response usually means OTP sent
             remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step="sent")
@@ -646,7 +649,8 @@ def check_pmfby_status_with_otp(
             if not scheme_response._has_valid_data():
                 record_type = "policy" if inquiry_type == "policy_status" else "claim"
                 return f"No {record_type} record found for {year} {season}."
-            remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step="verified",
+            # The status was returned with this OTP; a later status check needs a new OTP, so the step is done.
+            remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step=None,
                      year=year, season=season)
             return str(scheme_response)
         except json.JSONDecodeError as e:

@@ -71,7 +71,7 @@ def test_status_otp_sent_then_verified_by_reg_no(sync_post):
     assert state(ctx) == {"reg_no": "TN110700729", "status_otp_step": "sent"}
 
     pmkisan_scheme_status.check_pm_kisan_status_with_otp(ctx, otp="1234", reg_no="TN110700729")
-    assert state(ctx) == {"reg_no": "TN110700729", "status_otp_step": "verified"}
+    assert state(ctx) == {"reg_no": "TN110700729"}  # status returned: the OTP step is closed
     assert "1234" not in str(ctx.deps.session_state)
 
 
@@ -101,7 +101,7 @@ def test_grievance_status_otp_sent_then_verified(async_post):
 
     asyncio.run(pmkisan_grievance.pmkisan_grievance_status(ctx, reg_no="TN110700729", otp="1234"))
     # The OTP is used once (verify + search in the same call), so it is not stored.
-    assert state(ctx) == {"reg_no": "TN110700729", "grievance_otp_step": "verified"}
+    assert state(ctx) == {"reg_no": "TN110700729"}  # used within the call: step closed
 
 
 def test_grievance_wrong_otp_keeps_sent(async_post):
