@@ -552,6 +552,23 @@ mid-journey on one version cannot finish on the other.
    are pass-through now; the only thing either does to a value is cast the OTP
    to the number KCC's contract asks for.
 
+**Found by running the agent, not the tool.**
+
+12. **The agent skips `initiate_kcc_otp` on some phrasings and says an OTP was
+    sent anyway.** Three of eight farmer phrasings never call the tool and
+    still reply *"An OTP has been sent to your mobile XXXXXX3210. It is valid
+    for 15 minutes."* — 0/3 runs each for `check kcc application status for
+    <number>`, `check my kcc loan status for mobile <number>` and
+    `<number> - kcc loan application status`. The other five call it 3/3. The
+    farmer then waits for an SMS that was never requested. Reproduced
+    identically on **v1**, so this is not a v2 regression; the one-line
+    `status_*.md` step 2 example is the likely cause — it hands the model a
+    finished sentence with a literal masked number, and v1 copied that
+    number (`XXXXXX6386`) for a farmer whose number ended `3210`. Fixing it
+    means rewriting step 2 in all thirteen `status_*.md` files to describe the
+    reply instead of spelling it out. Not done here: it is a prompt change
+    across every language, and it is wrong on v1 too.
+
 **Open, and not KCC's to close.**
 
 10. **The response side is still not contract-driven.** The request path reads

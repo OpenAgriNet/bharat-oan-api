@@ -34,16 +34,17 @@ place -- read that first when picking a capability back up.
 | Soil Health Card | **Built, verified end to end locally** — [plan](shc/plan.md) · [try it](shc/quick-try.md) · [open TODOs](shc/plan.md#open-todos) |
 | AIF — loan status + grievance status | **Built, catalog published, discoverable; proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
 | KCC — credit card application status | **Built, catalog published, discoverable; proven against a mock only** — [plan](kcc/plan.md) · [try it](kcc/quick-try.md) · [open items](kcc/plan.md#open-items) |
-| The other eleven | Not started |
+| KHC — grievance registration + status | **Planned, not started** — nothing blocks it; the geography lookups need either one parameterised KHC endpoint or a second binding — [plan](khc/plan.md) · [open items](khc/plan.md#open-items) |
+| The other ten | Not started |
 
 Cutting across all of them: the scheme tools used to carry the provider and
 resource ids as constants and now ask `discover` for them — what that changed,
 how AIF publishes as `AgricultureResource/v0.2`, and why mandi silently
 returned no prices until 2026-11-23, is in [discovery.md](discovery.md).
 
-Both scheme capabilities ship behind a per-capability flag defaulting to `v1`,
-so nothing above is serving farmers on v2 yet. PM-KISAN is blocked on one
-thing — a run against the real host. PMFBY is blocked on two values nobody has
+Every capability above ships behind a per-capability flag that defaults to `v1`
+in code; the local stack sets all eight to `v2` — see *What the local stack
+runs on* below. PM-KISAN is blocked on one thing — a run against the real host. PMFBY is blocked on two values nobody has
 given us: its base URL and its login URL.
 
 Four of the open items across the two plans are the same kind of work — gaps
@@ -59,6 +60,18 @@ refusing every `select` for a missing `informationMode` — a catalog fact a
 are not published at all — see
 [aif/quick-try.md](aif/quick-try.md#before-you-start).
 
+KHC's planning turned up a fact that changes where every v2 catalog should
+publish: **the publish module resolves a pinned `@context` too.**
+`network-adapter.yaml.tmpl:253` is `oanProviderPublish`, and `:293-295` give it
+`extendedSchema_enabled: "true"` with the same `SchemeApplication/v0.2` and
+`Grievance/v0.2` rewrite the transaction modules have. A `Grievance/v0.2`
+catalog carrying the pinned github.io `@context` published `ACCEPTED` against the
+running stack on 2026-11-24. AIF's fallback to `AgricultureResource/v0.2`
+predates that and is now unnecessary; moving it back would let it publish
+`scheme` and `challenge`. The decision procedure — payload type, catalog type,
+resource count, decided separately — is in
+[khc/plan.md](khc/plan.md#how-we-decide-which-pack-a-capability-goes-under).
+
 KCC also added vocabulary the packs do not cover and should not: a provider's
 own request fields belong in its API contract, not in a schema pack.
 `x-oan-request-attributes` names the attributes a Beckn call must carry for a
@@ -73,6 +86,28 @@ coordinates back, but `fcstday1..5` are empty objects. Tracked as open item 4
 in [weather/plan.md](weather/plan.md#open-questions); re-run
 [weather/quick-try.md](weather/quick-try.md) when IMD is serving again.
 
+## What the local stack runs on
+
+`docker-compose.pilot.yml` now sets every implemented capability to v2. The
+flags are read at import time, so changing one means editing that file and
+restarting `app`. Checked through `agrinet_agent` with farmer sentences after
+the switch:
+
+| Capability | v2 through the agent |
+|---|---|
+| Mandi, Weather | work (weather's provider still returns an empty forecast) |
+| KCC | works — OTP, status, repeated select |
+| AIF — loan + grievance | works |
+| PM-KISAN — status | works. Its OTP is **four** digits, not six |
+| PMFBY — status + grievance | works |
+| SATHI | **blocked** — adapter answers `NET_ENTITY_NOT_FOUND`, item 3 below |
+| SHC | **blocked** — `discover found no shc-reports resource`, item 3 below |
+
+Nothing regressed in the switch: on v1 every one of these fails locally with
+`Connection refused`, because v1 dials the real provider hosts directly and
+this stack cannot reach them. SATHI and SHC were already broken and still are,
+for the same missing credentials.
+
 ## What v2 changes, in one paragraph
 
 v1 sent a single `/search` to a provider the tool had hardcoded in its
@@ -85,34 +120,17 @@ though the scheme tools only started taking that answer in November 2026; see
 
 ## Carried to the next phase
 
-Nothing here blocks what is already built. Written down so it is picked up
-deliberately rather than rediscovered.
+Every open item now lives in one place: **[open-issues.md](open-issues.md)**.
+Sixteen numbered items, grouped by what each one is waiting on — access, a
+decision, or an hour of work — plus a link to each capability's own open list.
+It is one file so a review does not have to go hunting.
 
-**Waiting on access. No decision to make, no code to write.**
-
-| # | Item | What unblocks it |
-|---|---|---|
-| 1 | KCC's AES key and IV rule are unknown | A real call. The mock and the codec share the same guess, so they agree whether or not it is right — [kcc/plan.md open item 1](kcc/plan.md#open-items). Check this first when credentials arrive |
-| 2 | No KCC credentials | `KCC_ENTITY_TYPE`, `KCC_USER_ID`, `KCC_PASSWORD`. Swapping the mock is a `.env` edit and one `make register-provider PROVIDER=kcc UPDATE=1` — no code, no rebuild |
-| 3 | `SATHI_API_KEY`, `SHC_TOKEN_URL`, `SHC_REFRESH_TOKEN` missing from `helmcharts/quick-start/.env` | Without them `setup.py` renders no provider binding for either, so the adapter answers `NET_ENTITY_NOT_FOUND` on SATHI's `select` and discover finds no `shc-reports` resource. This is the only reason the api collection is not green |
-
-**Needs a decision.**
-
-| # | Item | The question |
-|---|---|---|
-| 4 | The `AgricultureResource/v0.2` pack fix is on `bv-migration`; SATHI's catalog `@context` names `bv-features` | `bv-features` still has `required: [informationMode, subjectCategories]`, so deployed environments keep refusing every `select` for a catalog fact a select has no reason to carry. Needs a merge to `bv-features`, or the catalog repointed |
-| 5 | The response side is not contract-driven | The request path now reads every field name from the provider's OpenAPI. Responses do not: `applicationNo`, `sanctionedAmount` and the rest are field names in the tool, in all six providers, because the mapping defines the response shape and nothing declares it. Closing it means new vocabulary — an `x-oan-to` or the mapping output described in the contract — across every provider, not a KCC change |
-
-**Small and safe. Each is an hour or less.**
-
-| # | Item |
-|---|---|
-| 6 | AIF's `_LOAN_OFFER` / `_TICKETS_OFFER` constants can read the offer off `_first_resource`, which now carries it |
-| 7 | SATHI's `_FIELD_MEANINGS = {"cropCode": "crop", ...}` bridge can become `x-oan-from` hints in SATHI's OpenAPI — the same fix KCC just had |
-| 8 | `pmkisan_scheme_status.py:174` duplicates `post_action` instead of using the shared one in `aif.py` |
-| 9 | `mapping-files` and `spec-files` are started by hand and are not in `quick-start/docker-compose.yml`. Until they are, **never run `docker compose` with `--remove-orphans`** — it deletes them and `mock-ffs` |
-| 10 | A stray `cat-aif-schemaapp-probe` catalog is still in local discovery |
-| 11 | The PMFBY v0.2 mapping stubs are still `deployable: false` |
+Item 8 is done. `pmkisan_scheme_status.py` kept its own `post_action` and
+`_first_resource`, and `pmkisan_grievance.py` imports both *through* that module
+while passing `who=` — which the local copy never accepted, so all four of its
+calls raised `TypeError` in committed code. Both duplicates are gone and the
+shared ones in `aif.py` are used instead. The 266-assertion api collection could
+not catch this: newman posts to the adapter and never enters the tool.
 
 ## Read this before starting the next one
 
@@ -138,3 +156,52 @@ capability:
   `"*"` because IMD forecast data is open. A capability that needs both at once
   wants the spec's array form of `networkId`, which the adapter currently
   refuses — [weather/plan.md](weather/plan.md#scoping-a-discover-to-a-catalog-audience).
+
+KCC adds a fourth, about how a capability is signed off:
+
+- **A green api collection does not mean the tool works.** newman posts to the
+  network adapter, so 266 passing assertions prove the adapter, the mappings and
+  the provider agree with each other. They say nothing about the code the farmer
+  actually reaches. PM-KISAN's grievance tool was committed with all four of its
+  `post_action` calls raising `TypeError`, and the collection was green the whole
+  time. Verify both layers: the newman folder **and** the tool's own entry points,
+  happy path and negatives. A stub context is enough —
+  `RunContext` only needs `deps=FarmerContext(session_id=..., query=...)`:
+
+      docker exec -i -e PYTHONPATH=/app sva_app python - <<'PY'
+      import asyncio, types
+      from agents.deps import FarmerContext
+      from agents.tools.v2 import kcc
+      ctx = types.SimpleNamespace(deps=FarmerContext(session_id="t", query="t"))
+      print(asyncio.run(kcc.initiate_kcc_otp(ctx, "9876543211")))
+      PY
+
+- **And a green tool does not mean the farmer gets the right answer.** Calling
+  the entry points directly supplies the arguments yourself, so it never tests
+  whether the agent picks the tool or fills it correctly. Running KCC's three
+  tools through `agrinet_agent` with farmer sentences found a fourth layer of
+  bug: three of eight phrasings skip `initiate_kcc_otp` entirely and reply "an
+  OTP has been sent" — README item 13. Run the agent too, carrying message
+  history between turns, with a real `FarmerContext`:
+
+      docker exec -i -e KCC_BECKN_VERSION=v2 -e PYTHONPATH=/app sva_app python - <<'PY'
+      import asyncio
+      from agents.deps import FarmerContext
+      from agents.agrinet import agrinet_agent
+      async def main():
+          history = []
+          deps = FarmerContext(query="", session_id="t", lang_code="en")
+          for q in ["check my KCC loan status, my number is 9876543213",
+                    "123456", "show me 100247"]:
+              deps.query = q
+              deps.skills.restore(history)
+              res = await agrinet_agent.run(q, deps=deps, message_history=history)
+              history = res.all_messages()
+              print(q, "->", res.output)
+      asyncio.run(main())
+      PY
+
+  The flag is read at import time, so the version under test has to be injected
+  with `-e`. In the running container `KCC_BECKN_VERSION` is unset — only
+  `WEATHER_BECKN_VERSION` and `MANDI_BECKN_VERSION` are `v2` — so the deployed
+  agent still routes KCC to the v1 tools.

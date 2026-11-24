@@ -169,17 +169,19 @@ async def _discover(action: str) -> Optional[Dict[str, Any]]:
             f"{response.text[:300]}"
         )
         return None
-    found = _first_resource(response.json())
-    if not found:
-        return None
+    return _first_resource(
+        response.json(),
+        usable=lambda candidate: _unusable(candidate, action),
+        who="PMFBY",
+    )
+
+
+def _unusable(found: Dict[str, Any], action: str) -> Optional[str]:
+    """Why this resource cannot serve the action, or None when it can."""
     advertised = [entry.get("action") for entry in _actions(found)]
     if action not in advertised:
-        logger.error(
-            f"PMFBY v2 {found['resource'].get('id')} does not advertise {action}; "
-            f"catalog offers {advertised}"
-        )
-        return None
-    return found
+        return f"does not advertise {action}; catalog offers {advertised}"
+    return None
 
 
 # --------------------------------------------------------------------------------------

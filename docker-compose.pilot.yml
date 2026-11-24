@@ -34,6 +34,18 @@ services:
       # schema pack has nowhere to put -- so this is not a transparent swap.
       # See migration-plan/weather/plan.md.
       WEATHER_BECKN_VERSION: v2
+      # KCC's three tools move together on this one flag -- they share an OTP,
+      # so a farmer cannot start on v1 and finish on v2. Points at mockkcc
+      # until KCC credentials arrive; see migration-plan/kcc/plan.md.
+      KCC_BECKN_VERSION: v2
+      # The rest of what is built. Each is read at import time like the others,
+      # so flipping one back to v1 means editing this file and restarting.
+      # Status and known gaps per capability: migration-plan/README.md.
+      AIF_BECKN_VERSION: v2
+      PMKISAN_BECKN_VERSION: v2
+      PMFBY_BECKN_VERSION: v2
+      SATHI_BECKN_VERSION: v2
+      SHC_BECKN_VERSION: v2
 
   redis:
     image: redis:7-alpine

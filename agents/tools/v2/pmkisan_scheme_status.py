@@ -39,7 +39,7 @@ from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
 from agents.tools.pmkisan_scheme_status import generate_transaction_id
-from app.config import DEFAULT_HTTP_TIMEOUT
+from agents.tools.v2.aif import _first_resource, post_action
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
 
@@ -171,15 +171,6 @@ def explain_failure(response: httpx.Response, what: str) -> str:
     return f"PM-KISAN {what} is temporarily unavailable. Please try again later."
 
 
-async def post_action(action: str, body: Dict[str, Any]) -> httpx.Response:
-    url = adapter_url(action)
-    logger.info(f"PM-KISAN v2 {action} -> {url}")
-    async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-        response = await client.post(url, json=body)
-    logger.info(f"PM-KISAN v2 {action} <- {response.status_code}")
-    return response
-
-
 async def _discover_application() -> Optional[Dict[str, Any]]:
     """The PM-KISAN application-status resource, with its catalog provider.
 
@@ -201,23 +192,14 @@ async def _discover_application() -> Optional[Dict[str, Any]]:
             }
         },
     }
-    response = await post_action("discover", body)
+    response = await post_action("discover", body, who="PM-KISAN")
     if response.status_code != 200:
         logger.error(
             f"PM-KISAN v2 discover failed: HTTP {response.status_code} "
             f"{response.text[:300]}"
         )
         return None
-    return _first_resource(response.json())
-
-
-def _first_resource(payload: dict) -> Optional[Dict[str, Any]]:
-    """Nothing to rank: PM-KISAN publishes one resource for this capability."""
-    for catalog in (payload.get("message") or {}).get("catalogs") or []:
-        provider = catalog.get("provider") or {}
-        for resource in catalog.get("resources") or []:
-            return {"resource": resource, "provider": provider}
-    return None
+    return _first_resource(response.json(), who="PM-KISAN")
 
 
 def commitment_attributes(response: httpx.Response) -> Dict[str, Any]:
@@ -383,7 +365,7 @@ async def initiate_pm_kisan_status_check(
             _APPLICATION_OFFER,
             found,
         )
-        response = await post_action("init", body)
+        response = await post_action("init", body, who="PM-KISAN")
         if response.status_code != 200:
             return explain_failure(response, "OTP request")
 
@@ -457,7 +439,7 @@ async def check_pm_kisan_status_with_otp(
             _APPLICATION_OFFER,
             found,
         )
-        response = await post_action("status", body)
+        response = await post_action("status", body, who="PM-KISAN")
         if response.status_code != 200:
             return explain_failure(response, "status check")
 

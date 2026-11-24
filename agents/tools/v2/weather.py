@@ -23,6 +23,7 @@ from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
 from agents.tools.imd_advisory import agromet_note
+from agents.tools.v2.aif import _first_resource
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, get_today_date_str
@@ -139,15 +140,7 @@ async def _discover_provider(
         },
     }
     payload = await _post("discover", body)
-    return _first_resource(payload)
-
-
-def _first_resource(payload: dict) -> Optional[Dict[str, Any]]:
-    for catalog in payload.get("message", {}).get("catalogs", []) or []:
-        provider = catalog.get("provider") or {}
-        for resource in catalog.get("resources", []) or []:
-            return {"resource": resource, "provider": provider}
-    return None
+    return _first_resource(payload, who="Weather")
 
 
 async def _select_forecast(
