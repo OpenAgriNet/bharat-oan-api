@@ -110,8 +110,7 @@ appeared 0 times in the adapter logs.
    code copies exact values and the model only picks the crop.
 5. **Raise with network-specs:** the `/inv-apis2/` path, the 409 no-stock answer,
    and that their mapping files use a format the adapter cannot load.
-6. **OpenStreetMap boundaries in the catalog need a credit line**, not yet decided.
-7. **Native-speaker review** of the flow lines in the 12 translated v2 prompts.
+6. **Native-speaker review** of the flow lines in the 12 translated v2 prompts.
 
 ## What this does not cover
 
