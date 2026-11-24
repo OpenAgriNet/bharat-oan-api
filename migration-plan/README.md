@@ -73,6 +73,28 @@ coordinates back, but `fcstday1..5` are empty objects. Tracked as open item 4
 in [weather/plan.md](weather/plan.md#open-questions); re-run
 [weather/quick-try.md](weather/quick-try.md) when IMD is serving again.
 
+## What the local stack runs on
+
+`docker-compose.pilot.yml` now sets every implemented capability to v2. The
+flags are read at import time, so changing one means editing that file and
+restarting `app`. Checked through `agrinet_agent` with farmer sentences after
+the switch:
+
+| Capability | v2 through the agent |
+|---|---|
+| Mandi, Weather | work (weather's provider still returns an empty forecast) |
+| KCC | works — OTP, status, repeated select |
+| AIF — loan + grievance | works |
+| PM-KISAN — status | works. Its OTP is **four** digits, not six |
+| PMFBY — status + grievance | works |
+| SATHI | **blocked** — adapter answers `NET_ENTITY_NOT_FOUND`, item 3 below |
+| SHC | **blocked** — `discover found no shc-reports resource`, item 3 below |
+
+Nothing regressed in the switch: on v1 every one of these fails locally with
+`Connection refused`, because v1 dials the real provider hosts directly and
+this stack cannot reach them. SATHI and SHC were already broken and still are,
+for the same missing credentials.
+
 ## What v2 changes, in one paragraph
 
 v1 sent a single `/search` to a provider the tool had hardcoded in its
