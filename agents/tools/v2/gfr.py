@@ -235,6 +235,31 @@ async def _soil_values(found: dict, phone: str, cycle: str, transaction_id: str)
     return {name: results.get(name) for name in _SOIL_VALUES}
 
 
+async def _advice_and_soil_report(state_id: str, transaction_id: str) -> Optional[tuple]:
+    """The state's advice resource and the soil-report resource, or None when either is missing."""
+    found = await _discover(transaction_id, (
+        f'(@.descriptor.code == "{_ADVICE["code"]}" && @.resourceAttributes.coverageAreas[*].areaCode == "{state_id}")'
+        f' || @.descriptor.code == "{_SOIL["code"]}"'))
+    advice, soil_report = _of_kind(found, _ADVICE), _of_kind(found, _SOIL)
+    if not advice or not soil_report:
+        logger.warning(f"GFR v2 state {state_id}: advice found {bool(advice)}, soil report found {bool(soil_report)}")
+        return None
+    return advice[0], soil_report[0]
+
+
+async def _doses(advice: dict, variables: dict, transaction_id: str) -> str:
+    """The recommendation text for these soil values and crops, in v1's words."""
+    query = await _query_for(advice["resource"], "select")
+    logger.info(f"GFR v2 selecting {advice['resource'].get('id')} for crops {variables['crops']}")
+    attributes = _answer_attributes(await _post("select", _select_body(
+        advice, _ADVICE, {"query": query, "variables": variables}, transaction_id)))
+    recommendations = (attributes.get("data") or {}).get("getRecommendations")
+    if recommendations is None:
+        logger.warning(f"GFR v2 no recommendation: errors={[e.get('message') for e in attributes.get('errors') or []]}")
+        return _NO_DATA
+    return format_recommendations([_as_v1_item(recommendations)])
+
+
 @observe(name="tool:gfr_get_crop_registries", as_type="tool")
 async def gfr_get_crop_registries(
     ctx: RunContext[FarmerContext],
@@ -276,27 +301,16 @@ async def gfr_get_recommendations(
     lf_update_current_observation(
         metadata={"tool": "gfr.recommendations", "beckn_version": "v2", "transaction_id": transaction_id})
     # v1 sent district and lat/lon too, and provider-backend dropped them; v2 does not send them.
-    found = await _discover(transaction_id, (
-        f'(@.descriptor.code == "{_ADVICE["code"]}" && @.resourceAttributes.coverageAreas[*].areaCode == "{state_id}")'
-        f' || @.descriptor.code == "{_SOIL["code"]}"'))
-    advice, soil_report = _of_kind(found, _ADVICE), _of_kind(found, _SOIL)
-    if not advice or not soil_report:
-        logger.warning(f"GFR v2 state {state_id}: advice found {bool(advice)}, soil report found {bool(soil_report)}")
+    resources = await _advice_and_soil_report(state_id, transaction_id)
+    if resources is None:
         return _NO_DATA
+    advice, soil_report = resources
     try:
-        soil = await _soil_values(soil_report[0], phone, cycle_y, transaction_id)
+        soil = await _soil_values(soil_report, phone, cycle_y, transaction_id)
         if soil is None:
             return _NO_DATA
-        query = await _query_for(advice[0]["resource"], "select")
+        variables = {"state": state_id, "results": soil, "crops": crop_ids, "naturalFarming": bool(natural_farming)}
+        return await _doses(advice, variables, transaction_id)
     except SchemaUnavailable as e:
         logger.error(f"GFR v2 could not read the request schema: {e}")
         raise ModelRetry(_UNAVAILABLE)
-    variables = {"state": state_id, "results": soil, "crops": crop_ids, "naturalFarming": bool(natural_farming)}
-    logger.info(f"GFR v2 selecting {advice[0]['resource'].get('id')} for crops {crop_ids}")
-    attributes = _answer_attributes(await _post("select", _select_body(
-        advice[0], _ADVICE, {"query": query, "variables": variables}, transaction_id)))
-    recommendations = (attributes.get("data") or {}).get("getRecommendations")
-    if recommendations is None:
-        logger.warning(f"GFR v2 no recommendation: errors={[e.get('message') for e in attributes.get('errors') or []]}")
-        return _NO_DATA
-    return format_recommendations([_as_v1_item(recommendations)])
