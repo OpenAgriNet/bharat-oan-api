@@ -1,14 +1,12 @@
 """SATHI seed availability over Beckn v2: discover the district, select its stock.
 Rendering reuses v1's helpers so both versions answer with the same text."""
 import os
-import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-import yaml
 from dotenv import load_dotenv
 from langfuse import observe
 from pydantic_ai.tools import RunContext
@@ -20,6 +18,12 @@ from agents.tools.sathi_seed import (
     _format_dealer_details,
     _num,
     _seed_availability_data_not_available_response,
+)
+from agents.tools.v2.provider_openapi import (
+    SchemaUnavailable,
+    openapi_document,
+    request_schema,
+    select_operation_ref,
 )
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -53,18 +57,10 @@ _UNREACHABLE = "Could not reach seed availability service. Please try again late
 _UNEXPECTED = "Unexpected error while fetching seed availability. Please try again later."
 
 
-_OPENAPI_CACHE_TTL_SECONDS_DEFAULT = 3600
-# Each fetched OpenAPI document by URL, with the monotonic time it stops being reused.
-_OPENAPI_CACHE: Dict[str, Tuple[float, dict]] = {}
-
 # What each SATHI request field means, until the spec carries x-oan-from hints.
 _FIELD_MEANINGS = {"cropCode": "crop", "stateCode": "State", "districtCode": "District"}
 
 _JSON_TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "object": dict, "array": list}
-
-
-class SchemaUnavailable(Exception):
-    """The select operation's request schema could not be fetched or read."""
 
 
 @dataclass(frozen=True)
@@ -74,62 +70,6 @@ class FieldSpec:
     required: bool
     types: Tuple[str, ...] = ()
     value: Any = None
-
-
-def _cache_ttl_seconds() -> float:
-    return float(os.getenv("SATHI_OPENAPI_CACHE_TTL_SECONDS", _OPENAPI_CACHE_TTL_SECONDS_DEFAULT))
-
-
-async def _openapi_document(url: str) -> dict:
-    cached = _OPENAPI_CACHE.get(url)
-    if cached and cached[0] > time.monotonic():
-        logger.info(f"SATHI seed v2 reusing cached OpenAPI {url}")
-        return cached[1]
-    logger.info(f"SATHI seed v2 fetching OpenAPI {url}")
-    try:
-        async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-            response = await client.get(url)
-        response.raise_for_status()
-        document = yaml.safe_load(response.text)
-    except (httpx.HTTPError, yaml.YAMLError) as e:
-        raise SchemaUnavailable(f"fetch failed: {e}") from e
-    if not isinstance(document, dict):
-        raise SchemaUnavailable("not an OpenAPI document")
-    _OPENAPI_CACHE[url] = (time.monotonic() + _cache_ttl_seconds(), document)
-    return document
-
-
-def _follow_pointer(document: dict, pointer: str) -> Any:
-    node: Any = document
-    for part in pointer.strip("/").split("/"):
-        key = part.replace("~1", "/").replace("~0", "~")
-        if not isinstance(node, dict) or key not in node:
-            raise SchemaUnavailable(f"{pointer} has no {key!r}")
-        node = node[key]
-    return node
-
-
-def _resolved(document: dict, node: Any) -> Any:
-    seen = set()
-    while isinstance(node, dict) and "$ref" in node:
-        ref = node["$ref"]
-        if not ref.startswith("#/") or ref in seen:
-            raise SchemaUnavailable(f"cannot follow $ref {ref}: only local, non-circular refs are read")
-        seen.add(ref)
-        node = _follow_pointer(document, ref[1:])
-    return node
-
-
-def request_schema(document: dict, pointer: str) -> dict:
-    """The JSON request body schema of the operation at ``pointer``, with local refs followed."""
-    operation = _resolved(document, _follow_pointer(document, pointer))
-    body = _resolved(document, operation.get("requestBody") or {})
-    media = (body.get("content") or {}).get("application/json") or {}
-    schema = _resolved(document, media.get("schema") or {})
-    properties = {name: _resolved(document, prop) for name, prop in (schema.get("properties") or {}).items()}
-    if not properties:
-        raise SchemaUnavailable(f"{pointer} has no JSON request fields")
-    return {**schema, "properties": properties}
 
 
 def _field_source(prop: dict) -> str:
@@ -152,17 +92,10 @@ def select_fields(resource: dict, schema: dict) -> Dict[str, FieldSpec]:
     }
 
 
-def _select_operation_ref(resource: dict) -> str:
-    for action in (resource.get("resourceAttributes") or {}).get("actions") or []:
-        if action.get("action") == "select" and action.get("operationRef"):
-            return action["operationRef"]
-    raise SchemaUnavailable(f"{resource.get('id')} has no select operationRef")
-
-
 async def _field_specs(resource: dict) -> Dict[str, FieldSpec]:
-    url, _, pointer = _select_operation_ref(resource).partition("#")
+    url, _, pointer = select_operation_ref(resource).partition("#")
     try:
-        specs = select_fields(resource, request_schema(await _openapi_document(url), pointer))
+        specs = select_fields(resource, request_schema(await openapi_document(url), pointer))
     except SchemaUnavailable as e:
         raise SchemaUnavailable(f"{url}: {e}") from e
     logger.info(f"SATHI seed v2 request fields from {url}: { {n: f.source for n, f in specs.items()} }")

@@ -13,6 +13,7 @@ migration-plan/
 ├── pmkisan/
 ├── pmfby/
 ├── sathi/
+├── shc/
 └── aif/
 ```
 
@@ -29,8 +30,9 @@ place -- read that first when picking a capability back up.
 | PM-KISAN — Grievance + SchemeApplication | **Built, proven against a mock only** — [plan](pmkisan/plan.md) · [try it](pmkisan/quick-try.md) · [open TODOs](pmkisan/plan.md#open-todos) |
 | PMFBY — Grievance | **Wired up, provider never reached** — [plan](pmfby/plan.md) · [open TODOs](pmfby/plan.md#open-todos) |
 | SATHI seed availability | **Built, verified end to end locally** — [plan](sathi/plan.md) · [try it](sathi/quick-try.md) · [open TODOs](sathi/plan.md#open-todos) |
+| Soil Health Card | **Built, verified end to end locally** — [plan](shc/plan.md) · [try it](shc/quick-try.md) · [open TODOs](shc/plan.md#open-todos) |
 | AIF — loan status + grievance status | **Built, catalog published, discoverable; proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
-| The other twelve | Not started |
+| The other eleven | Not started |
 
 Cutting across all of them: the scheme tools used to carry the provider and
 resource ids as constants and now ask `discover` for them — what that changed,

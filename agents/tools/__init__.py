@@ -50,7 +50,10 @@ else:
         initiate_pmfby_status_check,
         check_pmfby_status_with_otp,
     )
-from agents.tools.shc_scheme_status import check_shc_status
+if _beckn_v2("SHC"):
+    from agents.tools.v2.shc_scheme_status import check_shc_status
+else:
+    from agents.tools.shc_scheme_status import check_shc_status
 if _beckn_v2("PMKISAN"):
     from agents.tools.v2.pmkisan_grievance import (
         pmkisan_grievance_send_otp,
