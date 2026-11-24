@@ -34,16 +34,17 @@ place -- read that first when picking a capability back up.
 | Soil Health Card | **Built, verified end to end locally** — [plan](shc/plan.md) · [try it](shc/quick-try.md) · [open TODOs](shc/plan.md#open-todos) |
 | AIF — loan status + grievance status | **Built, catalog published, discoverable; proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
 | KCC — credit card application status | **Built, catalog published, discoverable; proven against a mock only** — [plan](kcc/plan.md) · [try it](kcc/quick-try.md) · [open items](kcc/plan.md#open-items) |
-| The other eleven | Not started |
+| KHC — grievance registration + status | **Plan written, not started** — [plan](khc/plan.md) · [open items](khc/plan.md#open-items) |
+| The other ten | Not started |
 
 Cutting across all of them: the scheme tools used to carry the provider and
 resource ids as constants and now ask `discover` for them — what that changed,
 how AIF publishes as `AgricultureResource/v0.2`, and why mandi silently
 returned no prices until 2026-11-23, is in [discovery.md](discovery.md).
 
-Both scheme capabilities ship behind a per-capability flag defaulting to `v1`,
-so nothing above is serving farmers on v2 yet. PM-KISAN is blocked on one
-thing — a run against the real host. PMFBY is blocked on two values nobody has
+Every capability above ships behind a per-capability flag that defaults to `v1`
+in code; the local stack sets all eight to `v2` — see *What the local stack
+runs on* below. PM-KISAN is blocked on one thing — a run against the real host. PMFBY is blocked on two values nobody has
 given us: its base URL and its login URL.
 
 Four of the open items across the two plans are the same kind of work — gaps

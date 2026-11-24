@@ -64,3 +64,4 @@ not catch this: newman posts to the adapter and never enters the tool.
 | SHC | [shc/plan.md](shc/plan.md#open-todos) |
 | Weather | [weather/plan.md](weather/plan.md#open-questions) |
 | Mandi | [mandi/plan.md](mandi/plan.md) |
+| KHC | [khc/plan.md](khc/plan.md#open-items) — not started; the plan is the open list |
