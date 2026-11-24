@@ -67,7 +67,8 @@ not catch this: newman posts to the adapter and never enters the tool.
 
 | Plan | What it closes |
 |---|---|
-| [grievance-v0.2/plan.md](grievance-v0.2/plan.md) — move PM-KISAN and PMFBY grievance to `Grievance/v0.2` | PM-KISAN items 2, 3 and 5 and PMFBY item 5, plus the last call to the v1 BAP. Proposed 2026-11-24, not started |
+| [grievance-v0.2/plan.md](grievance-v0.2/plan.md) — move PM-KISAN and PMFBY grievance to `Grievance/v0.2` | PM-KISAN items 2, 3 and 5 and PMFBY item 5, plus the last call to the v1 BAP, plus the registry row below. Proposed 2026-11-24, corrected 2026-11-25, not started |
+| The registry advertises one pack version per capability, and it is wrong for two | `SchemaRegistry` makes `capabilityCode` unique, so the deployment holds a single version per capability (`bin/setup.py:592-612`). The live registry says `openagrinet:Grievance` is v0.1 while KHC and AIF publish v0.2 catalogs, and `openagrinet:SchemeApplication` is v0.1 while KCC, AIF and PMFBY insurance publish v0.2. No runtime effect — the validator resolves the pack from the payload's `@context` — but it is what federation peers read. `ensure_capability_schema` will not move a row already held, so each fix needs the row deleted first. Grievance is handled by the plan above; SchemeApplication is not yet planned. Found 2026-11-25 |
 
 ## Each capability's own open items
 

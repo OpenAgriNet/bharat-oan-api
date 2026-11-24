@@ -1,6 +1,8 @@
 # PM-KISAN and PMFBY grievance: `Grievance/v0.1` -> `v0.2`
 
-**Status: proposed, nothing built.** Written 2026-11-24 for review.
+**Status: proposed, nothing built.** Written 2026-11-24, corrected 2026-11-25
+after tracing the publish -> discover -> call -> mapper chain against the
+running stack.
 
 KHC is on `Grievance/v0.2`. PM-KISAN and PMFBY grievance are still on `v0.1`,
 and three of the migration's open items exist only because of that. This moves
@@ -12,33 +14,74 @@ costs nearly the same as doing both.
 
 ---
 
+## How the chain actually runs
+
+Written down first because two earlier drafts of this plan got it wrong. Each
+row is what the code does, not what the shape of the spec suggests.
+
+| Step | Carried in | Read by |
+|---|---|---|
+| Publish | `resourceAttributes`: `@context`, `@type`, `scheme`, `informationMode`, `grievanceOptions`, `actions[]` | the discovery service stores it |
+| Discover | the jsonpath in `intent.filters`, and `context.networkId` matched against the publish's `visibleTo` | the discovery service |
+| on_discover | `message.catalogs[].resources[]` | the tool |
+| What the tool takes from it | `provider.id`, `resource.id`, `grievanceOptions.categories`, `challenge.methods`, and `actions[].action` as a **presence check only** (`agents/tools/v2/aif.py:375`) | the tool |
+| The next call | `POST {OAN_ADAPTER_URL}/{action}`, body a commitment or support envelope carrying `@context` and `@type` | the adapter |
+| Which provider endpoint it hits | the registry's `ProviderSchema.actions[].path`, written by `setup.py` | the adapter |
+| What validates it | the `@context` **in the payload** is fetched, then `x-oan-schema-by-action[action]` | `schemav2validator` |
+| What builds the provider request | the registry's `actions[].mappings` URL, jsonata `request`/`response` | `jsonmapper` |
+
+Two consequences worth stating plainly, because the plan is sized by them.
+
+**`operationRef` does not drive anything at runtime.** `grep -rn operationRef
+--include="*.go"` across `beckn-onix` returns nothing; the adapter never fetches
+an `openapi.yaml`. In the pack `operationRef` is `format: uri` plus a string
+pattern, never dereferenced, so a URL that 404s still validates. The three-way
+reconciliation of catalog <-> OpenAPI <-> mapping is
+`network-specs/scripts/check-api-separation.py:88-95`, and it covers only the
+`deployable: false` drafts under `network-specs`, not the mappings the adapter
+loads from `quick-start`.
+
+**The registry's pack version is not what validates.** `SchemaRegistry.schemaUrl`
+is advertising metadata, published onward by `oanfed`'s `schema_packs()`. The
+validator resolves the pack from the payload's own `@context`, rewritten where
+`extendedSchema_contextRewrite` names a prefix. That is why KHC works today on a
+deployment whose registry still says v0.1 -- see "The registry row" below.
+
 ## Why v0.1 is the cause, not a coincidence
 
-`Grievance/v0.1` validates each provider with its own closed schema. Three
-consequences, all measured:
+`Grievance/v0.1` is a closed list of per-provider schemas, and the `Grievance`
+entry names a schema per action (`v0.1/attributes.yaml:18-37`):
+
+```yaml
+x-beckn-container-by-action: {catalog/publish: resourceAttributes, init: commitmentAttributes,
+                              status: commitmentAttributes, support: channels}
+x-oan-schema-by-action:      {catalog/publish: GrievanceCatalog, init: GrievanceInit,
+                              status: GrievanceStatus, support: GrievanceSupport}
+```
+
+**There is no `confirm` and no `select`, for any provider.** That is the root
+cause, and it is bigger than the missing `PMFBYInit` an earlier draft of this
+plan named: a two-call OTP exchange and a two-call status read have no actions
+to ride on v0.1 at all. It is why KHC had to be built on v0.2.
+
+On top of that, two closed shapes bite specific open items:
 
 | v0.1 | Where | What it forces |
 |---|---|---|
 | `PMKISANOption.code` is a closed enum, `[G001…G010]` | `v0.1/attributes.yaml:841` | thirteen of PM-KISAN's real grievance types, `CORRUPTION` among them, cannot be published. The tool carries a refusal branch instead |
 | `PMKISANStatus` requires `case`, and `mustSend` lists `case.filedOn` | `v0.1/attributes.yaml:645` | the farmer must produce a filing date they were shown once. A wrong date is indistinguishable from having no grievance |
-| There is no `PMFBYInit` — `v0.1` has `PMKISANInit` and no PMFBY equivalent | `v0.1/attributes.yaml` schema list | PMFBY's grievance OTP has no action to ride, so it stays on the v1 BAP |
 
-`Grievance/v0.2` maps all five actions to one `GrievanceCall`:
+`Grievance/v0.2` maps all five actions to one `GrievanceCall`
+(`v0.2/attributes.yaml:19-24`), which requires `@context` and `@type` and
+nothing else.
 
-```yaml
-x-oan-schema-by-action:
-  init: GrievanceCall
-  confirm: GrievanceCall
-  select: GrievanceCall
-  status: GrievanceCall
-  support: GrievanceCall
-```
-
-`GrievanceCall` requires `@context` and `@type` and nothing else. Per-operation
-validation moves to the provider's OpenAPI contract, which the catalog's
-`actions[].operationRef` names. So the enum, the required `case` and the missing
-`PMFBYInit` all stop being pack problems at once — not because v0.2 relaxed a
-rule for us, but because v0.2 puts provider-specific shapes where they belong.
+**Be honest about what that trade is.** v0.2 does not relocate per-operation
+validation to the OpenAPI contract -- nothing reads that contract at runtime. It
+*removes* per-operation validation. After the move, what stands between a
+farmer's words and KRPH is the mapper's jsonata and the provider's own 400.
+That is the same position KHC is already in, and the same position every v1 call
+was in, but it should be chosen knowingly rather than discovered later. See
+risk 1.
 
 ## The last v1 call, and why it is here
 
@@ -50,80 +93,112 @@ raises. So PMFBY cannot be cut over to v2 on its own, and this is the only
 capability where that is still true.
 
 It is here rather than in PMFBY's own plan because the fix is the pack move:
-once the grievance capability has an `init` and a `confirm`, the OTP has
-somewhere to go.
+v0.2 has an `init` and a `confirm`, so the OTP has somewhere to go.
 
-## What the move actually costs
+## The registry row, which is the part nobody has looked at
 
-Less than it looks, because the endpoints are already mapped — under the other
-capability.
+`SchemaRegistry` makes `capabilityCode` a unique index, so a deployment holds
+**one pack version per capability** (`bin/setup.py:592-606`). What the running
+registry holds:
 
-PMFBY's two OTP endpoints are on the same host as its grievance endpoints
-(`PMFBY_BASE_URL`), and `SchemeApplication/v0.2` already registers both:
-
-| Action | Path | Existing mapping |
+| capabilityCode | registered version | who publishes v0.2 catalogs against it |
 |---|---|---|
-| `init` | `/api/v1/services/nic/getOtp` | `insurance.init.yaml` |
-| `confirm` | `/api/v1/services/nic/verifyMobile` | `insurance.confirm.yaml` |
+| `openagrinet:Grievance` | **v0.1** | KHC, AIF |
+| `openagrinet:SchemeApplication` | **v0.1** | KCC, AIF, PMFBY insurance |
 
-So `grievance.init.yaml` and `grievance.confirm.yaml` are near-copies of two
-proven, working mappings, not new work against an unknown API. PM-KISAN needs no
-new mapping at all: its three actions (`init`, `support`, `status`) keep their
-paths and are repointed at v0.2.
+`PROVIDERS` is iterated in insertion order and `pmkisan` is first, so v0.1 won
+and stayed. `ensure_capability_schema` refuses to move a row already held: it
+prints a warning and leaves it (`setup.py:604-612`).
 
-One contract decision: `getOtp` and `verifyMobile` are declared in
-`api/external/pmfby/insurance/v0.2/openapi.yaml`, not the grievance one. Either
-point grievance's `init`/`confirm` `operationRef`s into the insurance contract,
-or declare the two operations in both. Cross-referencing is honest — it is one
-host and one verification — and avoids two copies drifting.
+This has no runtime effect, because validation resolves the pack from the
+payload. But the deployment currently **advertises v0.1 for a capability half
+its providers serve at v0.2**, and that is what federation peers read. So the
+move does not only close open items -- it removes a live inconsistency.
 
-Worth noting: `api/external/pmfby/grievance/v0.2/openapi.yaml` **already** names
-`Grievance/v0.2` in its `x-oan-binding.schema`, while `setup.py` registers the
-capability at `v0.1`. The contract was written for the move; only the
-registration and the catalog were left behind.
+It also means phase 1 needs a step that has nothing to do with code: **delete
+the `openagrinet:Grievance` SchemaRegistry row**, or re-running
+`register-providers` will leave v0.1 in place and print a warning into a log
+nobody reads.
 
-## The one thing that is real work: PMFBY has no categories
+## What the catalog edit actually is
 
-`Grievance/v0.2`'s `GrievanceFields` requires `grievanceOptions`
-(`v0.2/attributes.yaml:382-390`). PM-KISAN has a category list. **PMFBY does
-not**, and the current behaviour is worse than missing:
+Smaller than two earlier drafts claimed, and load-bearing rather than optional.
 
-- KRPH's filing operation takes `ticketCategoryID` and `ticketSubCategoryID`
-  (`pmfby/grievance/v0.2/openapi.yaml:12`).
-- `grievance.support.yaml:9-11` hardcodes `$DEFAULT_CATEGORY_CODE := "3"`,
-  `$DEFAULT_SUB_CATEGORY_CODE := "10"`, `$DEFAULT_RECEIPT_SOURCE_ID := "134306"`.
-- `pmfby_submit_grievance` takes no category argument on either version — only
-  `application_no` and a free-text `grievance_description`.
+Both catalogs were checked field by field against `GrievanceFields`
+(`v0.2/attributes.yaml:382-390`). Neither carries a field
+`unevaluatedProperties: false` would reject, and neither is missing a required
+field -- **except `actions[].operationRef`**, which v0.2 requires on every
+action. They carry `schema` and `attributesAt` today, and v0.2 allows both.
 
-So **every PMFBY grievance we file is filed under category 3, sub-category 10**,
-whatever the farmer complained about, and the farmer is never asked. The desk
-that receives a grievance is chosen by that code. This is the same routing
-failure `../pmkisan/plan.md` rejects as Option B, except it is already live and
-nobody chose it.
+| | PM-KISAN | PMFBY | KHC (already v0.2) |
+|---|---|---|---|
+| `@context` | v0.1 | v0.1 | v0.2 |
+| categories published | 10 | 1 (+1 sub-category) | 10 |
+| action keys | `action, attributesAt, description, schema` | same | `action, description, operationRef` |
+| `operationRef` | **missing** | **missing** | present |
+| `offers` | none | `off:pmfby:grievance` | none |
+| resource `descriptor` | **none** | **none** | `khc-grievance` |
 
-Requiring `grievanceOptions` forces this into the open, which is the strongest
-argument for the move. It also means the move cannot complete without PMFBY's
-real category list. **That is a question for KRPH, not a lookup**, and it is the
-one dependency here that is not ours to close.
+`catalog/publish` is not named in v0.2's `x-oan-schema-by-action`, and an
+unnamed action falls back to the whole type rather than being skipped
+(`schemav2validator/extended_schema.go:759-775`). The whole type is
+`GrievanceFields`. So **flipping `@context` without adding `operationRef` makes
+the publish fail validation**, and discover with it, since on_discover carries
+the same attributes. The two edits are one step, not two.
 
-Until it arrives, the choice is: publish the two codes we actually send as a
-one-entry `grievanceOptions` and say in the catalog that it is provisional, or
-hold PMFBY at v0.1 and move PM-KISAN alone. The first is honest about what we
-do; the second leaves the v1 BAP call in place.
+The shape to write is already in the pack. `v0.2/attributes.yaml` defines
+`PMFBYCatalog` (`:59`) and `PMKISANCatalog` (`:207`) -- per-provider catalog
+schemas with the operationRefs pinned by `enum`, for exactly the two providers
+this plan moves. **Nothing `$ref`s either of them**; they are unreferenced in the
+pack. Treat them as the author's intended catalog and lift the refs from there
+rather than composing new ones. Both target contracts already exist
+(`api/external/pm-kisan/grievance/v0.2/openapi.yaml`,
+`api/external/pmfby/grievance/v0.2/openapi.yaml`) and already declare
+`schema: .../Grievance/v0.2/attributes.yaml`. The escaped refs were checked
+against the pack's pattern, including
+`~1krphapi~1FGMS~1AddKRPHNCIPGrievenceSupportTicket/post`.
+
+While there: add `descriptor.code` to both resources. The contracts declare
+`descriptorCode` (`pm-kisan-grievances`, `pmfby-grievances`) that no catalog
+publishes, which is why these two discover by `@type` + `scheme.code` while KHC
+and AIF discover by `descriptor.code`. One convention is better than two.
+
+## PMFBY's categories: already published, already labelled
+
+An earlier draft called this "the one thing that is real work" and "the one
+dependency not ours to close". It was wrong, and the correction is worth keeping
+rather than deleting, because the mistake is easy to repeat.
+
+`grievance.support.yaml:9-11` hardcodes `$DEFAULT_CATEGORY_CODE := "3"`,
+`$DEFAULT_SUB_CATEGORY_CODE := "10"`, and `pmfby_submit_grievance` takes no
+category argument on either version, so every PMFBY grievance is filed under
+category 3 / sub-category 10. That part is true. But the catalog already says
+so, in the open:
+
+```json
+"categories": [{ "code": "3", "name": "Enrollment / Portal Issues",
+  "help": "The only category this desk sends. PMFBY publishes no category list,
+           so every grievance is filed under this one." }]
+```
+
+`grievanceOptions.categories` has `minItems: 1`, satisfied today. **The move is
+not blocked on KRPH.** Asking for the real list is still worth doing, and it is
+still the thing that would make PMFBY grievance route to the right desk, but it
+is an improvement and not a prerequisite.
 
 ## Plan
 
 Phases are ordered so each one is verifiable before the next starts.
 
-### Phase 0 — ask, before building
+### Phase 0 — ask, in parallel
 
-1. Ask KRPH for PMFBY's `ticketCategoryID` / `ticketSubCategoryID` list, and
-   what `134306` as a `receiptSourceID` means.
+1. Ask KRPH for PMFBY's real `ticketCategoryID` / `ticketSubCategoryID` list,
+   and what `134306` as a `receiptSourceID` means.
 2. Ask PM-KISAN whether its grievance status read can answer without a filing
    date, and how long its OTP is valid (open item 4, which this does **not**
    close).
 
-Neither blocks phases 1-3.
+**Neither blocks anything.** Both phases below ship without an answer.
 
 ### Phase 1 — PM-KISAN to v0.2
 
@@ -131,22 +206,31 @@ Neither blocks phases 1-3.
    v0.2 context URL. One constant, imported by `v2/pmfby_grievance.py:45`, so
    this is the line that moves both.
 2. `setup.py`'s `pmkisan` Grievance capability from `v0.1` to `v0.2`.
-3. `@context` in `grievance.init.yaml`, `grievance.support.yaml`,
+3. **Delete the `openagrinet:Grievance` SchemaRegistry row** before re-running
+   `register-providers`, or the row stays at v0.1.
+4. `@context` in `grievance.init.yaml`, `grievance.support.yaml`,
    `grievance.status.yaml`.
-4. Edit the catalog in the api collection — **Grievance / PM-KISAN /
-   Publish**, `catalogId` `catalog:grievance:pmkisan` — to the v0.2 `@context`,
-   publishing the **full** category list, the ten plus the thirteen, collapsed
-   as `../pmkisan/plan.md` argues (four or five headings, not thirteen). The
-   collection is this catalog's only publisher: nothing under
+5. Edit the catalog in the api collection — **Grievance / PM-KISAN /
+   Publish**, `catalogId` `catalog:grievance:pmkisan` — in one step: v0.2
+   `@context`, an `operationRef` on each of `init`/`status`/`support` lifted
+   from `PMKISANCatalog`, and a `descriptor.code` of `pm-kisan-grievances`.
+   Flipping the context without the refs fails validation. The collection is
+   this catalog's only publisher: nothing under
    `capability-examples/Grievance/publish/` covers PM-KISAN, and no make target
    publishes automatically.
-5. Delete `_CATEGORY_CODES` and its refusal branch in `v2/pmkisan_grievance.py`.
-6. Drop the pack-side requirement on `filed_on`: `grievance.status.yaml`'s
+6. Delete `_CATEGORY_CODES` and its refusal branch in `v2/pmkisan_grievance.py`,
+   and publish the full category list — the ten plus the thirteen, collapsed as
+   `../pmkisan/plan.md` argues (four or five headings, not thirteen). Separable
+   from step 5 if it needs its own review.
+7. Drop the pack-side requirement on `filed_on`: `grievance.status.yaml`'s
    `$filter(... = $ca.case.filedOn)[0]` returns the list unfiltered when no
    `case` is supplied, and `filed_on` becomes optional on the tool.
 
-**Verify:** api collection PM-KISAN folder green; then the agent, with a farmer
-sentence that names no date, and one that names a category outside G001-G010.
+**Verify:** api collection PM-KISAN folder green; then **re-run the tool**,
+because a green collection does not prove the agent still reads the same
+catalog row ([../khc/plan.md](../khc/plan.md), defect 4). Use a farmer sentence
+that names no date, and one that names a category outside G001-G010. Check
+PMFBY grievance too — step 1 moved it as well.
 
 ### Phase 2 — PMFBY to v0.2
 
@@ -155,18 +239,30 @@ sentence that names no date, and one that names a category outside G001-G010.
    `/api/v1/services/nic/verifyMobile`, both never retried — a retry sends or
    spends a second OTP.
 2. `grievance.init.yaml` and `grievance.confirm.yaml`, copied from
-   `insurance.init.yaml` / `insurance.confirm.yaml`.
-3. Point the catalog's `init`/`confirm` `operationRef`s into the insurance
-   contract.
-4. The same edit to **Grievance / PMFBY / Publish**, `catalogId`
-   `cat-pmfby-grievance`, with whatever phase 0 returns for `grievanceOptions`
-   — or a provisional one-entry list, labelled as such.
-5. Rewrite `initiate_pmfby_grievance_otp` and `check_pmfby_grievance_otp` as v2
+   `insurance.init.yaml` / `insurance.confirm.yaml`. Those two already map the
+   exact endpoints PMFBY grievance needs, on the same host (`PMFBY_BASE_URL`),
+   under `SchemeApplication/v0.2` — so this is a copy of two proven mappings,
+   not new work against an unknown API.
+3. The same single-step catalog edit to **Grievance / PMFBY / Publish**,
+   `catalogId` `cat-pmfby-grievance`: v0.2 `@context`, `operationRef` on every
+   action, `descriptor.code` of `pmfby-grievances`. `support` and `status` come
+   from `PMFBYCatalog`; `init` and `confirm` point into the **insurance**
+   contract, which is where `getOtp` and `verifyMobile` are declared. One host
+   and one verification, so cross-referencing is honest and avoids two copies
+   drifting. `grievanceOptions` needs no change.
+4. Rewrite `initiate_pmfby_grievance_otp` and `check_pmfby_grievance_otp` as v2
    tools in `agents/tools/v2/pmfby_grievance.py`, keeping v1's names,
    signatures and docstrings.
-6. Move their imports in `agents/tools/__init__.py:74` inside the
+5. Move their imports in `agents/tools/__init__.py:74` inside the
    `if _beckn_v2("PMFBY")` branch, and drop the `_verify_pmfby_otp_with_bap`
    import at `v2/pmfby_grievance.py:40`.
+6. Pass the action gate that KHC and AIF already use. `v2/pmfby_grievance.py:137`
+   and `v2/pmkisan_grievance.py:101` call `_first_resource(response.json(),
+   who=...)` with **no `usable=` callback**, so they send an action whether or
+   not the catalog advertises it. Add
+   `usable=lambda c: _unusable(c, action)` to both — `_unusable` is already in
+   `v2/aif.py:298` and needs importing — so the catalog and the
+   registry cannot drift apart silently once `init` and `confirm` exist.
 
 **Verify:** `BAP_ENDPOINT` unset, then file a grievance end to end against
 `mock-pmfby`. That is the test — if it passes with no BAP configured, the last
@@ -178,7 +274,9 @@ Close PM-KISAN items 2, 3 and 5 and PMFBY item 5 in
 [../open-issues.md](../open-issues.md); correct PMFBY's stale `2 of 6` count and
 Open TODO 6 (`SchemeApplication/v0.2` exists, those two tools are live); note
 the `deployable: false` drift between `network-specs/api/external/pmfby/
-insurance/v0.2/mappings/` and the working copies in `quick-start`.
+insurance/v0.2/mappings/` and the working copies in `quick-start`; and record
+that `PMFBYCatalog` and `PMKISANCatalog` are now the catalogs in use rather than
+unreferenced schemas.
 
 ## What this does not close
 
@@ -187,31 +285,37 @@ Said plainly, so the move is not oversold:
 | Still open | Why this does not touch it |
 |---|---|
 | PM-KISAN's invented 10-minute OTP window (`grievance.init.yaml:28`) | a fact nobody has. Phase 0 asks |
+| PMFBY grievances all file under category 3 / sub-category 10 | needs KRPH's list and a category argument on the tool. Phase 0 asks; the catalog already admits it |
 | PMFBY and PM-KISAN never reached their real providers | no credentials. Not ours |
 | The four prompt-fabrication bugs (items 13, 15, 16, 21) | identical on v1, parked by decision |
-| Pages builds from `main`, so every canonical `v0.2` URL 404s | a merge, not code — and the bigger deployment risk than this move |
+| Pages builds from `main`, so every canonical `v0.2` URL 404s | a merge, not code — and the bigger deployment risk than this move. It does not break the move, because `extendedSchema_contextRewrite` already redirects both v0.2 prefixes to `raw.githubusercontent` on `bv-migration`, and `operationRef` is never fetched |
 | Re-enabling PM-KISAN's grievance lodge path | **unblocked** by phase 1, but still someone's decision. It writes to a government system |
-| PM-KISAN application status is on `SchemeApplication/v0.1` (`v2/pmkisan_scheme_status.py:48`) while KCC, AIF and PMFBY insurance are on v0.2 | adjacent and the same shape, but a different pack and a different catalog (`catalog:scheme-application:pmkisan`). Deliberately out of scope — doing four catalogs in one change makes a failure unattributable |
+| `openagrinet:SchemeApplication` is registered at v0.1 while KCC, AIF and PMFBY insurance all serve v0.2 | the same registry-row problem as Grievance, one capability over. Deliberately out of scope here, but it should be the next thing after this |
 
 ## Risks
 
-1. **PMFBY's categories may not arrive.** Then phase 2 ships a provisional
-   `grievanceOptions`, and we are publishing a list we know is incomplete.
-   Better than hardcoding `3` silently, worse than the truth. Give it a dated
-   end.
+1. **v0.2 validates almost nothing per operation.** `GrievanceCall` checks
+   `@context` and `@type`. Nothing reads the OpenAPI contract at runtime, so the
+   contract is a document, not a guard. The mitigation is not inside this move:
+   extend `check-api-separation.py` to cover the deployed `quick-start`
+   mappings, so catalog, contract and mapper are reconciled somewhere. Until
+   that exists, the move trades a real check for a documented one.
 2. **One constant moves two capabilities.** `GRIEVANCE_CONTEXT` is shared, so a
    mistake in phase 1 breaks PMFBY grievance too. Phase 1's verification has to
    cover both before phase 2 starts.
-3. **`GrievanceCall` validates almost nothing.** Moving to v0.2 trades
-   pack-enforced shapes for contract-enforced ones, and the contract is only as
-   good as the OpenAPI. PMFBY's grievance contract is written but was never
-   checked against the real KRPH API — see risk 2 in `../pmfby/plan.md`.
+3. **The `@context` flip and the `operationRef` edit must land together.**
+   Separately, each one fails validation. Phase 1 step 5 and phase 2 step 3 are
+   each a single commit.
 4. **Changing `visibleTo` at the same time would be a second bug wearing the
    first one's clothes.** Both grievance catalogs publish `visibleTo:
    ["{{networkId}}", "{{otherNetworkId}}"]` and both tools discover with
-   `OAN_NETWORK_ID`, default `oan.dev` (`v2/pmkisan_scheme_status.py:95`), so
-   the pair agrees. KHC and AIF use the other self-consistent pair, `["*"]`
-   against `"*"`, and **`*` is matched literally, not as a wildcard** — mixing
-   them is what broke `check_khc_grievance_status` on 2026-11-24
+   `OAN_NETWORK_ID`, default `oan.dev`
+   (`v2/pmkisan_scheme_status.py:94`), so the pair agrees. KHC and AIF use the
+   other self-consistent pair, `["*"]` against `OAN_PUBLIC_NETWORK_ID` default
+   `"*"` (`v2/aif.py:81`), and **`*` is matched literally, not as a wildcard** --
+   mixing them is what broke `check_khc_grievance_status` on 2026-11-24
    ([../khc/plan.md](../khc/plan.md), defect 4). Pack version and visibility are
    independent. Move one per change, or a failure cannot be attributed.
+5. **PMFBY's grievance contract was never checked against the real KRPH API.**
+   Writing its `operationRef`s into the catalog makes it look authoritative.
+   It is not — see risk 2 in `../pmfby/plan.md`.
