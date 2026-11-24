@@ -63,6 +63,12 @@ shared ones in `aif.py` are used instead. The 266-assertion api collection could
 not catch this: newman posts to the adapter and never enters the tool.
 
 
+## Cross-capability plans
+
+| Plan | What it closes |
+|---|---|
+| [grievance-v0.2/plan.md](grievance-v0.2/plan.md) — move PM-KISAN and PMFBY grievance to `Grievance/v0.2` | PM-KISAN items 2, 3 and 5 and PMFBY item 5, plus the last call to the v1 BAP. Proposed 2026-11-24, not started |
+
 ## Each capability's own open items
 
 | Capability | Open items |
