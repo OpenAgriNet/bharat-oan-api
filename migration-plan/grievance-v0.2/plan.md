@@ -5,9 +5,10 @@ after tracing the publish -> discover -> call -> mapper chain against the
 running stack.
 
 KHC is on `Grievance/v0.2`. PM-KISAN and PMFBY grievance are still on `v0.1`,
-and three of the migration's open items exist only because of that. This moves
-both, together, because they share one context constant and doing either alone
-costs nearly the same as doing both.
+and three of the migration's open items exist only because of that. **This moves
+both**, in two phases: PM-KISAN first, then PMFBY. They share one context
+constant today, which is what makes the phases fictional until the first step
+splits it -- see phase 1.
 
 - Open items this closes: [../open-issues.md](../open-issues.md)
 - The capability that proved v0.2: [../khc/plan.md](../khc/plan.md)
@@ -98,7 +99,7 @@ v0.2 has an `init` and a `confirm`, so the OTP has somewhere to go.
 ## The registry row, which is the part nobody has looked at
 
 `SchemaRegistry` makes `capabilityCode` a unique index, so a deployment holds
-**one pack version per capability** (`bin/setup.py:592-606`). What the running
+**one pack version per capability** (`bin/setup.py:592-612`). What the running
 registry holds:
 
 | capabilityCode | registered version | who publishes v0.2 catalogs against it |
@@ -202,9 +203,16 @@ Phases are ordered so each one is verifiable before the next starts.
 
 1. Ask KRPH for PMFBY's real `ticketCategoryID` / `ticketSubCategoryID` list,
    and what `134306` as a `receiptSourceID` means.
-2. Ask PM-KISAN whether its grievance status read can answer without a filing
-   date, and how long its OTP is valid (open item 4, which this does **not**
-   close).
+2. Ask PM-KISAN how long its grievance OTP is valid (open item 4, which this
+   does **not** close).
+
+An earlier draft also asked PM-KISAN whether its status read can answer without
+a filing date. **It already does.** The request half of `grievance.status.yaml`
+sends `Type: "Reg_No_Status"` and `IdentityNo` and no date at all (`:4-7`); the
+provider returns every record held against the registration, and the date is
+applied locally in the response half. The contract says the same in its summary
+-- "Read PM-KISAN grievances for a registration number", plural. Nobody needs to
+be asked; see phase 1 step 7.
 
 **Neither blocks anything.** Both phases below ship without an answer.
 
@@ -244,9 +252,26 @@ cheaper than sequencing around it.
    and publish the full category list — the ten plus the thirteen, collapsed as
    `../pmkisan/plan.md` argues (four or five headings, not thirteen). Separable
    from step 5 if it needs its own review.
-7. Drop the pack-side requirement on `filed_on`: `grievance.status.yaml`'s
-   `$filter(... = $ca.case.filedOn)[0]` returns the list unfiltered when no
-   `case` is supplied, and `filed_on` becomes optional on the tool.
+7. Make `filed_on` optional. **This is three edits, not one, and the pack is
+   the smallest of them.** An earlier draft said the mapping "returns the list
+   unfiltered when no `case` is supplied". It does not:
+   `grievance.status.yaml:53` filters on `$iso($r.GrievanceDate) =
+   $ca.case.filedOn`, and with `filedOn` absent that predicate matches no
+   record, so `$record` is undefined and `:61-64` answers the hardcoded 400
+   *"No grievance matches this registration number and filing date."* The date
+   is enforced in three places and all three have to move:
+   - the tool returns `_NO_FILING_DATE_MSG` before it calls anything
+     (`v2/pmkisan_grievance.py:490-492`, message at `:151`);
+   - the mapping filters on it (`grievance.status.yaml:53`);
+   - v0.1's `PMKISANStatus` lists `case.filedOn` in `mustSend` -- the only one
+     this pack move removes by itself.
+
+   What is left is a decision, not a blocker: the provider already returns every
+   record, so with no date the mapping can answer with the newest one or with
+   all of them. `commitmentAttributes.case` is a single object today and v0.2
+   constrains nothing, so returning more than one needs a shape and a line in
+   the tool's formatter (`_format_case`, `v2/pmkisan_grievance.py:198`). v1
+   returned all of them. Separable from the rest of this phase.
 
 **Verify:** api collection PM-KISAN folder green; then **re-run the tool**,
 because a green collection does not prove the agent still reads the same
@@ -265,10 +290,15 @@ claim being tested.
    `/api/v1/services/nic/verifyMobile`, both never retried — a retry sends or
    spends a second OTP.
 3. `grievance.init.yaml` and `grievance.confirm.yaml`, copied from
-   `insurance.init.yaml` / `insurance.confirm.yaml`. Those two already map the
-   exact endpoints PMFBY grievance needs, on the same host (`PMFBY_BASE_URL`),
-   under `SchemeApplication/v0.2` — so this is a copy of two proven mappings,
-   not new work against an unknown API.
+   **`quick-start/config/mappings/pmfby/insurance.init.yaml` and
+   `insurance.confirm.yaml`** — the deployed copies, 96 and 100-odd lines with
+   `required:` guards. Not the files of the same name under
+   `network-specs/api/external/pmfby/insurance/v0.2/mappings/`: those are
+   13-line `deployable: false` sketches in a different format (`request.in`,
+   `request.jsonata`), not an earlier version of the same file. The deployed
+   pair already maps the exact endpoints PMFBY grievance needs, on the same host
+   (`PMFBY_BASE_URL`), under `SchemeApplication/v0.2` — so this is a copy of two
+   proven mappings, not new work against an unknown API.
 4. The same single-step catalog edit to **Grievance / PMFBY / Publish**,
    `catalogId` `cat-pmfby-grievance`: v0.2 `@context`, `operationRef` on every
    action, `descriptor.code` of `pmfby-grievances`. `support` and `status` come
@@ -298,11 +328,22 @@ v1 dependency is gone. Then the api collection, then the agent.
 
 Close PM-KISAN items 2, 3 and 5 and PMFBY item 5 in
 [../open-issues.md](../open-issues.md); correct PMFBY's stale `2 of 6` count and
-Open TODO 6 (`SchemeApplication/v0.2` exists, those two tools are live); note
-the `deployable: false` drift between `network-specs/api/external/pmfby/
-insurance/v0.2/mappings/` and the working copies in `quick-start`; and record
-that `PMFBYCatalog` and `PMKISANCatalog` are now the catalogs in use rather than
-unreferenced schemas.
+Open TODO 6 (`SchemeApplication/v0.2` exists, those two tools are live) and
+Open TODO 4 (phase 2 step 5 is that file); and record that `PMFBYCatalog` and
+`PMKISANCatalog` are now the catalogs in use rather than unreferenced schemas.
+
+Also split the "mapping drift" note, which has been one sentence covering two
+different situations:
+
+- **PMFBY insurance:** `network-specs/api/external/pmfby/insurance/v0.2/
+  mappings/` holds four `deployable: false` sketches, 13 lines each, against
+  96-152 line deployed files. Not drift — a sketch and an implementation that
+  were never the same document. Say so, or delete the sketches.
+- **PM-KISAN grievance:** the drafts are marked `status: "existing"` and are
+  byte-identical to the deployed files for `init` and `status`. For `support`
+  they are not, and the deployed copy is the poorer one — see open-issues.
+  Two near-identical copies of a real mapping with no test that compares them
+  is the condition that produced that bug.
 
 ## What this does not close
 
