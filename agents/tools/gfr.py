@@ -568,6 +568,93 @@ class GfrRecommendationItem(BaseModel):
         return "\n".join(lines).strip()
 
 
+def format_crop_registry(
+    crops: List[GfrRegistryItem],
+    only_gfr_available: bool,
+    crop_name_contains: Optional[str],
+    limit: int,
+) -> str:
+    """The crop list the model reads, one line per crop."""
+    limit = min(max(limit, 1), 50)
+    if not crops:
+        return "No crops found."
+
+    needle = (crop_name_contains or "").strip().lower()
+
+    filtered: List[GfrRegistryItem] = []
+    for c in crops:
+        if only_gfr_available and c.gfr_available is False:
+            continue
+        name = (c.combined_name or c.crop_name or "").lower()
+        if needle and needle not in name:
+            continue
+        filtered.append(c)
+
+    if not filtered:
+        msg = "No crops matched your filter."
+        if only_gfr_available:
+            msg += " (Only showing crops where recommendations are available.)"
+        return msg
+
+    lines = ["Crops (id - name - stateId - districtId - season - irrigation - GFR):"]
+    for c in filtered[:limit]:
+        cid = c.id or ""
+        cname = c.combined_name or c.crop_name or ""
+        sid = c.state_id or ""
+        did = c.district_id or ""
+        season = c.season or ""
+        irrig = c.irrigation_type or ""
+        gfr_ok = c.gfr_available
+        gfr_txt = "Yes" if gfr_ok is True else ("No" if gfr_ok is False else "Unknown")
+        if cid and cname:
+            lines.append(
+                f"- {cid} - {cname} - {sid} - {did} - {season} - {irrig} - {gfr_txt}"
+            )
+
+    return "\n".join(lines).strip()
+
+
+def checked_recommendation_inputs(state_id: str, crops: List[str], phone_no: str, cycle: str):
+    """state id, up to six crop ids, the +91 phone and the cycle; ModelRetry names what is wrong."""
+    if not state_id or len(state_id.strip()) < 6:
+        raise ModelRetry("Please provide a valid state ID.")
+    if not crops:
+        raise ModelRetry("Please provide at least one crop ID.")
+    crop_ids = [c.strip() for c in crops if c and c.strip()]
+    if not crop_ids:
+        raise ModelRetry("Please provide valid crop IDs.")
+    if len(crop_ids) > 6:
+        crop_ids = crop_ids[:6]
+
+    ten_digit = normalize_phone_for_api(phone_no or "")
+    if len(ten_digit) != 10 or not ten_digit.isdigit():
+        raise ModelRetry(
+            "Please provide a valid Indian mobile number registered on the Soil Health Card "
+            "(10 digits, or with country code 91 / +91)."
+        )
+    phone = f"+91{ten_digit}"
+    cycle_y = (cycle or "").strip()
+    if not cycle_y:
+        raise ModelRetry("Please provide SHC cycle year (e.g. 2025-26).")
+    return state_id.strip(), crop_ids, phone, cycle_y
+
+
+def format_recommendations(raw_items: List[Dict[str, Any]]) -> str:
+    """The recommendation text the model reads, from provider-backend-shaped items."""
+    if not raw_items:
+        return "No recommendation data found."
+
+    blocks: List[str] = []
+    for item_dict in raw_items[:6]:
+        try:
+            blocks.append(GfrRecommendationItem.model_validate(item_dict).format_block())
+        except ValidationError:
+            continue
+    if not blocks:
+        return "No recommendation data found."
+    return "\n".join(["Fertilizer recommendation:", *blocks]).strip()
+
+
 @observe(name="tool:gfr_get_crop_registries", as_type="tool")
 def gfr_get_crop_registries(
     ctx: RunContext[FarmerContext],
@@ -578,11 +665,6 @@ def gfr_get_crop_registries(
     limit: int = 25,
 ) -> str:
     """Crop registry from BAP /search (location lat/lon)."""
-    if limit < 1:
-        limit = 1
-    if limit > 50:
-        limit = 50
-
     payload = GfrCropRegistrySearch(
         latitude=latitude,
         longitude=longitude,
@@ -634,43 +716,7 @@ def gfr_get_crop_registries(
             crops.append(GfrRegistryItem.model_validate(x))
         except ValidationError:
             continue
-
-    if not crops:
-        return "No crops found."
-
-    needle = (crop_name_contains or "").strip().lower()
-
-    filtered: List[GfrRegistryItem] = []
-    for c in crops:
-        if only_gfr_available and c.gfr_available is False:
-            continue
-        name = (c.combined_name or c.crop_name or "").lower()
-        if needle and needle not in name:
-            continue
-        filtered.append(c)
-
-    if not filtered:
-        msg = "No crops matched your filter."
-        if only_gfr_available:
-            msg += " (Only showing crops where recommendations are available.)"
-        return msg
-
-    lines = ["Crops (id - name - stateId - districtId - season - irrigation - GFR):"]
-    for c in filtered[:limit]:
-        cid = c.id or ""
-        cname = c.combined_name or c.crop_name or ""
-        sid = c.state_id or ""
-        did = c.district_id or ""
-        season = c.season or ""
-        irrig = c.irrigation_type or ""
-        gfr_ok = c.gfr_available
-        gfr_txt = "Yes" if gfr_ok is True else ("No" if gfr_ok is False else "Unknown")
-        if cid and cname:
-            lines.append(
-                f"- {cid} - {cname} - {sid} - {did} - {season} - {irrig} - {gfr_txt}"
-            )
-
-    return "\n".join(lines).strip()
+    return format_crop_registry(crops, only_gfr_available, crop_name_contains, limit)
 
 
 @observe(name="tool:gfr_get_recommendations", as_type="tool")
@@ -691,29 +737,10 @@ def gfr_get_recommendations(
     districtId and lat/lon. Soil values come from the network (SHC). Default natural_farming=False
     matches sandbox /search (chemical + organic quantity tables); True returns NF practice advisory text.
     """
-    if not state_id or len(state_id.strip()) < 6:
-        raise ModelRetry("Please provide a valid state ID.")
-    if not crops:
-        raise ModelRetry("Please provide at least one crop ID.")
-    crop_ids = [c.strip() for c in crops if c and c.strip()]
-    if not crop_ids:
-        raise ModelRetry("Please provide valid crop IDs.")
-    if len(crop_ids) > 6:
-        crop_ids = crop_ids[:6]
-
-    ten_digit = normalize_phone_for_api(phone_no or "")
-    if len(ten_digit) != 10 or not ten_digit.isdigit():
-        raise ModelRetry(
-            "Please provide a valid Indian mobile number registered on the Soil Health Card "
-            "(10 digits, or with country code 91 / +91)."
-        )
-    phone = f"+91{ten_digit}"
-    cycle_y = (cycle or "").strip()
-    if not cycle_y:
-        raise ModelRetry("Please provide SHC cycle year (e.g. 2025-26).")
+    state_id, crop_ids, phone, cycle_y = checked_recommendation_inputs(state_id, crops, phone_no, cycle)
 
     payload = GfrRecommendationSearch(
-        state_id=state_id.strip(),
+        state_id=state_id,
         crops=crop_ids,
         phone_no=phone,
         cycle=cycle_y,
@@ -764,16 +791,4 @@ def gfr_get_recommendations(
         logger.warning("GFR recommendation response validation failed: %s", e)
         raise ModelRetry("GFR service returned an unexpected response format.")
 
-    raw_items = parsed.iter_raw_items()
-    if not raw_items:
-        return "No recommendation data found."
-
-    blocks: List[str] = []
-    for item_dict in raw_items[:6]:
-        try:
-            blocks.append(GfrRecommendationItem.model_validate(item_dict).format_block())
-        except ValidationError:
-            continue
-    if not blocks:
-        return "No recommendation data found."
-    return "\n".join(["Fertilizer recommendation:", *blocks]).strip()
+    return format_recommendations(parsed.iter_raw_items())
