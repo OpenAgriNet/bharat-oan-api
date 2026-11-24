@@ -33,7 +33,7 @@ import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import httpx
 from langfuse import observe
@@ -257,23 +257,46 @@ async def _discover(descriptor_code: str, action: str, what: str) -> Optional[Di
             f"{response.text[:300]}"
         )
         return None
-    found = _first_resource(response.json())
-    if found and not _offers(found, action):
-        logger.error(
-            f"AIF v2 {found['resource'].get('id')} does not advertise {action}; "
-            f"catalog offers {[a.get('action') for a in _actions(found)]}"
-        )
-        return None
-    return found
+    return _first_resource(
+        response.json(),
+        usable=lambda candidate: _unusable(candidate, action),
+        who="AIF",
+    )
 
 
-def _first_resource(payload: dict) -> Optional[Dict[str, Any]]:
-    """Nothing to rank: AIF publishes one resource per capability.
+def _unusable(found: Dict[str, Any], action: str) -> Optional[str]:
+    """Why this resource cannot serve the action, or None when it can."""
+    if not _offers(found, action):
+        advertised = [entry.get("action") for entry in _actions(found)]
+        return f"does not advertise {action}; catalog offers {advertised}"
+    return None
+
+
+def _first_resource(
+    payload: dict,
+    usable: Optional[Callable[[Dict[str, Any]], Optional[str]]] = None,
+    who: str = "AIF",
+) -> Optional[Dict[str, Any]]:
+    """The first published resource that can serve the call, with its catalog
+    provider and offer.
+
+    First, not best. discover hands back an unranked list, so nothing in the
+    payload says which of two providers to prefer. What makes that safe today
+    is the filter in the intent -- one provider publishes one resource per
+    descriptor code -- and what makes it visible on the day that stops being
+    true is the log line below.
+
+    `usable` filters, it does not rank. It answers whether a candidate can
+    serve this call at all, so one the catalog published without the action,
+    or without an offer, is skipped and the next tried rather than the whole
+    discover abandoned. Which of two usable providers is the better one is a
+    question the network has to answer, not a callback here.
 
     The offer is the catalog's too, so it is carried back rather than left for
     the caller to name -- a commitment is made against an offer, and inventing
     an id the catalog never published is how a tool quietly stops matching it.
     """
+    candidates: List[Dict[str, Any]] = []
     for catalog in (payload.get("message") or {}).get("catalogs") or []:
         provider = catalog.get("provider") or {}
         for resource in catalog.get("resources") or []:
@@ -282,11 +305,35 @@ def _first_resource(payload: dict) -> Optional[Dict[str, Any]]:
                 for offer in catalog.get("offers") or []
                 if resource.get("id") in (offer.get("resourceIds") or [])
             ]
-            return {
-                "resource": resource,
-                "provider": provider,
-                "offer": offers[0] if offers else {},
-            }
+            candidates.append(
+                {
+                    "resource": resource,
+                    "provider": provider,
+                    "offer": offers[0] if offers else {},
+                }
+            )
+
+    refused: List[str] = []
+    for candidate in candidates:
+        why = usable(candidate) if usable else None
+        if why is None:
+            # Only when there was a choice to make: a single candidate is the
+            # normal case and saying so on every discover buries the one line
+            # that matters.
+            if len(candidates) > 1:
+                logger.info(
+                    f"{who} v2 discover returned {len(candidates)} resources, "
+                    f"using {candidate['provider'].get('id')}/"
+                    f"{candidate['resource'].get('id')} after skipping "
+                    f"{len(refused)}"
+                )
+            return candidate
+        refused.append(f"{candidate['resource'].get('id')} {why}")
+
+    # Every candidate is named, not just the first: with two providers the
+    # second reason is the one that explains the refusal.
+    for reason in refused:
+        logger.error(f"{who} v2 {reason}")
     return None
 
 

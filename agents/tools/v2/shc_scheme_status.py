@@ -14,6 +14,7 @@ from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
 from agents.tools.shc_scheme_status import Descriptor, Item, MediaResource, Provider, format_phone_number
+from agents.tools.v2.aif import _first_resource
 from agents.tools.v2.provider_openapi import (
     SchemaUnavailable,
     openapi_document,
@@ -102,12 +103,15 @@ def _discover_body(transaction_id: str) -> dict:
 async def _discover_reports_resource(transaction_id: str) -> Optional[Dict[str, Any]]:
     """The SHC reports resource with its catalog provider, or None when nothing is published."""
     payload = await _post("discover", _discover_body(transaction_id))
-    for catalog in payload.get("message", {}).get("catalogs", []) or []:
-        for resource in catalog.get("resources", []) or []:
-            logger.info(f"SHC v2 discover found {resource.get('id')} from provider {(catalog.get('provider') or {}).get('id')}")
-            return {"resource": resource, "provider": catalog.get("provider") or {}}
-    logger.warning(f"SHC v2 discover found no {_SHC_REPORTS_CODE} resource")
-    return None
+    found = _first_resource(payload, who="SHC")
+    if not found:
+        logger.warning(f"SHC v2 discover found no {_SHC_REPORTS_CODE} resource")
+        return None
+    logger.info(
+        f"SHC v2 discover found {found['resource'].get('id')} from provider "
+        f"{found['provider'].get('id')}"
+    )
+    return found
 
 
 async def _report_query(resource: dict) -> str:

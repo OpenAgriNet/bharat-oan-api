@@ -178,23 +178,23 @@ async def _discover(action: str) -> Optional[Dict[str, Any]]:
             f"KCC v2 discover failed: HTTP {response.status_code} {response.text[:300]}"
         )
         return None
-    found = _first_resource(response.json())
-    if not found:
-        return None
+    return _first_resource(
+        response.json(),
+        usable=lambda candidate: _unusable(candidate, action),
+        who="KCC",
+    )
+
+
+def _unusable(found: Dict[str, Any], action: str) -> Optional[str]:
+    """Why this resource cannot serve the action, or None when it can. Asked of
+    every candidate rather than the first, so a second provider publishing
+    kcc-loan is tried instead of making the whole discover fail."""
     advertised = [entry.get("action") for entry in _actions(found)]
     if action not in advertised:
-        logger.error(
-            f"KCC v2 {found['resource'].get('id')} does not advertise {action}; "
-            f"catalog offers {advertised}"
-        )
-        return None
+        return f"does not advertise {action}; catalog offers {advertised}"
     if not (found.get("offer") or {}).get("id"):
-        logger.error(
-            f"KCC v2 {found['resource'].get('id')} is in no published offer; "
-            "a commitment has to be made against one"
-        )
-        return None
-    return found
+        return "is in no published offer; a commitment has to be made against one"
+    return None
 
 
 def _otp_length(found: Dict[str, Any]) -> int:

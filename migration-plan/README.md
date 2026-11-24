@@ -102,6 +102,7 @@ deliberately rather than rediscovered.
 |---|---|---|
 | 4 | The `AgricultureResource/v0.2` pack fix is on `bv-migration`; SATHI's catalog `@context` names `bv-features` | `bv-features` still has `required: [informationMode, subjectCategories]`, so deployed environments keep refusing every `select` for a catalog fact a select has no reason to carry. Needs a merge to `bv-features`, or the catalog repointed |
 | 5 | The response side is not contract-driven | The request path now reads every field name from the provider's OpenAPI. Responses do not: `applicationNo`, `sanctionedAmount` and the rest are field names in the tool, in all six providers, because the mapping defines the response shape and nothing declares it. Closing it means new vocabulary — an `x-oan-to` or the mapping output described in the contract — across every provider, not a KCC change |
+| 12 | Nothing says which of two providers to prefer | `discover` answers with an unranked list. Eight capabilities now share one selector, which takes the first candidate that can serve the call, skips the ones that cannot, and logs the pick when there was more than one — so a wrong choice is visible. What it still cannot do is prefer the *better* of two usable providers, because nothing in the payload ranks them. `mandi` is the one tool that does rank, by haversine distance, and `sathi_seed` sidesteps the question by returning every match. Settling it means discover returning an order, or the catalog carrying a preference the tool honours — a network-spec change, not a tool one |
 
 **Small and safe. Each is an hour or less.**
 
@@ -109,10 +110,16 @@ deliberately rather than rediscovered.
 |---|---|
 | 6 | AIF's `_LOAN_OFFER` / `_TICKETS_OFFER` constants can read the offer off `_first_resource`, which now carries it |
 | 7 | SATHI's `_FIELD_MEANINGS = {"cropCode": "crop", ...}` bridge can become `x-oan-from` hints in SATHI's OpenAPI — the same fix KCC just had |
-| 8 | `pmkisan_scheme_status.py:174` duplicates `post_action` instead of using the shared one in `aif.py` |
 | 9 | `mapping-files` and `spec-files` are started by hand and are not in `quick-start/docker-compose.yml`. Until they are, **never run `docker compose` with `--remove-orphans`** — it deletes them and `mock-ffs` |
 | 10 | A stray `cat-aif-schemaapp-probe` catalog is still in local discovery |
 | 11 | The PMFBY v0.2 mapping stubs are still `deployable: false` |
+
+Item 8 is done. `pmkisan_scheme_status.py` kept its own `post_action` and
+`_first_resource`, and `pmkisan_grievance.py` imports both *through* that module
+while passing `who=` — which the local copy never accepted, so all four of its
+calls raised `TypeError` in committed code. Both duplicates are gone and the
+shared ones in `aif.py` are used instead. The 266-assertion api collection could
+not catch this: newman posts to the adapter and never enters the tool.
 
 ## Read this before starting the next one
 
@@ -138,3 +145,22 @@ capability:
   `"*"` because IMD forecast data is open. A capability that needs both at once
   wants the spec's array form of `networkId`, which the adapter currently
   refuses — [weather/plan.md](weather/plan.md#scoping-a-discover-to-a-catalog-audience).
+
+KCC adds a fourth, about how a capability is signed off:
+
+- **A green api collection does not mean the tool works.** newman posts to the
+  network adapter, so 266 passing assertions prove the adapter, the mappings and
+  the provider agree with each other. They say nothing about the code the farmer
+  actually reaches. PM-KISAN's grievance tool was committed with all four of its
+  `post_action` calls raising `TypeError`, and the collection was green the whole
+  time. Verify both layers: the newman folder **and** the tool's own entry points,
+  happy path and negatives. A stub context is enough —
+  `RunContext` only needs `deps=FarmerContext(session_id=..., query=...)`:
+
+      docker exec -i -e PYTHONPATH=/app sva_app python - <<'PY'
+      import asyncio, types
+      from agents.deps import FarmerContext
+      from agents.tools.v2 import kcc
+      ctx = types.SimpleNamespace(deps=FarmerContext(session_id="t", query="t"))
+      print(asyncio.run(kcc.initiate_kcc_otp(ctx, "9876543211")))
+      PY
