@@ -158,6 +158,14 @@ rather than composing new ones. Both target contracts already exist
 against the pack's pattern, including
 `~1krphapi~1FGMS~1AddKRPHNCIPGrievenceSupportTicket/post`.
 
+**The mappings need no `@context` edit.** Every grievance mapping echoes the
+context the request carried -- `$ca.@context` in PM-KISAN's init and status,
+`$ch.@context` in its support, `$attributes.@context` and `$channel.@context`
+in PMFBY's two -- so none of them names a pack version
+and none has to change. That is why KHC's mappings and PM-KISAN's are the same
+shape while sitting on different packs. An earlier draft of this plan had a
+step for it; there is nothing to edit.
+
 While there: add `descriptor.code` to both resources. The contracts declare
 `descriptorCode` (`pm-kisan-grievances`, `pmfby-grievances`) that no catalog
 publishes, which is why these two discover by `@type` + `scheme.code` while KHC
@@ -200,16 +208,30 @@ Phases are ordered so each one is verifiable before the next starts.
 
 **Neither blocks anything.** Both phases below ship without an answer.
 
-### Phase 1 — PM-KISAN to v0.2
+### Phase 1 — split the shared constant first, then PM-KISAN
 
-1. `GRIEVANCE_CONTEXT` at `agents/tools/v2/pmkisan_scheme_status.py:53` to the
-   v0.2 context URL. One constant, imported by `v2/pmfby_grievance.py:45`, so
-   this is the line that moves both.
-2. `setup.py`'s `pmkisan` Grievance capability from `v0.1` to `v0.2`.
-3. **Delete the `openagrinet:Grievance` SchemaRegistry row** before re-running
-   `register-providers`, or the row stays at v0.1.
-4. `@context` in `grievance.init.yaml`, `grievance.support.yaml`,
-   `grievance.status.yaml`.
+**Yes, this moves both capabilities. But not at the same moment, and step 1 is
+what makes that true.** `GRIEVANCE_CONTEXT` is defined once in
+`v2/pmkisan_scheme_status.py:53` and imported by both grievance tools, so
+flipping it in place would cut PM-KISAN and PMFBY over together, before PMFBY's
+catalog or registry actions exist. Four references in total, so splitting it is
+cheaper than sequencing around it.
+
+1. Give PMFBY its own `GRIEVANCE_CONTEXT`: define it in
+   `v2/pmfby_grievance.py` instead of importing it at
+   `v2/pmfby_grievance.py:45`, still pointing at v0.1. Two lines, no
+   behaviour change, and from here the two capabilities move independently.
+   Phase 2 step 1 is then the only thing that moves PMFBY.
+2. `GRIEVANCE_CONTEXT` at `v2/pmkisan_scheme_status.py:53` to the v0.2 context
+   URL. This is now PM-KISAN's alone -- it is also imported by
+   `v2/pmkisan_grievance.py:46`, which is the same capability.
+3. `setup.py`'s `pmkisan` Grievance capability from `v0.1` to `v0.2`.
+4. **Delete the `openagrinet:Grievance` SchemaRegistry row** before re-running
+   `register-providers`, or the row stays at v0.1. Note what the row becomes:
+   `pmkisan` is first in `PROVIDERS`, so it re-registers at v0.2 and `pmfby`
+   then prints the warning instead. Right for PM-KISAN, KHC and AIF, wrong for
+   PMFBY -- three of four rather than two. Phase 2 makes it four. That is a
+   reason to keep the two phases close together, not a reason to merge them.
 5. Edit the catalog in the api collection — **Grievance / PM-KISAN /
    Publish**, `catalogId` `catalog:grievance:pmkisan` — in one step: v0.2
    `@context`, an `operationRef` on each of `init`/`status`/`support` lifted
@@ -230,33 +252,37 @@ Phases are ordered so each one is verifiable before the next starts.
 because a green collection does not prove the agent still reads the same
 catalog row ([../khc/plan.md](../khc/plan.md), defect 4). Use a farmer sentence
 that names no date, and one that names a category outside G001-G010. Check
-PMFBY grievance too — step 1 moved it as well.
+PMFBY grievance too: step 1 is meant to leave it untouched, and that is the
+claim being tested.
 
 ### Phase 2 — PMFBY to v0.2
 
-1. `setup.py`'s `pmfby` Grievance capability from `v0.1` to `v0.2`, plus two
+1. PMFBY's own `GRIEVANCE_CONTEXT`, the one phase 1 step 1 created, to the v0.2
+   context URL. This is the line that moves PMFBY, and after phase 1 it moves
+   nothing else.
+2. `setup.py`'s `pmfby` Grievance capability from `v0.1` to `v0.2`, plus two
    actions: `init` -> `/api/v1/services/nic/getOtp` and `confirm` ->
    `/api/v1/services/nic/verifyMobile`, both never retried — a retry sends or
    spends a second OTP.
-2. `grievance.init.yaml` and `grievance.confirm.yaml`, copied from
+3. `grievance.init.yaml` and `grievance.confirm.yaml`, copied from
    `insurance.init.yaml` / `insurance.confirm.yaml`. Those two already map the
    exact endpoints PMFBY grievance needs, on the same host (`PMFBY_BASE_URL`),
    under `SchemeApplication/v0.2` — so this is a copy of two proven mappings,
    not new work against an unknown API.
-3. The same single-step catalog edit to **Grievance / PMFBY / Publish**,
+4. The same single-step catalog edit to **Grievance / PMFBY / Publish**,
    `catalogId` `cat-pmfby-grievance`: v0.2 `@context`, `operationRef` on every
    action, `descriptor.code` of `pmfby-grievances`. `support` and `status` come
    from `PMFBYCatalog`; `init` and `confirm` point into the **insurance**
    contract, which is where `getOtp` and `verifyMobile` are declared. One host
    and one verification, so cross-referencing is honest and avoids two copies
    drifting. `grievanceOptions` needs no change.
-4. Rewrite `initiate_pmfby_grievance_otp` and `check_pmfby_grievance_otp` as v2
+5. Rewrite `initiate_pmfby_grievance_otp` and `check_pmfby_grievance_otp` as v2
    tools in `agents/tools/v2/pmfby_grievance.py`, keeping v1's names,
    signatures and docstrings.
-5. Move their imports in `agents/tools/__init__.py:74` inside the
+6. Move their imports in `agents/tools/__init__.py:74` inside the
    `if _beckn_v2("PMFBY")` branch, and drop the `_verify_pmfby_otp_with_bap`
    import at `v2/pmfby_grievance.py:40`.
-6. Pass the action gate that KHC and AIF already use. `v2/pmfby_grievance.py:137`
+7. Pass the action gate that KHC and AIF already use. `v2/pmfby_grievance.py:137`
    and `v2/pmkisan_grievance.py:101` call `_first_resource(response.json(),
    who=...)` with **no `usable=` callback**, so they send an action whether or
    not the catalog advertises it. Add
@@ -300,11 +326,15 @@ Said plainly, so the move is not oversold:
    extend `check-api-separation.py` to cover the deployed `quick-start`
    mappings, so catalog, contract and mapper are reconciled somewhere. Until
    that exists, the move trades a real check for a documented one.
-2. **One constant moves two capabilities.** `GRIEVANCE_CONTEXT` is shared, so a
-   mistake in phase 1 breaks PMFBY grievance too. Phase 1's verification has to
-   cover both before phase 2 starts.
+2. **The two capabilities are only independent after phase 1 step 1.**
+   `GRIEVANCE_CONTEXT` is defined once in `v2/pmkisan_scheme_status.py:53` and
+   imported by both grievance tools, so until the split lands, any edit to it
+   moves PMFBY as well -- before PMFBY has a v0.2 catalog or the registry
+   actions to serve one. Do step 1 on its own and confirm PMFBY grievance still
+   works before touching anything else. Skipping it does not make phase 1
+   smaller; it makes phase 1 silently become phase 2.
 3. **The `@context` flip and the `operationRef` edit must land together.**
-   Separately, each one fails validation. Phase 1 step 5 and phase 2 step 3 are
+   Separately, each one fails validation. Phase 1 step 5 and phase 2 step 4 are
    each a single commit.
 4. **Changing `visibleTo` at the same time would be a second bug wearing the
    first one's clothes.** Both grievance catalogs publish `visibleTo:
