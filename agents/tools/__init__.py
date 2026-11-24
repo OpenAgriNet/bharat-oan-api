@@ -121,8 +121,8 @@ else:
 # that initiate/verify opened, and the three lookups resolve the ids the filing
 # carries, so a farmer who started on v1 cannot finish on v2. On v2 the lookups
 # call KHC directly rather than riding the network -- see agents/tools/v2/khc.py
-# for why -- and the status read answers that it is unavailable, because KHC's
-# check-status cannot be bound (open-issues.md item 20).
+# for why -- and the status read is the gated pair, check-status then verify-otp,
+# with the grievance number on the query string (open-issues.md item 20, closed).
 if _beckn_v2("KHC"):
     from agents.tools.v2.khc import (
         initiate_khc_otp,
