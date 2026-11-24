@@ -1,8 +1,10 @@
 # Discover before you call
 
-**Status:** done for PM-KISAN and AIF. AIF now publishes an
-`AgricultureResource/v0.2` catalog and all four of its v2 tools run end to end.
-PMFBY has no v2 tool to wire. Verified against the live stack on 2026-11-23.
+**Status:** done for PM-KISAN and AIF. AIF publishes one catalog holding a
+`SchemeApplication/v0.2` loan resource and an `AgricultureResource/v0.2` ticket
+resource, and all four of its v2 tools run end to end. PMFBY has no v2 tool to
+wire. Verified against the live stack on 2026-11-23, re-verified after the pack
+move on 2026-11-24.
 
 ## The problem
 
@@ -97,14 +99,14 @@ mandi that genuinely had no arrivals.
 
 ## How AIF publishes
 
-AIF publishes as `AgricultureResource/v0.2`, not as `SchemeApplication/v0.2`.
-Both of its capabilities are one catalog with two resources, told apart by
-`descriptor.code` rather than by `@type`:
+Both of AIF's capabilities are one catalog with two resources, told apart by
+`descriptor.code` rather than by `@type` — the tool's discover filter never
+mentions a type:
 
-| resource | descriptor.code | actions advertised |
-|---|---|---|
-| `res-aif-loan-status` | `aif-loan-status` | `init`, `status` |
-| `res-aif-tickets` | `aif-support-tickets` | `status` |
+| resource | descriptor.code | published `@type` | actions advertised |
+|---|---|---|---|
+| `res-aif-loan-status` | `aif-loan-status` | `openagrinet:SchemeApplication` | `init`, `status` |
+| `res-aif-tickets` | `aif-support-tickets` | `openagrinet:AgricultureResource` | `status` |
 
 The catalog is `capability-examples/AgricultureResource/publish/ondemand-aif.json`
 in `helmcharts`, and the API collection publishes and discovers it under
@@ -117,9 +119,11 @@ the catalog does not advertise, rather than discovering that upstream:
 AIF v2 res-aif-tickets does not advertise init; catalog offers ['status']
 ```
 
-**Why not `SchemeApplication/v0.2`.** That pack pins `@context` with `const:` to
-`https://openagrinet.github.io/network-specs/schema/SchemeApplication/v0.2/context.jsonld`,
-and github.io does not serve v0.2 — 404. Three ways were tried and all refused:
+**Why both capabilities started on `AgricultureResource/v0.2`.** That pack has
+no `const` on `@context`, and on 2026-11-23 the pinned packs looked
+unpublishable. `SchemeApplication/v0.2` pins `@context` to
+`https://openagrinet.github.io/network-specs/schema/SchemeApplication/v0.2/context.jsonld`
+and github.io serves v0.2 nowhere. Three ways were tried and all refused:
 
 | `@context` sent | refusal |
 |---|---|
@@ -127,14 +131,32 @@ and github.io does not serve v0.2 — 404. Three ways were tried and all refused
 | a local `http://spec-files/...` URL | `SCH_TYPE_NOT_SUPPORTED: value must be an array` — the string branch is `const` the github URL |
 | both, as an array | `SCH_TYPE_NOT_SUPPORTED: value must be a string` — the base Beckn spec declares `@context` as `type: string` |
 
-`AgricultureResource/v0.2` has no such `const`, so it publishes cleanly from the
-raw `bv-migration` branch. v0.1 was not an option either: `SchemeApplication/v0.1`
-pins `scheme.code` to `const: PM-KISAN`, and `Grievance/v0.1` is a closed
-`oneOf` over PMFBY and PM-KISAN only.
+v0.1 was not an option either: `SchemeApplication/v0.1` pins `scheme.code` to
+`const: PM-KISAN`, and `Grievance/v0.1` is a closed `oneOf` over PMFBY and
+PM-KISAN only.
 
-The *action* payloads still carry `SchemeApplication/v0.2` and `Grievance/v0.2`,
-because registry bindings are keyed `<provider>|<@type>`. Those are reachable
-through a narrow rewrite on the adapter — see below.
+**Those three refusals are out of date.** They predate KCC's work, which gave
+the publish module the same `extendedSchema_contextRewrite` the transaction
+modules already had — `network-adapter.yaml.tmpl:253` is `oanProviderPublish`
+and `:293-295` enable it. The pinned github.io URL is now rewritten to the raw
+`bv-migration` URL before resolution, so it publishes. Proven twice on
+2026-11-24: a `Grievance/v0.2` probe catalog returned `ACCEPTED`, and AIF's loan
+resource moved to `SchemeApplication/v0.2` with the pinned `@context` and
+gained `scheme` and a `challenge` naming its six-digit SMS OTP.
+
+The ticket resource could not follow. `Grievance/v0.2` requires
+`grievanceOptions` with at least one category; AIF publishes no complaint
+categories and has no filing call, so the publish is refused with
+`SCH_REQUIRED_FIELD_MISSING`. And `AgricultureResource/v0.2` is the one pack
+*missing* from the rewrite list, so it cannot carry a pinned `@context`
+either — the raw URL on that resource is deliberate, not an oversight. Both are
+[aif/plan.md](aif/plan.md#open-items) items 7 and 8.
+
+The *action* payloads have always carried `SchemeApplication/v0.2` and
+`Grievance/v0.2`, because registry bindings are keyed `<provider>|<@type>`.
+Catalog type and payload type are separate decisions; the procedure for making
+both is in
+[khc/plan.md](khc/plan.md#how-we-decide-which-pack-a-capability-goes-under).
 
 ### The contextRewrite, and when to delete it
 

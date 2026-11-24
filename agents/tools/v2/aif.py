@@ -80,8 +80,8 @@ SOURCE_LINE = "**Source:** AIF Portal"
 # is what finds it. Same selector weather, mandi and sathi use.
 _DISCOVER_NETWORK_ID = os.getenv("OAN_PUBLIC_NETWORK_ID", "*")
 
-# Every AIF catalog resource carries one of these descriptor codes. @type is
-# openagrinet:AgricultureResource on both, so it cannot tell them apart.
+# Every AIF catalog resource carries one of these descriptor codes. The code,
+# not @type, is what tells the two capabilities apart.
 _LOAN_CODE = "aif-loan-status"
 _TICKETS_CODE = "aif-support-tickets"
 
@@ -232,9 +232,9 @@ def commitment_attributes(response: httpx.Response) -> Dict[str, Any]:
 async def _discover(descriptor_code: str, action: str, what: str) -> Optional[Dict[str, Any]]:
     """The AIF resource for a capability, with its catalog provider.
 
-    AIF publishes both capabilities as openagrinet:AgricultureResource, so
-    @type cannot tell them apart; the descriptor code can, which is how
-    sathi_seed finds its own resources.
+    The filter matches the descriptor code, not @type: loan and tickets sit in
+    different schema packs and the code is what names one resource. Same way
+    sathi_seed finds its own.
     """
     body = {
         "context": build_context("discover", str(uuid.uuid4())),

@@ -730,14 +730,25 @@ mobile, no write.
    only recoverable if KHC's ids are LGD codes. One optional `parentAreaCode`
    closes it for every provider with a gazetteer. Pack proposal, not this
    migration.
-6. **AIF publishes under the wrong pack now.** It fell back to
-   `AgricultureResource/v0.2` because the publish module could not resolve the
-   pinned `@context`; it can since KCC's work. Moving AIF's catalog to
-   `SchemeApplication/v0.2` and `Grievance/v0.2` would let it publish `scheme`
-   and `challenge` too. An AIF item, listed here because this plan is where the
-   finding came from.
-7. **No KHC credentials and no mock.** Same position KCC was in, except KHC
-   also writes. A mock is not optional here.
+6. ~~**AIF publishes under the wrong pack now.**~~ Half resolved on
+   2026-11-24. `res-aif-loan-status` moved to `SchemeApplication/v0.2` with the
+   pinned `@context`, `scheme` and `challenge`, and nothing in `aif.py` needed
+   to change — discovery filters on `descriptor.code`, not `@type`.
+   `res-aif-tickets` stayed on `AgricultureResource/v0.2`: `Grievance/v0.2`
+   requires `grievanceOptions` and AIF publishes no complaint categories, which
+   is the same shape of pack gap as item 5 here. Carried on as
+   [../aif/plan.md](../aif/plan.md#open-items) items 7 and 8 — including that
+   `AgricultureResource/v0.2` is missing from the publish module's
+   `contextRewrite`, which is why a mixed catalog carries two context styles.
+7. **The credentials exist, the registered mobile does not.** `KHC_BASE_URL`
+   and an API token are available as of 2026-11-24, but nobody on this side
+   holds a mobile number registered with KHC. That splits the capability in
+   two: the reference lists — categories, sub-categories, schemes, states,
+   districts, sub-districts, villages — need no OTP and can be read against the
+   real host, while registering a grievance and reading its status cannot be
+   exercised without one. `create_grievance` stays on a mock regardless, since
+   it writes to a real desk; verify it live once, deliberately, with the desk
+   owner. The values are not in `documents/bv-envs` yet.
 8. **Thirteen language files reference tool behaviour.** If any tool's
    contract changes — an argument added, an error reworded — all thirteen need
    the same edit. KCC's open item 12 is this problem already.

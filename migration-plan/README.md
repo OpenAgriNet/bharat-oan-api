@@ -67,10 +67,24 @@ publish: **the publish module resolves a pinned `@context` too.**
 `Grievance/v0.2` rewrite the transaction modules have. A `Grievance/v0.2`
 catalog carrying the pinned github.io `@context` published `ACCEPTED` against the
 running stack on 2026-11-24. AIF's fallback to `AgricultureResource/v0.2`
-predates that and is now unnecessary; moving it back would let it publish
-`scheme` and `challenge`. The decision procedure — payload type, catalog type,
-resource count, decided separately — is in
+predated that, so **AIF's loan resource moved to `SchemeApplication/v0.2`** the
+same day and gained `scheme` and a `challenge` naming its six-digit SMS OTP.
+Its ticket resource could not follow: `Grievance/v0.2` requires
+`grievanceOptions`, AIF publishes no complaint categories and has no filing
+call, so it stays where it is — [aif/plan.md](aif/plan.md#open-items) items 6
+to 8. The decision procedure — payload type, catalog type, resource count,
+decided separately — is in
 [khc/plan.md](khc/plan.md#how-we-decide-which-pack-a-capability-goes-under).
+
+The v0.2 packs are reachable again. Production Pages builds from `main`, which
+holds v0.1 only, and `bv-migration`'s own preview had been failing to deploy
+since 2026-11-23 — one example on an unrelated branch omitted `operationRef`
+and the single-process builder raised `NoMethodError`, which took every
+preview down with it. Fixed in `network-specs/scripts/generate-schema-pages.rb`
+on 2026-11-24; all three v0.2 packs now answer 200 under
+`https://openagrinet.github.io/network-specs/previews/bv-migration/`. The
+canonical URLs the packs pin still 404 until `bv-migration` merges to `main`,
+which is also what retires the `contextRewrite`.
 
 KCC also added vocabulary the packs do not cover and should not: a provider's
 own request fields belong in its API contract, not in a schema pack.
@@ -121,7 +135,7 @@ though the scheme tools only started taking that answer in November 2026; see
 ## Carried to the next phase
 
 Every open item now lives in one place: **[open-issues.md](open-issues.md)**.
-Sixteen numbered items, grouped by what each one is waiting on — access, a
+Nineteen numbered items, grouped by what each one is waiting on — access, a
 decision, or an hour of work — plus a link to each capability's own open list.
 It is one file so a review does not have to go hunting.
 

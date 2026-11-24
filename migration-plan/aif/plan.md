@@ -273,12 +273,15 @@ Steps 2 and 3 are independent and can run together.
    is confirmed against AIF itself until they arrive. Ask whoever runs the v1
    BPP. Swapping them in is a `.env` edit and one `make register-provider
    PROVIDER=aif UPDATE=1`; see `quick-try.md`.
-5. **The v0.2 packs are not published.** `openagrinet.github.io` serves v0.1
-   only; v0.2 lives on `origin/bv-features` in network-specs, and the
-   `x-oan-schema-by-action` change below is not pushed anywhere. Until it is,
-   the packs have to be served from inside the compose network and listed in
-   `EXTRA_SCHEMA_DOMAINS`, and a payload's `@context` points at that host
-   rather than at a public URL.
+5. **The v0.2 packs are not published at their canonical URLs.** Production
+   Pages still builds from `main`, which carries v0.1 only, so every
+   `openagrinet.github.io/network-specs/schema/*/v0.2/` URL 404s. Since
+   2026-11-24 a full branch preview is served at
+   `https://openagrinet.github.io/network-specs/previews/bv-migration/`, where
+   all three v0.2 packs answer 200. That is a preview path, not the URL the
+   packs pin, so the adapter's `extendedSchema_contextRewrite` still has to
+   redirect `Grievance/v0.2` and `SchemeApplication/v0.2` to the raw branch
+   URLs. Merging `bv-migration` into `main` is what retires the rewrite.
 2. **Redis has to be on for the adapter.** The session is not optional and
    there is no in-memory fallback by design — a fallback would work on one
    replica and silently lose sessions on two.
@@ -286,20 +289,65 @@ Steps 2 and 3 are independent and can run together.
    fix SATHI's published path at the same time or the first provider to use it
    calls the wrong URL.
 4. **PM-KISAN and PMFBY to v0.2** is its own piece of work, scoped above.
-6. ~~**AIF is not in the catalog.**~~ Resolved on 2026-11-23. AIF publishes as
-   `AgricultureResource/v0.2`, which carries no `@context` `const`, so it
-   publishes cleanly from the raw `bv-migration` branch where
-   `SchemeApplication/v0.2` could not. Both capabilities are one catalog with
-   two resources told apart by `descriptor.code`; see
+6. ~~**AIF is not in the catalog.**~~ Resolved on 2026-11-23, and the pack it
+   publishes under was corrected on 2026-11-24. Both capabilities are one
+   catalog with two resources told apart by `descriptor.code`; see
    [../discovery.md](../discovery.md#how-aif-publishes). The catalog lives at
    `helmcharts/quick-start/capability-examples/AgricultureResource/publish/ondemand-aif.json`
    and in the API collection under **AIF - loan and grievance status**.
 
-   Still open underneath it: the `operationRef`s name `openapi.yaml` while only
-   `openapi-draft.yaml` exists, so those URLs 404. The v0.2 pattern forbids the
-   `-draft` name, and `aif.py` never fetches them, so the journey works.
+   It first published both resources as `AgricultureResource/v0.2` because the
+   fallback was written when `SchemeApplication/v0.2` was thought to be
+   unpublishable. It is not: the publish module resolves a pinned `@context`
+   too, so `res-aif-loan-status` now publishes as `SchemeApplication/v0.2` with
+   the pinned github.io context, `scheme`, and a `challenge` naming its
+   six-digit SMS OTP — the shape KCC and PMFBY already use. AIF's own loan
+   draft asked for exactly that (`resourceType: openagrinet:SchemeApplication`
+   in `x-draft.catalogCandidate`). Nothing in `aif.py` changed: `_discover`
+   filters on `descriptor.code`, never on `@type`.
+
+7. **`res-aif-tickets` cannot move to `Grievance/v0.2`,** even though AIF's
+   tickets draft names that type. The pack requires `grievanceOptions` with at
+   least one category, and publishing one without it is refused:
+   `SCH_REQUIRED_FIELD_MISSING: property "grievanceOptions" is missing`. AIF
+   publishes no complaint-category list anywhere, and it has no filing call at
+   all — `subQueryType` arrives only inside a ticket it has already created.
+   Inventing codes to satisfy the schema would put fiction in a catalog, so it
+   stays `AgricultureResource/v0.2`. The pack should make `grievanceOptions`
+   required only when `actions` advertises `support`; a read-only grievance
+   resource has no categories to offer. Raise that with `Grievance/v0.3`.
+
+8. **`AgricultureResource/v0.2` is missing from the adapter's
+   `extendedSchema_contextRewrite`.** Only `SchemeApplication/v0.2` and
+   `Grievance/v0.2` are listed, so an `AgricultureResource` resource pinning
+   the canonical context is refused with `SCH_SCHEMA_ADAPTATION_FAILED: HTTP
+   404 fetching .../schema/AgricultureResource/v0.2/attributes.yaml`. That is
+   why AIF's ticket resource and SATHI's catalog still carry raw
+   `refs/heads/bv-migration` URLs while KCC, PMFBY and AIF's loan resource
+   carry pinned ones. Add the third entry in
+   `network-adapter.yaml.tmpl` so all three packs read the same, or merge to
+   `main` and delete the rewrite entirely.
+
+   Still open underneath all of this: the `operationRef`s name `openapi.yaml`
+   while only `openapi-draft.yaml` exists, so those URLs 404. The v0.2 pattern
+   forbids the `-draft` name, and `aif.py` never fetches them, so the journey
+   works. Promoting both AIF drafts the way KCC's was — rename to
+   `openapi.yaml`, add `x-oan-binding` per operation, replace
+   `catalog-placeholder.json` with `catalog.json` and `index.md` — is what
+   closes it.
 
 ## Verified, and what it took
+
+Re-verified on 2026-11-24 after the loan resource moved to
+`SchemeApplication/v0.2`. Publish returned `ACCEPTED` with two items; both
+`discover` calls return their resource with the new `@type` and the pinned
+context; all four tool entry points answer correctly, including a refused OTP;
+and the agent runs the whole journey with farmer sentences. One agent run
+failed first and it is not a regression: given *"check my AIF loan status, my
+beneficiary id is 101"* the model skipped `initiate_aif_otp` and asked for an
+OTP that was never sent, so the mock refused it. That is the same
+tool-skipping bug as [open-issues.md](../open-issues.md) item 13, it lives in
+the skill prompt, and agent-prompt work is parked.
 
 All four calls run end to end through the adapter against `mock-aif`, plus
 every refusal path: unknown beneficiary, wrong OTP, replayed OTP, a loan
