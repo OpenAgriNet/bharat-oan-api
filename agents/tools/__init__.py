@@ -101,11 +101,22 @@ else:
         check_aif_loan_status,
         check_aif_grievance_status,
     )
-from agents.tools.kcc import (
-    initiate_kcc_otp,
-    check_kcc_application_status,
-    select_kcc_application,
-)
+# KCC's three tools move together on one flag: they share the OTP the first
+# one sends, and the third reads a list the second fetched, so a farmer who
+# started on v1 cannot finish on v2. select_kcc_application sends nothing on
+# v2 -- it picks out of what status already returned.
+if _beckn_v2("KCC"):
+    from agents.tools.v2.kcc import (
+        initiate_kcc_otp,
+        check_kcc_application_status,
+        select_kcc_application,
+    )
+else:
+    from agents.tools.kcc import (
+        initiate_kcc_otp,
+        check_kcc_application_status,
+        select_kcc_application,
+    )
 from agents.tools.khc import (
     initiate_khc_otp,
     verify_khc_otp,

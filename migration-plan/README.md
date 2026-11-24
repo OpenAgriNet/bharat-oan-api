@@ -14,7 +14,8 @@ migration-plan/
 ├── pmfby/
 ├── sathi/
 ├── shc/
-└── aif/
+├── aif/
+└── kcc/
 ```
 
 Each capability gets a folder with the same two files. Every `plan.md` that
@@ -32,6 +33,7 @@ place -- read that first when picking a capability back up.
 | SATHI seed availability | **Built, verified end to end locally** — [plan](sathi/plan.md) · [try it](sathi/quick-try.md) · [open TODOs](sathi/plan.md#open-todos) |
 | Soil Health Card | **Built, verified end to end locally** — [plan](shc/plan.md) · [try it](shc/quick-try.md) · [open TODOs](shc/plan.md#open-todos) |
 | AIF — loan status + grievance status | **Built, catalog published, discoverable; proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
+| KCC — credit card application status | **Built, catalog published, discoverable; proven against a mock only** — [plan](kcc/plan.md) · [try it](kcc/quick-try.md) · [open items](kcc/plan.md#open-items) |
 | The other eleven | Not started |
 
 Cutting across all of them: the scheme tools used to carry the provider and
