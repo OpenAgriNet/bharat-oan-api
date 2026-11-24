@@ -103,6 +103,7 @@ deliberately rather than rediscovered.
 | 4 | The `AgricultureResource/v0.2` pack fix is on `bv-migration`; SATHI's catalog `@context` names `bv-features` | `bv-features` still has `required: [informationMode, subjectCategories]`, so deployed environments keep refusing every `select` for a catalog fact a select has no reason to carry. Needs a merge to `bv-features`, or the catalog repointed |
 | 5 | The response side is not contract-driven | The request path now reads every field name from the provider's OpenAPI. Responses do not: `applicationNo`, `sanctionedAmount` and the rest are field names in the tool, in all six providers, because the mapping defines the response shape and nothing declares it. Closing it means new vocabulary — an `x-oan-to` or the mapping output described in the contract — across every provider, not a KCC change |
 | 12 | Nothing says which of two providers to prefer | `discover` answers with an unranked list. Eight capabilities now share one selector, which takes the first candidate that can serve the call, skips the ones that cannot, and logs the pick when there was more than one — so a wrong choice is visible. What it still cannot do is prefer the *better* of two usable providers, because nothing in the payload ranks them. `mandi` is the one tool that does rank, by haversine distance, and `sathi_seed` sidesteps the question by returning every match. Settling it means discover returning an order, or the catalog carrying a preference the tool honours — a network-spec change, not a tool one |
+| 13 | The agent fabricates "an OTP has been sent" on some phrasings | Three of eight KCC phrasings never call `initiate_kcc_otp` and reply as if they had, so the farmer waits for an SMS nobody asked for. Reproduces on v1, so it is a prompt bug, not a migration one. The `status_*.md` step 2 example spells out a finished sentence with a literal masked number and the model copies it. Fixing it means rewriting that step in all thirteen language files — [kcc/plan.md open item 12](kcc/plan.md#open-items) |
 
 **Small and safe. Each is an hour or less.**
 
@@ -164,3 +165,33 @@ KCC adds a fourth, about how a capability is signed off:
       ctx = types.SimpleNamespace(deps=FarmerContext(session_id="t", query="t"))
       print(asyncio.run(kcc.initiate_kcc_otp(ctx, "9876543211")))
       PY
+
+- **And a green tool does not mean the farmer gets the right answer.** Calling
+  the entry points directly supplies the arguments yourself, so it never tests
+  whether the agent picks the tool or fills it correctly. Running KCC's three
+  tools through `agrinet_agent` with farmer sentences found a fourth layer of
+  bug: three of eight phrasings skip `initiate_kcc_otp` entirely and reply "an
+  OTP has been sent" — README item 13. Run the agent too, carrying message
+  history between turns, with a real `FarmerContext`:
+
+      docker exec -i -e KCC_BECKN_VERSION=v2 -e PYTHONPATH=/app sva_app python - <<'PY'
+      import asyncio
+      from agents.deps import FarmerContext
+      from agents.agrinet import agrinet_agent
+      async def main():
+          history = []
+          deps = FarmerContext(query="", session_id="t", lang_code="en")
+          for q in ["check my KCC loan status, my number is 9876543213",
+                    "123456", "show me 100247"]:
+              deps.query = q
+              deps.skills.restore(history)
+              res = await agrinet_agent.run(q, deps=deps, message_history=history)
+              history = res.all_messages()
+              print(q, "->", res.output)
+      asyncio.run(main())
+      PY
+
+  The flag is read at import time, so the version under test has to be injected
+  with `-e`. In the running container `KCC_BECKN_VERSION` is unset — only
+  `WEATHER_BECKN_VERSION` and `MANDI_BECKN_VERSION` are `v2` — so the deployed
+  agent still routes KCC to the v1 tools.
