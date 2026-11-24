@@ -34,7 +34,7 @@ place -- read that first when picking a capability back up.
 | Soil Health Card | **Built, verified end to end locally** — [plan](shc/plan.md) · [try it](shc/quick-try.md) · [open TODOs](shc/plan.md#open-todos) |
 | AIF — loan status + grievance status | **Built, catalog published, discoverable; proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
 | KCC — credit card application status | **Built, catalog published, discoverable; proven against a mock only** — [plan](kcc/plan.md) · [try it](kcc/quick-try.md) · [open items](kcc/plan.md#open-items) |
-| KHC — grievance registration + status | **Plan written, not started** — [plan](khc/plan.md) · [open items](khc/plan.md#open-items) |
+| KHC — grievance registration + status | **Blocked by design, not by access** — status journey can start; registration cannot until KHC exposes one parameterised reference endpoint — [plan](khc/plan.md) · [open items](khc/plan.md#open-items) |
 | The other ten | Not started |
 
 Cutting across all of them: the scheme tools used to carry the provider and
