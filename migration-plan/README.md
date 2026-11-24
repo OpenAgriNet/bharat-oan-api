@@ -34,8 +34,9 @@ place -- read that first when picking a capability back up.
 | Soil Health Card | **Built, verified end to end locally** — [plan](shc/plan.md) · [try it](shc/quick-try.md) · [open TODOs](shc/plan.md#open-todos) |
 | AIF — loan status + grievance status | **Built, catalog published, discoverable; proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
 | KCC — credit card application status | **Built, catalog published, discoverable; proven against a mock only** — [plan](kcc/plan.md) · [try it](kcc/quick-try.md) · [open items](kcc/plan.md#open-items) |
-| KHC — grievance registration + status | **Planned, not started** — nothing blocks it; the geography lookups need either one parameterised KHC endpoint or a second binding — [plan](khc/plan.md) · [open items](khc/plan.md#open-items) |
-| The other ten | Not started |
+| KHC — grievance registration + status | **In progress** — pack fixed and proven; its status journey contradicts the provider backend, item 20 — [plan](khc/plan.md) · [open items](khc/plan.md#open-items) |
+| The other seven Beckn tools | Not started — `advisory`, `agristack`, `amul_vistaar`, `gfr`, `maha_vistaar`, `smam_scheme_status`, `search`. All reach a provider through `BAP_ENDPOINT`, so all are migration targets |
+| Six tools that are not migration targets | `imd_advisory` reads its own database, `maps` calls Photon, and `chat_place`, `commodity`, `ffs` and `terms` make no provider call at all. None of them touches Beckn, so there is nothing to move |
 
 Cutting across all of them: the scheme tools used to carry the provider and
 resource ids as constants and now ask `discover` for them — what that changed,
@@ -135,7 +136,7 @@ though the scheme tools only started taking that answer in November 2026; see
 ## Carried to the next phase
 
 Every open item now lives in one place: **[open-issues.md](open-issues.md)**.
-Nineteen numbered items, grouped by what each one is waiting on — access, a
+Twenty numbered items, grouped by what each one is waiting on — access, a
 decision, or an hour of work — plus a link to each capability's own open list.
 It is one file so a review does not have to go hunting.
 

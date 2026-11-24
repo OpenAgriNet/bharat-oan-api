@@ -90,6 +90,132 @@ three places it can go:
 **This needs a decision before any code.** The rest of the plan assumes (1),
 because it is the only option that does not depend on someone else.
 
+## The native contract, verified
+
+Read off `bharat-provider-backend/src/services/khc/khc.service.ts` on
+2026-11-24 -- the code that calls KHC in production today -- and checked line
+by line against the draft. **The draft is accurate.** All twelve operations,
+their methods, their parameters and their response field names match. Nothing
+below was probed and no credential was used.
+
+The `REFERENCES` table at `khc.service.ts:31` is the whole answer:
+
+| List | Parent query parameter | Id field | Name field |
+|---|---|---|---|
+| `states` | *(none)* | `stateid` | `statename` |
+| `districts` | `stateId` | `districtid` | `districtname` |
+| `sub-districts` | `districtId` | `subdistrictid` | `subdistrictname` |
+| `villages` | `subDistrictId` | `villageid` | `villagename` |
+| `schemes` | `stateId` | `scheme` | `schemename` |
+| `categories` | `scheme` | `problemcategory` | `categoryname` |
+| `sub-categories` | `problemCategory` | `problemsubcategory` | `subcategoryname` |
+
+Four things in that table are load-bearing and three of them contradict an
+earlier draft of this plan:
+
+- **The parent parameter is camelCase and the response fields are lowercase.**
+  `stateId` goes out, `stateid` comes back. They are not the same string and a
+  mapping that reuses one for the other silently returns nothing.
+- **KHC does not paginate and does not filter by name.** `getReference`
+  (`khc.service.ts:324`) fetches the entire list in one GET and does the name
+  match and the 50-per-page slice *in the provider backend*
+  (`matches.slice((pageNumber - 1) * 50, pageNumber * 50)`). So the `page` and
+  `name` arguments v1's tools pass were never KHC parameters. **v2 loses
+  nothing by moving that work into the tool** -- it was never provider-side in
+  the first place, which removes the main objection to option 1 in *What the
+  provider actually does*.
+- **The grievance options are a cascade, not a flat list.** `schemes` is
+  scoped to a state, `categories` to a scheme, `sub-categories` to a category.
+  So *"categories and sub-categories are catalog data"* is only half true: a
+  published `grievanceOptions` is valid for exactly one scheme, which means a
+  Grievance resource per `(state, scheme)` pair rather than one for KHC. That
+  is affordable -- every such resource is `openagrinet:Grievance` and they all
+  share **one** binding, because bindings are keyed `<provider>|<@type>` and
+  resources are told apart by `descriptor.code`. Resource count does not cost
+  routing. What decides it is how many pairs there are, which is the one
+  question source cannot answer.
+- **The service key is sent as `Authorization: ApiKey <key>`**
+  (`khc.service.ts:146`), so the prefix is literally `ApiKey `, not `Bearer `.
+  `KHC_BASE_URL` must be `https`, with no query or fragment, and the client
+  uses a 20s timeout and refuses redirects.
+
+Every reply is `{"status": "200 OK", "data": ...}` and `status` is checked as a
+**string** against `/^20[01](?:\s|$)/`, not as a number. A reply without `data`
+is treated as a failure whatever the HTTP code.
+
+### The status journey does not match the draft
+
+The draft publishes two operations for reading a grievance:
+
+```
+POST /v1/state/grievances/check-status?grievanceNo=…   (KhcStatusStart)
+POST /v1/state/grievances/verify-otp                   (KhcStatusRead)
+```
+
+**Neither string appears anywhere in `khc.service.ts`.** What the provider
+backend actually does is one call:
+
+```
+GET /v1/state/grievances/status?grievanceNo=…          (khc.service.ts:384)
+```
+
+and the dispatcher's `status` branch ignores `request_type` entirely --
+`} else { result = await this.getStatus(text(values, "grievanceNo", 100)); }`
+at `:532`. So `get_status_otp` and `verify_status_otp`, the two request types
+v1's `check_khc_grievance_status` sends (`agents/tools/khc.py:693-694`), both
+land on the same read. **In this revision the status OTP is never sent and
+never checked.** The tool asks the farmer for a code that does not exist, and
+the grievance was already returned by the first call.
+
+**The draft was written against a different revision, so it cannot settle
+this either way.** Its `x-source` lines point into a longer file than the one
+on disk: `KhcCreate` cites `khc.service.ts#L588` and the snapshot is **577
+lines**. `KhcStatusStart` and `KhcStatusRead` cite `#L568` and `#L576`, which
+here fall inside the `catch` block that formats a failure response, and
+`KhcVerify` cites `#L384`, which here is `getStatus`'s request line. The line
+numbers are consistently shifted, not individually wrong, which is what reading
+a `blob/dev` link against an older or trimmed checkout looks like. So the draft
+is evidence about a revision this repository does not contain -- it neither
+confirms the two status endpoints nor is caught inventing them.
+
+One objection to the draft does survive, because it is about the adapter rather
+than the provider:
+
+- `KhcStatusStart` is declared `POST` with `grievanceNo` as its only input, in
+  `query`, and no `requestBody`. **The adapter cannot call that.**
+  `BuildEndpoint` returns early for any method `HasBody` accepts -- `GET`,
+  `HEAD` and `DELETE` are the only ones it appends a query string for
+  (`util/request.go:20-27`, `util/endpoint.go:28-31`) -- so a POST's mapped
+  request becomes the body and the query is dropped. The operation as written
+  would post to `/check-status` with no `grievanceNo` at all.
+
+The verified `GET …/status?grievanceNo=` has neither problem: it is a GET, so
+the adapter builds the query from the mapped request, and it needs **one**
+action slot rather than two.
+
+**Caveats, stated plainly.** This checkout is a snapshot dated 21 October 2026
+with no git history. By date it is the newer of the two, but by content it is
+the shorter, so "newer" does not follow -- it may be a trimmed or
+differently-configured deployment rather than an earlier commit. Its
+`khc.service.spec.ts` tests none of `get_status_otp`, `verify_status_otp`,
+`find_location` or `grievance_tree`, and the dispatcher implements neither
+`find_location` nor `grievance_tree` -- both would hit
+*"Invalid KHC request_type."* at `:522`. So either the deployed backend is
+newer still, or two of v1's seven tools are already broken in production.
+**Not resolvable from this repository**, and it decides whether the v2 status
+journey has an OTP at all -- which is a question about who may read a
+farmer's grievance, not a question about plumbing. Carried as open item 10.
+
+### What this changes
+
+The reference lists are each one GET with at most one query parameter and no
+paging. That is the simplest thing the adapter can express, and it means the
+seven lists are not blocked on contract work at all -- only on the action-slot
+arithmetic in *The seven reference lists*, which is unchanged: seven paths,
+and `ActionPlan` is a `map[string]ActionPlan` keyed by action name
+(`pkg/model/model.go:94`, `sunbirdRegistry/providerrecord.go:335`), so two rows
+with the same action name silently overwrite. Confirmed, not assumed.
+
 ## What already exists on the network side
 
 `network-specs/api/external/khc/tickets/v0.2/`, from commit `5b5e7fe`:
@@ -542,11 +668,11 @@ for it and registration is last.
 
 ## What this needs that does not exist yet
 
-- **`parent_id` on the reference GETs.** The draft declares `parameters: []` on
-  all seven and notes *"Legacy name/page filter the lookup; not native HTTP
-  parameters"*. Districts without a `stateId` and villages without a
-  `subDistrictId` cannot be what KHC really does, so the tracing is incomplete.
-  This is the single most important thing to confirm against the live API.
+- ~~**`parent_id` on the reference GETs.**~~ **Settled on 2026-11-24, and it
+  needed no API key.** This said the draft declares `parameters: []` on all
+  seven and that the tracing was incomplete. Both halves were wrong -- see
+  *The native contract, verified* below. Only `states` declares no parameter,
+  which is correct, because only `states` has no parent.
 - **`x-oan-request-attributes` on `KhcStatusStart`.** It takes `grievanceNo` as
   a query parameter, and `request_schema` reads only `x-oan-request-attributes`
   or `requestBody`, so the operation that starts the status journey is the one
@@ -560,11 +686,11 @@ for it and registration is last.
   and every operation declares only the service API key. `Authorization` is
   already taken by that key, so the token needs its own header and the draft
   does not name one. Only KHC can answer it.
-- **`confirm` and `select` in `Grievance/v0.2`'s `x-oan-schema-by-action`.** It
-  lists `init`, `status` and `support` only. Without the two extra lines pointing
-  at the existing permissive `GrievanceCall`, a `confirm` payload is validated
-  against the root schema — which requires `scheme`, `grievanceOptions` and
-  `actions` — and refused. Two lines, and the same revision AIF already started.
+- ~~**`confirm` and `select` in `Grievance/v0.2`'s `x-oan-schema-by-action`.**~~
+  **Done 2026-11-24.** Both now point at the existing permissive
+  `GrievanceCall`, so the pack knows all five actions KHC needs. Adding map
+  entries only widens what validates, and PM-KISAN, PMFBY and AIF use
+  `init`/`status`/`support` only, so none of them is affected.
 - **One parameterised reference endpoint**, per *The seven reference lists*. This
   is the one gap that blocks a journey rather than inconveniencing it.
 
@@ -709,15 +835,38 @@ mobile, no write.
    farmer consented defeats the OTP, so assume it is required and ask KHC for the
    header name. The adapter needs no code — `sessionCaptureOn: confirm`,
    `sessionSendOn: support`, `sessionHeader`.
-2. **`confirm` and `select` are missing from `Grievance/v0.2`'s call map.**
-   It knows `init`, `status` and `support`. Two lines pointing at the existing
-   `GrievanceCall` fix it; without them those payloads are validated against the
-   catalog schema and refused. `track` was the earlier proposal for the status
-   send and is dropped — it is also absent from the adapter's six-endpoint
-   routing list, where `select` already is.
-3. **The reference GETs declare `parameters: []`.** A district list that takes no
-   `stateId` cannot be what KHC does, so the tracing is incomplete. Needs the API
-   key to settle, and until it is settled the master-data design is a guess.
+2. ~~**`confirm` and `select` are missing from `Grievance/v0.2`'s call map.**~~
+   **Closed 2026-11-24.** `schema/Grievance/v0.2/attributes.yaml` now maps
+   `init`, `confirm`, `select`, `status` and `support` at `GrievanceCall` --
+   the five KHC needs. `track` was the earlier proposal for the status send and
+   is dropped: it is absent from the adapter's six-endpoint routing list, where
+   `select` already is.
+
+   **Verified against the running stack**, with a control that isolates the
+   pack layer. One `confirm` payload carrying `@context`, `@type`,
+   `challenge.response.value` and `farmerMobileNumber` -- and deliberately none
+   of `scheme`, `grievanceOptions` or `actions` -- sent twice, changing only
+   the pack version in `@context`:
+
+   | Pack | Adapter answer |
+   |---|---|
+   | `Grievance/v0.1` | `SCH_REQUIRED_FIELD_MISSING: property "scheme" is missing; property "challenge" is unsupported` |
+   | `Grievance/v0.2` | past schema; `NET_ENTITY_NOT_FOUND`, because no `khc` binding is registered yet |
+
+   `NET_ENTITY_NOT_FOUND` is a routing answer, so validation passed. The first
+   control attempted was `support` on `SchemeApplication/v0.2` and proved
+   nothing -- it was refused by the **base** spec with
+   `SCH_FIELD_NOT_ALLOWED: property "contract" is unsupported`, because
+   `support` does not carry `message.contract` at all. Changing only the pack
+   version is the comparison that isolates the pack.
+3. ~~**The reference GETs declare `parameters: []`.**~~ **Closed 2026-11-24.**
+   Wrong on both counts, and the answer was in the repo the whole time: six of
+   the seven take a required parent id as a query parameter, the draft declares
+   every one of them, and the field names match the live service exactly. Read
+   off `bharat-provider-backend`'s `REFERENCES` table rather than probed, so no
+   credential was needed. The master-data design is no longer a guess -- see
+   *The native contract, verified*. What the API key still buys is the one
+   thing source cannot answer: **how many rows each list returns.**
 4. **Four geography lists, and a binding holds one path per action.**
    `ActionPlan.Path` is a plain string and bindings are keyed
    `<provider>|<@type>`, and the grievance binding already spends all five
@@ -752,6 +901,39 @@ mobile, no write.
 8. **Thirteen language files reference tool behaviour.** If any tool's
    contract changes — an argument added, an error reworded — all thirteen need
    the same edit. KCC's open item 12 is this problem already.
+10. **Does KHC's status read need an OTP?** The two operations the draft
+    publishes for it, `POST /v1/state/grievances/check-status` and
+    `POST /v1/state/grievances/verify-otp`, are absent from the provider
+    backend on disk, which reads a grievance with a single
+    `GET /v1/state/grievances/status?grievanceNo=`. The draft's `x-source`
+    links point into a longer revision, so it is describing code this
+    repository does not hold and the disagreement cannot be settled here --
+    see *The status journey does not match the draft* above.
+
+    **Ask KHC one question: is a grievance number alone enough to read a
+    grievance?** If yes, v2 binds `status` to the GET and drops the OTP, and
+    v1's two-step prompt was never doing anything. If no, KHC must say which
+    endpoint sends the OTP and whether it takes `grievanceNo` in a **body** --
+    as a POST with only a query parameter it is unroutable, because
+    `BuildEndpoint` appends a query string for `GET`, `HEAD` and `DELETE` only.
+
+    This is not a plumbing question. It decides whether anyone holding a
+    grievance number can read that grievance, so it is answered before the
+    status journey is written, not after. Tracked network-wide as
+    [open-issues.md](../open-issues.md) item 20.
+
+11. **`division` has nowhere to live in the catalog.** Filing needs ten
+    identifiers and one of them is `division`, which is not a lookup of its
+    own: it rides along on the schemes row, which returns
+    `{scheme, schemename, division}` together -- v1's prompt says "take the
+    scheme and division from the SAME row"
+    (`agents/tools/khc.py:612`). `GrievanceFields.scheme` is
+    `additionalProperties: false` over `code` and `name` only, and the parent
+    `Grievance` sets `unevaluatedProperties: false`, so a published resource
+    cannot carry it. Either the scheme code encodes both, or `Grievance/v0.3`
+    gains a field. Until then the catalog publishes the scheme and the filing
+    has to source `division` elsewhere.
+
 9. **`khc_service_note` runs on every turn of every conversation.** It is v1
    code in `agents/tools/khc.py` imported directly by `agents/agrinet.py`, so
    flipping `KHC_BECKN_VERSION` would leave the agent importing both files.
