@@ -305,8 +305,10 @@ no-mobile, no-write exercise.
 
 ## Open items
 
-1. **Where the aggregation lives.** Section *What the provider actually does*.
-   Blocks everything.
+1. **Where the aggregation lives.** Taken as decided — into the tool, with a
+   cache (decisions 1 and 2) — because the alternatives wait on someone else.
+   Reopen it if KHC will expose aggregate endpoints, because phases 5 and 6 are
+   most of the work and they exist only to replace them.
 2. ~~**`support` versus `init` for creation.**~~ **Decided:** `support`, matching
    PM-KISAN and PMFBY. See decision 3 above.
 3. **No KHC credentials and no mock.** Same position KCC was in, except KHC
