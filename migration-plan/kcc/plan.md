@@ -552,6 +552,25 @@ mid-journey on one version cannot finish on the other.
    are pass-through now; the only thing either does to a value is cast the OTP
    to the number KCC's contract asks for.
 
+**Open, and not KCC's to close.**
+
+10. **The response side is still not contract-driven.** The request path reads
+    every field name from KCC's OpenAPI. The reply does not: the tool reads
+    `applications`, `applicationNo`, `status`, `requestedAmount`,
+    `sanctionedAmount`, `rejectionReason`, `bank` and `updatedOn` by name,
+    because the *mapping* defines the response shape and nothing declares it.
+    Every v2 tool does the same — SATHI reads `bags` and `dealer_id`, AIF reads
+    `loanApplicationNumber`, PM-KISAN reads `ticketNo`. Closing it needs new
+    vocabulary across all six providers, so it is carried rather than fixed
+    here — [README](../README.md#carried-to-the-next-phase), item 5.
+
+11. **`AgricultureResource/v0.2`'s fix is on the wrong branch for SATHI.** The
+    `x-oan-schema-by-action` entry this work added is on `bv-migration`;
+    SATHI's catalog `@context` names `bv-features`, which still refuses every
+    `select`. Verified locally through a `spec-files` context rewrite, not
+    through the published pack — [README](../README.md#carried-to-the-next-phase),
+    item 4.
+
 ## Risks
 
 1. **The cipher is the whole flow, and we cannot test it.** A wrong IV rule

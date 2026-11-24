@@ -83,6 +83,37 @@ payload. Who to call becomes the network's answer rather than an env var --
 though the scheme tools only started taking that answer in November 2026; see
 [discovery.md](discovery.md).
 
+## Carried to the next phase
+
+Nothing here blocks what is already built. Written down so it is picked up
+deliberately rather than rediscovered.
+
+**Waiting on access. No decision to make, no code to write.**
+
+| # | Item | What unblocks it |
+|---|---|---|
+| 1 | KCC's AES key and IV rule are unknown | A real call. The mock and the codec share the same guess, so they agree whether or not it is right — [kcc/plan.md open item 1](kcc/plan.md#open-items). Check this first when credentials arrive |
+| 2 | No KCC credentials | `KCC_ENTITY_TYPE`, `KCC_USER_ID`, `KCC_PASSWORD`. Swapping the mock is a `.env` edit and one `make register-provider PROVIDER=kcc UPDATE=1` — no code, no rebuild |
+| 3 | `SATHI_API_KEY`, `SHC_TOKEN_URL`, `SHC_REFRESH_TOKEN` missing from `helmcharts/quick-start/.env` | Without them `setup.py` renders no provider binding for either, so the adapter answers `NET_ENTITY_NOT_FOUND` on SATHI's `select` and discover finds no `shc-reports` resource. This is the only reason the api collection is not green |
+
+**Needs a decision.**
+
+| # | Item | The question |
+|---|---|---|
+| 4 | The `AgricultureResource/v0.2` pack fix is on `bv-migration`; SATHI's catalog `@context` names `bv-features` | `bv-features` still has `required: [informationMode, subjectCategories]`, so deployed environments keep refusing every `select` for a catalog fact a select has no reason to carry. Needs a merge to `bv-features`, or the catalog repointed |
+| 5 | The response side is not contract-driven | The request path now reads every field name from the provider's OpenAPI. Responses do not: `applicationNo`, `sanctionedAmount` and the rest are field names in the tool, in all six providers, because the mapping defines the response shape and nothing declares it. Closing it means new vocabulary — an `x-oan-to` or the mapping output described in the contract — across every provider, not a KCC change |
+
+**Small and safe. Each is an hour or less.**
+
+| # | Item |
+|---|---|
+| 6 | AIF's `_LOAN_OFFER` / `_TICKETS_OFFER` constants can read the offer off `_first_resource`, which now carries it |
+| 7 | SATHI's `_FIELD_MEANINGS = {"cropCode": "crop", ...}` bridge can become `x-oan-from` hints in SATHI's OpenAPI — the same fix KCC just had |
+| 8 | `pmkisan_scheme_status.py:174` duplicates `post_action` instead of using the shared one in `aif.py` |
+| 9 | `mapping-files` and `spec-files` are started by hand and are not in `quick-start/docker-compose.yml`. Until they are, **never run `docker compose` with `--remove-orphans`** — it deletes them and `mock-ffs` |
+| 10 | A stray `cat-aif-schemaapp-probe` catalog is still in local discovery |
+| 11 | The PMFBY v0.2 mapping stubs are still `deployable: false` |
+
 ## Read this before starting the next one
 
 Two findings from mandi that change how the next capability should be
