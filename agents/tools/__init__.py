@@ -165,10 +165,16 @@ else:
     from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
 from agents.tools.maps import reverse_geocode, forward_geocode
-from agents.tools.gfr import (
-    gfr_get_crop_registries,
-    gfr_get_recommendations,
-)
+if _beckn_v2("GFR"):
+    from agents.tools.v2.gfr import (
+        gfr_get_crop_registries,
+        gfr_get_recommendations,
+    )
+else:
+    from agents.tools.gfr import (
+        gfr_get_crop_registries,
+        gfr_get_recommendations,
+    )
 # v2 reads crops from the network catalog, so SATHI's master-API tools are v1 only.
 if _beckn_v2("SATHI"):
     from agents.tools.v2.sathi_seed import list_sathi_crops, search_sathi_seed_availability
