@@ -109,7 +109,8 @@ Nothing in `helmcharts` mentions KHC. No provider registration, no mock, no
 `.env` keys. PMFBY and KCC both have a local mock; KHC has none.
 
 The draft proposes `init`, `support` and `status`, and puts grievance creation
-on **`support`** — a change from v1, which creates on `init`.
+on **`support`** — a change from v1, which creates on `init`, and the right one:
+both existing v2 grievance submissions use `support` too.
 
 ## Four gaps between the draft and the machinery
 
@@ -146,54 +147,168 @@ master row, or that `externalReferenceNo` is the caller's own idempotency key.
 Without `x-oan-from` hints the tool has to know those by heart, which is the
 hardcoding the Sathi pattern exists to remove.
 
-## What gets built
+## Four decisions, and what they rest on
 
-In `bharat-oan-api`:
+**1. The aggregation moves into the tool.** Of the three homes in the section
+above, it is the only one that does not wait on someone else. `find_location`
+and `grievance_tree` become local matching in `agents/tools/v2/khc.py`.
 
-- `agents/tools/v2/khc.py`. Seven tools, same names and signatures, so the
-  skill manifest and all fifteen prompt files are untouched.
-- Seven `_beckn_v2("KHC")` call sites in `agents/tools/__init__.py`, imported as
-  one block — the OTP binds the whole journey, so a farmer cannot start on v1
-  and finish on v2. Same reasoning as KCC.
-- `KHC_BECKN_VERSION` in `docker-compose.pilot.yml`, default v1.
-- `_render_location` and `_render_tree` move across unchanged if the renderers
-  keep receiving the same structures; they are the farmer-facing text and
-  rewriting them is a regression risk for no gain.
+**2. Master data is cached, not fetched per turn.** This is what makes decision 1
+affordable. States, districts, sub-districts, villages, schemes, categories and
+sub-categories are slow-moving reference data; fetching four lists on every
+location question would be slower than v1, not faster. `app/core/cache.py`
+already configures an aiocache Redis instance with a JSON serializer, and
+`helpers/master_catalog.py` is the fail-open pattern to copy: a Redis outage
+degrades the lookup instead of raising.
 
-In `network-specs`:
+**3. Creation goes on `support`, as the draft says — not on `init` like v1.**
+Checked against both existing v2 grievance submissions, and they agree:
 
-- Promote `openapi-draft.yaml` to `openapi.yaml` with `x-oan-request-attributes`
-  on the four write operations and `x-oan-from` hints where a field needs one.
-- A real catalog, descriptor code `khc-tickets`, resource type
-  `openagrinet:Grievance`, with `variant` on every action entry.
-- Flip the twelve mappings to `deployable: true` once each is exercised.
+| | PM-KISAN | PMFBY |
+|---|---|---|
+| OTP send | `init` (`pmkisan_grievance.py:245`) | — |
+| **Submit a grievance** | **`support`** (`:410`) | **`support`** (`pmfby_grievance.py:409`) |
+| Grievance status | `status` (`:517`) | `status` (`:284`) |
 
-In `helmcharts`:
+v1 KHC creating on `init` is the outlier. The draft followed the house pattern;
+the port adopts it.
 
-- A `mock-khc` — twelve endpoints, same shape as `mock-aif`. KHC writes real
-  grievances to a real desk; this cannot be tested against the live provider.
-- Provider registration and the `.env` keys (`KHC_BASE_URL`, `KHC_API_KEY`).
-- An api-collection folder with the usual positive and negative assertions.
+**4. `operation_ref` learns about variants.** `operation_ref(resource, action,
+variant="")`, matching `entry["variant"]` when a variant is given and keeping
+today's first-match behaviour when it is not. Every existing caller is
+unchanged. The draft already writes `KhcStart`, `KhcVerify`, `KhcCreate`,
+`KhcStatusStart` and `KhcStatusRead`, so this is reading what is already there.
 
-## Order of work
+## Implementation, in eight phases
 
-1. Settle the aggregation question. Nothing else is safe to start.
-2. `operation_ref` variants, with a test. Smallest change, unblocks the rest.
-3. `mock-khc` and provider registration — the ability to run anything at all.
-4. Promote the OpenAPI and write the catalog.
-5. Status journey first: two operations, two tools, no master data, no write.
-   It is the half that can be proved before the hard half starts.
-6. Reference lists and the two aggregating tools.
-7. Registration last, because it is the only irreversible call.
-8. Verify three layers — newman, the tool entry points, then the agent with real
-   farmer sentences in Hindi and English.
+Each phase is shippable and proves something the next one depends on.
+
+### 1. Variants in `operation_ref`
+
+`agents/tools/v2/provider_openapi.py`. Twelve lines and a test: a resource with
+two `init` entries resolves each by variant; a call with no variant still
+returns the first. Nothing else in the codebase changes. **An hour.**
+
+### 2. The contract, promoted
+
+`network-specs/api/external/khc/tickets/v0.2/openapi-draft.yaml` becomes
+`openapi.yaml`, with four edits:
+
+- `x-oan-request-attributes` on `KhcStatusStart`. It takes `grievanceNo` as a
+  query parameter, and `request_schema` reads only
+  `x-oan-request-attributes` or `requestBody` — so today the one operation that
+  starts the status journey is the one the contract reader cannot read.
+- `x-oan-from` hints on the four write operations. `KhcCreateRequest` already
+  names its ten required fields, which tells the tool *what* to fill but not
+  *where it comes from*: that `farmerMobileNumber` is the mobile verified in this
+  session, that `scheme` and `division` must be taken from the same master row,
+  that `externalReferenceNo` is the caller's own idempotency key. Without the
+  hints the tool has to know those by heart — the hardcoding the Sathi pattern
+  exists to remove.
+- The seven reference lists added to `catalogCandidate.actions` as `select`
+  variants. Today they live under `mappings/internal/` with `action: internal`
+  and appear in no action entry, so no tool can reach them at all.
+- A real catalog in place of `catalog-placeholder.json`: descriptor code
+  `khc-tickets`, resource type `openagrinet:Grievance`, `AgricultureResource/v0.2`.
+
+The response shapes stay provisional until the live reference lists are read —
+every example in the draft is synthetic.
+
+### 3. `mock-khc`
+
+Twelve endpoints modelled on `mock-aif`, in `helmcharts/quick-start`, with
+`.env` placeholders so the real API swaps in without a code change.
+
+One requirement that matters more than it looks: **the lists must carry
+realistic volumes.** A mock with three villages per sub-district will make the
+tool-side fan-out look fine and tell us nothing. Fixed OTP `123456`
+(`MOCKKHC_OTP`), and deterministic negatives keyed off the input the way
+`mock-kcc` keys off the mobile's last digit.
+
+KHC writes to a real grievance desk, so unlike the other five capabilities the
+mock is not a stand-in for missing credentials — it is where creation gets
+tested permanently.
+
+### 4. The status journey
+
+Two operations, two tool calls, no master data, no write — the smallest thing
+that proves phases 1 to 3 work together end to end.
+`check_khc_grievance_status` sends `status`/`KhcStatusStart`, then
+`status`/`KhcStatusRead`. Every v1 guard stays: the
+`[A-Za-z]{2}/[0-9]{6}/[1-9][0-9]*` check with its per-reason error text, the
+six-digit OTP check, no automatic retry, and the explicit "this is not the
+registration OTP" wording.
+
+### 5. The master-data cache
+
+A new `agents/tools/v2/khc_master.py`: one `select` per reference list,
+addressed by variant, cached in Redis under a `khc-master` namespace with a long
+TTL, and failing open to a direct call when Redis is unavailable. The name
+normalisation (`_loose` and friends) moves across from v1.
+
+This is the phase whose shape depends on the unknown: the draft declares
+`parameters: []` on all seven lists and notes that *"Legacy name/page filter the
+lookup; not native HTTP parameters"*, which reads as though KHC returns every
+row and the 50-per-page pagination was the provider backend's invention. If
+that is true for villages, caching is mandatory rather than merely wise. Build
+it against the mock, then re-verify against the real lists.
+
+### 6. The two aggregating tools
+
+`find_khc_location` and `get_khc_grievance_options` become local matching over
+the cache, producing the same `matches` / `needs` / `state` / `schemes` /
+`match` structures the renderers already consume. `_render_location` and
+`_render_tree` move across **unchanged** — they are farmer-facing text that
+thirteen prompt files describe the behaviour of, and rewriting them is
+regression risk for no gain. `lookup_khc_reference` becomes a read of the cache,
+with the 50-per-page paging done as local slicing.
+
+This is the bulk of the work. It is a provider's job arriving in our code.
+
+### 7. Registration
+
+`initiate_khc_otp` and `verify_khc_otp` on the two `init` variants;
+`register_khc_grievance` on `support`/`KhcCreate`, filling `KhcCreateRequest`'s
+fields from the contract rather than from constants. Every refusal in v1 stays,
+because each one exists for a reason: the ten-digit mobile check, `farmer_type`
+from the verified `isRegistered` and not from the model, the six-integers check,
+`confirmed=True`, the `externalReferenceNo` derived from the session and the
+payload, and no automatic retry after an unconfirmed submission.
+
+Last, because it is the only irreversible call.
+
+### 8. The flag, the note, and verification
+
+- `khc_service_note` moves to a version-neutral module. Today
+  `agents/agrinet.py:55` imports it from the v1 tool, so flipping the flag would
+  leave the agent importing both files.
+- `KHC_BECKN_VERSION` in `docker-compose.pilot.yml`, default `v1`, with all seven
+  tools imported as one block — the OTP binds the whole journey, so a farmer
+  cannot start on v1 and finish on v2. Same reasoning as KCC.
+- Three layers, reported separately: the newman folder, the tool entry points,
+  then the agent with real farmer sentences in Hindi and English. The negatives
+  that matter here are a village in no list, a scheme KHC does not cover, a
+  wrong OTP, an unknown grievance number, and an unconfirmed submission — the
+  last one checked for the absence of a retry, not for a message.
+
+## What can start before the API details arrive
+
+Phases 1 to 4 need nothing from KHC: variants, the promoted contract, the mock
+and the status journey are all buildable today. Phase 5 can be written against
+the mock and must be re-verified against the real lists.
+
+What the API key unlocks is narrow and important: the **actual response field
+names** of the seven reference lists. The draft's `stateid` / `statename` are
+guesses, and those seven responses feed the six master IDs that
+`register_khc_grievance` refuses to send without. Reading them is a read-only,
+no-mobile, no-write exercise.
 
 ## Open items
 
 1. **Where the aggregation lives.** Section *What the provider actually does*.
    Blocks everything.
-2. **`support` versus `init` for creation.** The draft moves it; v1 creates on
-   `init`. Pick one and make the catalog, the mapping and the tool agree.
+2. ~~**`support` versus `init` for creation.**~~ **Decided:** `support`, matching
+   PM-KISAN and PMFBY. See decision 3 above.
 3. **No KHC credentials and no mock.** Same position KCC was in, except KHC
    also writes. A mock is not optional here.
 4. **Thirteen language files reference tool behaviour.** If any tool's
