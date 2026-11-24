@@ -1,12 +1,13 @@
 """KHC (Kisan Help Center) on Beckn v2.
 
-Four of KHC's operations ride the network and seven do not. The split is not an
+Five of KHC's operations ride the network and seven do not. The split is not an
 optimisation -- it is what the protocol leaves room for.
 
-    Beckn v2        send OTP            -> init
-                    verify OTP          -> confirm
-                    file the grievance  -> support
-                    read the status     -> status   (unbound, see below)
+    Beckn v2        send OTP              -> init
+                    verify OTP            -> confirm
+                    file the grievance    -> support
+                    send a status OTP     -> select
+                    answer it and read    -> status
 
     Direct HTTPS    states, districts, sub-districts, villages,
                     schemes, sub-categories
@@ -16,7 +17,7 @@ optimisation -- it is what the protocol leaves room for.
 
 A v1 registry row holds one ActionPlan per action name (pkg/model/model.go:114)
 and BuildEndpoint has no templating (internal/common/util/endpoint.go:16-40), so
-the eleven KHC operations cannot be eleven rows. v1 got around that by riding
+the twelve KHC operations this module uses cannot be twelve rows. v1 got around that by riding
 two actions with a `request_type` discriminator in the payload; v2 has one named
 endpoint per action and no discriminator, so the reference lists have no slot.
 Publishing them is not an option either: the village tree is about 1.06 million
@@ -31,9 +32,16 @@ find_khc_location and get_khc_grievance_options were never KHC operations -- the
 v1 provider backend composed them out of the flat lists. That composition moves
 here, which is why this module walks the geography tree itself.
 
-Status is published unbound. KHC's check-status is a POST whose only input is a
-query parameter, which no registry row can express; migration-plan/open-issues.md
-item 20 carries the question to KHC.
+The status read is two actions because KHC spends two calls on it: check-status
+sends an OTP to the mobile the grievance was filed against, and verify-otp
+answers that OTP and returns the grievance. check-status is a POST that reads
+its grievance number from the query string, which no path can hold, so the
+mapping names the field under the reserved _query key and the adapter puts it
+on the URL whatever the method.
+
+KHC's third status endpoint, GET /v1/state/grievances/status, is deliberately
+left unbound. It returns the grievance -- including the farmer's own words --
+for anyone holding the number, with no OTP at all.
 """
 
 import asyncio
@@ -710,17 +718,133 @@ async def lookup_khc_reference(
     )
 
 
+# --------------------------------------------------------------------------------------
+# The status journey: an OTP to the mobile the grievance was filed against, then the read
+# --------------------------------------------------------------------------------------
+
+# CaseStatusCode is what travels, because the contract declares an enum and a
+# portal's own phrase in its place is a value nothing can branch on. These are
+# the words to say it in, so the agent is not left translating an identifier.
+_CASE_STATUS_WORDS = {
+    "Registered": "registered and waiting to be picked up",
+    "UnderReview": "being looked into",
+    "AwaitingApplicant": "waiting for something from the farmer",
+    "Replied": "answered by the department",
+    "Resolved": "resolved",
+    "Rejected": "rejected",
+    "Closed": "closed",
+}
+
+
+def _status_transaction(ctx: RunContext[FarmerContext], number: str) -> str:
+    """One transaction id across select and status for this grievance number.
+
+    Keyed on the number rather than a mobile, because a status read never asks
+    for one. Separate from the filing journey's id on purpose: the two carry
+    different things and must not share a session.
+    """
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"khc-status:{ctx.deps.session_id}:{number}"))
+
+
+async def _send_status_otp(ctx: RunContext[FarmerContext], number: str) -> str:
+    """select: ask KHC to send an OTP for this grievance. Nothing is read yet."""
+    found = await _discover("select")
+    if not found:
+        return _UNAVAILABLE
+
+    body = commitment_envelope(
+        "select",
+        _status_transaction(ctx, number),
+        DRAFT,
+        _attributes(found, case={"ticketNo": number}),
+        _OFFER,
+        found,
+    )
+    response = await post_action("select", body, who=_WHO)
+    if response.status_code != 200:
+        return _explain(response, "status OTP send")
+    if not commitment_attributes(response).get("challenge", {}).get("issued"):
+        logger.error("KHC v2 on_select carried no issued challenge")
+        return _UNAVAILABLE
+    return (
+        "OTP sent successfully to the mobile registered on this grievance. "
+        "Ask the farmer for the 6-digit OTP, then call this same tool with the same "
+        "grievance number and the OTP. Do not ask for the grievance number again. "
+        "Do not use the registration OTP tools, and do not ask for a mobile number."
+    )
+
+
+async def _read_status(ctx: RunContext[FarmerContext], number: str, code: str) -> str:
+    """status: answer the OTP and read the grievance back."""
+    found = await _discover("status")
+    if not found:
+        return _UNAVAILABLE
+
+    body = commitment_envelope(
+        "status",
+        _status_transaction(ctx, number),
+        ACTIVE,
+        _attributes(
+            found,
+            case={"ticketNo": number},
+            challenge={"response": {"method": "OTP", "value": code}},
+        ),
+        _OFFER,
+        found,
+    )
+    response = await post_action("status", body, who=_WHO)
+    if response.status_code != 200:
+        return _explain(response, "status read")
+
+    case = commitment_attributes(response).get("case") or {}
+    ticket = str(case.get("ticketNo") or "")
+    state = str((case.get("status") or {}).get("code") or "")
+    # The number KHC named, and it has to be the one asked about: a status read
+    # reported against a different grievance is another farmer's answer.
+    if not state or ticket.upper() != number:
+        logger.error(
+            f"KHC v2 on_status answered for {ticket!r} with {state!r}, asked about {number!r}"
+        )
+        return _UNAVAILABLE
+
+    lines = [f"Grievance number: {ticket}", f"Status: {state}"]
+    if state in _CASE_STATUS_WORDS:
+        lines.append(f"In plain words: the grievance is {_CASE_STATUS_WORDS[state]}.")
+    lines.append(
+        "Tell the farmer the status in their own language. KHC publishes nothing "
+        "further on this grievance through this service, so do not offer details "
+        "the result does not carry."
+    )
+    lines.append(SOURCE)
+    return "\n".join(lines)
+
+
 @observe(name="tool:check_khc_grievance_status", as_type="tool", capture_input=False, capture_output=False)
 async def check_khc_grievance_status(
     ctx: RunContext[FarmerContext], grievance_number: str = "", otp: str = "",
 ) -> str:
-    """Read a KHC grievance status. Not available on this network version yet.
+    """Send a status OTP, or verify it and retrieve KHC grievance status.
 
-    Still validates the grievance number so the farmer is not asked for an OTP or a
-    resend for a number that was never usable. Ask for the full ID received by SMS
-    if missing or invalid; keep slashes and leading zeros, e.g. UP/231026/5.
-    Do not interpret the middle section as a calendar date, and never truncate, pad
-    or replace characters to make an invalid number pass.
+    Use only after KHC is identified as the service for this grievance. For a generic status
+    request with no known scheme or service, ask which scheme or service first, not for a number.
+    Named PM-Kisan, PMFBY and AIF grievances use their own status flows unless KHC was chosen.
+    Once KHC is known, ask the farmer for their grievance number only if missing.
+
+    First call without otp to send SMS to the mobile registered on the grievance.
+    After successful sending, ask for the 6-digit OTP and call this same tool with
+    the same grievance_number and the farmer's otp. Never use registration OTP tools.
+    The OTP expires after 5 minutes and is single-use. Resend only when requested
+    by calling without otp; this invalidates the previous OTP. Never retry automatically.
+    Keep slashes and leading zeros intact, e.g. UP/231026/5 and OTP 012345.
+    Grievance numbers must have two ASCII letters, exactly six digits in the middle and a positive numeric
+    sequence separated by slashes, e.g. UP/231026/5 (an example, never a default).
+    Do not interpret the middle section as a calendar date. Never truncate, pad or replace
+    characters to make an invalid number pass; ask for the full ID from the SMS again.
+    Surrounding whitespace and letter case are normalized. Ask for the full ID received by SMS on the registered
+    mobile if missing or invalid. Announce sending only after the send call succeeds.
+    Do not ask for a mobile, beneficiary ID or cookie. Never invent a number or OTP.
+    A wrong OTP can be corrected until expiry; an expired/used OTP needs a fresh send.
+    Explain ID and OTP failures based on the tool result, without guessing a cause.
     """
     number = to_ascii_digits(str(grievance_number or "")).strip()
     if len(number) > 100 or not re.fullmatch(r"[A-Za-z]{2}/[0-9]{6}/0*[1-9][0-9]*", number):
@@ -743,21 +867,16 @@ async def check_khc_grievance_status(
             "Never truncate, pad or replace characters to make it valid. "
             "Do not restart scheme/service selection. "
             "Keep both slashes and any leading zeros. "
+            "Do not send an OTP until a valid number is supplied."
         )
+    number = number.upper()
 
-    # KHC's check-status is a POST whose only input is a query parameter, which
-    # no registry row can express -- verified against the provider on
-    # 2026-11-24 and carried to KHC as open-issues.md item 20. Published
-    # unbound rather than routed around, because the alternative read needs no
-    # OTP at all and a grievance number alone must not open a farmer's record.
-    logger.info("khc v2 status requested while the journey is unbound")
-    return (
-        "KHC grievance status cannot be checked through this service right now. "
-        "Tell the farmer the status check is temporarily unavailable, that their "
-        "grievance number is still valid, and that they can call the Kisan Call "
-        "Centre on 1800-180-1551 to hear the status. Do not send or ask for an OTP, "
-        "do not ask for the number again, and do not retry this tool in this conversation."
-    )
+    if otp != "":
+        code = to_ascii_digits(str(otp or "")).strip()
+        if not re.fullmatch(r"[0-9]{6}", code):
+            return "The OTP must contain exactly 6 digits. Please share the 6-digit OTP received for this grievance."
+        return await _read_status(ctx, number, code)
+    return await _send_status_otp(ctx, number)
 
 
 @observe(name="tool:register_khc_grievance", as_type="tool")

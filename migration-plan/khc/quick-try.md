@@ -12,12 +12,12 @@ probed live; `support` never was.
 
 ## What rides the network and what does not
 
-KHC is eleven calls. They split three ways, and the split is the whole design.
+KHC is thirteen calls. They split three ways, and the split is the whole design.
 
 | | calls | how |
 |---|---|---|
-| On the network | send OTP, verify OTP, file grievance | adapter `init`, `confirm`, `support` |
-| Unbound | read grievance status | published but not routable — [open-issues item 20](../open-issues.md) |
+| On the network | send OTP, verify OTP, file grievance, send status OTP, read grievance | adapter `init`, `confirm`, `support`, `select`, `status` |
+| Left out on purpose | the ungated grievance read | `GET /v1/state/grievances/status?grievanceNo=` reads a grievance on a number alone, free text included. The gated pair above does the same read behind an OTP, so nothing is lost — [open-issues item 20](../open-issues.md) |
 | Straight to KHC | states, districts, sub-districts, villages, schemes, categories, sub-categories | plain HTTPS from the app, like mandi's and weather's master data |
 
 The seven reference lists are not a shortcut. A list of district names is not a
@@ -113,7 +113,7 @@ Then check it is there:
     curl -s -X POST http://127.0.0.1:9201/consumer/discover \
       -H 'Content-Type: application/json' -d '{...}' | grep khc-grievance
 
-## The journey, by curl
+## The filing journey, by curl
 
 Three bodies ship with the stack:
 
@@ -176,6 +176,56 @@ number; without the check, a transaction id alone was enough to file a
 grievance in another farmer's name. **The adapter image must be rebuilt for
 this — tag `0.2.0` does not contain the fix.**
 
+## The status journey, by curl
+
+Two more bodies, and a journey of its own:
+
+    capability-examples/Grievance/select/select-khc.json   send the status OTP
+    capability-examples/Grievance/status/status-khc.json   answer it and read
+
+Put the grievance number the filing returned into both, under
+`commitmentAttributes.case.ticketNo`. **This is KHC's own number** — not the
+`externalReferenceNo` we sent — because it is the one the desk answers to.
+
+The two share a `transactionId` of their own. The status OTP is a separate
+challenge from the filing one, so it does not reuse the filing's id.
+
+1. `select` → KHC sends an OTP to the mobile the grievance was filed against.
+   The answer echoes `case.ticketNo` and carries `challenge.issued`; the
+   commitment stays `DRAFT` and **no status comes back**, because nothing is
+   read by this call. A number no desk holds answers 404, so a 200 here is KHC
+   saying it knows this one.
+2. `status` with the code → the commitment goes `ACTIVE` and carries
+   `case.ticketNo` and `case.status.code`, a `CaseStatusCode`. KHC's own phrase
+   ("Open") does not travel: the mapping looks it up and sends `Registered`.
+
+### Why `select` posts a query string
+
+`check-status` is a POST whose only input is a query parameter. `grievanceNo` in
+the body answers `400 "grievanceNo is required"`; the same value in the query
+string reaches the grievance. A registry `Path` cannot hold a `?`, so the
+mapping writes the field under the reserved **`_query`** key and the adapter
+lifts whatever is there onto the URL — on a POST exactly as on a GET
+(`util/query.go`, `Split`). `verify-otp` takes both of its values in the body.
+The inconsistency is the provider's; each mapping follows the call in front of
+it. **The adapter image must be rebuilt for this — tag `0.2.0` does not contain
+`Split`.**
+
+### Status refusals worth running
+
+| what you send | what you should get |
+|---|---|
+| `select` for a grievance no desk holds | `BIZ_GENERIC_ERROR` "KHC could not send an OTP for that grievance number." |
+| `select` with no `case.ticketNo` | `SCH_INVALID_FORMAT` "needs case.ticketNo" |
+| `status` with a wrong OTP | `BIZ_GENERIC_ERROR` "KHC did not accept that OTP." |
+| `status` with the **right** OTP and no `select` before it | the same refusal — and this is the one to run |
+
+The last row is the gate. A real grievance and the correct code, refused,
+because no `check-status` has asked for a code against that grievance. Run it
+*before* the `select`: the challenge KHC holds is per grievance number and a
+verify does not clear it, so once `select` has run for a number a correct OTP
+against it keeps answering.
+
 ### Reading the errors
 
 | prefix | whose fault | what to do |
@@ -211,7 +261,7 @@ which means it is on `oan-internal`.
 | `initiate_khc_otp` | adapter `init` |
 | `verify_khc_otp` | adapter `confirm` |
 | `register_khc_grievance` | adapter `support` |
-| `check_khc_grievance_status` | nowhere — answers honestly that it cannot |
+| `check_khc_grievance_status` | adapter `select`, then `status` |
 | `find_khc_location` | KHC direct, the place walk in one call |
 | `get_khc_grievance_options` | KHC direct, plus the published catalog |
 | `lookup_khc_reference` | KHC direct, one list at a time |
@@ -234,12 +284,20 @@ times, one per sub-district, and the tool asks which rather than picking.
 that is not done — it will not dump a category list for the farmer to shop
 through.
 
-`check_khc_grievance_status` makes no call. It tells the farmer the status check
-is unavailable, that their grievance number is still valid, and to ring
-1800-180-1551 — and tells the agent not to retry. See
-[open-issues item 20](../open-issues.md) for why, and note that the answer there
-is the uncomfortable one: KHC's routable status read is ungated, so a grievance
-number alone reads the grievance.
+`check_khc_grievance_status` is one tool over two calls, and which one it makes
+depends on whether it was given an OTP. With a grievance number alone it sends
+`select` and tells the farmer a code is on its way; with a number and a
+six-digit code it sends `status` and reads the grievance back. It derives its
+own transaction id from the chat session and the grievance number, so the code
+the farmer reads out is matched to the grievance they asked about and not to
+whatever they asked about last.
+
+It validates the number before it sends anything —
+`[A-Za-z]{2}/[0-9]{6}/[1-9][0-9]*`, with a different sentence per reason — and
+refuses to send an OTP until a valid number is supplied. The status it reports
+is a `CaseStatusCode`, which the tool then puts in plain words for the farmer
+("registered and waiting to be picked up"), because `Registered` is not a thing
+to read out to anyone.
 
 ### What the agent actually does with them
 
@@ -284,13 +342,31 @@ mock. That is exactly the split the design exists for.
 
 - **A real filing.** Covered at the top. `support` has never been sent to KHC,
   UAT or otherwise.
-- **The status journey.** Published and unroutable. `check-status` is a POST
-  whose only input is a query parameter, and `BuildEndpoint` appends a query
-  string for bodyless methods only (`util/endpoint.go:26-29`), so the safe
-  journey is the one this adapter cannot call and the routable one protects
-  nothing. Waiting on KHC.
+- **A real status read.** The journey works, but `select` sends an SMS to the
+  mobile a grievance was filed against. On the mock that is a log line; against
+  UAT it is a real farmer's phone ringing about a grievance nobody filed. Mock
+  only.
+- **How long the status OTP really lasts.** The six digits and the five-minute
+  window the answer states are the filing challenge's figures carried over. KHC
+  publishes neither for the status code, so a farmer told five minutes on a code
+  that lasts two is told something KHC never said —
+  [open-issues item 20](../open-issues.md).
 - **KHC's real error bodies, rate limits or downtime pages.** The mock
   reproduces the awkwardnesses that were observed — `status` is a *string* in a
   200 response, the casing split, no paging — and nothing that was not.
-- **An api-collection folder.** There is no KHC folder yet; the journey above is
-  curl and the tool checks are Python. Worth adding, modelled on the AIF folder.
+## The same thing in Postman
+
+`helmcharts/api-collection` now carries a KHC folder under `Grievance`: the two
+registry reads, publish, discover, the filing journey 1 to 3, the status journey
+4 to 6 and the refusals. It saves the grievance number request 3 returns and the
+status journey reads it back, so the whole thing runs top to bottom.
+
+    cd helmcharts/api-collection
+    newman run OpenAgriNet.api-collection.json \
+      -e environments/OpenAgriNet.api.local-environment.json --folder KHC
+
+13 requests, 45 assertions, green on 2026-11-24.
+
+`khc-schema-base` stays on `openagrinet.github.io` even against a local stack,
+for the reason given above — the catalog's `@context` must be the canonical URL
+or the pack falls back to v0.1 and the publish is refused.

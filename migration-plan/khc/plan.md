@@ -204,7 +204,38 @@ differently-configured deployment rather than an earlier commit. Its
 newer still, or two of v1's seven tools are already broken in production.
 **Not resolvable from this repository**, and it decides whether the v2 status
 journey has an OTP at all -- which is a question about who may read a
-farmer's grievance, not a question about plumbing. Carried as open item 10.
+farmer's grievance, not a question about plumbing. Carried as open item 11.
+
+#### Resolved 2026-11-24, against the provider rather than the snapshot
+
+Read-only probes against KHC UAT settled it, and they settled it against this
+section. **All three operations exist.** A `GET` against `check-status` or
+`verify-otp` answers 405, not 404, so the two the draft published are deployed;
+the snapshot that names neither is older than what is running. The draft was
+right and the backend on disk was the wrong witness.
+
+So the gated pair is what is bound:
+
+```
+POST /v1/state/grievances/check-status?grievanceNo=…   select
+POST /v1/state/grievances/verify-otp                   status
+```
+
+The one objection that survived -- that the adapter could not call a POST whose
+only input is a query parameter -- was an adapter limit and is fixed as one. A
+mapping now names its query fields under the reserved `_query` key and `Split`
+lifts them onto the URL whatever the method (`util/query.go`), which replaced
+`queryParameters` plus `BodyFields` with one function and two call sites. KHC is
+asked to change nothing.
+
+`GET /v1/state/grievances/status?grievanceNo=` is **left unbound on purpose**,
+and that is the part worth being plain about. It reads a grievance on a number
+alone -- 404 for a number no desk holds, so the call reaches a grievance lookup
+and not an authorization check -- and the reply carries the free text the farmer
+wrote. The gated pair returns the same body behind an OTP, so binding the
+ungated one would publish a read with no gate and buy nothing. v1 prompts for a
+code before reaching it, but the dispatcher's `status` branch ignores the
+`request_type` that prompt sets, so on this revision that prompt gated nothing.
 
 ### What this changes
 
@@ -544,7 +575,9 @@ Before choosing one, two gates nobody mentioned:
 `/consumer/<action>` (`aif.py:109`). Anything else is a one-line edit to that
 file — small, but it is not free.
 
-**The pack validates per action, and `Grievance/v0.2` knows three.**
+**The pack validates per action, and `Grievance/v0.2` knows three.** (It maps
+all five now -- added 2026-11-24, open item 2. What follows is the choice that
+decided which five.)
 
 ```yaml
 x-oan-schema-by-action:
@@ -833,12 +866,15 @@ Three layers, in the order the standing discipline asks for: the adapter, then
 the tool entry points, then the agent with real farmer sentences. Everything
 below ran against `mock-khc`. **`support` has never been sent to KHC**, UAT or
 otherwise -- it writes to a real desk and that one filing is made deliberately,
-with the desk owner. The walk-through is [quick-try.md](quick-try.md).
+with the desk owner. `select` is mock-only for the same kind of reason: it sends
+an SMS to the mobile a grievance was filed against, which against UAT is a real
+farmer's phone ringing about a grievance nobody filed. The walk-through is
+[quick-try.md](quick-try.md).
 
 ### The adapter
 
 Catalog `cat-khc` published `200 / ACCEPTED / itemCount 1` and discoverable by
-`descriptor.code == "khc-grievance"`, carrying all three actions, scheme 38, the
+`descriptor.code == "khc-grievance"`, carrying all five actions, scheme 38, the
 OTP challenge block and categories 39-48.
 
 One transaction id through the whole journey: `on_init` returned
@@ -853,6 +889,26 @@ missing identifier, and a new farmer with no name. The unknown-mobile case
 *answering* is correct rather than a bug -- KHC sends an OTP to any ten-digit
 number and `isRegistered` is the discriminator.
 
+Then the status journey, on a transaction of its own. `on_select` echoed
+`case.ticketNo` and returned `challenge.issued` with a five-minute window and no
+status at all; `on_status` returned `case.status.code: "Registered"`, mapped
+from KHC's own "Open", with the commitment `ACTIVE`. The mock's log shows the
+two calls it should: `check-status … status OTP sent`, then `verify-otp …
+status read after a challenge`.
+
+Four more refusals behave, and the fourth is the one that matters: an unknown
+grievance number (`BIZ_GENERIC_ERROR` "KHC could not send an OTP for that
+grievance number."), a wrong OTP (`BIZ_GENERIC_ERROR` "KHC did not accept that
+OTP."), a missing `case.ticketNo` (`SCH_INVALID_FORMAT`), and **the correct OTP
+with no `select` before it, refused** -- which is the whole case for leaving the
+ungated read out.
+
+That last one only refuses if it runs first. KHC's challenge is a flag per
+grievance number and a verify does not clear it, so once `select` has asked for
+a code against a grievance, a correct OTP against it keeps answering. Run the
+gate on a grievance no `check-status` has touched, before the `select`, or it
+passes for the wrong reason.
+
 ### The tool entry points
 
 All seven, driven directly with `ctx.deps.session_id` the way the agent drives
@@ -860,8 +916,14 @@ them. The three network tools made their adapter calls; the four direct ones
 read KHC. The refusals that matter -- filing without confirmation, filing with
 no verified OTP, filing for a mobile other than the verified one, and a missing
 identifier -- each returned the sentence a farmer should hear, not a stack
-trace. `check_khc_grievance_status` answered honestly that it cannot, without
-making a call.
+trace.
+
+`check_khc_grievance_status` was driven through all six of its cases: a number
+that is not a grievance number, the OTP send, a wrong OTP, the right OTP, a
+number no desk holds, and an OTP that is not six digits. The read renders as
+three lines a farmer can hear -- the number, the `CaseStatusCode`, and the code
+put in plain words ("registered and waiting to be picked up") -- because
+`Registered` is not a thing to read out to anyone.
 
 ### The agent
 
@@ -871,6 +933,13 @@ one run resolved all six identifiers from real lookups -- state 5, village
 OTP and filed. Other runs made **no tool call at all** and answered *"Your
 grievance is registered. Grievance number: BR/231126/1"*, handing the farmer a
 number no desk recognises; one printed the literal placeholder `BR/...`.
+
+The status journey ran clean in its own agent session: a grievance filed as
+`BR/100008/8`, then two farmer turns that both called
+`check_khc_grievance_status`, answered *"Your grievance BR/100008/8 is
+registered and currently waiting to be picked up for further action."* No
+fabrication in that run -- which is a data point and not an acquittal, for the
+same reason the filing runs are not.
 
 The same seven turns on `KHC_BECKN_VERSION=v1` fabricate the same way. v2 kept
 v1's tool names, signatures and docstrings byte for byte precisely so this
@@ -908,8 +977,14 @@ Renamed -- no filler name may shadow a real one.
 
 ### Validators
 
-`check-api-separation.py` 908 checks and `check-applicability.py` 28 checks,
-both green after the support rewrite.
+`check-api-separation.py` 910 checks and `check-applicability.py` 28 checks,
+both green -- 910 rather than 908 because `select` and `status` are now bound
+mapping notes, each cross-checked against the index, the published catalog and
+the contract operation.
+
+The api collection carries a KHC folder now: 13 requests, 45 assertions, green.
+It runs the filing journey, the status journey and the refusals in one pass,
+saving the grievance number the filing returns and reading it back.
 
 ## Open items
 
@@ -953,29 +1028,45 @@ both green after the support rewrite.
    credential was needed. The master-data design is no longer a guess -- see
    *The native contract, verified*. What the API key still buys is the one
    thing source cannot answer: **how many rows each list returns.**
-4. **Four geography lists, and a binding holds one path per action.**
+4. **KHC returns `currentLevel` and `createdAt` on the status read and its
+   contract declares neither.** Both come back on every `verify-otp`, and
+   `khc/tickets/v0.2/openapi.yaml` promises neither, so neither is mapped -- a
+   field the contract does not declare is not one a farmer's answer can rest on.
+   `createdAt` has an obvious home in `case.filedOn`, which PMFBY already fills.
+   `currentLevel` has none: nothing in `Grievance/v0.2` says how far up a desk's
+   escalation ladder a case has climbed. Either add both to KHC's contract and
+   map them, or record in the contract that they are deliberately not read.
+   Carried as [open-issues item 24](../open-issues.md).
+5. **The grievance number travels under two names.** `support` answers with
+   `grievanceNo` on the support channel; `status` answers with `case.ticketNo`
+   on the commitment. Allowed rather than wrong -- `GrievanceCall` is
+   deliberately open and leaves operation-specific validation to the provider
+   contract -- but it means the agent carries the number between two shapes by
+   hand. A `Grievance/v0.3` question, beside the `grievanceOptions` one.
+   Carried as [open-issues item 25](../open-issues.md).
+6. **Four geography lists, and a binding holds one path per action.**
    `ActionPlan.Path` is a plain string and bindings are keyed
    `<provider>|<@type>`, and the grievance binding already spends all five
    routable actions. Four ways out are set out in *The seven reference lists*;
    route 2 works today, so this **shapes** registration rather than blocking it.
    Ask KHC for one parameterised endpoint first.
-5. **`AdministrativeAreaReference` has no parent field.** `coverageAreas` can
+7. **`AdministrativeAreaReference` has no parent field.** `coverageAreas` can
    carry `{codeScheme, areaCode, areaLevel, areaName}` and nothing else, so a
    published district cannot say which state it belongs to and the cascade is
    only recoverable if KHC's ids are LGD codes. One optional `parentAreaCode`
    closes it for every provider with a gazetteer. Pack proposal, not this
    migration.
-6. ~~**AIF publishes under the wrong pack now.**~~ Half resolved on
+8. ~~**AIF publishes under the wrong pack now.**~~ Half resolved on
    2026-11-24. `res-aif-loan-status` moved to `SchemeApplication/v0.2` with the
    pinned `@context`, `scheme` and `challenge`, and nothing in `aif.py` needed
    to change — discovery filters on `descriptor.code`, not `@type`.
    `res-aif-tickets` stayed on `AgricultureResource/v0.2`: `Grievance/v0.2`
    requires `grievanceOptions` and AIF publishes no complaint categories, which
-   is the same shape of pack gap as item 5 here. Carried on as
+   is the same shape of pack gap as item 7 here. Carried on as
    [../aif/plan.md](../aif/plan.md#open-items) items 7 and 8 — including that
    `AgricultureResource/v0.2` is missing from the publish module's
    `contextRewrite`, which is why a mixed catalog carries two context styles.
-7. **The credentials exist, the registered mobile does not.** `KHC_BASE_URL`
+9. **The credentials exist, the registered mobile does not.** `KHC_BASE_URL`
    and an API token are available as of 2026-11-24, but nobody on this side
    holds a mobile number registered with KHC. That splits the capability in
    two: the reference lists — categories, sub-categories, schemes, states,
@@ -984,31 +1075,25 @@ both green after the support rewrite.
    exercised without one. `create_grievance` stays on a mock regardless, since
    it writes to a real desk; verify it live once, deliberately, with the desk
    owner. The values are not in `documents/bv-envs` yet.
-8. **Thirteen language files reference tool behaviour.** If any tool's
-   contract changes — an argument added, an error reworded — all thirteen need
-   the same edit. KCC's open item 12 is this problem already.
-10. **Does KHC's status read need an OTP?** The two operations the draft
-    publishes for it, `POST /v1/state/grievances/check-status` and
-    `POST /v1/state/grievances/verify-otp`, are absent from the provider
-    backend on disk, which reads a grievance with a single
-    `GET /v1/state/grievances/status?grievanceNo=`. The draft's `x-source`
-    links point into a longer revision, so it is describing code this
-    repository does not hold and the disagreement cannot be settled here --
-    see *The status journey does not match the draft* above.
+10. **Thirteen language files reference tool behaviour.** If any tool's
+    contract changes — an argument added, an error reworded — all thirteen need
+    the same edit. KCC's open item 12 is this problem already.
+11. ~~**Does KHC's status read need an OTP?**~~ **Closed 2026-11-24. It does,
+    and the gated pair is what is bound.** Read-only probes against UAT settle
+    it: a `GET` against `check-status` or `verify-otp` answers 405, not 404, so
+    both operations the draft publishes are deployed and the backend on disk is
+    the older revision. `select` sends the OTP, `status` answers it and reads
+    the grievance, and a verify with no check-status before it returns 401 --
+    the gate is real. `GET /v1/state/grievances/status?grievanceNo=` stays
+    unbound on purpose, because it reads a grievance, the farmer's own words
+    included, on a number alone. The one objection that survived -- a POST whose
+    only input is a query parameter is unroutable -- was an adapter limit and is
+    fixed as one: a mapping names its query fields under `_query` and `Split`
+    lifts them onto the URL whatever the method (`util/query.go`). Closed
+    network-wide as [open-issues.md](../open-issues.md) item 20. Still not KHC's
+    published word: how long the status OTP lives and how many digits it has.
 
-    **Ask KHC one question: is a grievance number alone enough to read a
-    grievance?** If yes, v2 binds `status` to the GET and drops the OTP, and
-    v1's two-step prompt was never doing anything. If no, KHC must say which
-    endpoint sends the OTP and whether it takes `grievanceNo` in a **body** --
-    as a POST with only a query parameter it is unroutable, because
-    `BuildEndpoint` appends a query string for `GET`, `HEAD` and `DELETE` only.
-
-    This is not a plumbing question. It decides whether anyone holding a
-    grievance number can read that grievance, so it is answered before the
-    status journey is written, not after. Tracked network-wide as
-    [open-issues.md](../open-issues.md) item 20.
-
-11. **`division` has nowhere to live in the catalog.** Filing needs ten
+12. **`division` has nowhere to live in the catalog.** Filing needs ten
     identifiers and one of them is `division`, which is not a lookup of its
     own: it rides along on the schemes row, which returns
     `{scheme, schemename, division}` together -- v1's prompt says "take the
@@ -1020,15 +1105,15 @@ both green after the support rewrite.
     gains a field. Until then the catalog publishes the scheme and the filing
     has to source `division` elsewhere.
 
-9. **`khc_service_note` runs on every turn of every conversation.** It is v1
-   code in `agents/tools/khc.py` imported directly by `agents/agrinet.py`, so
-   flipping `KHC_BECKN_VERSION` leaves the agent importing both files.
-   **Confirmed on 2026-11-24** with the flag at `v2`: `agrinet.py:6` still
-   imports from the v1 module and the agent runs fine, because the function
-   only reads `ctx.messages`. Nothing is broken; it is one import away from
-   being honest.
-   Either the note moves somewhere version-neutral, or the v2 module re-exports
-   it.
+13. **`khc_service_note` runs on every turn of every conversation.** It is v1
+    code in `agents/tools/khc.py` imported directly by `agents/agrinet.py`, so
+    flipping `KHC_BECKN_VERSION` leaves the agent importing both files.
+    **Confirmed on 2026-11-24** with the flag at `v2`: `agrinet.py:6` still
+    imports from the v1 module and the agent runs fine, because the function
+    only reads `ctx.messages`. Nothing is broken; it is one import away from
+    being honest.
+    Either the note moves somewhere version-neutral, or the v2 module re-exports
+    it.
 
 **Settled, recorded so they are not reopened:** creation goes on `support`, not
 `init`, matching PM-KISAN and PMFBY. The two OTP steps are `init` and `confirm`,
