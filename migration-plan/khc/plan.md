@@ -217,9 +217,71 @@ Four things in there are not obvious and all four are load-bearing:
   that asks on the wrong one matches nothing and reports "no data" — the bug
   that hid mandi's broken discover until 2026-11-23.
 
-## Which pack KHC publishes under, and the thing that costs us
+## Two `@context`s, and KHC is a Grievance
 
-Not `Grievance/v0.2`. Its `@context` is pinned:
+`@context` means a different thing in the catalog than it does in a request, and
+confusing the two is the easiest mistake here. AIF carries **both**, and so will
+KHC.
+
+| Where | `@type` | `@context` | Why |
+|---|---|---|---|
+| The published catalog resource | `openagrinet:AgricultureResource` | `raw.githubusercontent.com/…/bv-migration/schema/AgricultureResource/v0.2/context.jsonld` | the catalog has to validate against a pack whose `@context` is not pinned |
+| Every action payload — `init`, `confirm`, `support`, `select`, `status` | **`openagrinet:Grievance`** | `openagrinet.github.io/…/schema/Grievance/v0.2/context.jsonld` | this is the real capability, and it is the registry binding key |
+
+AIF's own `status-aif.json` is exactly this: `@type: openagrinet:Grievance` with
+the github.io `@context`, against a catalog published as
+`openagrinet:AgricultureResource`.
+
+**So what is KHC, in pack terms? A Grievance.** Not a `SchemeApplication` —
+nobody applies to the Kisan Help Center, they complain to it, and
+`SchemeApplication` is for reading an application's progress. The
+`AgricultureResource` line in the catalog is a publishing workaround, not a
+statement about what KHC is.
+
+**How the github.io 404 is survived on the request side but not the catalog
+side.** `extendedSchema_contextRewrite` on the adapter rewrites *where a pack is
+fetched from*, never the payload's `@context`:
+
+```
+https://openagrinet.github.io/network-specs/schema/Grievance/v0.2/|https://raw.githubusercontent.com/OpenAgriNet/network-specs/refs/heads/bv-migration/schema/Grievance/v0.2/
+```
+
+So a request may carry the pinned github.io URL and still resolve. It is set only
+on the blocks with `extendedSchema_enabled: "true"` — the transaction path. The
+publish path has no such rewrite, which is why the catalog cannot name
+`Grievance/v0.2` and AIF publishes as `AgricultureResource/v0.2` instead.
+
+Both go away when `bv-migration` merges to `main` and github.io serves v0.2.
+Until then KHC inherits the workaround as-is — **no new adapter keys**, because
+the Grievance rewrite line AIF added already covers KHC.
+
+## One resource, two `@type`s — not two resources
+
+The two rows above are **one resource**, described twice in two different
+documents. They are not two catalog entries, and `SchemeApplication` is not
+involved in KHC at all.
+
+```
+catalog (published once)              action payload (sent on every call)
+──────────────────────────────        ──────────────────────────────────
+res-khc-grievance                     message.contract.commitments[0]
+  descriptor.code: khc-grievance        .commitmentAttributes
+  resourceAttributes:                      "@type": "openagrinet:Grievance"
+    "@type": "openagrinet:                 "@context": github.io/…/Grievance/v0.2/
+              AgricultureResource"         "scheme": {...}
+```
+
+The tool finds the resource by `descriptor.code` from `discover`, then posts a
+call whose `@type` is the capability — and that `@type` is what keys the registry
+binding, `khc|openagrinet:Grievance`.
+
+AIF has two resources because it has two capabilities: a loan application and a
+support-ticket list. KHC has one capability, grievances, so **one resource** —
+plus a second only if the reference lists become a capability of their own.
+
+### Why the catalog says the generic one
+
+`GrievanceFields` pins `@context`:
 
 ```yaml
   GrievanceFields:
@@ -232,30 +294,29 @@ Not `Grievance/v0.2`. Its `@context` is pinned:
           contains: {const: https://openagrinet.github.io/.../Grievance/v0.2/context.jsonld}
 ```
 
-Both branches require a URL github.io answers with 404, and the root
-`Grievance` is `allOf: [GrievanceFields]`. This is the identical wall AIF hit on
-`SchemeApplication/v0.2` and solved by publishing as `AgricultureResource/v0.2`
-instead — which has no such `const`. There is no `Grievance` publish example
-anywhere in `helmcharts`, which is the same fact seen from the other side:
-**nothing on this stack has ever published a Grievance catalog.**
+Both branches require a URL github.io answers with 404, and the root `Grievance`
+is `allOf: [GrievanceFields]`. On the request side the adapter's
+`contextRewrite` makes that survivable; on the publish side there is no rewrite,
+so the catalog has to name a pack whose `@context` is not pinned. That is
+`AgricultureResource/v0.2`. The identical wall AIF hit on
+`SchemeApplication/v0.2`, solved the identical way — and there is no `Grievance`
+publish example anywhere in `helmcharts`, which is the same fact from the other
+side: nothing on this stack has ever published a Grievance catalog.
 
-So KHC publishes as `AgricultureResource/v0.2`, `@type:
-openagrinet:AgricultureResource`, like AIF.
+### What the workaround costs
 
-**And that is what kills the plan to publish the options.** `grievanceOptions`
-is a `Grievance/v0.2` field; `AgricultureResourceFields` requires only
-`informationMode` and `subjectCategories` and does not define it. The root does
-not set `unevaluatedProperties: false`, so an extra `grievanceOptions` may well
-pass unvalidated — but an attribute the pack does not define is not published
-data, it is a field that happens not to be rejected. **Test it before relying on
-it; assume schemes and categories come back as `select` reads.**
+`grievanceOptions` is a `Grievance/v0.2` field, and `AgricultureResourceFields`
+requires only `informationMode` and `subjectCategories` and does not define it.
+The root does not set `unevaluatedProperties: false`, so an extra
+`grievanceOptions` may well pass unvalidated — but an attribute the pack does not
+define is not published data, it is a field that happens not to be rejected.
+**Test it before relying on it; assume schemes and categories come back as
+`select` reads.**
 
-The same applies to `scheme` and `challenge.methods`: both are `Grievance/v0.2`
-fields and neither exists in `AgricultureResource/v0.2`. The farmer-facing
-consequence is small — the tool knows KHC needs a six-digit OTP because the tool
-is KHC's — but it means the catalog cannot say so, and the per-(state, scheme)
-resource split has no `scheme` field to split on. One resource per capability,
-not per scheme.
+Same for `scheme` and `challenge.methods`. The farmer-facing consequence is
+small — the tool knows KHC needs a six-digit OTP because the tool is KHC's — but
+the catalog cannot say so, and a per-(state, scheme) resource split has no
+`scheme` field to split on. One resource per capability, not per scheme.
 
 ## So how does a capability get two OTP steps?
 
