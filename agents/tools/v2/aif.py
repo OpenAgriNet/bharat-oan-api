@@ -198,12 +198,17 @@ def explain_failure(response: httpx.Response, what: str) -> str:
     return f"AIF {what} is temporarily unavailable. Please try again later."
 
 
-async def post_action(action: str, body: Dict[str, Any]) -> httpx.Response:
+async def post_action(action: str, body: Dict[str, Any], who: str = "AIF") -> httpx.Response:
+    """One Beckn action against the consumer adapter.
+
+    ``who`` names the capability in the log. Shared by the tools that follow
+    this shape, and a KCC call logged as AIF is a line nobody can act on.
+    """
     url = adapter_url(action)
-    logger.info(f"AIF v2 {action} -> {url}")
+    logger.info(f"{who} v2 {action} -> {url}")
     async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
         response = await client.post(url, json=body)
-    logger.info(f"AIF v2 {action} <- {response.status_code}")
+    logger.info(f"{who} v2 {action} <- {response.status_code}")
     return response
 
 
@@ -263,11 +268,25 @@ async def _discover(descriptor_code: str, action: str, what: str) -> Optional[Di
 
 
 def _first_resource(payload: dict) -> Optional[Dict[str, Any]]:
-    """Nothing to rank: AIF publishes one resource per capability."""
+    """Nothing to rank: AIF publishes one resource per capability.
+
+    The offer is the catalog's too, so it is carried back rather than left for
+    the caller to name -- a commitment is made against an offer, and inventing
+    an id the catalog never published is how a tool quietly stops matching it.
+    """
     for catalog in (payload.get("message") or {}).get("catalogs") or []:
         provider = catalog.get("provider") or {}
         for resource in catalog.get("resources") or []:
-            return {"resource": resource, "provider": provider}
+            offers = [
+                offer
+                for offer in catalog.get("offers") or []
+                if resource.get("id") in (offer.get("resourceIds") or [])
+            ]
+            return {
+                "resource": resource,
+                "provider": provider,
+                "offer": offers[0] if offers else {},
+            }
     return None
 
 

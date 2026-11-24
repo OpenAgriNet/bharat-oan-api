@@ -15,10 +15,19 @@ refused on status, which is why the third tool, select_kcc_application, sends
 nothing at all: it picks a row out of the applications status already returned,
 so choosing between several does not spend a second OTP.
 
+**Nothing about KCC's request is written here.** discover answers with the
+catalog, every action in it carries an operationRef, and that document names the
+fields, their types, which are required, and where each value comes from. This
+module holds three values -- a mobile number, an OTP, and the session init
+handed over -- and places them in whichever fields the contract says they
+belong in. A field KCC adds arrives with the spec; a field this module cannot
+fill stops the call and says which one, rather than sending a short body and
+letting KCC refuse it.
+
 **The session is held by the adapter, not here.** What this module holds is the
-requestId: KCC wants it inside the body of the status call, and the adapter
-cannot put a held value into a body it did not build. Holding it is also what
-lets a farmer answer the OTP once and then browse their applications.
+token KCC wants inside the body of the status call, which the adapter cannot put
+into a body it did not build. Holding it is also what lets a farmer answer the
+OTP once and then browse their applications.
 
 The output is NOT byte-comparable with v1. v1 rendered whatever tags the
 gateway returned; v2 reads named fields out of the v0.2 pack. See
@@ -53,29 +62,47 @@ from agents.tools.v2.aif import (
     scheme_application_context,
     SCHEME_APPLICATION_TYPE,
 )
+from agents.tools.v2.provider_openapi import (
+    SchemaUnavailable,
+    VALUE_SOURCE,
+    openapi_document,
+    operation_ref,
+    request_schema,
+)
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
 
 logger = get_logger(__name__)
 
-SCHEME = {"code": "KCC", "name": "Kisan Credit Card"}
 SOURCE_LINE = "**Source:** Kisan Rin Portal"
 
-# The catalog publishes one resource under this code; the offer is not on the
-# discover answer, so it stays a constant while provider and resource id come
-# off the wire.
+# The catalog publishes one resource under this code. It is the question being
+# asked -- PM-KISAN, PMFBY and AIF all publish openagrinet:SchemeApplication,
+# so @type alone reaches the wrong scheme -- and everything else about the
+# capability comes off the discover answer.
 _LOAN_CODE = "kcc-loan"
-_LOAN_OFFER = "off:kcc:loan"
+
+# The three values this module has to offer, named as the spec names them.
+# A field hinted with one of these gets it; a field hinted with anything else
+# is one only a newer release can fill, and saying so is better than sending a
+# body KCC will refuse.
+_FROM_MOBILE = "subject.mobile"
+_FROM_OTP = "challenge.otp"
+_FROM_SESSION = "session"
 
 UNAVAILABLE = "The KCC system cannot be reached right now. Please try again in a few minutes."
 NEED_MOBILE = "Ask the farmer for the 10-digit mobile number they used for their KCC application."
-NEED_OTP = "Ask the farmer for the 6-digit OTP sent to their mobile."
 NEED_APPLICATION_NO = "Ask the farmer which KCC application number to check (digits only)."
 NEED_FRESH_OTP = (
     "This KCC check needs a fresh OTP. Send a new one and ask the farmer to read it out."
 )
 
-# KCC's requestId is good for five minutes (sessionTtl on the binding), so one
+
+def need_otp(length: int) -> str:
+    return f"Ask the farmer for the {length}-digit OTP sent to their mobile."
+
+
+# KCC's session is good for five minutes (sessionTtl on the binding), so one
 # older than that cannot be spent anyway. The applications outlive it: they are
 # already in hand, and select_kcc_application only reads them back.
 _REQUEST_ID_TTL_SECONDS = 5 * 60
@@ -91,7 +118,7 @@ APPROVED_STATUSES = {"APPROVED", "SANCTIONED", "DISBURSED"}
 # --------------------------------------------------------------------------------------
 
 async def _post(action: str, body: Dict[str, Any]) -> httpx.Response:
-    return await post_action(action, body)
+    return await post_action(action, body, who="KCC")
 
 
 def _explain_failure(response: httpx.Response, what: str) -> str:
@@ -130,12 +157,7 @@ def _discover_context() -> Dict[str, Any]:
 
 
 async def _discover(action: str) -> Optional[Dict[str, Any]]:
-    """The KCC loan resource, with its catalog provider.
-
-    The descriptor code is what separates it: PM-KISAN, PMFBY and AIF all
-    publish openagrinet:SchemeApplication, so @type alone reaches the wrong
-    scheme.
-    """
+    """The KCC loan resource, with its catalog provider and offer."""
     body = {
         "context": _discover_context(),
         "message": {
@@ -166,6 +188,12 @@ async def _discover(action: str) -> Optional[Dict[str, Any]]:
             f"catalog offers {advertised}"
         )
         return None
+    if not (found.get("offer") or {}).get("id"):
+        logger.error(
+            f"KCC v2 {found['resource'].get('id')} is in no published offer; "
+            "a commitment has to be made against one"
+        )
+        return None
     return found
 
 
@@ -182,25 +210,93 @@ def _otp_length(found: Dict[str, Any]) -> int:
 
 
 # --------------------------------------------------------------------------------------
-# Input handling
+# The provider's own request fields
 # --------------------------------------------------------------------------------------
 
-def _mobile(value: str) -> str:
-    """10-digit Indian mobile with any +91 / 91 / 0 prefix removed; "" when invalid."""
-    digits = re.sub(r"[\s-]", "", to_ascii_digits(str(value or "")))
-    digits = re.sub(r"^(\+?91|0)(?=\d{10}$)", "", digits)
-    return digits if re.fullmatch(r"[6-9]\d{9}", digits) else ""
+async def _request_attributes(found: Dict[str, Any], action: str) -> Dict[str, Any]:
+    """What this action's call has to carry, read from the contract the catalog names."""
+    resource = found["resource"]
+    url, _, pointer = operation_ref(resource, action).partition("#")
+    try:
+        schema = request_schema(await openapi_document(url), pointer)
+    except SchemaUnavailable as e:
+        raise SchemaUnavailable(f"{url}: {e}") from e
+    logger.info(
+        f"KCC v2 {action} request fields from {url}: "
+        f"{ {name: prop.get(VALUE_SOURCE) or ('fixed' if 'const' in prop else 'unhinted') for name, prop in schema['properties'].items()} }"
+    )
+    return schema
 
 
-def _attributes(mobile: str, **extra: Any) -> Dict[str, Any]:
-    return {
-        "@context": scheme_application_context(),
-        "@type": SCHEME_APPLICATION_TYPE,
-        "informationMode": "OnDemand",
-        "scheme": dict(SCHEME),
-        "applicant": {"mobile": mobile},
-        **extra,
+async def _session_field(found: Dict[str, Any]) -> str:
+    """The name KCC gives the token init hands over and status quotes back.
+
+    Read off the status contract rather than the init one: the field belongs to
+    the call that spends it, and both actions are in the one document the
+    catalog points at, so asking costs nothing extra.
+    """
+    schema = await _request_attributes(found, "status")
+    for name, prop in schema["properties"].items():
+        if prop.get(VALUE_SOURCE) == _FROM_SESSION:
+            return name
+    raise SchemaUnavailable(
+        f"{found['resource'].get('id')} status declares no {VALUE_SOURCE}: {_FROM_SESSION} field"
+    )
+
+
+def _as_declared(value: Any, prop: Dict[str, Any]) -> Any:
+    """``value`` in the JSON type the field is declared as.
+
+    KCC's OTP is the reason this exists: the contract says integer and the
+    quoted form is refused, and the farmer reads the code out as text.
+    """
+    declared = prop.get("type")
+    types = (declared,) if isinstance(declared, str) else tuple(declared or ())
+    try:
+        if "integer" in types:
+            return int(value)
+        if "number" in types:
+            return float(value)
+    except (TypeError, ValueError):
+        logger.warning(f"KCC v2 could not read {value!r} as {types}; sending it as given")
+        return value
+    return str(value) if "string" in types else value
+
+
+def _filled(schema: Dict[str, Any], held: Dict[str, str]) -> Tuple[Dict[str, Any], List[str]]:
+    """The request fields to send, and the required ones nothing here can fill."""
+    attributes: Dict[str, Any] = {}
+    unfillable: List[str] = []
+    for name, prop in schema["properties"].items():
+        if "const" in prop:
+            attributes[name] = prop["const"]
+            continue
+        source = prop.get(VALUE_SOURCE)
+        value = held.get(source) if source else None
+        if value in (None, ""):
+            if name in schema["required"]:
+                unfillable.append(f"{name} (wants {source or 'no ' + VALUE_SOURCE + ' hint'})")
+            continue
+        attributes[name] = _as_declared(value, prop)
+    return attributes, unfillable
+
+
+def _attributes(found: Dict[str, Any], fields: Dict[str, Any]) -> Dict[str, Any]:
+    """The commitment attributes: what the pack identifies the payload as, what
+    the catalog says the resource is, and the provider's own fields filled in.
+
+    The names are KCC's own, so the mapping hands them straight to KCC rather
+    than translating a second set of names nobody else uses.
+    """
+    published = found["resource"].get("resourceAttributes") or {}
+    attributes = {
+        "@context": published.get("@context") or scheme_application_context(),
+        "@type": published.get("@type") or SCHEME_APPLICATION_TYPE,
     }
+    for echoed in ("informationMode", "scheme"):
+        if published.get(echoed):
+            attributes[echoed] = published[echoed]
+    return {**attributes, **fields}
 
 
 def _remember(store: Dict[str, Tuple[Any, float]], key: str, value: Any, ttl: int) -> None:
@@ -213,6 +309,17 @@ def _recall(store: Dict[str, Tuple[Any, float]], key: str, empty: Any) -> Any:
         store.pop(key, None)
         return empty
     return value
+
+
+# --------------------------------------------------------------------------------------
+# Input handling
+# --------------------------------------------------------------------------------------
+
+def _mobile(value: str) -> str:
+    """10-digit Indian mobile with any +91 / 91 / 0 prefix removed; "" when invalid."""
+    digits = re.sub(r"[\s-]", "", to_ascii_digits(str(value or "")))
+    digits = re.sub(r"^(\+?91|0)(?=\d{10}$)", "", digits)
+    return digits if re.fullmatch(r"[6-9]\d{9}", digits) else ""
 
 
 # --------------------------------------------------------------------------------------
@@ -363,7 +470,7 @@ async def initiate_kcc_otp(ctx: RunContext[FarmerContext], mobile_number: str) -
                 "beckn_version": "v2",
             }
         )
-        # A new OTP replaces the one the held requestId belongs to, and the
+        # A new OTP replaces the one the held session belongs to, and the
         # applications it fetched are about to be fetched again.
         _request_ids.pop(transaction_id, None)
         _applications.pop(transaction_id, None)
@@ -373,19 +480,32 @@ async def initiate_kcc_otp(ctx: RunContext[FarmerContext], mobile_number: str) -
             logger.warning("KCC v2 discover found no loan catalog")
             return UNAVAILABLE
 
+        fields, unfillable = _filled(
+            await _request_attributes(found, "init"), {_FROM_MOBILE: mobile}
+        )
+        if unfillable:
+            logger.error(f"KCC v2 cannot fill the init contract: {unfillable}")
+            return UNAVAILABLE
+        session_field = await _session_field(found)
+
         response = await _post(
             "init",
             commitment_envelope(
-                "init", transaction_id, DRAFT, _attributes(mobile), _LOAN_OFFER, found
+                "init",
+                transaction_id,
+                DRAFT,
+                _attributes(found, fields),
+                found["offer"]["id"],
+                found,
             ),
         )
         if response.status_code != 200:
             return _explain_failure(response, "OTP request")
 
         attributes = commitment_attributes(response)
-        request_id = str(attributes.get("requestId") or "")
+        request_id = str(attributes.get(session_field) or "")
         if not request_id:
-            logger.error("KCC v2 init returned no requestId")
+            logger.error(f"KCC v2 init returned no {session_field}")
             return UNAVAILABLE
         _remember(_request_ids, transaction_id, request_id, _REQUEST_ID_TTL_SECONDS)
 
@@ -399,6 +519,9 @@ async def initiate_kcc_otp(ctx: RunContext[FarmerContext], mobile_number: str) -
             lines.append(f"Sent to mobile: {issued['sentTo']}")
         return "\n".join(lines)
 
+    except SchemaUnavailable as e:
+        logger.error(f"KCC v2 init could not read the request contract: {e}")
+        return UNAVAILABLE
     except httpx.TimeoutException:
         logger.error("KCC v2 init timed out")
         return "The KCC OTP request timed out. Please try again later."
@@ -433,8 +556,6 @@ async def check_kcc_application_status(
         return NEED_MOBILE
 
     otp_clean = numeric(otp)
-    if len(otp_clean) != 6:
-        return NEED_OTP
 
     try:
         transaction_id = generate_transaction_id(ctx.deps.session_id, mobile)
@@ -454,18 +575,28 @@ async def check_kcc_application_status(
             logger.warning("KCC v2 discover found no loan catalog")
             return UNAVAILABLE
 
+        # Checked against the catalog rather than a constant, so a farmer is
+        # asked to re-read a code of the length KCC is actually sending.
+        length = _otp_length(found)
+        if len(otp_clean) != length:
+            return need_otp(length)
+
+        fields, unfillable = _filled(
+            await _request_attributes(found, "status"),
+            {_FROM_MOBILE: mobile, _FROM_OTP: otp_clean, _FROM_SESSION: request_id},
+        )
+        if unfillable:
+            logger.error(f"KCC v2 cannot fill the status contract: {unfillable}")
+            return UNAVAILABLE
+
         response = await _post(
             "status",
             commitment_envelope(
                 "status",
                 transaction_id,
                 ACTIVE,
-                _attributes(
-                    mobile,
-                    requestId=request_id,
-                    challenge={"response": {"method": "OTP", "value": otp_clean}},
-                ),
-                _LOAN_OFFER,
+                _attributes(found, fields),
+                found["offer"]["id"],
                 found,
             ),
         )
@@ -480,6 +611,9 @@ async def check_kcc_application_status(
             _remember(_applications, transaction_id, rows, _APPLICATIONS_TTL_SECONDS)
         return format_applications(rows)
 
+    except SchemaUnavailable as e:
+        logger.error(f"KCC v2 status could not read the request contract: {e}")
+        return UNAVAILABLE
     except httpx.TimeoutException:
         logger.error("KCC v2 status timed out")
         return "The KCC status request timed out. Please try again later."

@@ -102,7 +102,8 @@ curl -s "$ADAPTER/init" -H 'Content-Type: application/json' -d "{
       \"@type\": \"openagrinet:SchemeApplication\",
       \"informationMode\": \"OnDemand\",
       \"scheme\": { \"code\": \"KCC\", \"name\": \"Kisan Credit Card\" },
-      \"applicant\": { \"mobile\": \"$MOBILE\" }
+      \"mobileNumber\": \"$MOBILE\",
+      \"otpFor\": \"krishika\"
     }
   }] } }
 }" | jq '.message.contract.commitments[0].commitmentAttributes'
@@ -114,23 +115,26 @@ What comes back, verbatim from the run above:
 {
   "@context": "…/SchemeApplication/v0.2/context.jsonld",
   "@type": "openagrinet:SchemeApplication",
-  "applicant": { "mobile": "9876543212" },
+  "informationMode": "OnDemand",
+  "scheme": { "code": "KCC", "name": "Kisan Credit Card" },
+  "mobileNumber": "9876543212",
+  "requestID": "RQ-9014",
   "challenge": {
     "issued": {
       "method": "OTP", "channel": "SMS", "length": 6, "valueType": "NUMERIC",
       "sentTo": "XXXXXX3212",
       "expiresAt": "2026-11-24T07:45:07.167Z"
     }
-  },
-  "informationMode": "OnDemand",
-  "requestId": "RQ-9014",
-  "scheme": { "code": "KCC", "name": "Kisan Credit Card" }
+  }
 }
 ```
 
-Two things to notice. The masked number is at `challenge.issued.sentTo` —
-`applicant.mobile` is the one you sent, echoed back unmasked, because it is
-your own input. And the status is still `DRAFT`: nothing has been verified yet.
+Three things to notice. `mobileNumber` and `otpFor` are **KCC's own field
+names**, not Beckn ones — the catalog's init `operationRef` points at the
+operation that declares them, and the mapping passes them straight through. The
+masked number is at `challenge.issued.sentTo`; `mobileNumber` is the one you
+sent, echoed back unmasked, because it is your own input. And the status is
+still `DRAFT`: nothing has been verified yet.
 
 Under this, three things happened that the response does not show: the adapter
 logged in to `/auth/login` (form-encoded, token cached an hour), it sealed
@@ -139,7 +143,7 @@ logged in to `/auth/login` (form-encoded, token cached an hour), it sealed
 
 ### 2. `status` — answer the OTP, get the applications
 
-Same `$TXN`. Send `requestId` back, and the six digits from the SMS — `123456`
+Same `$TXN`. Send `requestID` back, and the six digits from the SMS — `123456`
 on the mock.
 
 ```bash
@@ -150,9 +154,14 @@ The body is the `init` body with `action` set to `status` and two fields added
 to `commitmentAttributes`:
 
 ```json
-"requestId": "$REQ",
-"challenge": { "response": { "method": "OTP", "value": "123456" } }
+"requestID": "$REQ",
+"otp": 123456
 ```
+
+`otp` is a **number**. KCC's contract declares it an integer and refuses the
+quoted form. The mapping casts a string through `$number()`, so `"123456"`
+works too — but the field name and the type both come from the contract, not
+from anything written in the tool or this file.
 
 ```bash
 … | jq '.message.contract.commitments[0] |
@@ -214,8 +223,10 @@ the provider, the binding is wrong.
 | `init` twice on one transaction id | second one re-sends the OTP and replaces the held `requestID` | the farmer did not get the SMS; this is the retry path, not an error |
 | `status` twice with one OTP | **unknown — write down what happens** | this is open item 5. The plan assumes the second one fails |
 | a five-digit OTP through the tool | refused by the tool, no call made | `len(otp) != 6` guard, kept from v1 |
-| a **wrong** six-digit OTP | HTTP 400, `BIZ_GENERIC_ERROR`, KCC's own wording, `error.details.path` naming `challenge.response.value` | proves `envelopeResponseOptional` is on. If you get a 502 here, the flag is missing |
-| a `requestId` KCC never issued | HTTP 400, `SCH_INVALID_FORMAT`, "needs a verified session" | the adapter's session gate refuses it before KCC is called, so a guessed `requestId` cannot be spent on another farmer's transaction |
+| a **wrong** six-digit OTP | HTTP 400, `BIZ_GENERIC_ERROR`, KCC's own wording, `error.details.path` naming `commitmentAttributes.otp` | proves `envelopeResponseOptional` is on. If you get a 502 here, the flag is missing |
+| a `requestID` KCC never issued | HTTP 400, `SCH_INVALID_FORMAT`, "needs a verified session" | the adapter's session gate refuses it before KCC is called, so a guessed `requestID` cannot be spent on another farmer's transaction |
+| `init` without `otpFor` | HTTP 400, the mapping's `required` message naming `otpFor` | the contract fixes it at `const: krishika`, so the tool always fills it; a hand-written body can leave it out |
+| `status` without `otp` | HTTP 400, the mapping's `required` message naming `otp` | the `required` check runs before the session gate, so the message says what is missing rather than what is unverified |
 | `select` through the network | HTTP 400, `SCH_INVALID_FORMAT`, `kcc\|openagrinet:SchemeApplication does not serve action "select"; it serves init, status` | `select` is tool-side only and is deliberately not registered. The refusal names the two actions that do exist, so it is self-explaining |
 
 ## Reading the errors
@@ -224,14 +235,14 @@ the provider, the binding is wrong.
 |---|---|---|
 | `carries no future data.sessionTTL` on startup | `tokenExpiryField` was configured instead of `tokenTtl` | the template — KCC's `sessionTTL` is relative, so it must be `tokenTtl: 1h` |
 | `401` on every call | the login failed, so the `token` header is empty | `KCC_ENTITY_TYPE` / `KCC_USER_ID` / `KCC_PASSWORD`; and that `tokenEncoding: form` is set — KCC rejects a JSON login |
-| `BIZ_GENERIC_ERROR` carrying KCC's own OTP wording | working as designed | this is what a wrong OTP looks like: HTTP 400, with `error.details.path` pointing at `challenge.response.value`. Retype the code |
+| `BIZ_GENERIC_ERROR` carrying KCC's own OTP wording | working as designed | this is what a wrong OTP looks like: HTTP 400, with `error.details.path` pointing at `commitmentAttributes.otp`. Retype the code |
 | `NET_DOWNSTREAM_UNAVAILABLE` on a **wrong OTP** | `envelopeResponseOptional` is missing from the KCC binding | the codec found no `data` in KCC's error body and turned it into a 502 before the mapping ran. Add the flag; the farmer should be told to check the code, not that KCC is down |
 | `answered without an envelope` | same cause, stated plainly | as above |
 | garbled plaintext, or KCC rejecting a well-formed call | the IV rule is wrong | **open item 1, the one real blocker.** The mock cannot catch this — it shares the guess |
 | `applications` empty when the farmer has one | the three-shape trap | the decrypted `data` can be one object, an array, or `{applications: […]}`. And `[response.data]` on an empty array yields `[[]]` — guard with `$exists(response.data[0])` |
 | session refused on a call you think is right | the two calls used different transaction ids | `$TXN` must be identical; the tool derives it from `session_id` + mobile, so it is stable by construction |
 | `the envelope for kcc\|openagrinet:SchemeApplication is not configured on this adapter` | the `KCC_*` variables never reached the adapter **container** | not the template — `quick-start/docker-compose.yml`. `KCC_USER_ID`, `KCC_PASSWORD`, `KCC_ENCRYPTION_KEY` and `KCC_ENCRYPTION_IV` must be listed under **both** `provider-adapter` and `network-adapter`, then recreate the container. The adapter logs the real reason (`KCC_ENCRYPTION_KEY is not set`) on a separate line from the 500 it returns |
-| `SCH_INVALID_FORMAT` … `needs a verified session` on `status` | the adapter is holding no `requestID` for this transaction | either `init` was never run on this `$TXN`, or the `requestId` in the body is not the one `init` returned. This is the session gate doing its job, not a mapping fault |
+| `SCH_INVALID_FORMAT` … `needs a verified session` on `status` | the adapter is holding no `requestID` for this transaction | either `init` was never run on this `$TXN`, or the `requestID` in the body is not the one `init` returned. This is the session gate doing its job, not a mapping fault |
 | the registry's capability row still says `0.1` while KCC sends `0.2` | expected | the registry holds **one** pack version per capability and PM-KISAN pinned `SchemeApplication` at v0.1. KCC's v0.2 identity lives in the catalog `@context` and the mapping, and the `ProviderSchema` binding record has no version field at all |
 
 ## Through the agent tool
@@ -271,6 +282,44 @@ does not name the network finds nothing.
 
 Set `KCC_BECKN_VERSION=v2` first. All three tools move together: they share one
 OTP, so a farmer who started on v1 cannot finish on v2.
+
+### Where the field names come from
+
+Watch the log on the first call of each action:
+
+```
+KCC v2 init   request fields from …/kcc/loan/v0.2/openapi.yaml: {'mobileNumber': 'subject.mobile', 'otpFor': 'fixed'}
+KCC v2 status request fields from …/kcc/loan/v0.2/openapi.yaml: {'requestID': 'session', 'otp': 'challenge.otp', 'mobileNumber': 'subject.mobile'}
+```
+
+That line is the design working. The tool fetched the file the catalog's
+`operationRef` names and read the field names out of it; `mobileNumber`,
+`otpFor`, `requestID` and `otp` appear nowhere in `kcc.py`. Add a field to the
+contract with an `x-oan-from` and the tool fills it on the next call. Make one
+required with no `x-oan-from` and the tool refuses, naming it, rather than
+sending a body KCC will reject.
+
+If the log shows the fields being read from `http://spec-files/…` instead of
+the published address, that is `PROVIDER_OPENAPI_URL_REWRITE` doing its job —
+see below.
+
+### Trying a spec change before it is published
+
+The catalog names the published spec, which a local stack may not be able to
+reach, and which does not yet have your edit in it. Point the fetch somewhere
+else without touching the catalog:
+
+```bash
+PROVIDER_OPENAPI_URL_REWRITE=https://openagrinet.github.io/network-specs/=http://spec-files/
+```
+
+The `spec-files` container serves the `network-specs` working tree, so the tool
+reads your edit. The value is a comma-separated list of `from=to` prefix pairs.
+Deployment wiring, like the provider base URL — nothing in the catalog, the
+registry or the tool changes.
+
+The tool caches each document for an hour, so restart `sva_app` after editing a
+spec, or set `PROVIDER_OPENAPI_CACHE_TTL_SECONDS=0`.
 
 The third call is the one worth watching, because it proves the design:
 

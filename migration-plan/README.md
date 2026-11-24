@@ -52,9 +52,19 @@ They should be specified as one `v0.2` pack revision rather than piecemeal.
 AIF has now started that revision: both v0.2 packs gained an
 `x-oan-schema-by-action` entry pointing `init`/`status`/`support` at a
 permissive call schema, because as published they validate a catalog and
-reject every operational payload. That change is not pushed, and the v0.2
-packs are not published at all — see
+reject every operational payload. KCC's work extended it to
+`AgricultureResource/v0.2`, the last v0.2 pack without such an entry, which was
+refusing every `select` for a missing `informationMode` — a catalog fact a
+`select` has no reason to carry. That change is not pushed, and the v0.2 packs
+are not published at all — see
 [aif/quick-try.md](aif/quick-try.md#before-you-start).
+
+KCC also added vocabulary the packs do not cover and should not: a provider's
+own request fields belong in its API contract, not in a schema pack.
+`x-oan-request-attributes` names the attributes a Beckn call must carry for a
+provider whose wire body is a sealed envelope, and `x-oan-from` names where
+each value comes from. Both are read by the tool, not the adapter. See
+[kcc/plan.md](kcc/plan.md#what-the-contract-has-to-declare).
 
 Weather's tool and network path are done and verified; IMD Mausamgram itself is
 returning no forecast data, so a rendered forecast is the one thing not yet

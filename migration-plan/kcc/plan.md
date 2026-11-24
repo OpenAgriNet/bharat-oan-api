@@ -41,9 +41,8 @@ Two things make KCC different from every capability migrated so far.
 **There is no `confirm`.** KCC checks the OTP and returns the applications in
 the same call. The shape is `init → status`, not AIF's `init → init(verify) →
 status` or PMFBY's `init → confirm → status`. The OTP travels on the guarded
-call itself, as `challenge.response.value` — which is exactly what the v0.2
-vocab says that field is for ("the caller's answer to a challenge, presented on
-a guarded call", `vocab.jsonld:56`).
+call itself, as `commitmentAttributes.otp` — KCC's own field name, read off the
+operation the catalog's status `operationRef` points at.
 
 **`select` makes no call.** v1 re-posts `status` with an `application_no` tag
 and no OTP, which only works because the v1 BPP cached the list. Our OTP is
@@ -122,8 +121,10 @@ pack describes the catalog, the API contract describes the call — means PMFBY
 can return `policies`, AIF can return `application` and KCC can return
 `applications`, all on one pack, none of them touching it.
 
-`challenge.methods` (catalog) and `challenge.response` (call) are both already
-in the context and the vocab. Nothing to add.
+`challenge.methods` is a catalog fact and is already in the context and the
+vocab; it is where the tool reads that the OTP is six numeric digits. The
+*call* carries KCC's own field names instead, because the API contract
+describes the call. Nothing to add to the pack either way.
 
 ## Plugin — reuse `Grievance`
 
@@ -245,7 +246,7 @@ The same way PMFBY's `farmerID` reaches a query string, and for the same
 reason: the adapter cannot put a held value into a request it has already
 mapped.
 
-1. `init` answers `on_init` carrying `requestId` in `commitmentAttributes`,
+1. `init` answers `on_init` carrying `requestID` in `commitmentAttributes`,
    beside the masked mobile. In parallel the session layer holds it against the
    transaction id, bound to the mobile.
 2. The tool sends it back on `status`.
@@ -269,7 +270,7 @@ it is spent on that call.
 |---|---|---|
 | KCC → farmer's phone | — | SMS, sent by KCC when `init` lands |
 | farmer → tool | yes | the six digits typed into the chat |
-| tool → adapter (`status`) | yes | `commitmentAttributes.challenge.response = {method: "OTP", value: "123456"}` |
+| tool → adapter (`status`) | yes | `commitmentAttributes.otp = 123456`, the field name and integer type both read off KCC's contract |
 | adapter mapping → plaintext body | yes | `otp`, **as a number**, beside `requestID` |
 | codec → KCC | yes | inside the AES-256-CBC hex blob, so it is never in clear on the wire |
 | adapter → tool (`on_status`) | **no** | the answer carries applications, never the OTP |
@@ -288,9 +289,11 @@ re-sent by `select`. v1's `select_kcc_application` re-posts `status` with no
 OTP at all, which only works because the v1 BPP kept the list. v2 keeps the
 list tool-side instead, so `select` makes no call and needs no OTP.
 
-`challenge.response` is in the v0.2 context (`context.jsonld:39`) and the vocab
-calls it "the caller's answer to a challenge, presented on a guarded call"
-(`vocab.jsonld:56`). This is that call. Nothing in the pack changes.
+The OTP is named `otp` on the call because that is what KCC's contract calls
+it, and the mapping passes it through rather than translating a Beckn name into
+a provider one. `challenge` stays in the pack for the catalog side: the issued
+block on `on_init` and `challenge.methods` on the offer, which is where the
+tool learns the OTP is six numeric digits. Nothing in the pack changes.
 
 ### The binding
 
@@ -337,7 +340,7 @@ __PROVIDER_CONFIG__ Grievance
                 # outlives its OTP is of no use to anyone.
                 sessionTtl: 5m
                 sessionTtlMargin: 30s
-                sessionBindAt: "message.contract.commitments[].commitmentAttributes.applicant.mobile"
+                sessionBindAt: "message.contract.commitments[].commitmentAttributes.mobileNumber"
                 sessionHeader: X-KCC-Request-Session
                 sessionPrefix: ""
 ```
@@ -387,9 +390,42 @@ working JSONata.
 | 4 | Write the two real mappings; delete `mappings/internal/token.yaml`, because the login is `authScheme` config and not a mapped call |
 | 5 | Drop `deployable: false` and the `binding: Design only` note when the adapter work lands |
 
-As with AIF, **the adapter does not resolve `operationRef`** — method and path
-come from the registry row. KCC ships the same way all six existing providers
-do, and starts being read for free when resolution lands.
+**The adapter does not resolve `operationRef`** — method and path come from the
+registry row. **The tool does.** `agents/tools/v2/provider_openapi.py` fetches
+the file the catalog's `operationRef` points at and reads the field names out
+of it, the same way SATHI and SHC already do. Nothing about KCC's fields is
+written in the tool.
+
+### What the contract has to declare
+
+KCC seals its wire bodies, so `requestBody` describes an envelope and says
+nothing about fields. Three declarations close that gap, and they are now part
+of the OAN contract vocabulary rather than anything KCC-specific:
+
+| Declaration | Where | What it says |
+|---|---|---|
+| `x-oan-request-attributes` | on the operation | the attributes a Beckn call must carry. Read instead of `requestBody` where present |
+| `x-oan-from` | on a property | where the value comes from: `subject.mobile`, `challenge.otp`, or `session` |
+| `const` | on a property | fixed by the spec, so the tool fills it without being told (`otpFor: krishika`) |
+
+A required property with neither `x-oan-from` nor `const` is a gap in the
+contract, and the tool refuses the call naming the field rather than sending a
+body KCC will reject.
+
+Because the fields are the provider's own, both mappings are pass-through: they
+quote what arrived and cast where KCC's contract asks for a number. A field KCC
+adds arrives with a spec change, not a mapping change.
+
+### Reading a spec that is not published yet
+
+`PROVIDER_OPENAPI_URL_REWRITE` ("from=to,from=to") redirects the fetch without
+touching the catalog, which keeps naming the published address. A local stack
+sets it to
+
+    https://openagrinet.github.io/network-specs/=http://spec-files/
+
+so the `spec-files` container serves the `network-specs` working tree. Same idea
+as the provider base URL: deployment wiring, not a catalog or tool concern.
 
 ## What gets built
 
@@ -498,7 +534,23 @@ mid-journey on one version cannot finish on the other.
 6. **`tokenTtlField`** for a relative lifetime is deferred to `tokenTtl: 1h`.
    Revisit if KCC's `sessionTTL` ever stops being 3600.
 
-7. **`operationRef` resolution** is deferred, exactly as for AIF.
+7. **`operationRef` resolution in the adapter** is deferred, exactly as for
+   AIF — method and path keep coming from the registry row. The **tool** does
+   resolve it, so KCC's field names are read from the contract at runtime and
+   are written nowhere in the code.
+
+**Closed by the contract-driven work.**
+
+8. **Field names in the tool.** Was a real gap: the tool held KCC's field names
+   as constants, so a spec change meant a code change. Closed by
+   `x-oan-request-attributes` and `x-oan-from` on the operations, which the
+   tool reads. A required field with no hint is now refused loudly, naming the
+   field, rather than sent short.
+
+9. **Mapping-level renaming.** Both mappings were translating Beckn names into
+   KCC names, which made the mapping a second vocabulary to keep in step. They
+   are pass-through now; the only thing either does to a value is cast the OTP
+   to the number KCC's contract asks for.
 
 ## Risks
 

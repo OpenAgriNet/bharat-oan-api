@@ -91,7 +91,7 @@ async def _discover_grievance() -> Optional[Dict[str, Any]]:
             }
         },
     }
-    response = await post_action("discover", body)
+    response = await post_action("discover", body, who="PM-KISAN")
     if response.status_code != 200:
         logger.error(
             f"PM-KISAN v2 grievance discover failed: HTTP {response.status_code} "
@@ -242,7 +242,7 @@ async def _send_grievance_otp(ctx: RunContext[FarmerContext], reg_no: str, purpo
         _GRIEVANCE_OFFER,
         found,
     )
-    response = await post_action("init", body)
+    response = await post_action("init", body, who="PM-KISAN")
     if response.status_code != 200:
         return explain_failure(response, "OTP request")
 
@@ -407,7 +407,7 @@ async def pmkisan_submit_grievance(
                 }
             },
         }
-        response = await post_action("support", body)
+        response = await post_action("support", body, who="PM-KISAN")
         if response.status_code != 200:
             return explain_failure(response, "grievance submission")
 
@@ -514,7 +514,7 @@ async def pmkisan_grievance_status(
             _GRIEVANCE_OFFER,
             found,
         )
-        response = await post_action("status", body)
+        response = await post_action("status", body, who="PM-KISAN")
         if response.status_code != 200:
             code, _ = adapter_error(response)
             if code == "BIZ_GENERIC_ERROR":
