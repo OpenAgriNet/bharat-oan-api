@@ -1,4 +1,4 @@
-"""search_advisory's questions to the farmer, and the guards on what only the farmer can say."""
+"""search_advisory's follow-up questions to the farmer, and the guards on what only the farmer can say."""
 
 import asyncio
 from types import SimpleNamespace
@@ -8,13 +8,15 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolCall
 
 from agents.tools import advisory as sa
 from helpers.advisory_pending import (
+    CROP_MARKER,
+    LOCATION_MARKER,
     PENDING_MARKER,
+    SEASON_MARKER,
     farmer_gave_days,
     farmer_gave_season,
-    may_answer_now,
 )
 
-QUESTION = f"{PENDING_MARKER}\n> Advisories were found ... Ask the farmer ONE short question"
+QUESTION = f"{PENDING_MARKER}{SEASON_MARKER}\n> Follow-up: ... end your answer with ONE short question"
 ADVICE = "> Advisory Search Results for `q`\n\n**T**\n```\nAdvisory text\n```"
 
 
@@ -35,10 +37,19 @@ def _ctx(messages):
 
 
 class TestAdvisoryResultsCarryTheMarker:
-    def test_the_season_question_and_the_offer_carry_it_but_advice_does_not(self):
-        assert PENDING_MARKER in sa.format_details_question(["Rabi"], True, False, "q")
-        assert PENDING_MARKER in sa.format_season_suggestion("Zaid", "Wheat", ["Rabi"])
-        assert PENDING_MARKER in sa.format_crop_question("aphids", ["Wheat", "Mustard"])
+    def test_each_follow_up_carries_it_and_names_what_it_asks_but_advice_does_not(self):
+        assert SEASON_MARKER in sa.format_details_followup(["Rabi"], True, False)
+        assert SEASON_MARKER in sa.format_season_followup("Zaid", "Wheat", ["Rabi"])
+        assert CROP_MARKER in sa.format_crop_followup(["Wheat", "Mustard"])
+        assert LOCATION_MARKER in sa.format_details_followup([], False, False, True)
+        combined = sa.format_details_followup(["Rabi"], True, True, True)
+        assert SEASON_MARKER in combined and LOCATION_MARKER in combined
+        for followup in (
+            sa.format_details_followup(["Rabi"], True, False), sa.format_season_followup("Zaid", "Wheat", ["Rabi"]),
+            sa.format_crop_followup(["Wheat", "Mustard"]), combined,
+        ):
+            assert followup.startswith(PENDING_MARKER) and "After the Source line" in followup
+            assert "do not ask it again" in followup
         assert PENDING_MARKER not in sa.format_advisory_results([{"title": "T", "text": "x", "section": "full"}], "q")
 
 
@@ -51,13 +62,12 @@ class TestHardGuardsOnWhatOnlyTheFarmerCanSay:
 
     def test_no_history_means_the_guards_stay_out_of_the_way(self):
         ctx = _ctx(None)
-        assert farmer_gave_season(ctx) and farmer_gave_days(ctx) and may_answer_now(ctx)
+        assert farmer_gave_season(ctx) and farmer_gave_days(ctx)
 
     def test_a_season_the_farmer_never_wrote_is_not_accepted(self):
         ctx = _ctx([_user("How can I control aphids in my wheat crop?")])
         assert not farmer_gave_season(ctx)
         assert not farmer_gave_days(ctx)
-        assert not may_answer_now(ctx)
 
     @pytest.mark.parametrize("text", ["wheat aphids, Rabi", "kharif season", "गेहूं रबी में", "ખરીફ"])
     def test_a_season_word_in_the_farmers_text_is_accepted(self, text):
@@ -72,7 +82,6 @@ class TestHardGuardsOnWhatOnlyTheFarmerCanSay:
         ctx = _ctx([_user(prefix + "When should I harvest an early-maturing wheat variety?")])
         assert not farmer_gave_season(ctx)
         assert not farmer_gave_days(ctx)
-        assert not may_answer_now(ctx)
 
     def test_the_farmers_own_words_after_the_conversation_text_count(self):
         prefix = "**Conversation**\n\nUser: hi\n\n---\n\n"
@@ -87,23 +96,11 @@ class TestHardGuardsOnWhatOnlyTheFarmerCanSay:
             + [ModelResponse(parts=[TextPart(content="Advice")]), _user("When to harvest wheat?")]
         )
         ctx = _ctx(history)
-        assert not farmer_gave_season(ctx) and not farmer_gave_days(ctx) and not may_answer_now(ctx)
-
-    def test_answer_now_is_allowed_when_tool_results_of_earlier_turns_were_not_kept(self):
-        history = [
-            _user("wheat aphids"),
-            ModelResponse(parts=[TextPart(content="Which season?")]),
-            _user("I don't know"),
-        ]
-        assert may_answer_now(_ctx(history))
+        assert not farmer_gave_season(ctx) and not farmer_gave_days(ctx)
 
     def test_after_the_farmer_was_asked_whatever_they_answer_is_accepted(self):
         ctx = _ctx(self._asked_before("the winter one, since last month"))
-        assert farmer_gave_season(ctx) and farmer_gave_days(ctx) and may_answer_now(ctx)
-
-    def test_answer_now_is_not_honoured_in_the_same_turn_as_the_question(self):
-        ctx = _ctx([_user("wheat aphids")] + _advisory_result(QUESTION))
-        assert not may_answer_now(ctx)
+        assert farmer_gave_season(ctx) and farmer_gave_days(ctx)
 
 
 def _chunks():
@@ -128,13 +125,8 @@ class TestToolIgnoresInventedDetails:
     def test_an_invented_season_and_days_make_the_tool_ask(self, monkeypatch):
         ctx = _ctx([_user("How can I control aphids in my wheat crop?")])
         out, seen = self._run(monkeypatch, ctx, season="Rabi", days_after_sowing=40)
-        assert PENDING_MARKER in out
+        assert SEASON_MARKER in out and "body" in out  # general advice, then the season follow-up
         assert seen["calls"][0] == {"days": None, "season": None}
-
-    def test_an_invented_answer_now_does_not_skip_the_question(self, monkeypatch):
-        ctx = _ctx([_user("wheat aphids")] + _advisory_result(QUESTION))
-        out, _ = self._run(monkeypatch, ctx, answer_now=True)
-        assert PENDING_MARKER in out
 
     def test_the_farmers_own_details_are_used(self, monkeypatch):
         ctx = _ctx([_user("Wheat aphids, Rabi, 40 days after sowing")])
@@ -142,13 +134,13 @@ class TestToolIgnoresInventedDetails:
         assert seen["calls"][0] == {"days": 40, "season": "Rabi"}
         assert PENDING_MARKER not in out
 
-    def test_answer_now_works_after_the_farmer_was_asked_and_said_they_do_not_know(self, monkeypatch):
+    def test_the_follow_up_is_not_asked_again_when_the_farmer_does_not_answer_it(self, monkeypatch):
         history = [_user("wheat aphids")] + _advisory_result(QUESTION) + [
-            ModelResponse(parts=[TextPart(content="Which season?")]),
+            ModelResponse(parts=[TextPart(content="Advice.\n\n**Source: ICAR - Kisan Sarathi**\n\nWhich season?")]),
             _user("I don't know"),
         ]
-        out, _ = self._run(monkeypatch, _ctx(history), answer_now=True)
-        assert PENDING_MARKER not in out
+        out, _ = self._run(monkeypatch, _ctx(history))
+        assert PENDING_MARKER not in out and "Search notes" in out
 
 
 class TestPlaceGuards:

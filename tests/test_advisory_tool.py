@@ -241,6 +241,11 @@ def _respond(items, **kw):
     return httpx.Response(200, json=_on_search(items, **kw))
 
 
+def _followup(out):
+    """The follow-up part of a result ('' when the answer ends without one)."""
+    return out.split("> Follow-up:", 1)[1] if "> Follow-up:" in out else ""
+
+
 def _sent(kp, index):
     return json.loads(kp.requests[index].read())
 
@@ -362,7 +367,7 @@ class TestSearchFirst:
     def test_the_tool_signature(self):
         params = inspect.signature(sa.search_advisory).parameters
         assert list(params)[1:] == [
-            "query", "crop", "days_after_sowing", "season", "location", "top_k", "answer_now", "state", "district",
+            "query", "crop", "days_after_sowing", "season", "location", "top_k", "state", "district",
             "crop_words", "image_url",
         ]
         assert "advice_type" not in params
@@ -384,48 +389,133 @@ class TestSearchFirst:
         assert "T0" in out and "T1" in out and "T2" not in out
 
 
-class TestAskWhatTheChunksNeed:
-    def test_a_named_season_in_the_chunks_means_the_farmer_is_asked_even_for_one_season(self, kp):
+class TestFollowUpForWhatTheChunksNeed:
+    """Answer first: the advice is always given; a missing season / days becomes ONE follow-up after the Source line."""
+
+    def test_a_named_season_in_the_chunks_means_a_season_follow_up_even_for_one_season(self, kp):
         kp.response = _respond([_chunk("c1", "Rabi"), _chunk("c2", "Rabi")], **NO_DAYS)
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
-        assert "Could you please tell me which season you are growing your crop in?" in out and "(Rabi)" not in out
-        assert "Rabi" not in out  # one season: do not hint that it is the expected one
-        assert "Scout for aphids" not in out and "Cite as" not in out  # no advice yet
+        assert "Scout for aphids (c1)" in out and "Cite as" in out  # the advice comes first
+        assert sa.SEASON_MARKER in out and out.index("Cite as") < out.index("> Follow-up:")
+        followup = _followup(out)
+        assert "Could you please tell me which season you are growing your crop in?" in followup
+        assert "Rabi" not in followup  # one season: do not hint that it is the expected one
+        assert "general advice" in followup and "do not say which season" in followup
         assert len(kp.requests) == 1
 
-    def test_several_seasons_are_all_named_in_the_question(self, kp):
+    def test_several_seasons_are_all_named_in_the_follow_up(self, kp):
         kp.response = _respond([_chunk("c1", "Rabi"), _chunk("c2", "Kharif")], **NO_DAYS)
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
-        assert "cover the Rabi and Kharif seasons" in out and "(Rabi" not in out and "Scout for aphids" not in out
-        assert "farmer decides" in out
-        assert "Your whole reply is only that one question" in out and "no Source line" in out
+        followup = _followup(out)
+        assert "cover the Rabi and Kharif seasons" in followup and "(Rabi" not in followup
+        assert "farmer decides" in followup and "your only follow-up question" in followup
+        assert "Scout for aphids" in out
 
-    def test_season_and_days_are_asked_in_one_question(self, kp):
+    def test_season_and_days_are_asked_in_one_follow_up(self, kp):
         kp.response = _respond([_chunk("c1", "Rabi")], has_day_range="true")
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
-        assert "Could you please tell me which season you are growing your crop in, and how many days ago you sowed it?" in out
-        assert "`season` and `days_after_sowing`" in out
+        followup = _followup(out)
+        assert "Could you please tell me which season you are growing your crop in, and how many days ago you sowed it?" in followup
+        assert "`season` and `days_after_sowing`" in followup
+        assert "Scout for aphids (c1)" in out
 
     def test_only_the_days_are_asked_when_the_season_is_known(self, kp):
         kp.response = _respond([_chunk("c1", "Rabi")], has_day_range="true")
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", season="Rabi"))
-        assert "Could you please tell me how many days ago you sowed your crop?" in out and "Which season" not in out
-        assert "Scout for aphids" not in out
+        followup = _followup(out)
+        assert "Could you please tell me how many days ago you sowed your crop?" in followup and "which season" not in followup
+        assert "Scout for aphids" in out
 
     def test_nothing_is_asked_when_the_chunks_have_no_named_season_or_day_range(self, kp):
         kp.response = _respond([_chunk("c1", "Other"), _chunk("c2")], **NO_DAYS)
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat"))
-        assert "Scout for aphids (c1)" in out and "Ask the farmer" not in out
+        assert "Scout for aphids (c1)" in out and sa.PENDING_MARKER not in out
 
-    def test_answer_now_skips_the_question(self, kp):
+    def test_a_season_follow_up_is_not_asked_again_when_the_farmer_does_not_answer_it(self, kp):
         kp.response = _respond([_chunk("c1", "Rabi")], has_day_range="true")
-        out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", answer_now=True))
-        assert "Scout for aphids (c1)" in out and "Cite as" in out
+        history = [_user("aphids in my wheat")] + _asked(f"{sa.PENDING_MARKER}{sa.SEASON_MARKER} q") + [_user("I do not know")]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat"))
+        assert "Scout for aphids (c1)" in out and sa.PENDING_MARKER not in out
+
+    def test_the_answer_to_the_season_follow_up_gives_the_specific_advice(self, kp):
+        kp.response = _respond([_chunk("c1", "Rabi"), _chunk("c2", "Kharif")], has_day_range="true", days_matched="true")
+        history = [_user("aphids in my wheat")] + _asked(f"{sa.PENDING_MARKER}{sa.SEASON_MARKER} q") + [_user("Rabi, 40 days")]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=40))
+        assert "(c1)" in out and "(c2)" not in out and sa.PENDING_MARKER not in out
+        assert _params(_sent(kp, 0))["season"] == "Rabi"
+
+    def test_an_answer_without_the_place_is_used_as_given_and_nothing_more_is_asked(self, kp):
+        kp.response = _respond([_located()], has_day_range="true", days_matched="true")
+        asked = f"{sa.PENDING_MARKER}{sa.SEASON_MARKER}{sa.LOCATION_MARKER} q"
+        history = [_user("aphids in my wheat")] + _asked(asked) + [_user("Rabi, 45 days")]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=45))
+        assert '"This advice is for your Rabi wheat crop at 45 days after sowing. It is not specific to your area."' in out
+        assert sa.PENDING_MARKER not in out and "could not match" not in out
+        assert "Already asked" in out and "Do not ask for their state and district again" in out
+
+    def test_an_answer_with_everything_gives_the_place_and_stage_opening(self, kp):
+        kp.response = _respond([_located(location={**AGRA, "match": "matched"})], has_day_range="true", days_matched="true")
+        asked = f"{sa.PENDING_MARKER}{sa.SEASON_MARKER}{sa.LOCATION_MARKER} q"
+        history = [_user("aphids in my wheat")] + _asked(asked) + [_user("Rabi, 45 days, Agra, Uttar Pradesh")]
+        out = asyncio.run(sa.search_advisory(
+            _ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=45, state="Uttar Pradesh", district="Agra",
+        ))
+        assert ('"This advice is for your district, Agra, in Uttar Pradesh. It is for your Rabi wheat crop at 45 days '
+                'after sowing."') in out
+        assert sa.PENDING_MARKER not in out and "Already asked" not in out  # everything was given
+
+    def test_a_place_the_lookup_does_not_know_is_named_without_the_season_and_days(self, kp):
+        kp.response = _respond([_located()], has_day_range="true", days_matched="true")
+        asked = f"{sa.PENDING_MARKER}{sa.SEASON_MARKER}{sa.LOCATION_MARKER} q"
+        history = [_user("aphids in my wheat")] + _asked(asked) + [_user("Rabi, 45 days, Bangalore")]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=45))
+        assert "I could not match Bangalore to a state or district." in out and sa.PENDING_MARKER not in out
+        assert "Do not ask for their state and district again" in out
 
     def test_everything_given_is_answered_in_one_search(self, kp):
         kp.response = _respond([_chunk("c1", "Rabi")], has_day_range="true", days_matched="true")
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", crop="Wheat", season="Rabi", days_after_sowing=40))
-        assert "Scout for aphids (c1)" in out and len(kp.requests) == 1
+        assert "Scout for aphids (c1)" in out and len(kp.requests) == 1 and sa.PENDING_MARKER not in out
+
+
+def _staged(chunk_id, start, end, season="Kharif", crop="Sorghum"):
+    """An ICAR-style chunk with its sowing-day range lines."""
+    text = (
+        f"Problem: P{chunk_id}\nCommodity: {crop}\nSeason: {season}\nStart day relative to sowing: {start}\n"
+        f"End day relative to sowing: {end}\nAdvisory: Do {chunk_id}.\n\nSource: ICAR–DKMA, jak"
+    )
+    return _item(chunk_id, title=f"T {chunk_id}", text=text, crop=crop)
+
+
+class TestDayRange:
+    @pytest.mark.parametrize("text, expected", [
+        ("Start day relative to sowing: 10\nEnd day relative to sowing: 30", (10, 30)),
+        ("Start day relative to sowing: -30\nEnd day relative to sowing: -7", (-30, -7)),
+        ("Start day relative to sowing: 0\nEnd day relative to sowing: 0", None),
+        ("Start day relative to sowing: 10", None),
+        ("no range here", None),
+    ])
+    def test_reads_the_sowing_day_range(self, text, expected):
+        assert sa.parse_chunk_days(text) == expected
+
+    def test_keeps_advisories_for_the_farmers_stage_and_those_without_a_range(self):
+        results = [{"id": "shoot fly", "day_range": (10, 30)}, {"id": "harrowing", "day_range": (-30, -7)},
+                   {"id": "general", "day_range": None}]
+        assert [r["id"] for r in sa.for_days(results, 15)] == ["shoot fly", "general"]
+        assert sa.for_days(results, None) == results
+
+    def test_keeps_everything_when_no_advisory_fits_the_stage(self):
+        results = [{"id": "harrowing", "day_range": (-30, -7)}]
+        assert sa.for_days(results, 200) == results
+
+    def test_advice_for_another_sowing_stage_is_dropped(self, kp):
+        kp.response = _respond(
+            [_staged("shootfly", 10, 30), _staged("harrowing", -30, -7), _staged("heat", 20, 100)],
+            has_day_range="true", days_matched="true",
+        )
+        history = [_user("sorghum care")] + _asked(f"{sa.PENDING_MARKER}{sa.SEASON_MARKER} q") + [_user("Kharif, 15 days")]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "sorghum care", crop="Sorghum", season="Kharif", days_after_sowing=15))
+        assert "Do shootfly" in out and "Do harrowing" not in out and "Do heat" not in out
 
 
 class TestSeasonInspection:
@@ -446,16 +536,17 @@ class TestSeasonInspection:
         assert "crop" not in (_params(_sent(kp, 0)) or {})
         assert _params(_sent(kp, 1)) == {"crop": "Wheat", "days_after_sowing": "30", "season": "Zaid", "top_k": "20"}
 
-    def test_requery_finding_nothing_offers_the_seasons_that_exist(self, kp):
+    def test_requery_finding_nothing_gives_general_advice_and_offers_the_seasons_that_exist(self, kp):
         kp.queue = [
             _respond([_chunk("c1", "Rabi"), _chunk("c2", "Kharif")]),
             _respond([_chunk("c3", "Rabi")]),
         ]
         out = asyncio.run(sa.search_advisory(CTX, "aphids in wheat", season="Zaid", crop="Wheat"))
         assert len(kp.requests) == 2  # never a third search
-        assert "No advisory is available for the Zaid season for Wheat" in out
-        assert "Rabi" in out and "Kharif" in out
-        assert "Scout for aphids" not in out and "Cite as" not in out
+        followup = _followup(out)
+        assert "No advisory is available for the Zaid season for Wheat" in followup and sa.SEASON_MARKER in out
+        assert "Rabi" in followup and "Kharif" in followup
+        assert "Scout for aphids" in out and "Cite as" in out  # general advice first, then the offer
 
     def test_requery_with_an_empty_response_still_suggests(self, kp):
         kp.queue = [_respond([_chunk("c1", "Rabi")]), httpx.Response(200, json={"responses": []})]
@@ -483,7 +574,9 @@ class TestCropCheck:
         out = asyncio.run(sa.search_advisory(CTX, "aphids in sorghum", crop="Sorghum"))
         assert len(kp.requests) == 2
         assert _params(_sent(kp, 1))["crop"] == "Sorghum"
-        assert "Could you please tell me which season you are growing your crop in?" in out and "Kharif" not in out and "w1" not in out
+        followup = _followup(out)
+        assert "Could you please tell me which season you are growing your crop in?" in followup and "Kharif" not in followup
+        assert "(s1)" in out and "w1" not in out
 
     def test_other_crop_chunks_are_never_shown_when_the_crop_has_no_advisory(self, kp):
         kp.queue = [
@@ -498,7 +591,7 @@ class TestCropCheck:
         kp.response = _respond(
             [_chunk("w1", "Rabi", crop="Wheat"), _chunk("s1", "Kharif", crop="Sorghum")], **NO_DAYS
         )
-        out = asyncio.run(sa.search_advisory(CTX, "aphids in sorghum", crop="sorghum", answer_now=True))
+        out = asyncio.run(sa.search_advisory(CTX, "aphids in sorghum", crop="sorghum"))
         assert len(kp.requests) == 1
         assert "(s1)" in out and "(w1)" not in out
 
@@ -513,16 +606,31 @@ class TestCropCheck:
 
 
 class TestCropIsOptional:
-    """Option C: no crop -> search anyway; ask which crop only when the advisories found span several crops.
-    A crop the model does pass must still be in the farmer's words (see TestCropGuard)."""
+    """Option C: no crop -> search anyway; when the advisories found span several crops, answer for each crop and
+    ask which crop as the follow-up. A crop the model does pass must still be in the farmer's words (see TestCropGuard)."""
 
     @pytest.mark.parametrize("blank", ["", "   ", None])
-    def test_advisories_for_several_crops_ask_which_crop(self, kp, blank):
+    def test_advisories_for_several_crops_are_answered_then_ask_which_crop(self, kp, blank):
         kp.response = _respond([_item("c1", crop="Wheat"), _item("c2", crop="Mustard")], **NO_DAYS)
         out = asyncio.run(sa.search_advisory(_ctx([_user("how to control aphids?")]), "aphids control", crop=blank))
-        assert sa.PENDING_MARKER in out and "which crop" in out
-        assert "Wheat and Mustard" in out and "Harvest AKJ-1" not in out
+        followup = _followup(out)
+        assert sa.CROP_MARKER in out and "which crop" in followup and "Wheat and Mustard" in followup
+        assert "Harvest AKJ-1" in out and out.index("Cite as") < out.index("> Follow-up:")
         assert len(kp.requests) == 1
+
+    def test_nothing_is_said_about_the_place_while_the_crop_is_not_known(self, kp):
+        kp.response = _respond(
+            [_item("c1", crop="Wheat", location=AGRA), _item("c2", crop="Rice", location=AGRA)], **NO_DAYS
+        )
+        out = asyncio.run(sa.search_advisory(_ctx([_user("how do I control insect pests in my crop?")]), "insect pests"))
+        assert sa.CROP_MARKER in out
+        assert "general advice found for your crop" not in out and "not for the farmer's place" not in out
+
+    def test_the_crop_follow_up_is_not_asked_again(self, kp):
+        kp.response = _respond([_item("c1", crop="Wheat"), _item("c2", crop="Mustard")], **NO_DAYS)
+        history = [_user("how to control aphids?")] + _asked(f"{sa.PENDING_MARKER}{sa.CROP_MARKER} q") + [_user("not sure")]
+        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids control"))
+        assert "Harvest AKJ-1" in out and sa.PENDING_MARKER not in out
 
     def test_livestock_question_is_answered_without_a_crop(self, kp):
         kp.response = _respond([_item("c1", crop="Cow"), _item("c2", crop="")], **NO_DAYS)
@@ -586,7 +694,8 @@ def test_tool_is_registered_with_context():
     assert schema["required"] == ["query"]
     assert "image_url" in schema["properties"]
     assert "advice_type" not in schema["properties"]
-    assert {"crop", "season", "days_after_sowing", "answer_now"} <= set(schema["properties"])
+    assert {"crop", "season", "days_after_sowing"} <= set(schema["properties"])
+    assert "answer_now" not in schema["properties"]
     assert "search_schemes" in registered
     for merged in ("search_documents", "search_pests_diseases", "search_terms", "analyze_crop_image"):
         assert merged not in registered
@@ -625,22 +734,26 @@ def _located(chunk_id="c1", location=None, season="Rabi"):
 
 
 class TestLocationQuestion:
-    def test_the_place_is_asked_after_season_and_days_when_advisories_are_tied_to_places(self, kp):
+    def test_the_place_follow_up_comes_after_season_and_days_when_advisories_are_tied_to_places(self, kp):
         kp.response = _respond([_located()], **NO_DAYS)
         ctx = _ctx([_user("wheat aphids, Rabi")])
         out = asyncio.run(sa.search_advisory(ctx, "aphids in wheat", crop="Wheat", season="Rabi"))
         assert sa.PENDING_MARKER in out and sa.LOCATION_MARKER in out
-        assert "state and district" in out and "no Source line" in out
-        assert "Scout for aphids" not in out
+        assert "state and district" in _followup(out)
+        assert "Scout for aphids" in out and out.index("Cite as") < out.index("> Follow-up:")
         # the call to make next restates what the farmer already gave
-        assert '`season`="Rabi"' in out
+        assert '`season`="Rabi"' in _followup(out)
 
-    def test_season_and_days_are_asked_before_the_place(self, kp):
+    def test_season_days_and_place_are_asked_in_one_follow_up(self, kp):
         kp.response = _respond([_located()], has_day_range="true")
         ctx = _ctx([_user("How can I control aphids in my wheat crop?")])
         out = asyncio.run(sa.search_advisory(ctx, "aphids in wheat", crop="Wheat"))
-        assert sa.PENDING_MARKER in out and sa.LOCATION_MARKER not in out
-        assert "which season" in out
+        assert sa.SEASON_MARKER in out and sa.LOCATION_MARKER in out
+        followup = _followup(out)
+        assert ("Could you please tell me which season you are growing your crop in, how many days ago you sowed it, "
+                "and which state and district you are farming in?") in followup
+        assert "Never split it into separate questions" in followup
+        assert "`season`, `days_after_sowing` and `state` and `district` (in English)" in followup
 
     def test_no_place_question_when_every_advisory_applies_everywhere(self, kp):
         kp.response = _respond([_chunk("c1", "Rabi")], **NO_DAYS)
@@ -659,13 +772,13 @@ class TestLocationQuestion:
         out = asyncio.run(sa.search_advisory(ctx, "aphids in wheat", crop="Wheat", season="Rabi", district="Agra"))
         assert sa.PENDING_MARKER not in out and "Scout for aphids" in out
 
-    def test_answer_now_skips_the_place_question(self, kp):
+    def test_the_place_follow_up_is_not_asked_again_when_the_farmer_does_not_answer_it(self, kp):
         kp.response = _respond([_located()], **NO_DAYS)
         history = [_user("wheat aphids")] + _asked(f"{sa.PENDING_MARKER}{sa.LOCATION_MARKER} q") + [_user("I do not know")]
-        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", season="Rabi", answer_now=True))
+        out = asyncio.run(sa.search_advisory(_ctx(history), "aphids in wheat", crop="Wheat", season="Rabi"))
         assert sa.PENDING_MARKER not in out and "Scout for aphids" in out
-        assert "This is the general advice found for your crop." in out
-        assert "meant for" not in out
+        assert '"This advice is for your Rabi wheat crop. It is not specific to your area."' in out
+        assert "meant for" not in out and "could not match" not in out
 
     def test_a_place_the_lookup_cannot_match_is_not_asked_for_again(self, kp):
         kp.response = _respond([_located()], **NO_DAYS)
@@ -938,12 +1051,12 @@ class TestCoffeePdfAnswersGenerically:
     def test_a_coffee_chunk_from_kisan_sarathi_still_asks(self, kp):
         kp.response = _respond([_chunk("w1", "Rabi", crop="Coffee", origin="webhook")], **NO_DAYS)
         out = asyncio.run(sa.search_advisory(CTX, "leaf rust", crop="Coffee"))
-        assert "Scout for aphids (w1)" not in out
+        assert "Scout for aphids (w1)" in out and sa.SEASON_MARKER in out
 
     def test_a_pdf_of_another_crop_still_asks(self, kp):
         kp.response = _respond([_chunk("w1", "Rabi", crop="Wheat", origin="docs-pipeline")], **NO_DAYS)
         out = asyncio.run(sa.search_advisory(CTX, "aphids", crop="Wheat"))
-        assert "Scout for aphids (w1)" not in out
+        assert "Scout for aphids (w1)" in out and sa.SEASON_MARKER in out
 
     def test_coffee_pdf_chunks_win_over_other_coffee_chunks(self, kp):
         kp.response = _respond([_chunk("w1", "Rabi", crop="Coffee", origin="webhook"), self._pdf("p1")], **NO_DAYS)

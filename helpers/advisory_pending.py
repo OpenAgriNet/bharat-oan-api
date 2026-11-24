@@ -1,8 +1,10 @@
-"""Conversation checks for `search_advisory`'s questions to the farmer.
+"""Conversation checks for `search_advisory`'s follow-up questions to the farmer.
 
-`search_advisory` returns a result that tells the agent to ask the farmer something (the crop, the season,
-the sowing days, the place, or an offer of other seasons) and to give no advice yet. Those results carry
-`PENDING_MARKER`. The checks below read the message history, so they work the same for every model.
+`search_advisory` answers with general advice and, when a detail would make it more specific (the crop, the
+season and sowing days, the place, or another season), tells the agent to end the answer with ONE follow-up
+question. Those results carry `PENDING_MARKER`, plus a marker naming what was asked, so the farmer's reply
+continues the same question and each follow-up is asked only once. The checks below read the message history,
+so they work the same for every model.
 """
 import re
 
@@ -11,8 +13,12 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolRetu
 
 # Kept as an HTML comment: it is not meant to be shown to the farmer.
 PENDING_MARKER = "<!-- advisory-question-pending -->"
-# Added to the pending question that asks for the farmer's place (state / district).
+# Added to the follow-up that asks for the farmer's place (state / district).
 LOCATION_MARKER = "<!-- advisory-location-question -->"
+# Added to the follow-up that asks for the season and/or the sowing days, or offers another season.
+SEASON_MARKER = "<!-- advisory-season-question -->"
+# Added to the follow-up that asks which crop (the advice found was for several crops).
+CROP_MARKER = "<!-- advisory-crop-question -->"
 
 def _current_turn(ctx) -> list:
     """Messages since the farmer's latest message."""
@@ -28,7 +34,7 @@ def _current_turn(ctx) -> list:
 
 
 # --- Hard guards: the model may not fill in what only the farmer can say -----------------------------------
-# A weaker model sometimes passes `season`, `days_after_sowing` or `answer_now` that the farmer never gave,
+# A weaker model sometimes passes a `season` or `days_after_sowing` that the farmer never gave,
 # so the tool never asks. These checks read the conversation instead of trusting the arguments. They work
 # the same for every model. They do nothing when there is no history to read (direct calls, tests).
 
@@ -45,6 +51,22 @@ _NUMBER_WORDS = re.compile(
     r"week|weeks|month|months|yesterday)\b",
     re.IGNORECASE,
 )
+
+# Words in a reply to the season / days / place question that are not a place.
+_NOT_PLACE_WORDS = re.compile(
+    r"\d+|\b(days?|ago|sowed|sown|sowing|after|before|season|crop|it|is|in|my|the|and|of|about|around|"
+    r"i|don't|dont|do|not|know|sure|no|idea)\b",
+    re.IGNORECASE,
+)
+
+
+def place_words(text: str) -> str:
+    """What is left of the farmer's reply once the season, the sowing days and filler words are taken out ('' when
+    nothing is left). A reply like "Rabi, 45 days" names no place, so it is not reported as a place we could not
+    match; "Rabi, 45 days, Bangalore" leaves "Bangalore"."""
+    rest = _NOT_PLACE_WORDS.sub(" ", _NUMBER_WORDS.sub(" ", _SEASON_WORDS.sub(" ", text or "")))
+    return " ".join(re.sub(r"[^\w\s]", " ", rest).split())
+
 
 # The agent's prompt is "**Conversation**\n\n<last message pairs>\n\n---\n\n<the farmer's message>", so the
 # farmer's own words are only what follows the last separator. Reading the whole prompt would pick up
@@ -99,18 +121,6 @@ def asked_in_previous_turn(ctx) -> bool:
     return _turn_asked(_previous_turn(ctx))
 
 
-def _tool_history_missing(ctx) -> bool:
-    """True when earlier turns exist but none of their tool results were kept, so nothing can be checked."""
-    earlier = _earlier_turns(ctx)
-    has_earlier_turn = any(
-        isinstance(m, ModelRequest) and any(isinstance(p, UserPromptPart) for p in m.parts) for m in earlier
-    )
-    has_tool_part = any(
-        isinstance(m, ModelRequest) and any(isinstance(p, ToolReturnPart) for p in m.parts) for m in earlier
-    )
-    return has_earlier_turn and not has_tool_part
-
-
 _PLACE_QUESTION = re.compile(r"\bstate\b.{0,40}\bdistrict\b|\bdistrict\b.{0,40}\bstate\b", re.IGNORECASE | re.DOTALL)
 
 
@@ -130,6 +140,16 @@ def _turn_asked_location(turn: list) -> bool:
 def asked_location_in_previous_turn(ctx) -> bool:
     """True when the turn right before this one asked the farmer for their place (state / district)."""
     return _turn_asked_location(_previous_turn(ctx))
+
+
+def asked_season_in_previous_turn(ctx) -> bool:
+    """True when the turn right before this one asked for the season / sowing days (or offered another season)."""
+    return _turn_asked(_previous_turn(ctx), SEASON_MARKER)
+
+
+def asked_crop_in_previous_turn(ctx) -> bool:
+    """True when the turn right before this one asked which crop."""
+    return _turn_asked(_previous_turn(ctx), CROP_MARKER)
 
 
 def _split_turns(ctx) -> list:
@@ -239,13 +259,6 @@ def farmer_gave_days(ctx) -> bool:
         or any(ch.isdigit() for ch in text)
         or bool(_NUMBER_WORDS.search(text))
     )
-
-
-def may_answer_now(ctx) -> bool:
-    """`answer_now` is honoured only when this message answers our question (never in the turn it was asked)."""
-    if not _has_history(ctx):
-        return True
-    return asked_in_previous_turn(ctx) or _tool_history_missing(ctx)
 
 
 # --- Crop check ---------------------------------------------------------------------------------

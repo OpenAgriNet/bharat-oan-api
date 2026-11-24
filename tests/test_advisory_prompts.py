@@ -1,5 +1,6 @@
 """Every language prompt must route crop, pest, livestock and photo questions to search_advisory, search first."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -51,32 +52,40 @@ def test_prompt_has_no_generic_or_personalised_flow(path):
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
 def test_prompt_has_the_search_first_advisory_flow(path):
     flow = _render(path).split("### Crop advisory flow", 1)[1]
-    assert "1. **Search first.**" in flow
+    assert "1. **Search first, answer first.**" in flow
+    assert "not even the crop" in flow and "If the farmer has not said which crop, search without `crop`" in flow
     assert "Livestock questions" in flow and "with no `crop`" in flow
-    assert "A request to ask which crop" in flow
+    assert "end your answer with that ONE follow-up question, after the Source line" in flow
+    assert "**Which crop**" in flow and "**Another season**" in flow
+    assert "**The season, the days since sowing and/or the place**" in flow and "in that one question" in flow
+    assert "Ask each follow-up only once" in flow
     assert "The farmer's place comes only from the farmer" in flow
     assert "Never take it from the browser coordinates" in flow
-    assert "A request to ask for the farmer's place" in flow
     assert "the very first line of your answer" in flow and "add nothing from your own knowledge" in flow
     assert "call `search_advisory` again with the same `query`" in flow
     assert "**Source: ICAR - Kisan Sarathi**" in flow
-    assert "your first reply is only one short question asking which crop" in flow
-    assert "`answer_now=true`" in flow and "`crop=\"Wheat\"`, `days_after_sowing=40`" in flow
+    assert "`crop=\"Wheat\"`, `days_after_sowing=40`" in flow
     assert "never put season names in brackets" in flow
     assert "the farmer decides" in flow
-    assert "Your whole reply is only that question" in flow
     assert "never fill the gap from memory" in flow
+    for gone in ("answer_now", "Your whole reply is only that question", "your first reply is only one short question"):
+        assert gone not in flow
 
 
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.stem)
-def test_a_missing_crop_is_asked_first_in_the_tool_rows(path):
-    asking = [r for r in _rows(path) if "ask which crop first" in r and "`crop`" in r]
-    assert len(asking) == 2, f"{path.name}: crop info and pests rows must ask for a missing crop"
-    assert any("general knowledge" in r for r in asking)
+def test_a_missing_crop_is_searched_without_a_crop_in_the_tool_rows(path):
+    rows = _rows(path)
+    searching = [r for r in rows if "search without `crop`" in r]
+    assert len(searching) == 2, f"{path.name}: crop info and pests rows must search when no crop is named"
+    assert any("general knowledge" in r for r in searching)
+    assert not any("ask which crop first" in r for r in rows)
 
 
-def test_global_prompt_lets_a_tool_question_stand_alone():
-    """A question the farmer must answer first is the whole reply: no source line, no extra follow-up."""
-    prompt = (Path(__file__).resolve().parents[1] / "assets/prompts/chat/agrinet_en.md").read_text()
-    assert "Exception — asking the farmer" in prompt
-    assert "no source citation and no extra follow-up question" in prompt
+@pytest.mark.parametrize("path", sorted((Path(__file__).resolve().parents[1] / "assets/prompts/chat").glob("agrinet_*.md")), ids=lambda p: p.stem)
+def test_global_prompt_always_answers_first(path):
+    """No question-only replies: answer, then source, then the one follow-up question (in every language)."""
+    prompt = path.read_text()
+    # the removed "Exception — asking the farmer" bullet (bold label with an em dash), in any language
+    assert not re.search(r"^- \*\*[^*\n]+ — [^*\n]+:\*\*", prompt, re.MULTILINE)
+    if path.stem == "agrinet_en":
+        assert "Answer first, then source citation on its own line, then the follow-up question last" in prompt
