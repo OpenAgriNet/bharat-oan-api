@@ -1,5 +1,13 @@
 ---
-summary: SMAM application / beneficiary status
+summary: Status of the farmer's OWN SMAM application (Sub-Mission on Agricultural Mechanization, subsidy for tractors,
+  power tillers, rotavators, sprayers and other farm machinery), checked with their mobile number or application
+  reference number.
+load_when:
+- they ask whether their farm-machinery subsidy application was approved or where it stands
+examples:
+- has my tractor subsidy been approved?
+not_for:
+- SMAM scheme information or how to apply
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

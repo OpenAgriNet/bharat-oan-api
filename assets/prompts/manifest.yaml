@@ -178,25 +178,18 @@ agents:
     - weather.agromet
     - pm_kisan.installments
     - documents.search
-    # Loaded from the first turn; other enabled skills load on demand with load_skill.
-    # Chosen from production tool calls over 14 days (2026-11-09..23, ~227k traces): the most used skills,
-    # plus PM-KISAN and document search always (product decision). Rarely used or large skills
-    # (KHC, FFS, AgriStack, ICAR, seeds, fertilizer, IMD agromet) load when needed.
+    # Loaded from the first turn; every other enabled skill loads on demand with load_skill, picked from
+    # the skill descriptions that stay in the prompt. Product decision (2026-11-23): PM-KISAN, schemes,
+    # crop advice with ICAR, mandi, weather and AgriStack. A preloaded skill loads only where it is enabled.
     preloaded_skills:
-    - pm_kisan.status       # 34.1k calls
-    - pm_kisan.grievances   # 16.5k
-    - pm_kisan.installments # release note, no tools; PM-KISAN always
-    - documents.search      # 5.3k, always
-    - schemes.information   # 24.8k
-    - crop.advice           # 6.2k
-    - mandi.prices          # 5.1k
-    - location.resolve      # 3.9k, required by weather/mandi
-    - pmfby.status          # 2.5k
-    - weather.forecast      # 1.3k
-    # Small OTP workflow skills, preloaded after the long-session eval: when lazy, Gemma did not load
-    # pmfby.grievances in any of 13 languages and soil_health.status in 4 of 13, and answered without tools.
-    - pmfby.grievances      # 0.5k calls, ~0.6k tokens (en)
-    - soil_health.status    # 0.4k, ~0.3k
-    - smam.status           # 0.5k, ~0.3k
-    - kcc.status            # 0.6k, ~0.8k
-    - aif.status            # 0.2k, ~1.1k
+    - pm_kisan.status
+    - pm_kisan.grievances
+    - pm_kisan.installments
+    - schemes.information
+    - documents.search      # required by schemes.information and crop.advice
+    - crop.advice
+    - crop.icar             # always with crop.advice, so ICAR is tried first for crop questions
+    - mandi.prices
+    - weather.forecast
+    - location.resolve      # required by mandi.prices and weather.forecast
+    - agristack.profile     # the AgriStack status line in the user message relies on its tools

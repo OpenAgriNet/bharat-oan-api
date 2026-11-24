@@ -118,8 +118,12 @@ class SkillCatalog:
             raise ValueError(f'Prompt path outside assets: {relative}')
         return path
 
+    # Front matter of each skill file: `summary` is required; the other keys are optional
+    # and describe when to load the skill (see docs/session-state-and-history.md).
+    DESCRIPTION_KEYS = {'summary', 'load_when', 'examples', 'not_for'}
+
     @lru_cache(maxsize=1024)
-    def document(self, skill_id: str, language: str, agent: str = 'chat') -> tuple[str, str]:
+    def front_matter(self, skill_id: str, language: str, agent: str = 'chat') -> tuple[dict, str]:
         config = self.manifest.agents[agent]
         if language not in config.languages:
             raise ValueError(f'Unsupported language {language!r} for {agent}')
@@ -133,13 +137,38 @@ class SkillCatalog:
         if not match:
             raise ValueError(f'Missing summary front matter: {folder}/{stem}_{language}.md')
         metadata = yaml.load(match[1], Loader=UniqueKeysLoader)
-        if not isinstance(metadata, dict) or set(metadata) != {'summary'} or not isinstance(metadata['summary'], str) or not metadata['summary'].strip() or not match[2].strip():
+        if (not isinstance(metadata, dict) or 'summary' not in metadata or not set(metadata) <= self.DESCRIPTION_KEYS
+                or not isinstance(metadata['summary'], str) or not metadata['summary'].strip() or not match[2].strip()):
             raise ValueError(f'Expected a nonempty summary and body: {skill_id}/{language}')
-        return metadata['summary'], match[2]
+        if not all(isinstance(metadata.get(k, []), list) for k in ('load_when', 'examples', 'not_for')):
+            raise ValueError(f'Invalid description fields: {skill_id}/{language}')
+        return metadata, match[2]
+
+    def document(self, skill_id: str, language: str, agent: str = 'chat') -> tuple[str, str]:
+        metadata, body = self.front_matter(skill_id, language, agent)
+        return metadata['summary'], body
 
     def render_summary(self, skill_id: str, language: str, context: dict, agent: str = 'chat') -> str:
-        summary, _ = self.document(skill_id, language, agent)
-        return self.env.from_string(summary).render(**context)
+        """One catalog line: summary, when to load, examples, what it is not for, and its tools.
+
+        Always the English description: it is an instruction to the model, never shown to the farmer, and the
+        structured English text (load when / examples / not for) is what makes on-demand loading reliable. The
+        one-line translated summaries made the model ask instead of loading (combined eval 2026-11-23: load_skill
+        calls English 44, Hindi 39, Marathi 30, Gujarati 29; soil health and PMFBY never loaded in Marathi).
+        """
+        metadata, _ = self.front_matter(skill_id, 'en', agent)
+        render = lambda text: ' '.join(self.env.from_string(text).render(**context).split())
+        parts = [render(metadata['summary'])]
+        if metadata.get('load_when'):
+            parts.append('Load when: ' + '; '.join(render(t) for t in metadata['load_when']) + '.')
+        if metadata.get('examples'):
+            parts.append('Examples: ' + ', '.join(f'"{render(t)}"' for t in metadata['examples']) + '.')
+        if metadata.get('not_for'):
+            parts.append('Not for: ' + '; '.join(render(t) for t in metadata['not_for']) + '.')
+        tools = self.manifest.skills[skill_id].tools
+        if tools:
+            parts.append('Tools: ' + ', '.join(tools) + '.')
+        return ' '.join(parts)
 
     def render_skill(self, skill_id: str, language: str, context: dict, agent: str = 'chat') -> str:
         _, body = self.document(skill_id, language, agent)
@@ -180,7 +209,8 @@ class SkillCatalog:
         roots = select(config.enabled_skills, set(self.manifest.skills), 'agent skills')
         enabled = set(self.resolve(roots))
         if config.preloaded_skills != 'all':
-            select(config.preloaded_skills, enabled, 'preloaded skills')
+            # A preloaded skill must exist; it loads only where it is also enabled (e.g. off in bh-main).
+            select(config.preloaded_skills, set(self.manifest.skills), 'preloaded skills')
         if not set(config.skill_variants) <= enabled:
             raise ValueError(f'Variant selected for unavailable skill: {agent}')
         if not config.languages or len(config.languages) != len(set(config.languages)):

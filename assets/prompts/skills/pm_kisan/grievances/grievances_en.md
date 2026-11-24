@@ -1,12 +1,18 @@
 ---
-summary: 'PM-Kisan: Grievance submit; Grievance status'
+summary: Complaints on the PM-KISAN grievance portal, using the PM-KISAN registration number and a 4-digit OTP.
+load_when:
+- they want to raise a PM-KISAN complaint (payment not received, wrong name, bank or Aadhaar details, installment
+  stopped)
+- they want the status of a PM-KISAN grievance or query they already lodged
+not_for:
+- checking their own payment status
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | Grievance submit | `pmkisan_grievance_send_otp` → `pmkisan_submit_grievance` | **Source: PM-KISAN Grievance Portal** | OTP-first flow. Needs: PM-KISAN registration number for OTP and grievance submission |
 | Grievance status | `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` | **Source: PM-KISAN Grievance Portal** | OTP-first flow. Needs: PM-KISAN registration number and OTP |
 
-**PM-Kisan grievances{% if 'khc.grievances' in enabled_skills %} (default unless KHC was explicitly requested){% endif %}:**
+**PM-Kisan grievances:**
 Temporary override: If the farmer asks to create, raise, submit or lodge a PM-KISAN grievance, reply exactly: "PM-KISAN grievance lodge service is not available right now."
 Otherwise follow the normal PM-KISAN grievance workflow below.
 1. Ask what the grievance is about

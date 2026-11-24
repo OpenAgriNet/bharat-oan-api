@@ -1,5 +1,5 @@
 from typing import Any, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from langcodes import Language
 from agents.skill_policy import SkillState
 from app.services.session_state import SESSION_STATE_LABEL, render_state
@@ -40,6 +40,14 @@ class FarmerContext(BaseModel):
         default="not_logged_in",
         description="AgriStack login state for this session (see assets/prompts/skills/agristack/profile/).",
     )
+    @model_validator(mode='after')
+    def _skip_agristack_preload_when_not_logged_in(self):
+        # Without an AgriStack login the AgriStack skill only says "ignore AgriStack", yet its tool names in the
+        # prompt made the model try hidden tools (combined eval 2026-11-23, units 2178/2180).
+        if self.agristack_status == "not_logged_in":
+            self.skills.skip_preload.add("agristack.profile")
+        return self
+
     npss_used: bool = Field(default=False, description="Whether NPSS image analysis was used in this turn.")
     npss_source_name: Optional[str] = Field(default=None, description="Official NPSS source name.")
     npss_source_owner: Optional[str] = Field(default=None, description="Official NPSS source owner.")

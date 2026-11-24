@@ -17,5 +17,5 @@ Farmer-ID/OTP fertilizer entitlement and booking use the separate workflow.
 They do not require SHC
 mobile/cycle, browser geocoding or an AgriStack profile lookup. FFS itself supplies
 the selected land and crop context; its survey labels may be shown for selecting
-the farmer's plots. General fertilizer-dose advice keeps its existing flow.
+the farmer's plots.
 {%- endif %}

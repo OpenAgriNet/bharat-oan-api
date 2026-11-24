@@ -264,10 +264,3 @@ def farmer_gave_days(ctx) -> bool:
         or any(ch.isdigit() for ch in text)
         or bool(_NUMBER_WORDS.search(text))
     )
-
-
-def may_answer_now(ctx) -> bool:
-    """`answer_now` is honoured only when this message answers our question (never in the turn it was asked)."""
-    if not _has_history(ctx):
-        return True
-    return asked_in_previous_turn(ctx) or _tool_history_missing(ctx)

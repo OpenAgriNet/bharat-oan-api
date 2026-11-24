@@ -7,7 +7,6 @@ agent sees them as one "**Session state:**" line in the user message, so old too
 
 Keys use a hash of the session ID; values may hold personal data, so never log them.
 """
-import asyncio
 import hashlib
 import json
 from typing import Any, Callable, Optional
@@ -48,11 +47,20 @@ def _deps_of(ctx_or_deps: Any) -> Any:
 
 
 async def load_state(session_id: str) -> dict[str, dict[str, Any]]:
-    """Every registered section that has data (concurrent small reads, once per turn)."""
+    """Every registered section that has data: one MGET per turn (one round trip, one pooled connection).
+
+    Parallel per-section GETs took one connection each and exhausted the Redis pool under concurrent chats.
+    The keys equal those written with namespace=namespace(section): the key builder joins "<namespace>:<key>".
+    """
     names = list(_SECTIONS)
     if not names or not session_id:
         return {}
-    values = await asyncio.gather(*(get_section(session_id, n) for n in names))
+    key = session_key(session_id)
+    try:
+        values = await cache.multi_get([f"{namespace(n)}:{key}" for n in names])
+    except Exception as exc:
+        logger.warning("session_state: read failed: %s", exc)
+        return {}
     return {n: v for n, v in zip(names, values) if v}
 
 

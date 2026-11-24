@@ -19,6 +19,10 @@ class FakeCache:
     async def get(self, key, namespace=None):
         return self.values.get((namespace, key))
 
+    async def multi_get(self, keys, namespace=None):
+        # The real key builder joins "<namespace>:<key>", so a pre-joined key reads the same entry.
+        return [self.values.get(tuple(k.rsplit(":", 1))) for k in keys]
+
     async def set(self, key, value, ttl=None, namespace=None):
         self.values[(namespace, key)] = json.loads(json.dumps(value))
 
@@ -208,3 +212,114 @@ def test_stub_mode_keeps_old_calls_with_placeholder_results():
     assert calls == [p.tool_call_id for p in returns] == ["c0", "c1", "c2"]
     assert all(p.content == utils.OLD_TOOL_RESULT_STUB for p in returns)
     assert "result 1" not in str([p.content for p in returns])
+
+
+def test_load_reads_the_keys_that_save_writes_in_one_call():
+    from app.core.cache import cache
+    session_state.register_section("test_one_call")
+    key = session_state.session_key("s")
+    ns = session_state.namespace("test_one_call")
+    assert cache.build_key(f"{ns}:{key}", None) == cache.build_key(key, ns)
+    calls = []
+    fake = FakeCache()
+    original = fake.multi_get
+    async def counting(keys, namespace=None):
+        calls.append(keys)
+        return await original(keys, namespace)
+    fake.multi_get = counting
+    with mock.patch.object(session_state, "cache", fake):
+        d = deps("s")
+        session_state.remember(d, "test_one_call", mobile="1")
+        asyncio.run(session_state.save_changed_state(d))
+        assert asyncio.run(session_state.load_state("s"))["test_one_call"] == {"mobile": "1"}
+    assert len(calls) == 1  # one Redis round trip per turn, whatever the number of sections
+
+
+def test_pmkisan_status_summary_keeps_only_beneficiary_fields():
+    from agents.tools.pmkisan_scheme_status import SchemeStatusResponse, status_summary
+    details = ("=== PM KISAN BENEFICIARY STATUS ===\n\nBeneficiary Name - Ravi Kumar\n"
+               "Beneficiary Location - Edappally, Ernakulam, Kerala, India\nRegistration Number - KL221000980\n"
+               "Registration Date - 15/03/2021 10:42:17 AM\nLast Installment Status - 17th Installment payment done\n"
+               "eKYC - Done\n\n=== PAYMENT STATUS & ISSUES ===\nRavi Kumar, your 17th installment has been processed.")
+    context = {"action": "on_status", "timestamp": "t", "message_id": "m", "transaction_id": "x",
+               "domain": "d", "version": "1"}
+    response = SchemeStatusResponse.model_validate({"context": context, "responses": [{"context": context, "message": {
+        "order": {"fulfillments": [{"state": {"descriptor": {"name": "Status", "long_desc": details}}}]}}}]})
+    assert status_summary(response) == {
+        "Beneficiary Name": "Ravi Kumar", "Beneficiary Location": "Edappally, Ernakulam, Kerala, India",
+        "Registration Date": "15/03/2021 10:42:17 AM", "Last Installment Status": "17th Installment payment done",
+        "eKYC": "Done"}
+
+
+def test_agristack_is_not_preloaded_without_login_but_stays_loadable():
+    logged_out = FarmerContext(query="q", session_id="s")
+    assert "agristack.profile" not in logged_out.skills.active
+    assert "agristack.profile" in logged_out.skills.permitted
+    logged_in = FarmerContext(query="q", session_id="s", agristack_status="consent")
+    assert "agristack.profile" in logged_in.skills.active
+    # Other preloaded skills are unaffected.
+    assert {"mandi.prices", "location.resolve"} <= logged_out.skills.active
+
+
+def test_fertilizer_agristack_rule_only_for_consented_login_and_english_descriptions_everywhere():
+    from agents.skill_catalog import get_catalog
+    catalog = get_catalog()
+    shown = lambda status: 'get_agristack_farmer_crops' in catalog.render_skill(
+        'fertilizer.recommendations', 'hi', {'agristack_status': status, 'enabled_skills': set(catalog.manifest.skills)})
+    assert shown('consent') and not shown('not_logged_in') and not shown('no_consent')
+    # The catalog line is the structured English description in every language.
+    assert catalog.render_summary('fertilizer.recommendations', 'mr', {}) == \
+        catalog.render_summary('fertilizer.recommendations', 'en', {})
+    assert 'Load when:' in catalog.render_summary('soil_health.status', 'ta', {})
+
+
+def test_sathi_crop_codes_saved_and_crop_names_rejected():
+    import pytest
+    from pydantic_ai import ModelRetry
+    from agents.tools import sathi_seed
+    deps = FarmerContext(query="q", session_id="s")
+    ctx = SimpleNamespace(deps=deps)
+    rows = [{"crop_code": "A0410", "crop_name": "SOYBEAN"}, {"crop_code": "A0401", "crop_name": "CASTOR"}]
+    with mock.patch.object(sathi_seed, "_fetch_crops_for_group_from_api", mock.AsyncMock(return_value=rows)):
+        asyncio.run(sathi_seed.list_sathi_crops_in_group.__wrapped__(ctx, "a04")
+                    if hasattr(sathi_seed.list_sathi_crops_in_group, "__wrapped__")
+                    else sathi_seed.list_sathi_crops_in_group(ctx, "a04"))
+    assert deps.session_state["sathi"] == {"group_code": "A04", "crop_codes": {"SOYBEAN": "A0410", "CASTOR": "A0401"}}
+    with pytest.raises(ModelRetry):
+        asyncio.run(sathi_seed.search_sathi_seed_availability(ctx, "SOYBEAN", 18.5, 73.8))
+
+
+def test_npss_diagnosis_saved_and_replaced_by_a_new_analysis():
+    from agents.tools import npss
+    deps = FarmerContext(query="q", session_id="s")
+    ctx = SimpleNamespace(deps=deps)
+    results = [{"pest": "Leaf blight", "crop": "Rice", "pathogenClass": "Fungus", "description": "x" * 900,
+                "errors": None, "imageId": "internal"},
+               {"pest": ["Aphid"], "crop": "Wheat"}]
+    with mock.patch.object(npss, "_get_cached_npss_token", mock.AsyncMock(return_value="t")), \
+            mock.patch.object(npss, "_download_image", mock.AsyncMock(return_value=(b"\xff\xd8\xffimg", "image/jpeg"))), \
+            mock.patch.object(npss, "_call_npss_analyze", mock.AsyncMock(side_effect=results)):
+        asyncio.run(npss.analyze_crop_image(ctx, "https://example.org/a.jpg"))
+        first = deps.session_state["npss"]
+        assert first["source"] == npss.NPSS_SOURCE_NAME
+        assert first["diagnosis"] == {"pest": "Leaf blight", "crop": "Rice", "pathogenClass": "Fungus",
+                                      "description": "x" * 600}
+        assert "npss" in deps.session_state_changed
+        asyncio.run(npss.analyze_crop_image(ctx, "https://example.org/b.jpg"))
+    assert deps.session_state["npss"]["diagnosis"] == {"pest": "- Aphid", "crop": "Wheat"}
+
+
+
+def test_sathi_group_codes_saved_and_group_names_rejected():
+    import pytest
+    from pydantic_ai import ModelRetry
+    from agents.tools import sathi_seed
+    deps = FarmerContext(query="q", session_id="s")
+    ctx = SimpleNamespace(deps=deps)
+    groups = [{"group_code": "A03", "group_name": "PULSES", "is_active": 1},
+              {"group_code": "A04", "group_name": "OILSEEDS", "is_active": 1}]
+    with mock.patch.object(sathi_seed.cache, "get", mock.AsyncMock(return_value=groups)):
+        asyncio.run(sathi_seed.get_sathi_crop_groups(ctx))
+    assert deps.session_state["sathi"]["group_codes"] == {"PULSES": "A03", "OILSEEDS": "A04"}
+    with pytest.raises(ModelRetry):
+        asyncio.run(sathi_seed.list_sathi_crops_in_group(ctx, "Pulses"))

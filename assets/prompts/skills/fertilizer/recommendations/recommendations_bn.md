@@ -16,4 +16,6 @@ summary: সরকারি সার সুপারিশ (GFR)
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id-এর তালিকা), **phone_no**, **cycle**, ঐচ্ছিক **district_id**, **latitude**, **longitude**, এবং স্টেপ 2 অনুযায়ী **natural_farming** পাঠান।
 6. টুল আউটপুট কৃষক-বান্ধব ভাষায় সংক্ষেপ করুন। সফল হলে আলাদা লাইনে **উৎস: GFR ফসল সুপারিশ** দিন।
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}

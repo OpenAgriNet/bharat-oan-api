@@ -53,6 +53,9 @@ class SkillState(BaseModel):
     enabled_skills: Selection | None = None
     preloaded_skills: Selection | None = None
     loaded_skills: set[str] = Field(default_factory=set)
+    # Per-turn: preloaded skills that do not apply to this request (e.g. AgriStack when the farmer is not
+    # logged in). They stay permitted and can still be loaded on demand. Never persisted.
+    skip_preload: set[str] = Field(default_factory=set, exclude=True)
     # Fresh per-turn rendering context; never persisted as session permissions.
     context: dict[str, Any] = Field(default_factory=dict, exclude=True)
     language: str = 'en'
@@ -63,8 +66,12 @@ class SkillState(BaseModel):
         return self
 
     def selection(self) -> tuple[set[str], set[str]]:
-        return resolve_selection(get_catalog(), self.agent, self.environment,
-                                 self.enabled_skills, self.preloaded_skills)
+        selected, initial = resolve_selection(get_catalog(), self.agent, self.environment,
+                                              self.enabled_skills, self.preloaded_skills)
+        if self.skip_preload:
+            # Keep what other preloaded skills require (resolve adds dependencies back).
+            initial = set(get_catalog().resolve(initial - self.skip_preload))
+        return selected, initial
 
     @property
     def permitted(self) -> set[str]:

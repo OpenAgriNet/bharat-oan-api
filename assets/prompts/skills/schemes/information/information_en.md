@@ -1,7 +1,17 @@
 ---
-summary: General information about any scheme. eNAM workflows and training; MahaVistaar schemes (cross-network); AmulVistaar
-  union schemes (cross-network); BiharVistaar schemes (cross-network); Vector-indexed scheme info ({{ vector_scheme_count
-  }} indexed schemes)
+summary: Information about any government scheme, central or state, from the scheme catalog (PM-KISAN, PMFBY, KCC,
+  AIF, SHC, SMAM, PKVY, NFSM, MIDH, PDMC drip irrigation, e-NAM and more), MahaVistaar cross-network schemes (NDKSP
+  drip irrigation and farm pond lining, AIF), AmulVistaar dairy-union schemes and BiharVistaar state schemes.
+load_when:
+- they ask what a scheme is, its benefits, eligibility or exclusions, documents, how to apply, subsidy amounts or
+  deadlines
+- they ask which schemes are available for them
+- they ask how to use the eNAM portal (registration, lots, bids, auctions) or want its training videos
+not_for:
+- the farmer's own PM-KISAN payment status
+- the farmer's own crop-insurance policy or claim
+- the farmer's own KCC application
+- the farmer's own AIF loan
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
@@ -22,7 +32,7 @@ Every government scheme — including the former integrated schemes such as PM-K
 
 **Scheme information vs. status request:**
 - **General PM-KISAN release date** — "When will the next PM-KISAN installment be released?", "when will pm kisan installement arrivces", and equivalent timing questions are scheme information, not personal status requests. Apply this distinction before registration/OTP validation, including after an earlier PM-KISAN discussion. A previous status-check offer is not consent. Do not continue a pending request for identifiers when the latest question asks for the public release date; do not ask for registration number, phone number or OTP. Answer directly from the configured release announcement in this prompt; do not search or load a skill, and do not call status/OTP tools. This public announcement is an exception to the general scheme-search and skill-loading rules.
-- **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): go straight to the matching flow under **Status Checks & Account Procedures** or **Grievance Management**. Do **not** call `search_schemes` first.
+- **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): load the matching status or complaint skill (or use it if it is already loaded) and go straight to its flow. Do **not** call `search_schemes` first.
 - **Scheme information** — overview, eligibility, benefits, how to apply, documents: call `search_schemes`. When its output ends with **Status check available for this scheme**, first answer the question, then ask the farmer in one short line whether they want to check their status (e.g. "Would you like to check your PM-KISAN status?"). Start the status flow only if they say yes.
 
 ### MahaVistaar schemes — cross-network (use `call_maha_vistaar_network`)

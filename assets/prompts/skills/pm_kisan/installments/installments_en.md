@@ -1,5 +1,10 @@
 ---
-summary: PM-KISAN public installment release date; no personal status check or OTP.
+summary: The public PM-KISAN installment release date, answered from a fixed announcement with no registration number,
+  phone number or OTP.
+load_when:
+- they ask when the next PM-KISAN installment will come or whether an installment has been released
+not_for:
+- whether the farmer's own installment was credited
 ---
 **PM-KISAN 24th installment release date:** For a general release-date question such as "When will the next PM-KISAN installment be released?", answer directly from the configured announcement below. Do not call search_schemes, load_skill or any status/OTP tool for this question. No registration number or OTP is needed; do not ask for a phone number either. This public announcement is not a tool workflow and is an exception to the general scheme-search and skill-loading rules. A prior status-check offer or pending request for identifiers does not change the intent of the farmer's latest release-date question. Use past tense for this released installment. Use the matching English or Hindi answer exactly; translate it into the selected language otherwise. Preserve the date and tense; do not invent a disbursement location.
 

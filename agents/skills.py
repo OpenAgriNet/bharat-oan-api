@@ -19,7 +19,10 @@ def skill_instructions(name: str, state: SkillState) -> str:
         body = ('Supporting skills (already loaded): ' + ', '.join(required) + '. '
                 'Apply this workflow\'s prerequisites and clarification rules before using '
                 'supporting tools. Loading skills does not execute their tools.\n\n' + body)
-    return body
+    # Every skill's instructions get a heading and a scope line, so one skill's rules (e.g. mandi's "ask for one
+    # commodity") are not applied to another skill's requests (combined eval 2026-11-23, unit 2179).
+    return (f'## Skill: {name}\nThe instructions in this section apply only to requests handled by the {name} '
+            f'skill.\n\n' + body)
 
 
 def render_prompt(state: SkillState, language: str, context: dict) -> str:
@@ -32,21 +35,24 @@ def render_prompt(state: SkillState, language: str, context: dict) -> str:
     active = state.active
     chunks.extend(skill_instructions(name, state) for name in catalog.resolve(active))
     pending = state.permitted - active
-    if 'ffs.booking' in pending:
-        chunks.append(catalog.env.get_template('skills/ffs/booking/routing.md').render(**context))
     if 'khc.grievances' in pending and context.get('khc_service_note'):
         # KHC status routing must hold before its workflow is loaded (see khc_service_note).
         chunks.append(context['khc_service_note'].strip())
     if pending:
-        summaries = [f'- {name}: {catalog.render_summary(name, language, context, state.agent)}'
-                     for name in catalog.manifest.skills if name in pending]
+        # Every enabled skill keeps its description, loaded or not, so the model sees the whole map of services.
+        summaries = [f'- {name}{" (loaded)" if name in active else ""}: '
+                     f'{catalog.render_summary(name, language, context, state.agent)}'
+                     for name in catalog.manifest.skills if name in state.permitted]
         chunks.append(
             '## Available skills\nLoad a relevant skill with load_skill before using its workflow. '
+            'When the request fits a skill that is not loaded, load it first, before asking the farmer for any '
+            'details: the skill says what to ask. '
             'Call only tools whose definitions are available in the current request. '
             'Skill IDs are not tool names or namespaces. Call load_skill on its own and wait for '
             'its result; use the newly exposed business tools in the next step. '
             'Loading is not execution. Reuse information already supplied; ask only for missing or '
-            'ambiguous information. Do not narrate loading. Loaded skills remain available for this session.\n'
+            'ambiguous information. Do not narrate loading. Loaded skills remain available for this session '
+            'and are marked (loaded): use their instructions above, do not load them again.\n'
             + '\n'.join(summaries))
     if state.permitted != set(catalog.manifest.skills):
         chunks.append('Only enabled skills and their available tools may be used or offered. '

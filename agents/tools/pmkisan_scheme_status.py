@@ -20,6 +20,24 @@ logger = get_logger(__name__)
 # Shared with pmkisan_grievance: identifiers the provider accepted and the OTP step of each flow.
 SESSION_SECTION = register_section("pmkisan")
 
+# Beneficiary fields kept in session state after a verified status check, so a later question
+# ("what is my registered location?") is answered without a new OTP. Keys are matched on the
+# "Key - Value" lines of the status details; anything else in the response is not stored.
+_SUMMARY_KEYS = ("beneficiary name", "beneficiary location", "registration date", "last installment", "ekyc")
+
+
+def status_summary(scheme_response: "SchemeStatusResponse") -> dict[str, str]:
+    summary: dict[str, str] = {}
+    for item in scheme_response.responses:
+        for fulfillment in item.message.order.fulfillments or []:
+            details = fulfillment.state.descriptor.long_desc if fulfillment.state else None
+            for line in (details or "").splitlines():
+                key, sep, value = line.partition(" - ")
+                key, value = key.strip(), value.strip()
+                if sep and value and key.lower().startswith(_SUMMARY_KEYS):
+                    summary[key] = value[:200]
+    return summary
+
 # -----------------------
 # Basic Models (Shared)
 # -----------------------
@@ -563,10 +581,12 @@ def initiate_pm_kisan_status_check(ctx: RunContext[FarmerContext], reg_no: str =
             response_json = response.json()
             scheme_response = SchemeInitResponse.model_validate(response_json)
             if scheme_response.responses:
+                # A new check starts from a clean summary (it may be for another registration number).
                 if reg_no:
-                    remember(ctx, SESSION_SECTION, reg_no=reg_no, status_otp_step="sent")
+                    remember(ctx, SESSION_SECTION, reg_no=reg_no, status_otp_step="sent", status_summary=None)
                 else:
-                    remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step="sent")
+                    remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step="sent",
+                             status_summary=None)
             return str(scheme_response)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response from scheme init API: {e}. Response text: {response_text[:200]}")
@@ -668,10 +688,12 @@ def check_pm_kisan_status_with_otp(ctx: RunContext[FarmerContext], otp: str, reg
             if is_otp_verified(scheme_response):
                 # Status returned: this OTP is used up, so no step stays open (a stale "verified" step
                 # invites the model to treat a later, different OTP as already verified).
+                summary = status_summary(scheme_response) or None
                 if reg_no:
-                    remember(ctx, SESSION_SECTION, reg_no=reg_no, status_otp_step=None)
+                    remember(ctx, SESSION_SECTION, reg_no=reg_no, status_otp_step=None, status_summary=summary)
                 else:
-                    remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step=None)
+                    remember(ctx, SESSION_SECTION, phone_number=phone_number, status_otp_step=None,
+                             status_summary=summary)
             return str(scheme_response)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response from scheme status API: {e}. Response text: {response_text[:200]}")
