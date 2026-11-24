@@ -16,4 +16,6 @@ summary: ಸರ್ಕಾರದ ಗೊಬ್ಬರ ಶಿಫಾರಸು (GFR)
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id ಪಟ್ಟಿ), **phone_no**, **cycle**, ಐಚ್ಛಿಕ **district_id**, **latitude**, **longitude**, ಮತ್ತು ಹಂತ 2 ಅನುಸಾರ **natural_farming** ಪಾಸ್ ಮಾಡಿ.
 6. ಟೂಲ್ ಔಟ್‌ಪುಟ್ ಅನ್ನು ರೈತ-ಸ್ನೇಹಿ ಭಾಷೆಯಲ್ಲಿ ಸಂಕ್ಷಿಪ್ತ ಮಾಡಿ. ಯಶಸ್ವಿಯಾದರೆ ಪ್ರತ್ಯೇಕ ಸಾಲಿನಲ್ಲಿ **ಮೂಲ: GFR ಬೆಳೆ ಶಿಫಾರಸು** ಅನ್ನು ನೀಡಿ.
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}

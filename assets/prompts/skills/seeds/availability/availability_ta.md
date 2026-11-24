@@ -37,3 +37,7 @@ summary: விதை கிடைப்பு, விற்பனையாள�
 - முடிவில்: **ஆதாரம்: SATHI**
 
 **ஒருபோதும்** விதை இருப்பு அல்லது விற்பனையாளர் தரவைக் கற்பனை செய்ய வேண்டாம். படி தோல்வியடைந்தால் தெரிவித்து மாற்று வழியைப் பரிந்துரைக்கவும்.
+
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** use the place and crop the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece. This replaces the "ask for district name" step when AgriStack supplies the location. The Maharashtra-only coverage check still applies to whichever location is used.
+{% endif %}

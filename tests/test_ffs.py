@@ -392,7 +392,7 @@ def test_chat_ingress_keeps_spoken_otp_and_allows_refreshed_token(setup, monkeyp
         assert response.status_code == 200
         assert forwarded[0]["query"] == query
         assert "ffs_otp" not in forwarded[0] and "ffs_owner" not in forwarded[0]
-        assert forwarded[0]["ffs_context"]["stage"] == "otp_pending"
+        assert ffs.chat_context(forwarded[0]["session_state"]["ffs"])["stage"] == "otp_pending"
         image = client.post("/api/chat/analyze-image", data={"query": "१२३४५६", "session_id": "session-1"},
                             files={"image": ("test.png", b"image", "image/png")})
         assert image.status_code == 200
@@ -405,7 +405,7 @@ def test_chat_ingress_keeps_spoken_otp_and_allows_refreshed_token(setup, monkeyp
         assert client.get("/api/chat/", params={"query": "show plots", "session_id": "session-1"}).status_code == 200
         monkeypatch.setattr(ffs.settings, "ffs_base_url", "")
         assert client.get("/api/chat/", params={"query": "show plots", "session_id": "session-1"}).status_code == 200
-        assert forwarded[-1]["ffs_context"] == {}
+        assert ffs.chat_context(forwarded[-1]["session_state"].get("ffs", {})) == {}
         assert history_reads == ["session-1"] * 4
 
 

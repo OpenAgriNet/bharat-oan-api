@@ -1,5 +1,17 @@
 ---
-summary: Official fertilizer dose (GFR)
+summary: 'Government fertilizer recommendations (GFR, linked to the Soil Health Card) for one or more crops: how much
+  fertilizer to apply, the mix or schedule, and which crops have a GFR recommendation near a place.'
+load_when:
+- they ask for fertilizer recommendations, doses (kg of urea, DAP, MOP, NPK, manure), the mix or schedule for any crops
+- they ask which crops are covered under GFR for a place
+- 'load it before asking for district, Soil Health Card mobile or cycle year: the skill says what to ask'
+examples:
+- how much urea per acre for soybean?
+- I need fertilizer recommendations for my wheat and mustard crops
+- which crops have a GFR recommendation near Nashik?
+not_for:
+- buying or booking fertilizer
+- general fertilizer timing within a crop advisory
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
@@ -20,4 +32,6 @@ Tool-call rules (keep precise):
 - For `gfr_get_crop_registries`, set `crop_name_contains` to the **farmer’s crop name** (short form is fine) *only if* the registry list is too large; otherwise pass `None`.
 - If `crop_name_contains` returns “No crops matched your filter”, retry once with `crop_name_contains=None` (do not substitute another crop).
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}

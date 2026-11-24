@@ -20,6 +20,7 @@ from redis.exceptions import RedisError
 
 from app.config import get_default_httpx_timeout, settings
 from app.core.cache import cache
+from app.services.session_state import namespace, register_section, session_key
 from agents.ffs_crop_resolver import resolve_crops
 from agents.ffs_product_resolver import resolve_products
 from helpers.ffs_model_view import compact_ffs_result
@@ -31,7 +32,6 @@ MASTER = "/ufa-master-service/ufa-master/v1/api"
 APPROVAL = "/ufa-approval-service/ufa-approval-service/v1/api"
 FERT = "/ufa-fertilizer-service/ufa-fertilizer/v1/api"
 APPLICANT_FETCH = "/bharatVistar/applicantFetch"
-NAMESPACE = "ffs-session"
 LEVELS = ("V", "T", "D", "S")
 PRODUCTS = {11: 1089, 12: 1005}
 # State/UT master snapshot from FFS getStateLgdMaster, verified 2026-11-11.
@@ -66,8 +66,6 @@ def result(status, next_action, **data):
     return {"status": status, "data": data, "next_action": next_action, "source": "FFS"}
 
 
-def session_key(session_id):
-    return hashlib.sha256(session_id.encode()).hexdigest()
 
 
 class FFSError(Exception):
@@ -82,15 +80,19 @@ async def get_session(session_id):
 
 async def prepare_chat_turn(session_id):
     """Restore FFS workflow context; user text and API authentication stay unchanged."""
+    return chat_context(await get_session(session_id))
+
+
+def chat_context(state):
+    """What the model sees of the FFS session state (never the token or raw provider data)."""
     if not settings.ffs_base_url:
         return {}
-    state = await get_session(session_id)
     context = {"stage": state.get("stage", "not_started"),
                "authenticated": bool(state.get("token") and state.get("token_expires", 0) > time.time())} if state else {}
     if state:
         context["village_scope"] = deepcopy(state.get("village_scope", {"mode": "single_village"}))
     if all(k in state for k in ("profile", "crops", "season")):
-        view = FFSService(session_id, "")
+        view = FFSService("", "")
         view.state = state
         farmer = view.farmer_view()["data"]
         context["villages"] = farmer["villages"]
@@ -104,6 +106,11 @@ async def prepare_chat_turn(session_id):
         if state.get("selected_shop"):
             context["selected_shop"] = view._shop_view(state["selected_shop"])
     return context
+
+
+# FFS keeps its whole workflow state (login token included) in its session-state section; chat_context is the
+# part shown to the model each turn. Login lasts 20 minutes, so the section does too.
+NAMESPACE = namespace(register_section("ffs", ttl=1200, view=chat_context))
 
 
 class FFSService:

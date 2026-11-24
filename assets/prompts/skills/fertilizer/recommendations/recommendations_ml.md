@@ -16,4 +16,6 @@ summary: സർക്കാർ വള ശുപാർശ (GFR)
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id ലിസ്റ്റ്), **phone_no**, **cycle**, ഐച്ഛിക **district_id**, **latitude**, **longitude**, കൂടാതെ ഘട്ടം 2 അനുസരിച്ചുള്ള **natural_farming** പാസ് ചെയ്യുക.
 6. ടൂൾ ഔട്ട്പുട്ട് കർഷക സൗഹൃദമായി ചുരുക്കി പറയുക. വിജയിച്ചാൽ വേറൊരു വരിയിൽ **ഉറവിടം: GFR വിള ശുപാർശ** ചേർക്കുക.
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}

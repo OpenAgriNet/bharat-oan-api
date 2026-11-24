@@ -21,11 +21,18 @@ from agents.deps import FarmerContext
 from agents.tools.pmfby_scheme_status import normalize_phone_for_api
 from helpers.utils import get_logger
 from helpers.langfuse_tracing import lf_update_current_observation
+from app.services.session_state import register_section, remember
 from pydantic_ai.tools import RunContext
 
 load_dotenv()
 
 logger = get_logger(__name__)
+
+# state_id / district_id and crop registry IDs (id -> name) for gfr_get_recommendations, plus the SHC
+# phone_no / cycle once a recommendation was returned. Crop IDs are kept only for a short listing (the
+# farmer's crops, e.g. filtered by crop_name_contains); a long listing is re-queried with a filter.
+STATE = register_section("gfr")
+MAX_REMEMBERED_CROPS = 10
 
 
 class GfrCropRegistrySearch(BaseModel):
@@ -670,7 +677,30 @@ def gfr_get_crop_registries(
                 f"- {cid} - {cname} - {sid} - {did} - {season} - {irrig} - {gfr_txt}"
             )
 
+    _remember_registry(ctx, filtered[:limit])
     return "\n".join(lines).strip()
+
+
+def _remember_registry(ctx: RunContext[FarmerContext], listed: List[GfrRegistryItem]) -> None:
+    def label(c: GfrRegistryItem) -> str:
+        extra = ", ".join(v for v in (c.season, c.irrigation_type) if v)
+        name = c.combined_name or c.crop_name
+        return f"{name} ({extra})" if extra else name
+
+    listed_crops = {c.id: label(c) for c in listed if c.id and (c.combined_name or c.crop_name)}
+    state_id = next((c.state_id for c in listed if c.state_id), None)
+    saved = (getattr(ctx.deps, "session_state", None) or {}).get(STATE, {})
+    # Crop IDs belong to a location: keep earlier ones (farmer asked about several crops) only for the same state.
+    crops = dict(saved.get("crops") or {}) if saved.get("state_id") == state_id else {}
+    if len(listed_crops) <= MAX_REMEMBERED_CROPS:
+        crops.update(listed_crops)
+    remember(
+        ctx,
+        STATE,
+        state_id=state_id,
+        district_id=next((c.district_id for c in listed if c.district_id), None),
+        crops=dict(list(crops.items())[-MAX_REMEMBERED_CROPS:]) or None,
+    )
 
 
 @observe(name="tool:gfr_get_recommendations", as_type="tool")
@@ -776,4 +806,6 @@ def gfr_get_recommendations(
             continue
     if not blocks:
         return "No recommendation data found."
+    remember(ctx, STATE, state_id=state_id.strip(), phone_no=ten_digit, cycle=cycle_y,
+             **({"district_id": district_id.strip()} if district_id else {}))
     return "\n".join(["Fertilizer recommendation:", *blocks]).strip()

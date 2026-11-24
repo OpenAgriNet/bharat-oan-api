@@ -15,7 +15,6 @@ from helpers.advisory_pending import (
     advisory_question_pending,
     farmer_gave_days,
     farmer_gave_season,
-    may_answer_now,
 )
 
 QUESTION = f"{PENDING_MARKER}\n> Advisories were found ... Ask the farmer ONE short question"
@@ -146,13 +145,12 @@ class TestHardGuardsOnWhatOnlyTheFarmerCanSay:
 
     def test_no_history_means_the_guards_stay_out_of_the_way(self):
         ctx = _ctx(None)
-        assert farmer_gave_season(ctx) and farmer_gave_days(ctx) and may_answer_now(ctx)
+        assert farmer_gave_season(ctx) and farmer_gave_days(ctx)
 
     def test_a_season_the_farmer_never_wrote_is_not_accepted(self):
         ctx = _ctx([_user("How can I control aphids in my wheat crop?")])
         assert not farmer_gave_season(ctx)
         assert not farmer_gave_days(ctx)
-        assert not may_answer_now(ctx)
 
     @pytest.mark.parametrize("text", ["wheat aphids, Rabi", "kharif season", "गेहूं रबी में", "ખરીફ"])
     def test_a_season_word_in_the_farmers_text_is_accepted(self, text):
@@ -167,7 +165,6 @@ class TestHardGuardsOnWhatOnlyTheFarmerCanSay:
         ctx = _ctx([_user(prefix + "When should I harvest an early-maturing wheat variety?")])
         assert not farmer_gave_season(ctx)
         assert not farmer_gave_days(ctx)
-        assert not may_answer_now(ctx)
 
     def test_the_farmers_own_words_after_the_conversation_text_count(self):
         prefix = "**Conversation**\n\nUser: hi\n\n---\n\n"
@@ -182,23 +179,12 @@ class TestHardGuardsOnWhatOnlyTheFarmerCanSay:
             + [ModelResponse(parts=[TextPart(content="Advice")]), _user("When to harvest wheat?")]
         )
         ctx = _ctx(history)
-        assert not farmer_gave_season(ctx) and not farmer_gave_days(ctx) and not may_answer_now(ctx)
-
-    def test_answer_now_is_allowed_when_tool_results_of_earlier_turns_were_not_kept(self):
-        history = [
-            _user("wheat aphids"),
-            ModelResponse(parts=[TextPart(content="Which season?")]),
-            _user("I don't know"),
-        ]
-        assert may_answer_now(_ctx(history))
+        assert not farmer_gave_season(ctx) and not farmer_gave_days(ctx)
 
     def test_after_the_farmer_was_asked_whatever_they_answer_is_accepted(self):
         ctx = _ctx(self._asked_before("the winter one, since last month"))
-        assert farmer_gave_season(ctx) and farmer_gave_days(ctx) and may_answer_now(ctx)
+        assert farmer_gave_season(ctx) and farmer_gave_days(ctx)
 
-    def test_answer_now_is_not_honoured_in_the_same_turn_as_the_question(self):
-        ctx = _ctx([_user("wheat aphids")] + _advisory_result(QUESTION))
-        assert not may_answer_now(ctx)
 
 
 def _chunks():
@@ -226,10 +212,11 @@ class TestToolIgnoresInventedDetails:
         assert PENDING_MARKER in out
         assert seen["calls"][0] == {"days": None, "season": None}
 
-    def test_an_invented_answer_now_does_not_skip_the_question(self, monkeypatch):
+    def test_answer_now_is_the_bots_decision(self, monkeypatch):
+        # No hard gate (user, 2026-11-24): the bot decides when the farmer's reply means "answer without the details".
         ctx = _ctx([_user("wheat aphids")] + _advisory_result(QUESTION))
         out, _ = self._run(monkeypatch, ctx, answer_now=True)
-        assert PENDING_MARKER in out
+        assert PENDING_MARKER not in out
 
     def test_the_farmers_own_details_are_used(self, monkeypatch):
         ctx = _ctx([_user("Wheat aphids, Rabi, 40 days after sowing")])
@@ -244,6 +231,16 @@ class TestToolIgnoresInventedDetails:
         ]
         out, _ = self._run(monkeypatch, _ctx(history), answer_now=True)
         assert PENDING_MARKER not in out
+
+    def test_the_question_asked_is_noted_in_session_state_and_cleared_by_advice(self, monkeypatch):
+        deps = SimpleNamespace(session_id="s", question_id="q", session_state={}, session_state_changed=set())
+        ctx = SimpleNamespace(deps=deps, messages=[_user("wheat aphids")])
+        out, _ = self._run(monkeypatch, ctx)
+        assert PENDING_MARKER in out
+        assert deps.session_state["advisory"] == {"asked_farmer": "days since sowing", "crop": "Wheat"}
+        out, _ = self._run(monkeypatch, ctx, answer_now=True)
+        assert PENDING_MARKER not in out
+        assert not deps.session_state.get("advisory")  # cleared (an empty section is not saved or shown)
 
 
 class TestPlaceGuards:

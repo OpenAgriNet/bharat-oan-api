@@ -20,4 +20,6 @@ summary: ସରକାରୀ ସାର ମାତ୍ରା (GFR)
 - `gfr_get_crop_registries` ପାଇଁ, `crop_name_contains` କୁ **କୃଷକଙ୍କ ଫସଲ ନାମ** (ଛୋଟ ରୂପ ଠିକ୍ ଅଛି) ରେ ସେଟ୍ କରନ୍ତୁ *କେବଳ ଯଦି* ରେଜିଷ୍ଟ୍ରି ତାଲିକା ବହୁତ ବଡ଼ ଥାଏ; ନଚେତ୍ `None` ପାସ୍ କରନ୍ତୁ।
 - ଯଦି `crop_name_contains` "No crops matched your filter" ପ୍ରଦାନ କରେ, ତେବେ `crop_name_contains=None` ସହିତ ଥରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ (ଅନ୍ୟ ଏକ ଫସଲ ବଦଳାନ୍ତୁ ନାହିଁ)।
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}

@@ -1,7 +1,7 @@
 FFS covers fertilizer entitlement, shop discovery and final booking creation.
-Public questions about what FFS is use scheme information; SHC-based fertilizer
-advice remains fertilizer.recommendations. Do not start an OTP for general
-advice or an ambiguous request.
+Public questions about what FFS is and fertilizer-dose advice (how much to apply)
+are not part of this purchase flow. Do not start an OTP for general advice or an
+ambiguous request.
 
 {% include "skills/ffs/booking/routing.md" %}
 

@@ -13,7 +13,8 @@ from app.routers.chat_query_utils import (
     prepare_image_analyze_payload,
 )
 from app.services.chat import stream_chat_messages
-from app.services.ffs import prepare_chat_turn
+import app.services.ffs  # noqa: F401  registers the FFS session-state section
+from app.services.session_state import load_state
 from helpers.utils import get_logger
 
 
@@ -33,7 +34,7 @@ async def chat_endpoint(
     Requires JWT authentication.
     """
     session_id = ensure_session_id(request.session_id)
-    ffs_context = await prepare_chat_turn(session_id)
+    session_state = await load_state(session_id)
     session_id, history = await get_session_history(session_id)
     qid = request.qid or str(uuid.uuid4())
     channel = current_user.get("channel", "BharatVistaar")
@@ -63,7 +64,7 @@ async def chat_endpoint(
             longitude=request.longitude,
             qid=qid,
             current_user=current_user,
-            ffs_context=ffs_context,
+            session_state=session_state,
         ),
         media_type="text/event-stream",
         headers={"X-QID": qid, "Access-Control-Expose-Headers": "X-QID"},
@@ -93,7 +94,7 @@ async def chat_analyze_image_endpoint(
 
     session_id = ensure_session_id(session_id)
     qid = str(uuid.uuid4())
-    ffs_context = await prepare_chat_turn(session_id)
+    session_state = await load_state(session_id)
     logger.info(
         f"Image analyze request received - session_id: {session_id}, user_id: {user_id}, "
         f"authenticated_user: {authenticated_user}, channel: {channel}, source_lang: {source_lang}, "
@@ -122,7 +123,7 @@ async def chat_analyze_image_endpoint(
             longitude=longitude,
             qid=qid,
             current_user=current_user,
-            ffs_context=ffs_context,
+            session_state=session_state,
         ),
         media_type="text/event-stream",
         headers={"X-QID": qid, "Access-Control-Expose-Headers": "X-QID"},

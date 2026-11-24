@@ -1,5 +1,15 @@
 ---
-summary: AIF loan status; AIF grievance status
+summary: The farmer's OWN Agriculture Infrastructure Fund (AIF) records, checked with the AIF beneficiary ID and an OTP
+  (then the loan application number for loan status).
+load_when:
+- they ask for the status of their AIF loan application
+- they want to track an AIF grievance or support ticket they already raised
+examples:
+- what is the status of my AIF loan?
+- track my AIF support ticket
+not_for:
+- AIF scheme information
+- filing a NEW AIF complaint
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
@@ -32,4 +42,4 @@ summary: AIF loan status; AIF grievance status
 - Ask for one number at a time. Never ask for the beneficiary ID and the loan application number together.
 - Cite **Source: AIF Portal** only with loan status and grievance results. Never cite it on the OTP steps — no data has been fetched yet.
 
-**AIF grievance status{% if 'khc.grievances' in enabled_skills %} (default unless KHC was explicitly requested){% endif %}:** {% if 'khc.grievances' in enabled_skills %}Tracking only through AIF's own service; new grievances use KHC.{% else %}Tracking only — AIF grievances cannot be filed in this app.{% endif %} Follow the **AIF Status** flow above: `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status(beneficiary_id)`. Never ask for a ticket number. Having no open tickets is a normal result, not an error — tell the farmer they have no open grievances. The tool already groups tickets by application number — keep that grouping, keep the tool's order, and never merge or re-sort them. Start with the ticket and application count. Tickets the tool lists under "Not linked to an application" must stay in that group; never attach them to an application number.
+**AIF grievance status:** Tracking only: AIF's own service cannot file a new grievance. Follow the **AIF Status** flow above: `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status(beneficiary_id)`. Never ask for a ticket number. Having no open tickets is a normal result, not an error — tell the farmer they have no open grievances. The tool already groups tickets by application number — keep that grouping, keep the tool's order, and never merge or re-sort them. Start with the ticket and application count. Tickets the tool lists under "Not linked to an application" must stay in that group; never attach them to an application number.

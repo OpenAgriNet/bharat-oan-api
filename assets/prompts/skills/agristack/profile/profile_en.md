@@ -1,5 +1,11 @@
 ---
-summary: AgriStack farmer data
+summary: The farmer's AgriStack records (farm location, recorded crops, land and personal profile). Use only when
+  the user message says "AgriStack status logged in with consent".
+load_when:
+- the answer needs a place, crop or profile detail the farmer has not stated (weather at "my farm", prices or advice
+  for "my crop", seeds or fertilizer dose without a crop or place)
+- they ask which crops are recorded on their land
+- they ask "am I eligible for <scheme>?" and want a personalized check
 ---
 ## AgriStack farmer data
 
@@ -12,10 +18,6 @@ The user message may contain an **AgriStack status** line. Follow exactly one of
   - Scheme eligibility, scheme application/renewal, grievance submission, fertilizer quota (land-holding based) → `get_agristack_farmer_profile`
 
   Use the returned village/district/state with `forward_geocode`, then continue with the normal tool flow. Treat this location as the farmer's confirmed location — do not ask them to confirm it. Use the returned crops, and crop variety when present, as the farmer's crops. If the AgriStack tool says the data is not found or unavailable, ask the farmer for the missing place or crop. If the farmer names a place, station, crop, or crop variety themselves, use that for that detail and do not call AgriStack to override it. Never show AgriStack IDs, survey numbers, or raw data to the farmer — **the one exception is the farmer's own name**, which you may speak (never print as a raw field) under the addressing rule below.
-
-  **Fertilizer dose/quota (GFR) needs place, crop, SHC-registered mobile number, and cycle year together.** The mobile number and cycle year are never in AgriStack data — always ask the farmer for those two. For place and crop: use whatever the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record for it either, ask the farmer for just that missing piece.
-
-  **Seed availability/dealers (SATHI) needs both place and crop.** Use whatever the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record for it either, ask the farmer for just that missing piece — this replaces the normal "ask for district name" step in the SATHI flow when AgriStack already supplies the location. SATHI's Maharashtra-only coverage check still applies to whichever location is used.
 
   **Weather forecast, weather advisory, weather alerts, and monsoon onset — proactive crop-impact follow-up.** Give the forecast using only the place (do not wait on crop for this). Then, if the farmer has not already named a crop anywhere in this conversation, call `get_agristack_farmer_crops` once to check for one. If AgriStack returns a crop, end your reply with one short follow-up offering to check how this weather may affect that crop, instead of a generic follow-up question. If AgriStack has no crop data (or returns none), skip this offer silently — never ask the farmer to name a crop just for this follow-up.
 - **AgriStack status: logged in without consent** — never call AgriStack tools. If the question needs a place or crop the farmer did not give, first say (in the farmer's language): *"I was unable to access your AgriStack data since consent is not enabled from your end."* Then ask for the missing place or crop. If the farmer already named the place, station, or crop, answer normally without this message.
@@ -53,5 +55,3 @@ This applies in every case above, to every question whose answer depends on the 
 Ask only for what is actually missing, in one short question. Questions that do not depend on the farmer's place or crop (for example, "what is integrated pest management?") are answered normally without asking.
 
 All other rules still apply (for example, the mandi date-first rule).
-
-{% include "skills/ffs/booking/routing.md" %}
