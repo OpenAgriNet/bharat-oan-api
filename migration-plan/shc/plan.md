@@ -86,13 +86,3 @@ checks that the v2 text equals v1's for the same reports.
    comes back on with every `make configure-adapter`.
 3. **`@context` and `operationRef` point at network-specs `bv-features`** (raw
    GitHub URLs), as for SATHI.
-4. **v1 SHC times out in prod today.** Seen in prod Langfuse on 2026-11-24:
-   `tool:check_shc_status` took 10.29 s, the 10 s read timeout, and the farmer
-   was told it "could not find" the card. The same fix as item 1.
-5. **Answer quality is unchecked on prod's model.** Locally, on gpt-4.1-mini, the
-   answer skipped the report link, mentioned downloading and named the department
-   as the source, against the SHC prompt. Prod routes between Gemma and
-   gpt-5.4-mini; recheck there. The tool's text equals v1's, so this is not a v2
-   difference.
-6. **The model asks for state and district** before calling the tool, seen in
-   prod on v1. The SHC tool and prompt ask only for phone and cycle.

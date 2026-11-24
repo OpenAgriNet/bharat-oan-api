@@ -69,13 +69,13 @@ recommendation blocks, and v1's error texts.
 
 On the local stack, 2026-11-24, for barley (Rainfed / Rabi) in Madhya Pradesh and one phone and
 cycle: publish, discover, both selects through the adapter, and both tools inside the app all
-worked. The doses (DAP 65.22, MOP 25.00, Urea 104.91 kg/ha) equal the prod v1 answer for the
+worked. The doses (DAP 65.22, MOP 25.00, Urea 104.91 kg/ha) equal v1's answer for the
 same farmer and crop.
 
 ## Open TODOs
 
-1. **`DEFAULT_API_READ_TIMEOUT`.** The soil test is SHC's slow query; the prod v1 run took
-   7.5 s against a 10 s limit. Same fix as the Soil Health Card.
+1. **`DEFAULT_API_READ_TIMEOUT`.** The soil test is SHC's slow query, 15-26 s, longer than the
+   10 s default. Same fix as the Soil Health Card.
 2. **Extended (L2) schema validation is off** for this flow.
 3. **Links point at branches**: the `@context` URLs, the `operationRef`s and the mapping URLs.
    To be moved to a fixed tag.
@@ -83,5 +83,5 @@ same farmer and crop.
    skips one whose code and pack do not match.
 5. **Carried over from v1:** only the first soil report is used, so a farmer with several plots
    can get doses for the wrong one; the soil-test reply keeps all 12 soil values.
-6. **Answer quality on prod's model** is unchecked: v1's organic-inputs block is headed
-   "Natural farming" even on an inorganic answer.
+6. **v1's organic-inputs block is headed "Natural farming"** even on an inorganic answer, so
+   the model may leave it out.

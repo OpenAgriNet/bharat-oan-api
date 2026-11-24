@@ -77,7 +77,7 @@ On the local stack, 2026-11-23:
 
 | Question | Result |
 |---|---|
-| Paddy in Nashik | dealers in Nashik; same dealers, bags and ranking as prod v1 |
+| Paddy in Nashik | dealers in Nashik; same dealers, bags and ranking as v1 |
 | Paddy in Pune | discover matched Ahilyanagar and Pune; the model passed `district`, Pune chosen |
 | Barley in Nashik | SATHI 409, shown as "not available" |
 | Paddy in Hyderabad | refused by the prompt's Maharashtra rule, as v1 |
