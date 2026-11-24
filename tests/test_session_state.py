@@ -59,7 +59,7 @@ def test_save_and_load_round_trip_per_section():
     session_state.register_section("test_a")
     session_state.register_section("test_b")
     fake = FakeCache()
-    with mock.patch.object(session_state, "cache", fake):
+    with mock.patch("app.core.cache.cache", fake):
         d = deps("round-trip")
         session_state.remember(d, "test_a", x=1)
         session_state.remember(d, "test_b", y="two")
@@ -227,7 +227,7 @@ def test_load_reads_the_keys_that_save_writes_in_one_call():
         calls.append(keys)
         return await original(keys, namespace)
     fake.multi_get = counting
-    with mock.patch.object(session_state, "cache", fake):
+    with mock.patch("app.core.cache.cache", fake):
         d = deps("s")
         session_state.remember(d, "test_one_call", mobile="1")
         asyncio.run(session_state.save_changed_state(d))

@@ -9,12 +9,10 @@ Keys use a hash of the session ID; values may hold personal data, so never log t
 """
 import hashlib
 import json
+import logging
 from typing import Any, Callable, Optional
 
-from app.core.cache import cache
-from helpers.utils import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 NAMESPACE_PREFIX = "session-state"
 DEFAULT_TTL_SECONDS = 24 * 3600
@@ -55,6 +53,9 @@ async def load_state(session_id: str) -> dict[str, dict[str, Any]]:
     names = list(_SECTIONS)
     if not names or not session_id:
         return {}
+    # Prompt rendering only uses in-memory state; load Redis dependencies when doing I/O.
+    from app.core.cache import cache
+
     key = session_key(session_id)
     try:
         values = await cache.multi_get([f"{namespace(n)}:{key}" for n in names])
@@ -65,6 +66,8 @@ async def load_state(session_id: str) -> dict[str, dict[str, Any]]:
 
 
 async def get_section(session_id: str, section: str) -> dict[str, Any]:
+    from app.core.cache import cache
+
     try:
         return await cache.get(session_key(session_id), namespace=namespace(section)) or {}
     except Exception as exc:
@@ -74,6 +77,8 @@ async def get_section(session_id: str, section: str) -> dict[str, Any]:
 
 async def set_section(session_id: str, section: str, value: dict[str, Any]) -> None:
     """Replace a whole section (for workflows such as FFS that keep their own full state)."""
+    from app.core.cache import cache
+
     try:
         if value:
             await cache.set(session_key(session_id), value, ttl=_SECTIONS.get(section, DEFAULT_TTL_SECONDS),
