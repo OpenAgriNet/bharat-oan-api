@@ -947,7 +947,7 @@ comparison could be made, and it says the cause is the prompt, not the
 transport. Tracked as [open-issues.md](../open-issues.md) item 21, beside the
 identical failure in KCC and PM-KISAN.
 
-### Three defects the verification found
+### Four defects the verification found
 
 1. **`support` was reading a contract it cannot carry.** `SupportAction` is
    `additionalProperties: false` over a single `support` object
@@ -969,6 +969,27 @@ identical failure in KCC and PM-KISAN.
    scheme on a filing is the one resolved from KHC's own list, because a farmer
    may be complaining about a scheme this resource advertises nothing about.
    The catalog's name is now carried only when it is that same scheme.
+
+4. **The api collection published the catalog the agent reads, more
+   narrowly.** The collection and `capability-examples` publish the same
+   `catalogId`, so whichever ran last wins. The folder followed the
+   collection's majority convention, `visibleTo: ["{{networkId}}",
+   "{{otherNetworkId}}"]`, while the example publishes `["*"]` and
+   `agents/tools/v2/khc.py` discovers with `networkId: "*"` -- and discovery
+   matches those literally, because **`*` is not a wildcard on either side**.
+   One collection run therefore left `check_khc_grievance_status` answering
+   "KHC service is unavailable" with nothing wrong in the adapter, the mapping
+   or the mock. Fixed by publishing `["*"]` and discovering with `"*"`, which
+   is the self-consistent pair AIF's folder already used.
+
+   Worth saying how it was caught, because the collection was green either way:
+   only re-running the tool *after* a collection run found it. A green
+   collection does not prove the agent still works, since the two share one
+   catalog row.
+
+   The other folders were checked and are not affected -- KCC's and PMFBY's
+   apparent difference is `{{networkId}}` against its resolved value, the same
+   list either way.
 
 The mock had one data fault of its own: its filler scheme list repeated
 "Agriculture Infrastructure Fund (AIF)" at scheme 22 alongside the real scheme

@@ -367,6 +367,16 @@ status journey reads it back, so the whole thing runs top to bottom.
 
 13 requests, 45 assertions, green on 2026-11-24.
 
+Two settings in that folder are not free choices.
+
 `khc-schema-base` stays on `openagrinet.github.io` even against a local stack,
 for the reason given above — the catalog's `@context` must be the canonical URL
 or the pack falls back to v0.1 and the publish is refused.
+
+The publish sends `visibleTo: ["*"]` and the discover sends `networkId: "*"`,
+and they have to agree, because **`*` is matched literally — it is not a
+wildcard**. The folder and `capability-examples` publish the same `catalogId`,
+so whichever ran last wins: publish it any narrower here and
+`check_khc_grievance_status` starts answering "KHC service is unavailable" with
+nothing wrong anywhere else. If you change one, change all three — this folder,
+the example file, and the tool.
