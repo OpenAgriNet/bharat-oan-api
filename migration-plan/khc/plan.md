@@ -153,8 +153,9 @@ provider's OpenAPI at the catalog's `operationRef`.
 One POST to the adapter's `/publish` mount, which strips the path and routes
 through the network module to discovery
 (`routing-network-adapter-provider.yaml`). The action is `catalog/publish`,
-and the whole catalog goes in one request. AIF's, trimmed, is the model
-(`helmcharts/quick-start/capability-examples/AgricultureResource/publish/ondemand-aif.json`):
+and the whole catalog goes in one request. KCC's, trimmed, is the model
+(`helmcharts/quick-start/capability-examples/SchemeApplication/publish/ondemand-kcc.json`)
+— the one provider that publishes under the same pack its calls carry:
 
 ```json
 {
@@ -165,47 +166,58 @@ and the whole catalog goes in one request. AIF's, trimmed, is the model
     "transactionId": "…", "messageId": "…", "timestamp": "…",
     "networkId": "oan.dev", "senderId": "oan.dev", "receiverId": "oan.dev"
   },
-  "message": { "catalogs": [ {
-    "id": "cat-khc",
-    "bppId": "oan.dev",
-    "bppUri": "https://net-a.oan.dev",
-    "descriptor": { "code": "KHC", "name": "Kisan Help Center" },
-    "provider": { "id": "khc", "descriptor": { "code": "KHC", "name": "Kisan Help Center" } },
-    "isActive": true,
-    "resources": [ {
-      "id": "res-khc-grievance",
-      "descriptor": {
-        "code": "khc-grievance",
-        "name": "KHC grievance registration",
-        "shortDesc": "Register a grievance with the Kisan Help Center and read its status."
-      },
-      "resourceAttributes": {
-        "@context": "https://raw.githubusercontent.com/OpenAgriNet/network-specs/refs/heads/bv-migration/schema/AgricultureResource/v0.2/context.jsonld",
-        "@type": "openagrinet:AgricultureResource",
-        "informationMode": "OnDemand",
-        "subjectCategories": ["Scheme"],
-        "agricultureSubjects": [ { "descriptor": { "code": "KHC", "name": "Kisan Help Center" } } ],
-        "languages": ["en", "hi"],
-        "coverageAreas": [ { "codeScheme": "ISO-3166-1", "areaLevel": "Country",
-                             "areaCode": "IN", "areaName": "India" } ],
-        "actions": [
-          { "action": "init",
-            "operationRef": "https://raw.githubusercontent.com/OpenAgriNet/network-specs/refs/heads/bv-migration/api/external/khc/tickets/v0.2/openapi.yaml#/paths/~1auth~1send-otp/post" },
-          { "action": "confirm", "operationRef": "…#/paths/~1auth~1verify-otp/post" },
-          { "action": "support",  "operationRef": "…#/paths/~1v1~1state~1grievances/post" }
-        ]
-      }
+  "message": {
+    "publishDirectives": [ {
+      "catalogId": "cat-khc", "catalogType": "REGULAR",
+      "updateMode": "MERGE", "visibleTo": ["oan.dev"]
+    } ],
+    "catalogs": [ {
+      "id": "cat-khc",
+      "bppId": "oan.dev",
+      "bppUri": "https://net-a.oan.dev",
+      "descriptor": { "code": "KHC", "name": "Kisan Help Center" },
+      "provider": { "id": "khc", "descriptor": { "code": "KHC", "name": "Kisan Help Center" } },
+      "isActive": true,
+      "resources": [ {
+        "id": "res-khc-grievance",
+        "descriptor": {
+          "code": "khc-grievance",
+          "name": "KHC grievance registration",
+          "shortDesc": "Register a grievance with the Kisan Help Center and read its status."
+        },
+        "resourceAttributes": {
+          "@context": "https://openagrinet.github.io/network-specs/schema/Grievance/v0.2/context.jsonld",
+          "@type": "openagrinet:Grievance",
+          "informationMode": "OnDemand",
+          "scheme": { "code": "KHC", "name": "Kisan Help Center" },
+          "grievanceOptions": {
+            "categories":    [ { "code": "CROP", "name": "Crop related" } ],
+            "subCategories": [ { "code": "CROP-PEST", "name": "Pest attack" } ]
+          },
+          "actions": [
+            { "action": "init",
+              "operationRef": "https://raw.githubusercontent.com/OpenAgriNet/network-specs/refs/heads/bv-migration/api/external/khc/tickets/v0.2/openapi.yaml#/paths/~1auth~1send-otp/post" },
+            { "action": "confirm", "operationRef": "…#/paths/~1auth~1verify-otp/post" },
+            { "action": "support",  "operationRef": "…#/paths/~1v1~1state~1grievances/post" }
+          ]
+        }
+      } ]
     } ]
-  } ] }
+  }
 }
 ```
 
-Four things in there are not obvious and all four are load-bearing:
+Five things in there are not obvious and all five are load-bearing:
 
-- **`@context` is a `raw.githubusercontent.com` URL on `bv-migration`, not
-  `openagrinet.github.io`.** github.io does not serve v0.2 at all, and the
-  adapter resolves the pack from this URL. A github.io v0.2 URL fails with
-  `SCH_SCHEMA_ADAPTATION_FAILED`.
+- **`publishDirectives` is where the audience is set**, not the catalog.
+  `visibleTo` is matched by array overlap, so a catalog published to
+  `["oan.dev"]` is invisible to a tool that discovers on `"*"`. Every scheme
+  catalog publishes to `oan.dev`; KHC follows.
+- **`@context` is the pinned `openagrinet.github.io` URL even though github.io
+  404s it.** The adapter's `extendedSchema_contextRewrite` fetches the pack from
+  `raw.githubusercontent.com/…/bv-migration/…` instead, on the publish module as
+  well as the transaction ones. Verified: this exact shape published
+  `ACCEPTED` on 2026-11-24.
 - **`operationRef` is a JSON pointer with `/` escaped as `~1`**, and the schema
   pattern requires the document be named `openapi.yaml` — so the draft has to be
   promoted before anything can be published.
@@ -217,49 +229,93 @@ Four things in there are not obvious and all four are load-bearing:
   that asks on the wrong one matches nothing and reports "no data" — the bug
   that hid mandi's broken discover until 2026-11-23.
 
-## Two `@context`s, and KHC is a Grievance
+## How we decide which pack a capability goes under
 
-`@context` means a different thing in the catalog than it does in a request, and
-confusing the two is the easiest mistake here. AIF carries **both**, and so will
-KHC.
+Three questions, and they have three different deciders. Running them together
+is what produced two wrong answers in earlier drafts of this plan.
 
-| Where | `@type` | `@context` | Why |
-|---|---|---|---|
-| The published catalog resource | `openagrinet:AgricultureResource` | `raw.githubusercontent.com/…/bv-migration/schema/AgricultureResource/v0.2/context.jsonld` | the catalog has to validate against a pack whose `@context` is not pinned |
-| Every action payload — `init`, `confirm`, `support`, `select`, `status` | **`openagrinet:Grievance`** | `openagrinet.github.io/…/schema/Grievance/v0.2/context.jsonld` | this is the real capability, and it is the registry binding key |
+| Question | Decided by | Rule |
+|---|---|---|
+| What `@type` does the **action payload** carry? | what the farmer is doing | the capability's own pack |
+| What `@type` does the **catalog** publish under? | whether that pack's catalog schema can actually be satisfied | the same pack — fall back only on a refusal you have reproduced |
+| **How many resources** does the catalog hold? | how the adapter has to route | one per binding, where a binding is one `<provider>\|<@type>` with up to one native path per action |
 
-AIF's own `status-aif.json` is exactly this: `@type: openagrinet:Grievance` with
-the github.io `@context`, against a catalog published as
-`openagrinet:AgricultureResource`.
+### 1. The payload `@type` is what the farmer is doing
 
-**So what is KHC, in pack terms? A Grievance.** Not a `SchemeApplication` —
-nobody applies to the Kisan Help Center, they complain to it, and
-`SchemeApplication` is for reading an application's progress. The
-`AgricultureResource` line in the catalog is a publishing workaround, not a
-statement about what KHC is.
+Every action example in `helmcharts/quick-start/capability-examples` carries the
+`@type` of the folder it sits in — eleven files, no exceptions. The pack is the
+verb, not the provider:
 
-**How the github.io 404 is survived on the request side but not the catalog
-side.** `extendedSchema_contextRewrite` on the adapter rewrites *where a pack is
-fetched from*, never the payload's `@context`:
+| The farmer is… | pack | precedent |
+|---|---|---|
+| complaining | `Grievance` | PM-KISAN, PMFBY, AIF tickets |
+| tracking an application they filed | `SchemeApplication` | KCC loan, PMFBY insurance, PM-KISAN |
+| reading reference data or content | `AgricultureResource` | SATHI seed stock |
+| asking a price | `MandiPrice` | agmarknet |
+| asking a forecast | `WeatherObservation` | mausamgram |
+
+KHC is a help centre. A farmer files a complaint and reads its progress.
+**`openagrinet:Grievance`** — not `SchemeApplication`, because nobody applies to
+a help centre, and not `AgricultureResource`, which is where a capability lands
+when nothing fits and something fits here.
+
+This answer is also the registry binding key, `khc|openagrinet:Grievance`, so it
+is the one of the three that cannot be revisited later without re-registering.
+
+### 2. The catalog `@type` is the same one, until a refusal says otherwise
+
+Default to the pack from step 1. Fall back to `AgricultureResource` only on a
+refusal reproduced against a running adapter, and write the refusal down.
+
+**This plan previously said KHC has to fall back, and that was wrong.** Checked
+against the running stack on 2026-11-24 — a `Grievance/v0.2` resource with
+`scheme`, `grievanceOptions.categories` and `grievanceOptions.subCategories`,
+`@context` the pinned github.io URL:
 
 ```
-https://openagrinet.github.io/network-specs/schema/Grievance/v0.2/|https://raw.githubusercontent.com/OpenAgriNet/network-specs/refs/heads/bv-migration/schema/Grievance/v0.2/
+POST http://localhost:9201/publish
+  -> 200  {"catalogId":"cat-khc-probe","status":"ACCEPTED",
+           "stats":{"itemCount":1,"providerCount":1,"categoryCount":1}}
 ```
 
-So a request may carry the pinned github.io URL and still resolve. It is set only
-on the blocks with `extendedSchema_enabled: "true"` — the transaction path. The
-publish path has no such rewrite, which is why the catalog cannot name
-`Grievance/v0.2` and AIF publishes as `AgricultureResource/v0.2` instead.
+AIF's three refusals in [discovery.md](../discovery.md#how-aif-publishes) are
+real and were correctly recorded. They are also out of date. They predate the
+publish module getting the same treatment as the transaction modules:
+`network-adapter.yaml.tmpl:253` is `oanProviderPublish`, mounted at `/publish`,
+and `:293-295` set `extendedSchema_enabled: "true"` with the rewrite covering
+both `SchemeApplication/v0.2` and `Grievance/v0.2`. The pinned github.io
+`@context` resolves on publish now. KCC is the other half of the proof: it
+publishes `openagrinet:SchemeApplication` carrying that same pinned `@context`
+and its publish passes.
 
-Both go away when `bv-migration` merges to `main` and github.io serves v0.2.
-Until then KHC inherits the workaround as-is — **no new adapter keys**, because
-the Grievance rewrite line AIF added already covers KHC.
+So the rewrite is **not** transaction-only, and the one-line rule is: a pinned
+`@context` is survivable anywhere the rewrite covers the pack, and it covers
+both packs on all three modules that validate.
 
-## One resource, two `@type`s — not two resources
+**KHC publishes as `Grievance/v0.2`.** That is not cosmetic. It is what makes
+`scheme` and `grievanceOptions` publishable, which is what removes reference
+calls from the runtime path — see *The reference lists* below.
 
-The two rows above are **one resource**, described twice in two different
-documents. They are not two catalog entries, and `SchemeApplication` is not
-involved in KHC at all.
+AIF should be moved off `AgricultureResource` for the same reason. That is an
+AIF item, not a KHC one; it is carried, not done here.
+
+### 3. Resource count follows routing, not data
+
+One catalog resource per binding, and a binding is `<provider>|<@type>` with at
+most one native path per Beckn action. Split a resource when the adapter has to
+reach a different endpoint. Do **not** split because the data differs — AIF's
+two resources are told apart by `descriptor.code`, and the tool reads
+`actions[]` off the discovered resource to know what it may send.
+
+For KHC that is one resource, `res-khc-grievance`, carrying `init`, `confirm`,
+`support`, `select`, `status` — plus a second only if the geography lookups
+become a capability of their own, which is the open question below.
+
+### The catalog and the payload are two documents about one resource
+
+Worth stating plainly because it is the easiest thing to misread: the catalog
+resource and the action payload are not two resources, and a resource does not
+have to publish under the pack whose calls it answers.
 
 ```
 catalog (published once)              action payload (sent on every call)
@@ -267,56 +323,23 @@ catalog (published once)              action payload (sent on every call)
 res-khc-grievance                     message.contract.commitments[0]
   descriptor.code: khc-grievance        .commitmentAttributes
   resourceAttributes:                      "@type": "openagrinet:Grievance"
-    "@type": "openagrinet:                 "@context": github.io/…/Grievance/v0.2/
-              AgricultureResource"         "scheme": {...}
+    "@type": "openagrinet:Grievance"       "@context": github.io/…/Grievance/v0.2/
+    "scheme": {...}                        "grievanceNo": "MH/202411/1"
+    "grievanceOptions": {...}
 ```
 
-The tool finds the resource by `descriptor.code` from `discover`, then posts a
-call whose `@type` is the capability — and that `@type` is what keys the registry
-binding, `khc|openagrinet:Grievance`.
+With step 2 settled the two now agree, which is the point — AIF's split was the
+workaround, not the pattern. The tool finds the resource by `descriptor.code`
+from `discover`, then posts a call whose `@type` keys the binding.
 
-AIF has two resources because it has two capabilities: a loan application and a
-support-ticket list. KHC has one capability, grievances, so **one resource** —
-plus a second only if the reference lists become a capability of their own.
+### What is still pinned, and when it stops mattering
 
-### Why the catalog says the generic one
-
-`GrievanceFields` pins `@context`:
-
-```yaml
-  GrievanceFields:
-    required: [scheme, '@context', '@type', informationMode, grievanceOptions, actions]
-    properties:
-      '@context':
-        oneOf:
-        - const: https://openagrinet.github.io/network-specs/schema/Grievance/v0.2/context.jsonld
-        - type: array
-          contains: {const: https://openagrinet.github.io/.../Grievance/v0.2/context.jsonld}
-```
-
-Both branches require a URL github.io answers with 404, and the root `Grievance`
-is `allOf: [GrievanceFields]`. On the request side the adapter's
-`contextRewrite` makes that survivable; on the publish side there is no rewrite,
-so the catalog has to name a pack whose `@context` is not pinned. That is
-`AgricultureResource/v0.2`. The identical wall AIF hit on
-`SchemeApplication/v0.2`, solved the identical way — and there is no `Grievance`
-publish example anywhere in `helmcharts`, which is the same fact from the other
-side: nothing on this stack has ever published a Grievance catalog.
-
-### What the workaround costs
-
-`grievanceOptions` is a `Grievance/v0.2` field, and `AgricultureResourceFields`
-requires only `informationMode` and `subjectCategories` and does not define it.
-The root does not set `unevaluatedProperties: false`, so an extra
-`grievanceOptions` may well pass unvalidated — but an attribute the pack does not
-define is not published data, it is a field that happens not to be rejected.
-**Test it before relying on it; assume schemes and categories come back as
-`select` reads.**
-
-Same for `scheme` and `challenge.methods`. The farmer-facing consequence is
-small — the tool knows KHC needs a six-digit OTP because the tool is KHC's — but
-the catalog cannot say so, and a per-(state, scheme) resource split has no
-`scheme` field to split on. One resource per capability, not per scheme.
+The `@context` KHC publishes and sends is
+`https://openagrinet.github.io/network-specs/schema/Grievance/v0.2/context.jsonld`,
+which github.io answers with 404 today; the adapter's rewrite fetches the pack
+from `raw.githubusercontent.com/…/bv-migration/…` instead. **No new adapter keys
+for KHC** — the Grievance line AIF added already covers it. The rewrite goes away
+when `bv-migration` merges to `main` and github.io serves v0.2.
 
 ## So how does a capability get two OTP steps?
 
@@ -444,58 +467,78 @@ be `openagrinet:Grievance` and collide on one key. AIF's two bindings are two
 different types, and where it wants one session across both it says so with
 `sessionBindingKey`.
 
-### The seven reference lists — the one thing that does not fit
+### The seven reference lists, and what each one costs
 
 They are `GET`s under `mappings/internal/` with `action: internal`, which is not
 a Beckn action, and they appear in no `actions` entry. As things stand no tool
-can reach them. Working out where they should go is what turned up the hard
-limit in this whole plan.
+can reach them. They are not one problem — they are three, with three different
+answers.
 
-**The catalog cannot hold the options.** The earlier draft of this section said
-schemes, categories and sub-categories are catalog data and belong in
-`grievanceOptions`. They are, and they would — but `grievanceOptions` is a
-`Grievance/v0.2` field and KHC publishes under `AgricultureResource/v0.2`,
-because `Grievance/v0.2` pins `@context` to a github.io URL that 404s. See
-*Which pack KHC publishes under* above. So all seven stay runtime reads.
+| List | Answer | Runtime calls |
+|---|---|---|
+| categories, sub-categories | publish them in `grievanceOptions` | 0 |
+| schemes | one resource per scheme, or a live read — decide on sight of the list | 0 or 1 |
+| states, districts, sub-districts, villages | live reads, and the limit below bites here | up to 4 |
 
-**And the adapter binds one fixed path per (capability, action).** Two facts,
-both checked:
+**Categories and sub-categories are catalog data, and the catalog takes them.**
+`grievanceOptions.categories` and `.subCategories` are exactly this shape:
+`{code, name, help}`, provider-defined codes, no central enumeration. The probe
+in *How we decide* above published both and was `ACCEPTED`. Two of the seven
+stop being calls at all, and the tool reads them off `discover`.
+
+**Schemes depend on how many there are.** `GrievanceFields.scheme` is one scheme
+per resource, `{code, name}` — PM-KISAN and PMFBY each publish a resource per
+scheme, which is the precedent. KHC is a multi-scheme desk, so either it
+publishes a resource per scheme, or `scheme` names KHC itself and the list stays
+a read. Under ~20 stable schemes, publish them; otherwise read. We cannot see
+the list yet, so this is one of the four questions in phase 1.
+
+**The geography cascade is where one-path-per-action bites.** Two facts, both
+checked:
 
 - `ActionPlan.Path` is a plain `string` (`pkg/model/model.go:114-116`). No
-  templating, no substitution from the payload. The JSONata mapping shapes the
-  body and nothing else.
-- A binding is keyed by participant and capability, and the capability is read
-  off the payload's `@type` —
+  templating, no substitution from the payload.
+- A binding is keyed `<provider>|<@type>` —
   `capabilityCodeAt: "message.contract.commitments[].commitmentAttributes.@type"`
-  in `network-adapter.yaml`, and `ensure_actions_binding(participant,
-  capability, …)` in `setup.py:647`. discovery.md states it outright:
-  *"registry bindings are keyed `<provider>|<@type>`"*.
+  in `network-adapter.yaml`, `ensure_actions_binding(participant, capability, …)`
+  at `setup.py:647` — and holds at most one path per Beckn action. The adapter
+  routes six actions and `discover` is not one a provider serves, so five.
 
-So seven native paths need seven distinct (`@type`, action) pairs. One `select`
-on an `AgricultureResource`-typed capability reaches exactly **one** of the seven
-— `sathi_seed.py:41` is the precedent, `@type: openagrinet:AgricultureResource`
-with `select`. Reaching all seven needs seven `@type`s, and the only ones that
-exist mean mandi prices, weather, facilities, knowledge, scheme applications and
-grievances. None of them means "village list", and inventing one is a pack
-change we do not get to make.
+The grievance binding spends all five on `init`, `confirm`, `support`, `select`
+and `status`. There is no slot left for a district list.
+
+Publishing the geography does not escape it either.
+`AgricultureResourceFields.coverageAreas` holds
+`{codeScheme, areaCode, areaLevel, areaName}` with `additionalProperties: false`
+and **no parent field**, so a flat publish loses the tree: a district cannot say
+which state it is in. That only works if KHC's ids are LGD codes, which are
+unique per level and let the tool rebuild the hierarchy itself. Villages are too
+many to publish whatever the scheme.
 
 The ways out, in the order they should be tried:
 
-1. **Ask KHC for one parameterised reference endpoint** —
-   `GET /v1/state/reference?type=villages&parentId=…`. One native path, one
-   `select`, one binding, all seven lists. It is a single request to the
-   provider and it is the only option that leaves v2 clean.
-2. **Keep the provider backend in front of the lists only.** Register
-   `bharat-provider-backend` as the v2 provider for a `khc-reference`
-   capability and let it keep doing the fan-out, while grievance filing and
-   status go straight to KHC. Hybrid, ugly, and it works today.
-3. **Propose a `Place`-style pack** for a location hierarchy any provider with a
-   gazetteer could publish. The right answer, and far too slow to block on.
+1. **Ask KHC for one parameterised endpoint** —
+   `GET /v1/state/reference?type=villages&parentId=…`. One path, one `select`,
+   one binding, all four lists. It costs no adapter change at all: for a method
+   with no body `BuildEndpoint` already turns the mapped request into the query
+   string (`internal/common/util/endpoint.go:26-40`). One email, and it is the
+   only option that leaves v2 clean.
+2. **A second binding, `khc|openagrinet:AgricultureResource`.** That pack's
+   `x-oan-schema-by-action` allows `init`, `confirm`, `select`, `status` — four
+   slots for exactly four lists, on a second resource `res-khc-reference`. This
+   works today with no ask and no pack change, and it is a lie in the registry:
+   `init` would mean "list districts". Use it only if 1 is refused, and comment
+   the registry row.
+3. **Add `parentAreaCode` to `AdministrativeAreaReference`.** One optional field,
+   and the geography becomes publishable for every provider with a gazetteer.
+   The right answer and the slowest.
+4. **Keep `bharat-provider-backend` in front of the lists only.** Grievance
+   filing and status go to KHC; the fan-out stays where it is. Hybrid, ugly,
+   available.
 
-**Until one of these lands, the registration journey cannot migrate.** Filing
-needs six master IDs and there is no supported way to fetch them. The status
-journey has no such dependency, which is why it is phase 4 and registration is
-phase 7.
+**The registration journey is not blocked.** Route 2 exists today. Route 1 is
+strictly better and worth one email before building, which is why phase 1 asks
+for it and registration is last.
 
 ## What this needs that does not exist yet
 
@@ -535,13 +578,15 @@ Not code: four answers, and the catalog cannot be written without them.
 
 | Question | Who answers | Needs the API key |
 |---|---|---|
-| Will KHC expose **one** parameterised reference endpoint? | KHC | no |
+| Will KHC expose **one** parameterised reference endpoint for the geography? | KHC | no |
+| How many schemes are there, and how often do they change? | KHC | no |
 | Is the farmer's token required on create, and in which header? | KHC | no |
 | Do the reference GETs take a parent id, and what are their fields called? | KHC, or a probe | **yes** |
 | Will the pack take `confirm` and `select` in its call map? | pack owners | no |
 
-Three of the four can be asked today, and the first one decides whether
-registration can migrate at all.
+Four of the five can be asked today. None of them blocks: question 1 decides
+between route 1 and route 2 of *The seven reference lists*, and question 2
+decides whether schemes are published or read.
 
 ### 2. The contract and the catalog
 
@@ -549,14 +594,17 @@ Promote `openapi-draft.yaml` to `openapi.yaml` with the contract fixes above,
 and write the catalog in place of `catalog-placeholder.json`. One catalog,
 `cat-khc`, with resources told apart by `descriptor.code` the way AIF's are:
 
-| resource | descriptor.code | action-payload `@type` | actions |
-|---|---|---|---|
-| `res-khc-grievance` | `khc-grievance` | `openagrinet:Grievance` | `init`, `confirm`, `support`, `select`, `status` |
-| `res-khc-reference` | `khc-reference` | `openagrinet:AgricultureResource` | `select` |
+| resource | descriptor.code | published `@type` | payload `@type` | actions |
+|---|---|---|---|---|
+| `res-khc-grievance` | `khc-grievance` | `openagrinet:Grievance` | `openagrinet:Grievance` | `init`, `confirm`, `support`, `select`, `status` |
+| `res-khc-reference` | `khc-reference` | `openagrinet:AgricultureResource` | `openagrinet:AgricultureResource` | `select`, or four slots on route 2 |
 
-Both publish as `@type: openagrinet:AgricultureResource` with a
-`raw.githubusercontent.com` `@context` on `bv-migration`. The second resource
-exists only if question 1 is answered yes.
+The grievance resource publishes and transacts under the same pack, with the
+pinned `openagrinet.github.io` `@context` — the probe in *How we decide* proved
+that publishes. It carries the categories and sub-categories in
+`grievanceOptions`, and a `scheme` per resource if question 2 says to publish
+them. The reference resource exists only for the geography, and its shape
+depends on the answer to question 1.
 
 Note the descriptor code changes: the draft says `khc-tickets`, v1's item id is
 `khc-grievance`. Pick `khc-grievance` and update the draft, so the catalog, the
@@ -592,12 +640,16 @@ this is not the registration OTP.
 
 ### 5. Master data, cached
 
-`agents/tools/v2/khc_master.py`: one `select` per location list, cached in Redis
-through the aiocache instance in `app/core/cache.py` under a `khc-master`
-namespace with a long TTL, failing open to a direct call when Redis is down —
-the pattern `helpers/master_catalog.py` already uses. Without a cache the
-four-level walk would make v2 slower than v1, which had the provider backend do
-it in one hop. The name normalisation moves across from v1.
+`agents/tools/v2/khc_master.py` covers the geography only — categories and
+sub-categories now come off the published catalog, and schemes do too if
+question 2 says to publish them.
+
+One `select` per location list, cached in Redis through the aiocache instance in
+`app/core/cache.py` under a `khc-master` namespace with a long TTL, failing open
+to a direct call when Redis is down — the pattern `helpers/master_catalog.py`
+already uses. Without a cache the four-level walk would make v2 slower than v1,
+which had the provider backend do it in one hop. The name normalisation moves
+across from v1.
 
 ### 6. The two aggregating tools
 
@@ -639,12 +691,13 @@ The whole status journey, end to end: the contract fixes, the catalog, the
 provider template, `mock-khc` and phases 2 through 4. Nothing in it needs a
 credential or a field name we do not have.
 
-Registration cannot start, and not because of the missing key — because of the
-reference endpoint. See *The seven reference lists*.
+Registration can start too, on route 2 of *The seven reference lists* — but one
+email to KHC decides between route 1 and route 2, and asking before building is
+cheaper than rebuilding. Send it in phase 1.
 
 What the API key unlocks is narrow and decisive: whether the reference GETs take
 a parent id, and what their fields are really called. The draft's `stateid` and
-`statename` are guesses, and those seven responses feed the six master IDs that
+`statename` are guesses, and those responses feed the six master IDs that
 `register_khc_grievance` refuses to send without. Reading them is read-only, no
 mobile, no write.
 
@@ -665,24 +718,30 @@ mobile, no write.
 3. **The reference GETs declare `parameters: []`.** A district list that takes no
    `stateId` cannot be what KHC does, so the tracing is incomplete. Needs the API
    key to settle, and until it is settled the master-data design is a guess.
-4. **Seven reference lists, and the adapter binds one fixed path per
-   (capability, action).** `ActionPlan.Path` is a plain string and bindings are
-   keyed `<provider>|<@type>`, so seven native paths need seven `@type`s and
-   none of the existing ones means "village list". **This blocks registration,
-   not just inconveniences it.** Ask KHC for one parameterised reference
-   endpoint; fall back to keeping the provider backend in front of the lists.
-5. **`grievanceOptions`, `scheme` and `challenge` cannot be published.** All
-   three are `Grievance/v0.2` fields, and `Grievance/v0.2` pins `@context` to a
-   github.io URL that 404s — the same wall AIF hit on `SchemeApplication/v0.2`.
-   KHC publishes as `AgricultureResource/v0.2`, which defines none of them. A
-   `Place`-style pack for location hierarchies is the real long answer and is a
-   pack proposal, not this migration.
-6. **No KHC credentials and no mock.** Same position KCC was in, except KHC
+4. **Four geography lists, and a binding holds one path per action.**
+   `ActionPlan.Path` is a plain string and bindings are keyed
+   `<provider>|<@type>`, and the grievance binding already spends all five
+   routable actions. Four ways out are set out in *The seven reference lists*;
+   route 2 works today, so this **shapes** registration rather than blocking it.
+   Ask KHC for one parameterised endpoint first.
+5. **`AdministrativeAreaReference` has no parent field.** `coverageAreas` can
+   carry `{codeScheme, areaCode, areaLevel, areaName}` and nothing else, so a
+   published district cannot say which state it belongs to and the cascade is
+   only recoverable if KHC's ids are LGD codes. One optional `parentAreaCode`
+   closes it for every provider with a gazetteer. Pack proposal, not this
+   migration.
+6. **AIF publishes under the wrong pack now.** It fell back to
+   `AgricultureResource/v0.2` because the publish module could not resolve the
+   pinned `@context`; it can since KCC's work. Moving AIF's catalog to
+   `SchemeApplication/v0.2` and `Grievance/v0.2` would let it publish `scheme`
+   and `challenge` too. An AIF item, listed here because this plan is where the
+   finding came from.
+7. **No KHC credentials and no mock.** Same position KCC was in, except KHC
    also writes. A mock is not optional here.
-7. **Thirteen language files reference tool behaviour.** If any tool's
+8. **Thirteen language files reference tool behaviour.** If any tool's
    contract changes — an argument added, an error reworded — all thirteen need
    the same edit. KCC's open item 12 is this problem already.
-8. **`khc_service_note` runs on every turn of every conversation.** It is v1
+9. **`khc_service_note` runs on every turn of every conversation.** It is v1
    code in `agents/tools/khc.py` imported directly by `agents/agrinet.py`, so
    flipping `KHC_BECKN_VERSION` would leave the agent importing both files.
    Either the note moves somewhere version-neutral, or the v2 module re-exports
@@ -694,7 +753,9 @@ matching PMFBY insurance, because KHC's send and verify are different endpoints.
 `variant` keys in `operationRef` entries are **not** an option — `Grievance/v0.2`
 sets `additionalProperties: false` on `actions[]` and the adapter binds one path
 per action, so an earlier draft of this plan proposed something neither layer
-supports.
+supports. And KHC publishes under `Grievance/v0.2`, not `AgricultureResource` —
+an earlier draft said the opposite and was wrong; the probe is in *How we
+decide*.
 
 ## Risks
 

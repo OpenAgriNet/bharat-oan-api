@@ -34,7 +34,7 @@ place -- read that first when picking a capability back up.
 | Soil Health Card | **Built, verified end to end locally** — [plan](shc/plan.md) · [try it](shc/quick-try.md) · [open TODOs](shc/plan.md#open-todos) |
 | AIF — loan status + grievance status | **Built, catalog published, discoverable; proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
 | KCC — credit card application status | **Built, catalog published, discoverable; proven against a mock only** — [plan](kcc/plan.md) · [try it](kcc/quick-try.md) · [open items](kcc/plan.md#open-items) |
-| KHC — grievance registration + status | **Blocked by design, not by access** — status journey can start; registration cannot until KHC exposes one parameterised reference endpoint — [plan](khc/plan.md) · [open items](khc/plan.md#open-items) |
+| KHC — grievance registration + status | **Planned, not started** — nothing blocks it; the geography lookups need either one parameterised KHC endpoint or a second binding — [plan](khc/plan.md) · [open items](khc/plan.md#open-items) |
 | The other ten | Not started |
 
 Cutting across all of them: the scheme tools used to carry the provider and
@@ -59,6 +59,18 @@ refusing every `select` for a missing `informationMode` — a catalog fact a
 `select` has no reason to carry. That change is not pushed, and the v0.2 packs
 are not published at all — see
 [aif/quick-try.md](aif/quick-try.md#before-you-start).
+
+KHC's planning turned up a fact that changes where every v2 catalog should
+publish: **the publish module resolves a pinned `@context` too.**
+`network-adapter.yaml.tmpl:253` is `oanProviderPublish`, and `:293-295` give it
+`extendedSchema_enabled: "true"` with the same `SchemeApplication/v0.2` and
+`Grievance/v0.2` rewrite the transaction modules have. A `Grievance/v0.2`
+catalog carrying the pinned github.io `@context` published `ACCEPTED` against the
+running stack on 2026-11-24. AIF's fallback to `AgricultureResource/v0.2`
+predates that and is now unnecessary; moving it back would let it publish
+`scheme` and `challenge`. The decision procedure — payload type, catalog type,
+resource count, decided separately — is in
+[khc/plan.md](khc/plan.md#how-we-decide-which-pack-a-capability-goes-under).
 
 KCC also added vocabulary the packs do not cover and should not: a provider's
 own request fields belong in its API contract, not in a schema pack.
