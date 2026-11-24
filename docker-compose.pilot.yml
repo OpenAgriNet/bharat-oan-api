@@ -46,6 +46,13 @@ services:
       PMFBY_BECKN_VERSION: v2
       SATHI_BECKN_VERSION: v2
       SHC_BECKN_VERSION: v2
+      # KHC's seven tools move together on this one flag -- they share an OTP
+      # and a transaction, so a farmer cannot start on v1 and finish on v2.
+      # Four operations ride the network; the seven reference lists are read
+      # straight from KHC, which is why the app needs KHC_BASE_URL and
+      # KHC_AUTH_HEADER of its own in .env beside the adapter's copy.
+      # See migration-plan/khc/plan.md.
+      KHC_BECKN_VERSION: v2
 
   redis:
     image: redis:7-alpine

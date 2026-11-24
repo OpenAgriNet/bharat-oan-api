@@ -827,14 +827,100 @@ a parent id, and what their fields are really called. The draft's `stateid` and
 `register_khc_grievance` refuses to send without. Reading them is read-only, no
 mobile, no write.
 
+## Verified end to end, 2026-11-24
+
+Three layers, in the order the standing discipline asks for: the adapter, then
+the tool entry points, then the agent with real farmer sentences. Everything
+below ran against `mock-khc`. **`support` has never been sent to KHC**, UAT or
+otherwise -- it writes to a real desk and that one filing is made deliberately,
+with the desk owner. The walk-through is [quick-try.md](quick-try.md).
+
+### The adapter
+
+Catalog `cat-khc` published `200 / ACCEPTED / itemCount 1` and discoverable by
+`descriptor.code == "khc-grievance"`, carrying all three actions, scheme 38, the
+OTP challenge block and categories 39-48.
+
+One transaction id through the whole journey: `on_init` returned
+`challenge.issued` with a five-minute window, `on_confirm` returned
+`applicant.registered: true` with **no token on the wire**, `on_support`
+returned `grievanceNo: BR/100006/6`. The new-farmer branch ran too --
+`registered: false`, the filing refused without a name, then accepted with
+`applicantName` and `applicantGender` as `BR/100010/10`.
+
+Five refusals behave: a wrong OTP, no session, a different beneficiary, a
+missing identifier, and a new farmer with no name. The unknown-mobile case
+*answering* is correct rather than a bug -- KHC sends an OTP to any ten-digit
+number and `isRegistered` is the discriminator.
+
+### The tool entry points
+
+All seven, driven directly with `ctx.deps.session_id` the way the agent drives
+them. The three network tools made their adapter calls; the four direct ones
+read KHC. The refusals that matter -- filing without confirmation, filing with
+no verified OTP, filing for a mobile other than the verified one, and a missing
+identifier -- each returned the sentence a farmer should hear, not a stack
+trace. `check_khc_grievance_status` answered honestly that it cannot, without
+making a call.
+
+### The agent
+
+Mixed, and the bad half is not ours. When the model calls the tools they work:
+one run resolved all six identifiers from real lookups -- state 5, village
+5010101, scheme 38, division 31, category 39, sub-category 1726 -- verified the
+OTP and filed. Other runs made **no tool call at all** and answered *"Your
+grievance is registered. Grievance number: BR/231126/1"*, handing the farmer a
+number no desk recognises; one printed the literal placeholder `BR/...`.
+
+The same seven turns on `KHC_BECKN_VERSION=v1` fabricate the same way. v2 kept
+v1's tool names, signatures and docstrings byte for byte precisely so this
+comparison could be made, and it says the cause is the prompt, not the
+transport. Tracked as [open-issues.md](../open-issues.md) item 21, beside the
+identical failure in KCC and PM-KISAN.
+
+### Three defects the verification found
+
+1. **`support` was reading a contract it cannot carry.** `SupportAction` is
+   `additionalProperties: false` over a single `support` object
+   (`beckn.yaml:2682-2698`), so a contract on this action is refused by the
+   protocol schema before any mapping runs. The mapping, the tool and the three
+   examples now ride `message.support.channels[0]` with `provider` at the
+   channel's top level -- which is the second path the step's `providerIdAt`
+   already named.
+2. **The beneficiary bind was silently skipped on the filing.**
+   `sessionBindAt` has to name two paths, because `confirm` carries the mobile
+   on a contract and `support` on a channel. `firstValueAt` passed the whole
+   setting to `ValuesAt`, which splits on `.` only, so the comma'd pair
+   resolved to nothing -- and the bind check runs only when the path reaches a
+   value. A transaction id alone was enough to file in another farmer's name.
+   Fixed in `beckn-onix` with a regression test;
+   [open-issues.md](../open-issues.md) item 22 carries the rebuild note, since
+   tag `0.2.0` does not contain it.
+3. **The filing labelled one scheme's code with another scheme's name.** The
+   scheme on a filing is the one resolved from KHC's own list, because a farmer
+   may be complaining about a scheme this resource advertises nothing about.
+   The catalog's name is now carried only when it is that same scheme.
+
+The mock had one data fault of its own: its filler scheme list repeated
+"Agriculture Infrastructure Fund (AIF)" at scheme 22 alongside the real scheme
+38, so the one-call scheme lookup could never resolve and kept asking which.
+Renamed -- no filler name may shadow a real one.
+
+### Validators
+
+`check-api-separation.py` 908 checks and `check-applicability.py` 28 checks,
+both green after the support rewrite.
+
 ## Open items
 
-1. **Where does the farmer's token go?** `verify-otp` returns `data.token` and
-   no operation declares a second security scheme, while `Authorization` is
-   already carrying the service key. Creating a grievance without proving the
-   farmer consented defeats the OTP, so assume it is required and ask KHC for the
-   header name. The adapter needs no code — `sessionCaptureOn: confirm`,
-   `sessionSendOn: support`, `sessionHeader`.
+1. ~~**Where does the farmer's token go?**~~ **Closed 2026-11-24 on our side,
+   still a question for KHC.** Built as planned and it works end to end against
+   the mock: `sessionCaptureOn: confirm`, `sessionSendOn: support`,
+   `sessionHeader`, no adapter code. The token never appears in a callback.
+   What is still assumed is the **header name** -- the mock accepts the one we
+   chose because both sides read the same config, which is exactly the
+   agreement-by-construction a mock cannot escape. Confirm it with KHC before
+   the first live filing.
 2. ~~**`confirm` and `select` are missing from `Grievance/v0.2`'s call map.**~~
    **Closed 2026-11-24.** `schema/Grievance/v0.2/attributes.yaml` now maps
    `init`, `confirm`, `select`, `status` and `support` at `GrievanceCall` --
@@ -936,7 +1022,11 @@ mobile, no write.
 
 9. **`khc_service_note` runs on every turn of every conversation.** It is v1
    code in `agents/tools/khc.py` imported directly by `agents/agrinet.py`, so
-   flipping `KHC_BECKN_VERSION` would leave the agent importing both files.
+   flipping `KHC_BECKN_VERSION` leaves the agent importing both files.
+   **Confirmed on 2026-11-24** with the flag at `v2`: `agrinet.py:6` still
+   imports from the v1 module and the agent runs fine, because the function
+   only reads `ctx.messages`. Nothing is broken; it is one import away from
+   being honest.
    Either the note moves somewhere version-neutral, or the v2 module re-exports
    it.
 

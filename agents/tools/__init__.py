@@ -117,15 +117,32 @@ else:
         check_kcc_application_status,
         select_kcc_application,
     )
-from agents.tools.khc import (
-    initiate_khc_otp,
-    verify_khc_otp,
-    lookup_khc_reference,
-    find_khc_location,
-    get_khc_grievance_options,
-    check_khc_grievance_status,
-    register_khc_grievance,
-)
+# KHC's seven tools move together on one flag: the filing spends the session
+# that initiate/verify opened, and the three lookups resolve the ids the filing
+# carries, so a farmer who started on v1 cannot finish on v2. On v2 the lookups
+# call KHC directly rather than riding the network -- see agents/tools/v2/khc.py
+# for why -- and the status read answers that it is unavailable, because KHC's
+# check-status cannot be bound (open-issues.md item 20).
+if _beckn_v2("KHC"):
+    from agents.tools.v2.khc import (
+        initiate_khc_otp,
+        verify_khc_otp,
+        lookup_khc_reference,
+        find_khc_location,
+        get_khc_grievance_options,
+        check_khc_grievance_status,
+        register_khc_grievance,
+    )
+else:
+    from agents.tools.khc import (
+        initiate_khc_otp,
+        verify_khc_otp,
+        lookup_khc_reference,
+        find_khc_location,
+        get_khc_grievance_options,
+        check_khc_grievance_status,
+        register_khc_grievance,
+    )
 from agents.tools.terms import search_terms
 from agents.tools.search import (
     search_documents,
