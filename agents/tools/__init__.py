@@ -37,10 +37,19 @@ else:
         initiate_pm_kisan_status_check,
         check_pm_kisan_status_with_otp,
     )
-from agents.tools.pmfby_scheme_status import (
-    initiate_pmfby_status_check,
-    check_pmfby_status_with_otp,
-)
+# The same flag as PMFBY's grievance tools: the policy and claim reads share
+# the OTP the grievance tools do not, so a farmer mid-journey on one version
+# cannot finish on the other.
+if _beckn_v2("PMFBY"):
+    from agents.tools.v2.pmfby_scheme_status import (
+        initiate_pmfby_status_check,
+        check_pmfby_status_with_otp,
+    )
+else:
+    from agents.tools.pmfby_scheme_status import (
+        initiate_pmfby_status_check,
+        check_pmfby_status_with_otp,
+    )
 from agents.tools.shc_scheme_status import check_shc_status
 if _beckn_v2("PMKISAN"):
     from agents.tools.v2.pmkisan_grievance import (
