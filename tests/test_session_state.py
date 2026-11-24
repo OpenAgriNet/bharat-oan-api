@@ -214,6 +214,22 @@ def test_stub_mode_keeps_old_calls_with_placeholder_results():
     assert "result 1" not in str([p.content for p in returns])
 
 
+def test_history_transforms_do_not_mutate_saved_messages():
+    from copy import deepcopy
+    history = _history()
+    saved = deepcopy(history)
+    for stub in (False, True):
+        kept = utils.keep_tool_results(history, 1, stub=stub)
+        assert history == saved
+        assert kept[-4:] == history[-4:]  # newest turn retains its full tool evidence
+        if stub:
+            assert any(p.content == utils.OLD_TOOL_RESULT_STUB for m in kept for p in m.parts
+                       if p.part_kind == "tool-return")
+        else:
+            assert "c0" not in [p.tool_call_id for m in kept for p in m.parts
+                                if p.part_kind == "tool-call"]
+
+
 def test_load_reads_the_keys_that_save_writes_in_one_call():
     from app.core.cache import cache
     session_state.register_section("test_one_call")

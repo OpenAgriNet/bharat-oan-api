@@ -532,25 +532,21 @@ class InitResponseItem(BaseModel):
 class InitResponse(BaseModel):
     responses: List[InitResponseItem] = []
 
+    def _grievance_response_tags(self):
+        """Displayed grievance tags with fields, in provider response order."""
+        for r in self.responses:
+            if not r.message or not r.message.order:
+                continue
+            for tag in r.message.order.tags or []:
+                if tag.display and tag.descriptor and tag.descriptor.code == "grievance-response" and tag.list:
+                    yield tag
+
     def grievance_response(self) -> Optional[Dict[str, str]]:
         """Displayed key/values of the first `grievance-response` tag of a submit response (None if absent)."""
-        for r in self.responses:
-            order = (r.message.order if r.message and r.message.order else None) if r.message else None
-            if not order or not order.tags:
-                continue
-            for tag in order.tags:
-                if not tag.display:
-                    continue
-                tag_code = (tag.descriptor.code if tag.descriptor else None) or ""
-                if tag_code != "grievance-response" or not tag.list:
-                    continue
-
-                kv: Dict[str, str] = {}
-                for li in tag.list:
-                    if not li.display or not li.descriptor or not li.descriptor.code or li.value is None:
-                        continue
-                    kv[str(li.descriptor.code)] = str(li.value)
-                return kv
+        tag = next(self._grievance_response_tags(), None)
+        if tag is not None:
+            return {str(li.descriptor.code): str(li.value) for li in tag.list
+                    if li.display and li.descriptor and li.descriptor.code and li.value is not None}
         return None
 
     def format_grievance_result(self) -> str:

@@ -353,6 +353,27 @@ def last_user_message(history: List[ModelMessage]) -> Optional[str]:
 OLD_TOOL_RESULT_STUB = "[Earlier result not repeated. Facts needed later are in the session state.]"
 
 
+def _stub_tool_results(message: ModelMessage) -> ModelMessage:
+    if not any(getattr(part, "part_kind", "") == "tool-return" for part in message.parts):
+        return message
+    copy = deepcopy(message)
+    for part in copy.parts:
+        if getattr(part, "part_kind", "") == "tool-return":
+            part.content = OLD_TOOL_RESULT_STUB
+    return copy
+
+
+def _drop_tool_parts(message: ModelMessage) -> Optional[ModelMessage]:
+    parts = [part for part in message.parts if getattr(part, "part_kind", "") not in TOOL_PART_KINDS]
+    if len(parts) == len(message.parts):
+        return message
+    if not parts:
+        return None
+    copy = deepcopy(message)
+    copy.parts = parts
+    return copy
+
+
 def keep_tool_results(history: List[ModelMessage], last_n_turns: int, stub: bool = False) -> List[ModelMessage]:
     """Keep tool results only in the last n turns; earlier turns keep their prompt and answer text.
 
@@ -364,29 +385,15 @@ def keep_tool_results(history: List[ModelMessage], last_n_turns: int, stub: bool
     turns = split_turns(history)
     cut = max(len(turns) - last_n_turns, 0)
     kept: List[ModelMessage] = []
+    transform = _stub_tool_results if stub else _drop_tool_parts
     for index, turn in enumerate(turns):
         if index >= cut:
             kept.extend(turn)
             continue
-        if stub:
-            for message in turn:
-                if not any(getattr(p, "part_kind", "") == "tool-return" for p in message.parts):
-                    kept.append(message)
-                    continue
-                copy = deepcopy(message)
-                for part in copy.parts:
-                    if getattr(part, "part_kind", "") == "tool-return":
-                        part.content = OLD_TOOL_RESULT_STUB
-                kept.append(copy)
-            continue
         for message in turn:
-            parts = [p for p in message.parts if getattr(p, "part_kind", "") not in TOOL_PART_KINDS]
-            if len(parts) == len(message.parts):
-                kept.append(message)
-            elif parts:
-                copy = deepcopy(message)
-                copy.parts = parts
-                kept.append(copy)
+            transformed = transform(message)
+            if transformed is not None:
+                kept.append(transformed)
     return kept
 
 

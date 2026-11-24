@@ -37,6 +37,23 @@ TICKET_STATUS = {"responses": [{"message": {"catalog": {"providers": [{"items": 
         {"descriptor": {"code": "status", "name": "Status"}, "value": "Open"}]}]}]}]}}}]}
 
 
+def test_submit_response_preserves_first_tag_and_display_rules():
+    hidden = {"descriptor": {"code": "grievance-response"}, "display": False,
+              "list": [{"descriptor": {"code": "ticket-no"}, "value": "hidden"}]}
+    first = {"descriptor": {"code": "grievance-response"}, "list": [
+        {"descriptor": {"code": "ticket-no"}, "value": "first"},
+        {"descriptor": {"code": "ticket-no"}, "value": "updated"},
+        {"descriptor": {"code": "secret"}, "value": "hidden", "display": False},
+        {"descriptor": {"code": "missing"}, "value": None},
+        {"value": "no descriptor"}]}
+    later = {"descriptor": {"code": "grievance-response"}, "list": [
+        {"descriptor": {"code": "ticket-no"}, "value": "later"}]}
+    body = {"responses": [{}, {"message": {}}, {"message": {"order": {"tags": [hidden, first, later]}}}]}
+    assert pmfby_grievance.InitResponse.model_validate(body).grievance_response() == {"ticket-no": "updated"}
+    first["list"] = [{"value": "no displayed key"}]
+    assert pmfby_grievance.InitResponse.model_validate(body).grievance_response() == {}
+
+
 @pytest.fixture
 def post(monkeypatch):
     monkeypatch.setenv("BAP_ENDPOINT", "http://bap")

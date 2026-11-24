@@ -87,6 +87,16 @@ def test_status_by_phone_and_failures_store_nothing_new(sync_post):
     assert state(ctx) == {"phone_number": "9876543210", "status_otp_step": "sent"}
 
 
+def test_status_by_phone_clears_old_summary_and_consumed_otp(sync_post):
+    ctx = make_ctx()
+    ctx.deps.session_state["pmkisan"] = {"status_summary": {"Beneficiary Name": "Previous farmer"}}
+    sync_post += [httpx.Response(200, json=init_ok()), httpx.Response(200, json=status("COMPLETED"))]
+    pmkisan_scheme_status.initiate_pm_kisan_status_check(ctx, phone_number="९८७६५४३२१०")
+    assert state(ctx) == {"phone_number": "9876543210", "status_otp_step": "sent"}
+    pmkisan_scheme_status.check_pm_kisan_status_with_otp(ctx, otp="1234", phone_number="9876543210")
+    assert state(ctx) == {"phone_number": "9876543210"}
+
+
 # --- grievance flow ----------------------------------------------------------------------
 
 def test_grievance_status_otp_sent_then_verified(async_post):
