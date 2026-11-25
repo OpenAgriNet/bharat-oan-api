@@ -516,8 +516,10 @@ async def pmkisan_grievance_status(
         )
         response = await post_action("status", body, who="PM-KISAN")
         if response.status_code != 200:
-            code, _ = adapter_error(response)
-            if code == "BIZ_GENERIC_ERROR":
+            code, message = adapter_error(response)
+            # A refused OTP is a BIZ_GENERIC_ERROR too, and telling a farmer who
+            # mistyped it that no grievance exists sends them to the wrong fix.
+            if code == "BIZ_GENERIC_ERROR" and "otp" not in message.lower():
                 # Almost always a filing date matching no record, so name it back.
                 logger.info(
                     f"No PM-KISAN grievance for {reg_no_clean}"
