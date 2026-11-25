@@ -80,8 +80,8 @@ SOURCE_LINE = "**Source:** AIF Portal"
 # is what finds it. Same selector weather, mandi and sathi use.
 _DISCOVER_NETWORK_ID = os.getenv("OAN_PUBLIC_NETWORK_ID", "*")
 
-# Every AIF catalog resource carries one of these descriptor codes. @type is
-# openagrinet:AgricultureResource on both, so it cannot tell them apart.
+# Every AIF catalog resource carries one of these descriptor codes. The code,
+# not @type, is what tells the two capabilities apart.
 _LOAN_CODE = "aif-loan-status"
 _TICKETS_CODE = "aif-support-tickets"
 
@@ -163,6 +163,28 @@ def commitment_envelope(
     }
 
 
+def support_envelope(
+    transaction_id: str,
+    attributes: Dict[str, Any],
+    found: Dict[str, Any],
+) -> Dict[str, Any]:
+    """The support shape: one channel, no contract.
+
+    SupportAction is additionalProperties:false over a single support object
+    (beckn.yaml, Support Action), so support cannot carry a contract at all.
+    The provider sits on the channel itself, which is where the adapter's
+    providerIdAt looks for it on this action.
+    """
+    return {
+        "context": build_context("support", transaction_id),
+        "message": {
+            "support": {
+                "channels": [{**attributes, "provider": found["provider"]}]
+            }
+        },
+    }
+
+
 def adapter_error(response: httpx.Response) -> Tuple[str, str]:
     """(code, message) out of a NACK; empty strings when the body is not one."""
     try:
@@ -225,6 +247,15 @@ def commitment_attributes(response: httpx.Response) -> Dict[str, Any]:
     return commitments[0].get("commitmentAttributes") or {}
 
 
+def support_channel(response: httpx.Response) -> Dict[str, Any]:
+    """The first channel off an on_support response."""
+    try:
+        channels = response.json().get("message", {}).get("support", {}).get("channels") or []
+    except ValueError:
+        return {}
+    return channels[0] if channels else {}
+
+
 # --------------------------------------------------------------------------------------
 # Input handling
 # --------------------------------------------------------------------------------------
@@ -232,9 +263,9 @@ def commitment_attributes(response: httpx.Response) -> Dict[str, Any]:
 async def _discover(descriptor_code: str, action: str, what: str) -> Optional[Dict[str, Any]]:
     """The AIF resource for a capability, with its catalog provider.
 
-    AIF publishes both capabilities as openagrinet:AgricultureResource, so
-    @type cannot tell them apart; the descriptor code can, which is how
-    sathi_seed finds its own resources.
+    The filter matches the descriptor code, not @type: loan and tickets sit in
+    different schema packs and the code is what names one resource. Same way
+    sathi_seed finds its own.
     """
     body = {
         "context": build_context("discover", str(uuid.uuid4())),

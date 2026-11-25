@@ -114,15 +114,32 @@ else:
         check_kcc_application_status,
         select_kcc_application,
     )
-from agents.tools.khc import (
-    initiate_khc_otp,
-    verify_khc_otp,
-    lookup_khc_reference,
-    find_khc_location,
-    get_khc_grievance_options,
-    check_khc_grievance_status,
-    register_khc_grievance,
-)
+# KHC's seven tools move together on one flag: the filing spends the session
+# that initiate/verify opened, and the three lookups resolve the ids the filing
+# carries, so a farmer who started on v1 cannot finish on v2. On v2 the lookups
+# call KHC directly rather than riding the network -- see agents/tools/v2/khc.py
+# for why -- and the status read is the gated pair, check-status then verify-otp,
+# with the grievance number on the query string (open-issues.md item 20, closed).
+if _beckn_v2("KHC"):
+    from agents.tools.v2.khc import (
+        initiate_khc_otp,
+        verify_khc_otp,
+        lookup_khc_reference,
+        find_khc_location,
+        get_khc_grievance_options,
+        check_khc_grievance_status,
+        register_khc_grievance,
+    )
+else:
+    from agents.tools.khc import (
+        initiate_khc_otp,
+        verify_khc_otp,
+        lookup_khc_reference,
+        find_khc_location,
+        get_khc_grievance_options,
+        check_khc_grievance_status,
+        register_khc_grievance,
+    )
 from agents.tools.search import search_schemes
 from agents.tools.advisory import search_advisory
 # Unlike mandi, weather's v2 output differs: the provider mapping drops fields
@@ -139,10 +156,16 @@ else:
     from agents.tools.mandi import get_mandi_prices
 from agents.tools.commodity import search_commodity
 from agents.tools.maps import reverse_geocode, forward_geocode
-from agents.tools.gfr import (
-    gfr_get_crop_registries,
-    gfr_get_recommendations,
-)
+if _beckn_v2("GFR"):
+    from agents.tools.v2.gfr import (
+        gfr_get_crop_registries,
+        gfr_get_recommendations,
+    )
+else:
+    from agents.tools.gfr import (
+        gfr_get_crop_registries,
+        gfr_get_recommendations,
+    )
 # v2 reads crops from the network catalog, so SATHI's master-API tools are v1 only.
 if _beckn_v2("SATHI"):
     from agents.tools.v2.sathi_seed import list_sathi_crops, search_sathi_seed_availability

@@ -77,7 +77,7 @@ On the local stack, 2026-11-23:
 
 | Question | Result |
 |---|---|
-| Paddy in Nashik | dealers in Nashik; same dealers, bags and ranking as prod v1 |
+| Paddy in Nashik | dealers in Nashik; same dealers, bags and ranking as v1 |
 | Paddy in Pune | discover matched Ahilyanagar and Pune; the model passed `district`, Pune chosen |
 | Barley in Nashik | SATHI 409, shown as "not available" |
 | Paddy in Hyderabad | refused by the prompt's Maharashtra rule, as v1 |
@@ -110,9 +110,7 @@ appeared 0 times in the adapter logs.
    code copies exact values and the model only picks the crop.
 5. **Raise with network-specs:** the `/inv-apis2/` path, the 409 no-stock answer,
    and that their mapping files use a format the adapter cannot load.
-6. **The catalog builder and its OpenStreetMap boundaries** live outside these
-   repos; OSM data needs a credit line, not yet decided.
-7. **Native-speaker review** of the flow lines in the 12 translated v2 prompts.
+6. **Native-speaker review** of the flow lines in the 12 translated v2 prompts.
 
 ## What this does not cover
 

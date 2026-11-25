@@ -14,6 +14,7 @@ migration-plan/
 ├── pmfby/
 ├── sathi/
 ├── shc/
+├── gfr/
 ├── aif/
 └── kcc/
 ```
@@ -32,10 +33,12 @@ place -- read that first when picking a capability back up.
 | PMFBY — Grievance | **Wired up, provider never reached** — [plan](pmfby/plan.md) · [open TODOs](pmfby/plan.md#open-todos) |
 | SATHI seed availability | **Built, verified end to end locally** — [plan](sathi/plan.md) · [try it](sathi/quick-try.md) · [open TODOs](sathi/plan.md#open-todos) |
 | Soil Health Card | **Built, verified end to end locally** — [plan](shc/plan.md) · [try it](shc/quick-try.md) · [open TODOs](shc/plan.md#open-todos) |
+| GFR fertilizer recommendation | **Built, verified end to end locally** — [plan](gfr/plan.md) · [try it](gfr/quick-try.md) · [open TODOs](gfr/plan.md#open-todos) |
 | AIF — loan status + grievance status | **Built, catalog published, discoverable; proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
 | KCC — credit card application status | **Built, catalog published, discoverable; proven against a mock only** — [plan](kcc/plan.md) · [try it](kcc/quick-try.md) · [open items](kcc/plan.md#open-items) |
-| KHC — grievance registration + status | **Planned, not started** — nothing blocks it; the geography lookups need either one parameterised KHC endpoint or a second binding — [plan](khc/plan.md) · [open items](khc/plan.md#open-items) |
-| The other ten | Not started |
+| KHC — grievance registration + status | **Built, proven against a mock only** — five actions on one binding, filing and status both ride the network — [plan](khc/plan.md) · [try it](khc/quick-try.md) · [open items](khc/plan.md#open-items) |
+| The other six Beckn tools | Not started — `advisory`, `agristack`, `amul_vistaar`, `maha_vistaar`, `smam_scheme_status`, `search`. All reach a provider through `BAP_ENDPOINT`, so all are migration targets |
+| Six tools that are not migration targets | `imd_advisory` reads its own database, `maps` calls Photon, and `chat_place`, `commodity`, `ffs` and `terms` make no provider call at all. None of them touches Beckn, so there is nothing to move |
 
 Cutting across all of them: the scheme tools used to carry the provider and
 resource ids as constants and now ask `discover` for them — what that changed,
@@ -67,10 +70,24 @@ publish: **the publish module resolves a pinned `@context` too.**
 `Grievance/v0.2` rewrite the transaction modules have. A `Grievance/v0.2`
 catalog carrying the pinned github.io `@context` published `ACCEPTED` against the
 running stack on 2026-11-24. AIF's fallback to `AgricultureResource/v0.2`
-predates that and is now unnecessary; moving it back would let it publish
-`scheme` and `challenge`. The decision procedure — payload type, catalog type,
-resource count, decided separately — is in
+predated that, so **AIF's loan resource moved to `SchemeApplication/v0.2`** the
+same day and gained `scheme` and a `challenge` naming its six-digit SMS OTP.
+Its ticket resource could not follow: `Grievance/v0.2` requires
+`grievanceOptions`, AIF publishes no complaint categories and has no filing
+call, so it stays where it is — [aif/plan.md](aif/plan.md#open-items) items 6
+to 8. The decision procedure — payload type, catalog type, resource count,
+decided separately — is in
 [khc/plan.md](khc/plan.md#how-we-decide-which-pack-a-capability-goes-under).
+
+The v0.2 packs are reachable again. Production Pages builds from `main`, which
+holds v0.1 only, and `bv-migration`'s own preview had been failing to deploy
+since 2026-11-23 — one example on an unrelated branch omitted `operationRef`
+and the single-process builder raised `NoMethodError`, which took every
+preview down with it. Fixed in `network-specs/scripts/generate-schema-pages.rb`
+on 2026-11-24; all three v0.2 packs now answer 200 under
+`https://openagrinet.github.io/network-specs/previews/bv-migration/`. The
+canonical URLs the packs pin still 404 until `bv-migration` merges to `main`,
+which is also what retires the `contextRewrite`.
 
 KCC also added vocabulary the packs do not cover and should not: a provider's
 own request fields belong in its API contract, not in a schema pack.
@@ -100,6 +117,7 @@ the switch:
 | AIF — loan + grievance | works |
 | PM-KISAN — status | works. Its OTP is **four** digits, not six |
 | PMFBY — status + grievance | works |
+| KHC — filing + status | works — the farmer is answered with the grievance number the desk returned and its real status |
 | SATHI | **blocked** — adapter answers `NET_ENTITY_NOT_FOUND`, item 3 below |
 | SHC | **blocked** — `discover found no shc-reports resource`, item 3 below |
 
@@ -121,7 +139,7 @@ though the scheme tools only started taking that answer in November 2026; see
 ## Carried to the next phase
 
 Every open item now lives in one place: **[open-issues.md](open-issues.md)**.
-Sixteen numbered items, grouped by what each one is waiting on — access, a
+Twenty numbered items, grouped by what each one is waiting on — access, a
 decision, or an hour of work — plus a link to each capability's own open list.
 It is one file so a review does not have to go hunting.
 
