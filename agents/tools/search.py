@@ -1,27 +1,15 @@
-"""
-Scheme information search -- one tool, search_schemes: national scheme guidelines on the Knowledge Provider,
-the MahaVistaar and AmulVistaar cross-network catalogs, other agricultural documents for schemes outside the
-catalog, and eNAM training videos.
-"""
-import asyncio
-import os
-import re
+"""General documents and scheme guidelines through Knowledge Provider."""
 from typing import Any, Dict, List, Literal, Optional
 
 import httpx
 from langfuse import observe
 from pydantic_ai import ModelRetry
-from pydantic_ai.tools import RunContext
 
-from agents.deps import FarmerContext
-from agents.tools.amul_vistaar import call_amul_vistaar_network
-from agents.tools.maha_vistaar import call_maha_vistaar_network
 from helpers import knowledge_provider
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.scheme_qdrant_search import (
     NO_RESULTS_MESSAGE,
     _format_page,
-    classify_chunk_section,
     format_search_results,
     format_status_check_offer,
 )
@@ -42,7 +30,7 @@ def _scheme_result_from_hit(hit: Dict[str, Any], score: float) -> Optional[Dict[
         return None
     return {
         "score": score,
-        "scheme_code": str(hit.get("scheme_code") or hit.get("code") or "").strip(),
+        "scheme_code": str(hit.get("scheme_code") or hit.get("code") or "").strip().lower(),
         "scheme_name": str(hit.get("scheme_name") or hit.get("name_en") or hit.get("name") or "").strip(),
         "text": text,
         "doc_id": str(hit.get("doc_id") or "").strip(),
@@ -51,7 +39,7 @@ def _scheme_result_from_hit(hit: Dict[str, Any], score: float) -> Optional[Dict[
         "section": str(hit.get("section_type") or "").strip().lower() or "other",
         # KP's origin is the intake channel, not a citation; format_search_results falls back to its label.
         "source": "",
-        "doc_title": str(hit.get("title_en") or hit.get("name_en") or hit.get("filename") or "").strip(),
+        "doc_title": str(hit.get("title_en") or hit.get("name_en") or hit.get("name") or hit.get("filename") or "").strip(),
         "page": _format_page(hit.get("page_start"), hit.get("page_end")),
     }
 
@@ -68,209 +56,100 @@ def _parse_scheme_search_response(data: Dict[str, Any]) -> tuple[List[Dict[str, 
     return results, knowledge_provider.context_strings(data.get("scheme_search"))
 
 
-def _build_scheme_search_payload(query: str, top_k: int = 10) -> Dict[str, Any]:
-    """KP /search body for scheme guideline search (search_profile scheme). Plain semantic search: no scheme filter."""
-    body: Dict[str, Any] = {"query": query, "search_profile": "scheme"}
-    if top_k and top_k > 0:
-        body["top_k"] = min(top_k, 50)
-    return body
-
-
-_ENAM = re.compile(r"\be[\s-]?nam\b", re.IGNORECASE)
-
-
-@observe(name="tool:search_schemes", as_type="tool")
-async def search_schemes(
-    ctx: RunContext[FarmerContext],
+@observe(name="tool:search_documents", as_type="tool")
+async def search_documents(
     query: str,
+    profile: Literal["general", "scheme"] = "general",
     top_k: int = 10,
-    network: Literal["national", "mahavistaar", "amul", "other_documents"] = "national",
     scheme_code: Optional[str] = None,
-    union: Optional[str] = None,
-    provider_id: Optional[str] = None,
 ) -> str:
-    """
-    Search government scheme information: what a scheme is, who is eligible, benefits, how to apply.
+    """Search documents in Knowledge Provider.
 
-    Use for every scheme-information question. For a direct status/grievance request (e.g. "check my
-    PM-KISAN status"), call the status tools instead -- do not call this first.
-
-    - network="national" (default): scheme guideline documents for every catalog scheme (PM-KISAN, PMFBY,
-      KCC, AIF, SHC, SMAM, N.B.M., eNAM ...), each result labelled with its scheme, document and page.
-      eNAM questions also get related training videos.
-    - network="mahavistaar": the Maharashtra cross-network schemes; pass `scheme_code`
-      ("ndksp-drip-irrigation", "ndksp-farm-pond-lining" or "aif" -- drip irrigation under AIF only).
-    - network="amul": Amul union schemes; optional `union` ("banas", "kutch", "sumul", "surendranagar")
-      or `provider_id` (e.g. "banas-union").
-    - network="other_documents": only when the national search found nothing relevant for a scheme (for
-      example a state scheme): searches the other agricultural documents.
+    Use profile="scheme" for government scheme guidelines: eligibility, benefits,
+    application details, and eNAM portal instructions. Include the scheme name or
+    acronym in the English query. Pass scheme_code only for a known catalog code.
+    Use profile="general" for other documents, including regional scheme references
+    when the scheme profile finds no relevant text. Crop and livestock advice,
+    personal scheme status, and grievance follow-up have their own tools.
 
     Args:
-        query: The scheme question in English, 2-5 words (eligibility, benefits, application process) (required)
-        top_k: Maximum number of chunks to return (default: 10)
-        network: Which source to search: "national", "mahavistaar", "amul" or "other_documents"
-        scheme_code: MahaVistaar scheme code, only with network="mahavistaar"
-        union: Amul union filter, only with network="amul"
-        provider_id: Amul canonical provider ID, only with network="amul"
-
-    Returns:
-        Formatted scheme information with its source (and related videos for eNAM).
+        query: A short search question in English, naming the subject.
+        profile: "general" for documents or "scheme" for official scheme guidance.
+        top_k: Maximum passage count, from 1 to 50 (default 10).
+        scheme_code: Optional exact catalog code, used only with profile="scheme".
     """
-    if network == "mahavistaar":
-        return await call_maha_vistaar_network(ctx, scheme_code or query)
-    if network == "amul":
-        return await call_amul_vistaar_network(ctx, query, union=union, provider_id=provider_id)
-    if network == "other_documents":
-        return await _search_other_documents(query)
-    result = await _search_national_schemes(ctx, query, top_k)
-    if _ENAM.search(query):
-        result += await _enam_videos(query)
-    return result
+    query = query.strip()
+    if not query:
+        raise ModelRetry("Provide a non-empty document search query.")
+    scheme_code = (scheme_code or "").strip().lower()
+    if scheme_code and profile != "scheme":
+        raise ModelRetry('Use profile="scheme" when passing a scheme code.')
+    payload = {"query": query, "search_profile": "scheme" if profile == "scheme" else "default",
+               "top_k": min(max(top_k, 1), 50)}
+    if scheme_code:
+        payload["document_code"] = scheme_code
 
-
-async def _enam_videos(query: str, top_k: int = 3) -> str:
-    """Related eNAM training videos from Qdrant; empty when none or the video search fails."""
-    try:
-        from helpers.video_qdrant_search import format_video_search_results, search_videos
-
-        if not os.getenv("QDRANT_URL"):
-            raise ValueError("QDRANT_URL is required")
-        collection = os.getenv("QDRANT_VIDEO_COLLECTION_NAME", "video_data_collection")
-        results = await asyncio.to_thread(search_videos, query, collection, top_k)
-    except Exception as e:  # videos are extra: never fail the scheme answer for them
-        logger.error("eNAM video search failed: %s for query: %s", e, query)
-        return ""
-    return "\n\n" + format_video_search_results(results, query) if results else ""
-
-
-async def _search_other_documents(query: str) -> str:
-    """A scheme the national search has nothing relevant for: search the other agricultural documents on KP."""
-    from agents.tools.advisory import _post_search, build_advisory_search_payload, parse_advisory_response
-
-    data, error = await _post_search(build_advisory_search_payload(query=query))
-    if data is None:
-        return error
-    results = parse_advisory_response(data)[0]
-    if not results:
-        return NO_RESULTS_MESSAGE
-    blocks = [f"**{r.get('title') or 'Document'}**\n```\n{r['text']}\n```" for r in results[:5]]
-    return (
-        "> Document Search Results for `" + query + "`\n\n"
-        + "\n\n----\n\n".join(blocks)
-        + "\n\n> Cite the Source line shown in the text you use. If none is about this scheme, say the "
-        "information is not available."
-    )
-
-
-async def _search_national_schemes(ctx: RunContext[FarmerContext], query: str, top_k: int) -> str:
-    """Scheme guideline search on the Knowledge Provider (POST /search, search_profile scheme)."""
-    logger.info("TOOL CALL: search_schemes(query=%r, top_k=%d)", query, top_k)
-    payload = _build_scheme_search_payload(query=query, top_k=top_k)
+    tool = "scheme.search" if profile == "scheme" else "documents.search"
     lf_update_current_observation(
-        input={"query": query, "top_k": top_k},
-        metadata={
-            "tool": "scheme.search",
-            "category": SCHEME_SEARCH_CATEGORY,
-        },
+        input=payload,
+        metadata={"tool": tool, "category": SCHEME_SEARCH_CATEGORY if profile == "scheme" else "knowledge-provider"},
     )
-    search_url = knowledge_provider.search_url()
-    if not search_url:
+    if not knowledge_provider.search_url():
         logger.error("KNOWLEDGE_PROVIDER_URL is not set")
-        return "Scheme search service is not configured. Please try again later."
-    logger.info("Scheme KP search: query=%r url=%s", query, search_url)
+        return "Document search service is not configured. Please try again later."
 
     try:
         data = await knowledge_provider.search(payload)
-        results, search_ctx = _parse_scheme_search_response(data)
-        status = str(search_ctx.get("status") or "").strip().lower()
-        message = str(search_ctx.get("message") or "").strip()
+    except (knowledge_provider.KnowledgeProviderError, httpx.HTTPError) as exc:
+        logger.warning("Knowledge Provider document search failed: %s", exc)
+        lf_update_current_observation(metadata={"tool": tool, "error_type": type(exc).__name__})
+        return "Document search service is unavailable. Please try again later."
 
-        if status and status != "success" and not results:
-            logger.info(
-                "TOOL RESULT: search_schemes — KP status=%s message=%r hits=%s",
-                status,
-                message,
-                len(results),
-            )
-            lf_update_current_observation(
-                metadata={
-                    "tool": "scheme.search",
-                    "category": SCHEME_SEARCH_CATEGORY,
-                    "network_status": status or None,
-                    "hit_count": 0,
-                    "doc_ids": [],
-                    "chunk_ids": [],
-                    "widened_to_all_schemes": search_ctx.get("widened_to_all_schemes"),
-                }
-            )
-            return message or NO_RESULTS_MESSAGE
+    if profile == "general":
+        hits = [
+            hit for hit in data.get("hits") or []
+            if isinstance(hit, dict) and hit.get("text")
+            and (hit.get("document_kind") or hit.get("type")) != "video"
+        ]
+        lf_update_current_observation(metadata={"tool": tool, "hit_count": len(hits)})
+        return _format_documents(hits)
 
-        if top_k and top_k > 0:
-            results = results[:top_k]
+    results, search_ctx = _parse_scheme_search_response(data)
+    resolved_code = scheme_code or search_ctx.get("resolved_scheme_code", "").lower()
+    if resolved_code:
+        results = [hit for hit in results if hit["scheme_code"] == resolved_code]
+    status = search_ctx.get("status", "").lower()
+    if status and status != "success":
+        results = []
 
-        # Shown in Langfuse tool metadata.
-        doc_ids = list(
-            dict.fromkeys(str(r.get("doc_id") or "") for r in results if r.get("doc_id"))
-        )
-        chunk_ids = [str(r.get("chunk_id") or "") for r in results if r.get("chunk_id")]
+    lf_update_current_observation(metadata={
+        "tool": tool,
+        "network_status": status or None,
+        "hit_count": len(results),
+        "doc_ids": list(dict.fromkeys(r["doc_id"] for r in results if r["doc_id"])),
+        "chunk_ids": [r["chunk_id"] for r in results if r["chunk_id"]],
+        "chunks": [
+            {key: result[key] for key in ("doc_id", "chunk_id", "scheme_code", "section", "score", "source")}
+            for result in results
+        ],
+        "widened_to_all_schemes": search_ctx.get("widened_to_all_schemes") == "true",
+    })
+    if not results:
+        return search_ctx.get("message", "") if status == "scheme_unavailable" and search_ctx.get("message") else NO_RESULTS_MESSAGE
+    formatted = format_search_results(results, query)
+    if resolved_code:
+        formatted += format_status_check_offer(resolved_code)
+    return formatted
 
-        lf_update_current_observation(
-            metadata={
-                "tool": "scheme.search",
-                "category": SCHEME_SEARCH_CATEGORY,
-                "network_status": status or None,
-                "hit_count": len(results),
-                "doc_ids": doc_ids,
-                "chunk_ids": chunk_ids,
-                "chunks": [
-                    {
-                        "doc_id": r.get("doc_id") or "",
-                        "chunk_id": r.get("chunk_id") or "",
-                        "scheme_code": r.get("scheme_code") or "",
-                        "section": r.get("section") or "",
-                        "score": r.get("score"),
-                        "source": r.get("source") or "",
-                    }
-                    for r in results
-                ],
-                "widened_to_all_schemes": search_ctx.get("widened_to_all_schemes"),
-            }
-        )
-        logger.info(
-            "TOOL RESULT: search_schemes — hit_count=%d doc_ids=%s",
-            len(results), doc_ids,
-        )
 
-        formatted = format_search_results(results, query)
-        if results:
-            # No resolved scheme any more: offer status checks for the top-ranked hit's scheme.
-            formatted += format_status_check_offer(results[0].get("scheme_code"))
-        return formatted
-
-    except knowledge_provider.KnowledgeProviderError as e:
-        logger.error("Scheme KP search failed: %s", e)
-        lf_update_current_observation(
-            metadata={"tool": "scheme.search", "error_type": "knowledge_provider"}
-        )
-        return "Scheme search service is unavailable. Please try again later."
-
-    except httpx.TimeoutException as e:
-        logger.error("Scheme KP search timed out: %s", e)
-        lf_update_current_observation(
-            metadata={"tool": "scheme.search", "error_type": "timeout"}
-        )
-        return "Scheme search request timed out. Please try again later."
-
-    except httpx.RequestError as e:
-        logger.error("Scheme KP search request failed: %s", e)
-        lf_update_current_observation(
-            metadata={"tool": "scheme.search", "error_type": "request_error"}
-        )
-        return f"Scheme search request failed: {e!s}"
-
-    except Exception as e:
-        logger.error("Error searching schemes: %s for query: %s", e, query)
-        lf_update_current_observation(
-            metadata={"tool": "scheme.search", "error_type": "exception"}
-        )
-        raise ModelRetry("Error searching schemes, please try again") from e
+def _format_documents(hits: List[Dict[str, Any]]) -> str:
+    if not hits:
+        return "No relevant documents found for this query."
+    blocks = []
+    for hit in hits:
+        title = str(hit.get("title_en") or hit.get("name_en") or hit.get("name") or hit.get("filename") or "Document")
+        section = hit.get("section")
+        page = _format_page(hit.get("page_start"), hit.get("page_end"))
+        reference = " | ".join(str(part) for part in (title, section, f"p. {page}" if page else "") if part)
+        blocks.append(f"**Source: {reference}**\n\n{hit['text']}")
+    return "\n\n----\n\n".join(blocks)

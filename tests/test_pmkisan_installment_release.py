@@ -53,8 +53,7 @@ def run_search(search, monkeypatch, response, query="PM-KISAN 24th installment r
     else:
         client.post.return_value = response
     monkeypatch.setattr(search.httpx, "AsyncClient", lambda: client)
-    ctx = SimpleNamespace(deps=SimpleNamespace(session_id="test", question_id="test"))
-    result = asyncio.run(search.search_schemes(ctx, query))
+    result = asyncio.run(search.search_documents(query, profile="scheme"))
     return result, client.post
 
 
@@ -70,7 +69,7 @@ def test_search_does_not_append_system_announcement(search, monkeypatch, scheme,
     assert "Scheme details" in result
     assert "PM-KISAN 24th Instalment Release" not in result
     assert "30th October" not in result
-    if scheme == "pmkisan":
+    if scheme == "pmkisan" and resolved:
         assert "Status check available" in result
     assert "23rd" not in result and "20 June 2026" not in result
     assert post.call_args.args[0] == "https://example.test/search"
@@ -117,7 +116,7 @@ def test_release_announcement_skill_needs_no_business_tools(language):
     state = SkillState(enabled_skills=["pm_kisan.installments"])
     prompt = render_prompt(state, language, {"today_date": "28 October 2026"})
     assert "The 24th instalment of PM-KISAN was released on 30th October 2026." in prompt
-    assert "Do not call search_schemes, load_skill or any status/OTP tool" in prompt
+    assert "Do not call search_documents, load_skill or any status/OTP tool" in prompt
     assert not state.visible
 
 
@@ -129,7 +128,7 @@ def test_release_and_status_rules_remain_present_in_default_mode(language):
     assert "Before any PM-KISAN tool call" not in prompt
     assert "does not apply to scheme information or public release dates" in prompt
     assert "The 24th instalment of PM-KISAN was released on 30th October 2026." in prompt
-    assert "Do not call search_schemes, load_skill or any status/OTP tool" in prompt
+    assert "Do not call search_documents, load_skill or any status/OTP tool" in prompt
 
 
 def test_removed_legacy_tool_is_not_registered():

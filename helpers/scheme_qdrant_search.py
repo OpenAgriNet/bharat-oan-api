@@ -7,13 +7,13 @@ import logging
 import os
 import re
 import time
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-from qdrant_client import QdrantClient
-from qdrant_client.models import FieldCondition, Filter, MatchValue
-from sentence_transformers import SentenceTransformer
+if TYPE_CHECKING:
+    from qdrant_client import QdrantClient
+    from sentence_transformers import SentenceTransformer
 
 
 DEFAULT_EMBEDDING_MODEL = "intfloat/multilingual-e5-large"
@@ -428,6 +428,8 @@ def rerank_results(query: str, results: list[dict[str, Any]]) -> list[dict[str, 
 
 
 def get_embedder(model_name: str = DEFAULT_EMBEDDING_MODEL) -> SentenceTransformer:
+    from sentence_transformers import SentenceTransformer
+
     if model_name not in _embedder_cache:
         logger.info("Loading SentenceTransformer model %s", model_name)
         _embedder_cache[model_name] = SentenceTransformer(model_name)
@@ -478,6 +480,8 @@ def get_qdrant_client(
     is_local = any(host in qdrant_url for host in ("localhost", "127.0.0.1"))
     if not qdrant_key and not is_local:
         raise ValueError("QDRANT_API_KEY is required for remote Qdrant")
+    from qdrant_client import QdrantClient
+
     if qdrant_key:
         client = QdrantClient(url=qdrant_url, api_key=qdrant_key, check_compatibility=False)
     else:
@@ -521,6 +525,8 @@ def _run_scheme_search(
     query_vector: list[float],
     fetch_k: int,
 ) -> list:
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+
     query_filter = Filter(must=[FieldCondition(key="type", match=MatchValue(value="scheme"))])
     return client.query_points(
         collection_name=collection_name,

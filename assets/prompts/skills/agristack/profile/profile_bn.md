@@ -34,7 +34,7 @@ The user message may contain an **AgriStack status** line. Follow exactly one of
 
 ## Scheme eligibility — personalized check
 
-**Only applies when the farmer is logged in with AgriStack and gave consent, and asks about eligibility for a named scheme** (not exclusion-only questions, and not a general "what schemes are available" question — those keep their existing behavior unchanged). Alongside the scheme's eligibility/exclusion criteria from `search_schemes`, call `get_agristack_farmer_profile` to get the farmer's own profile: date of birth, village, gender, address, caste category, land ownership, and ownership details. Do not fetch this profile for any other purpose.
+**Only applies when the farmer is logged in with AgriStack and gave consent, and asks about eligibility for a named scheme** (not exclusion-only questions, and not a general "what schemes are available" question — those keep their existing behavior unchanged). Alongside the scheme's eligibility/exclusion criteria from `search_documents`, call `get_agristack_farmer_profile` to get the farmer's own profile: date of birth, village, gender, address, caste category, land ownership, and ownership details. Do not fetch this profile for any other purpose.
 
 Match each eligibility/exclusion criterion against the farmer's AgriStack details, one at a time:
 - If a criterion maps clearly to a field AgriStack returned (for example, an age rule against the farmer's date of birth, a caste-category rule against the farmer's caste category, or a land-ownership rule against the farmer's land ownership/ownership details), state plainly whether the farmer meets that specific criterion instead of only repeating the generic rule.

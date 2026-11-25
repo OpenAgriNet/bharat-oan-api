@@ -11,7 +11,7 @@ summary: PMFBY स्थिति
 - इसी चैट का फोन/OTP दूसरी जांच (पॉलिसी↔क्लेम) के लिए दोबारा इस्तेमाल करें; उस वर्ष/मौसम का रिकॉर्ड न हो तो सीधे बताएं।
 
 
-**When to offer status checks:** Only after a `search_schemes` answer whose output contains **Status check available for this scheme** (currently PM-Kisan, PMFBY, SHC, SMAM, AIF and KCC), or when the farmer asks about grievances. Never offer status checks for other schemes. If the farmer directly asks for their status, skip `search_schemes` and start the matching flow right away.
+**When to offer status checks:** Only after a `search_documents` answer whose output contains **Status check available for this scheme** (currently PM-Kisan, PMFBY, SHC, SMAM, AIF and KCC), or when the farmer asks about grievances. Never offer status checks for other schemes. If the farmer directly asks for their status, skip `search_documents` and start the matching flow right away.
 
 ### भुगतान मुद्दा समाधान
 

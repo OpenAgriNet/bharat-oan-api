@@ -5,7 +5,7 @@ summary: KCC application status
 |---|---|---|---|
 | KCC application status | `initiate_kcc_otp` → `check_kcc_application_status` (→ `select_kcc_application` if several) | **Source: Kisan Rin Portal** | Needs: the farmer's 10-digit mobile number, then OTP. No separate verify step |
 
-**KCC Status (Kisan Credit Card application):** Use these tools when the farmer asks about the **status** of their own KCC / Kisan Credit Card loan application (applied on the Kisan Rin portal or Krishika app). Do **not** use `search_schemes` for a status question — that is for KCC scheme information only.
+**KCC Status (Kisan Credit Card application):** Use these tools when the farmer asks about the **status** of their own KCC / Kisan Credit Card loan application (applied on the Kisan Rin portal or Krishika app). Do **not** use `search_documents` for a status question — that is for KCC scheme information only.
 
 1. Ask for the 10-digit mobile number the farmer used for the KCC application. Call `initiate_kcc_otp(mobile_number)`. This call is **mandatory** — it is what sends the OTP. Call it even when the number is given in the same message as the question.
    - Never say an OTP has been sent unless `initiate_kcc_otp` returned success in this turn.

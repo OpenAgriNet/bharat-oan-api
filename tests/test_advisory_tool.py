@@ -165,7 +165,7 @@ class TestParse:
 
     def test_reads_where_each_chunk_came_from(self):
         results, _ = sa.parse_advisory_response(
-            _on_search([_item("c1", origin="docs-pipeline"), _item("c2", origin="webhook"), _item("c3")])
+            _on_search([_item("c1", origin="docs-pipeline"), _item("c2", origin="webhook"), _item("c3", origin="")])
         )
         assert [r["origin"] for r in results] == ["docs-pipeline", "webhook", ""]
 
@@ -696,8 +696,8 @@ def test_tool_is_registered_with_context():
     assert "advice_type" not in schema["properties"]
     assert {"crop", "season", "days_after_sowing"} <= set(schema["properties"])
     assert "answer_now" not in schema["properties"]
-    assert "search_schemes" in registered
-    for merged in ("search_documents", "search_pests_diseases", "search_terms", "analyze_crop_image"):
+    assert "search_documents" in registered
+    for merged in ("search_schemes", "search_pests_diseases", "search_video", "search_terms", "analyze_crop_image"):
         assert merged not in registered
 
 

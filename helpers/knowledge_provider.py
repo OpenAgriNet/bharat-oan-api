@@ -1,8 +1,8 @@
 """Knowledge Provider POST /search client.
 
 Authenticates as a Keycloak service account (client-credentials grant) and caches
-the token until shortly before it expires. The advisory and scheme tools call
-`search` with a KP search body (`search_profile` advisory or scheme).
+the token until shortly before it expires. The advisory and document tools
+call `search` with a KP search body.
 """
 import asyncio
 import os
@@ -51,10 +51,17 @@ async def _access_token(client: httpx.AsyncClient, refresh: bool) -> str:
         )
         if response.status_code != 200:
             raise KnowledgeProviderError(f"Knowledge Provider token request returned status {response.status_code}")
-        body = response.json()
-        _token = body["access_token"]
-        _token_expires_at = time.monotonic() + max(int(body.get("expires_in", 60)) - _TOKEN_EXPIRY_MARGIN, 0)
-        return _token
+        try:
+            body = response.json()
+            token = body["access_token"]
+            expires_in = int(body.get("expires_in", 60))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise KnowledgeProviderError("Knowledge Provider returned an invalid token response") from exc
+        if not isinstance(token, str) or not token.strip():
+            raise KnowledgeProviderError("Knowledge Provider returned an empty or invalid access token")
+        _token = token
+        _token_expires_at = time.monotonic() + max(expires_in - _TOKEN_EXPIRY_MARGIN, 0)
+        return token
 
 
 async def search(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -79,15 +86,18 @@ async def search(body: Dict[str, Any]) -> Dict[str, Any]:
             if response.status_code != 401:
                 break
     if response.status_code != 200:
-        raise KnowledgeProviderError(
-            f"Knowledge Provider search returned status {response.status_code}: {(response.text or '')[:300]}"
-        )
+        raise KnowledgeProviderError(f"Knowledge Provider search returned status {response.status_code}")
     try:
         data = response.json()
     except ValueError as exc:
         raise KnowledgeProviderError("Knowledge Provider search returned a non-JSON body") from exc
     if not isinstance(data, dict):
         raise KnowledgeProviderError("Knowledge Provider search returned a non-object body")
+    if data.get("hits") is not None and not isinstance(data["hits"], list):
+        raise KnowledgeProviderError("Knowledge Provider search returned invalid hits")
+    for key in ("effective_config", "scheme_search", "advisory_search"):
+        if data.get(key) is not None and not isinstance(data[key], dict):
+            raise KnowledgeProviderError(f"Knowledge Provider search returned invalid {key}")
     return data
 
 

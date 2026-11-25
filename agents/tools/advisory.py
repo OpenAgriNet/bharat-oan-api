@@ -703,7 +703,7 @@ async def search_advisory(
 
     Use this for every crop, pest, disease or livestock question, such as "aphids in wheat", "when to
     harvest sorghum" or "my cow has fever". Search straight away; do not ask the farmer anything first,
-    not even the crop. Do NOT use it for government scheme questions (use search_schemes) or for weather,
+    not even the crop. Do NOT use it for government scheme questions (use search_documents with profile="scheme") or for weather,
     mandi prices or status checks.
 
     The tool always returns advice. If it depends on the crop, the season, the sowing stage or the farmer's

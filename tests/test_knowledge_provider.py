@@ -16,17 +16,19 @@ def fake_kp(monkeypatch):
     monkeypatch.setenv("KNOWLEDGE_PROVIDER_CLIENT_SECRET", "secret")
     monkeypatch.delenv("KNOWLEDGE_PROVIDER_NETWORK_ID", raising=False)
     monkeypatch.setattr(kp, "_token", None)
-    calls = {"token": 0, "search": [], "search_status": []}
+    calls = {"token": 0, "search": [], "search_status": [], "token_response": None, "search_body": {"hits": []}}
     real = httpx.AsyncClient
 
     def handler(request):
         if request.url.path == "/token":
             calls["token"] += 1
             assert b"grant_type=client_credentials" in request.read()
+            if calls["token_response"] is not None:
+                return calls["token_response"]
             return httpx.Response(200, json={"access_token": f"tok{calls['token']}", "expires_in": 300})
         calls["search"].append(request.headers["Authorization"])
         status = calls["search_status"].pop(0) if calls["search_status"] else 200
-        return httpx.Response(status, json={"hits": []})
+        return httpx.Response(status, json=calls["search_body"])
 
     monkeypatch.setattr(kp.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler)))
     return calls
@@ -61,3 +63,28 @@ def test_context_strings_match_the_old_tag_values():
     assert kp.context_strings({"status": "success", "has_day_range": True, "days_matched": False, "message": None}) == {
         "status": "success", "has_day_range": "true", "days_matched": "false",
     }
+
+
+@pytest.mark.parametrize("response", [
+    httpx.Response(200, text="invalid JSON"),
+    httpx.Response(200, json={}),
+    httpx.Response(200, json={"access_token": ""}),
+    httpx.Response(200, json={"access_token": "test-token", "expires_in": "invalid"}),
+])
+def test_malformed_token_response_does_not_reach_search(fake_kp, response):
+    fake_kp["token_response"] = response
+    with pytest.raises(kp.KnowledgeProviderError, match="invalid"):
+        asyncio.run(kp.search({"query": "a"}))
+    assert not fake_kp["search"]
+
+
+@pytest.mark.parametrize("data", [
+    {"hits": {"text": "a"}},
+    {"hits": [], "scheme_search": []},
+    {"hits": [], "advisory_search": "success"},
+    {"hits": [], "effective_config": "default"},
+])
+def test_bad_search_response_shape_is_a_transport_failure(fake_kp, data):
+    fake_kp["search_body"] = data
+    with pytest.raises(kp.KnowledgeProviderError, match="invalid"):
+        asyncio.run(kp.search({"query": "a"}))

@@ -11,7 +11,9 @@ skills:
   schemes.information:
     prompt_dir: skills/schemes/information
     tools:
-    - search_schemes
+    - search_documents
+    - call_amul_vistaar_network
+    - call_maha_vistaar_network
   pm_kisan.status:
     prompt_dir: skills/pm_kisan/status
     tools:

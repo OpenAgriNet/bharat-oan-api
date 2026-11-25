@@ -125,9 +125,9 @@ async def call_maha_vistaar_network(
     Use for schemes listed under MahaVistaar / cross-network in the system prompt
     (e.g. ndksp-drip-irrigation, ndksp-farm-pond-lining, aif). Pass scheme_code
     exactly as in the prompt. Do not use for national scheme documents handled by
-    search_schemes — note "aif" here is a distinct cross-network catalog code for drip
+    search_documents with profile="scheme". Note "aif" here is a distinct cross-network catalog code for drip
     irrigation, not the national Agriculture Infrastructure Fund FAQ handled by
-    search_schemes("AIF FAQ"); tool choice (not the code string) is what disambiguates.
+    search_documents with query="AIF FAQ" and profile="scheme".
 
     Args:
         scheme_code: Scheme code from the prompt (e.g. "ndksp-drip-irrigation", "aif").
