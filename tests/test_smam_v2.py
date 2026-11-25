@@ -74,7 +74,7 @@ def adapter(monkeypatch):
 CTX = SimpleNamespace(deps=SimpleNamespace(session_id="s", question_id="q"))
 
 
-def _check(search_type="mobile", value="98765 43210"):
+def _check(search_type="mobile", value="99999 99999"):
     return asyncio.run(smam.check_smam_scheme_status(CTX, search_type, value))
 
 
@@ -91,7 +91,7 @@ V1_ON_SEARCH = {"catalog": {
     "descriptor": {"name": "SMAM Application Status", "code": "smam"},
     "tags": [{"descriptor": {"code": "search-context", "name": "Search Context"}, "list": _tags(
         ("status", "Status", "Success"), ("message", "Message", "Application status found successfully"),
-        ("search-type", "Search Type", "application_no"), ("search-value", "Search Value", "9876543210"))}],
+        ("search-type", "Search Type", "application_no"), ("search-value", "Search Value", "9999999999"))}],
     "providers": [
         {"id": "101", "descriptor": {"name": "REF-1", "code": "101"}, "items": [{
             "id": "11", "descriptor": {"name": "Tractor", "code": "11"}, "tags": [
@@ -120,10 +120,10 @@ def test_discover_asks_the_public_catalog_for_smam_benefits(adapter):
 
 
 def test_status_sends_only_the_cleaned_search_value_against_the_published_offer(adapter):
-    _check(value="+91 98765 43210")
+    _check(value="+91 99999 99999")
     commitment = adapter.bodies["status"]["message"]["contract"]["commitments"][0]
     attributes = commitment["commitmentAttributes"]
-    assert attributes["searchValue"] == "9876543210"
+    assert attributes["searchValue"] == "9999999999"
     assert "searchType" not in attributes
     assert attributes["@type"] == "openagrinet:SchemeApplication" and attributes["scheme"] == {"code": "SMAM"}
     assert attributes["@context"].endswith("/SchemeApplication/v0.2/context.jsonld")

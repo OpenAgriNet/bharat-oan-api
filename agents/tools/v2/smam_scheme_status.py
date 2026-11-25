@@ -143,6 +143,18 @@ def _rendered(answer: Dict[str, Any], search_value: str) -> str:
     return str(SmamStatusApiResponse.model_validate({"responses": [{"context": {"action": "on_search"}, "message": on_search}]}))
 
 
+async def _lookup(search_value: str, transaction_id: str) -> str:
+    """Discover the SMAM resource, ask its status, and render the answer as v1 did."""
+    found = await _discover(transaction_id)
+    if not found:
+        return _UNAVAILABLE
+    response = await _post("status", _status_body(found, search_value, transaction_id))
+    if response.status_code != 200:
+        logger.error(f"SMAM v2 status refused: HTTP {response.status_code} {response.text[:300]}")
+        return _UNAVAILABLE
+    return _rendered(commitment_attributes(response), search_value)
+
+
 @observe(name="tool:check_smam_scheme_status", as_type="tool")
 async def check_smam_scheme_status(
     ctx: RunContext[FarmerContext],
@@ -172,14 +184,7 @@ async def check_smam_scheme_status(
         metadata={"tool": "smam.status", "search_type": search_type, "beckn_version": "v2", "transaction_id": transaction_id},
     )
     try:
-        found = await _discover(transaction_id)
-        if not found:
-            return _UNAVAILABLE
-        response = await _post("status", _status_body(found, normalized, transaction_id))
-        if response.status_code != 200:
-            logger.error(f"SMAM v2 status refused: HTTP {response.status_code} {response.text[:300]}")
-            return _UNAVAILABLE
-        return _rendered(commitment_attributes(response), normalized)
+        return await _lookup(normalized, transaction_id)
     except httpx.TimeoutException as e:
         logger.error(f"SMAM v2 status timed out: {e}")
         return _TIMED_OUT
