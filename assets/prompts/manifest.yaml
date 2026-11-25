@@ -153,9 +153,9 @@ agents:
     - pa
     - ta
     - te
-    # bh-main comments out: ffs.booking, agristack.profile, crop.icar
+    # bh-main comments out: agristack.profile, crop.icar
     enabled_skills:
-    # - ffs.booking
+    - ffs.booking
     - schemes.information
     - pm_kisan.status
     - pm_kisan.grievances
