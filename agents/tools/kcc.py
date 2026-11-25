@@ -19,9 +19,10 @@ from langfuse import observe
 from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
-from agents.tools.aif import _descriptor, _endpoint, _numeric, _unwrap, _values
+from agents.tools.aif import _descriptor, _endpoint, _numeric, _outcome_tag, _unwrap, _values
 from agents.tools.pmkisan_scheme_status import generate_transaction_id
 from app.config import DEFAULT_HTTP_TIMEOUT
+from app.services.session_state import register_section, remember
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
 
@@ -36,6 +37,10 @@ UNAVAILABLE = "The KCC system cannot be reached right now. Please try again in a
 NEED_MOBILE = "Ask the farmer for the 10-digit mobile number they used for their KCC application."
 NEED_OTP = "Ask the farmer for the 6-digit OTP sent to their mobile."
 NEED_APPLICATION_NO = "Ask the farmer which KCC application number to check (digits only)."
+
+# mobile + otp_step ("sent" | "verified") + application_nos when several were listed. The OTP itself is
+# not kept: check_kcc_application_status submits it once and select_kcc_application needs no OTP.
+STATE = register_section("kcc")
 
 
 class _KccUnavailable(Exception):
@@ -319,9 +324,12 @@ def initiate_kcc_otp(ctx: RunContext[FarmerContext], mobile_number: str) -> str:
         mobile_number=mobile_number,
     )
     try:
-        return _render_otp_sent(_request("init", payload))
+        envelope = _request("init", payload)
     except _KccUnavailable as e:
         return str(e)
+    if _descriptor(_outcome_tag(envelope, "init"))[0] == "otp_sent":
+        remember(ctx, STATE, mobile=mobile_number, otp_step="sent", application_nos=None)
+    return _render_otp_sent(envelope)
 
 
 @observe(name="tool:check_kcc_application_status", as_type="tool")
@@ -361,9 +369,26 @@ def check_kcc_application_status(
         otp=otp,
     )
     try:
-        return _render_application_status(_request("status", payload))
+        envelope = _request("status", payload)
     except _KccUnavailable as e:
         return str(e)
+    _remember_verified(ctx, mobile_number, envelope)
+    return _render_application_status(envelope)
+
+
+def _remember_verified(ctx: RunContext[FarmerContext], mobile_number: str, envelope: Dict[str, Any]) -> None:
+    """The portal answered with applications (or none), so the OTP was accepted."""
+    code = _descriptor(_outcome_tag(envelope, "status"))[0]
+    if code not in ("application_status", "multiple_applications", "no_applications"):
+        return
+    numbers = None
+    if code == "multiple_applications":
+        numbers = [
+            _values((item.get("tags") or [{}])[0]).get("application_no", "")
+            for item in _order(envelope).get("items") or []
+        ]
+        numbers = [n for n in numbers if n] or None
+    remember(ctx, STATE, mobile=mobile_number, otp_step="verified", application_nos=numbers)
 
 
 @observe(name="tool:select_kcc_application", as_type="tool")

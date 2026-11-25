@@ -1,5 +1,16 @@
 ---
-summary: Seed availability, dealers, stock (SATHI)
+summary: The SATHI certified-seed portal (Maharashtra districts only).
+load_when:
+- they ask which seed crop groups or categories exist, or which crops or varieties are listed in a group (oilseeds, pulses,
+  cereals)
+- they ask where to buy certified seed, or for seed dealers or shops in a district
+- they ask about seed stock or bags available
+examples:
+- where can I get certified soybean seed in Latur?
+- which pulse seeds are listed on SATHI?
+not_for:
+- which variety to grow, seed rate or seed treatment advice
+- seed subsidy schemes
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
@@ -31,3 +42,7 @@ When the farmer asks to **buy seeds**, find **seed dealers**, or check **seed st
 - End with: **Source: SATHI**
 
 **Never** invent seed stock or dealer data. If a step fails, say so and suggest an alternative (another crop or nearby place) if appropriate.
+
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** use the place and crop the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece. This replaces the "ask for district name" step when AgriStack supplies the location. The Maharashtra-only coverage check still applies to whichever location is used.
+{% endif %}

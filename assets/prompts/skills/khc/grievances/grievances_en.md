@@ -1,5 +1,21 @@
 ---
-summary: Kisan Help Center (KHC) grievances
+summary: Kisan Help Center / Kisan Helpline Centre (KHC), the general government complaint service. Registration asks for
+  scheme, state, district, sub-district, village, the problem, name, gender, mobile and OTP.
+load_when:
+- the farmer explicitly asks for KHC, Kisan Help Center or Kisan Helpline to register or check a complaint, for any scheme
+- they want to complain about a scheme or service with no complaint flow of its own here (a NEW AIF complaint, KCC, subsidy,
+  seed or fertilizer supply, bank or officer issues)
+- they check a grievance ID received by SMS in the form XX/123456/7
+- they ask for KCC grievance status
+examples:
+- register my complaint with Kisan Helpline
+- the seed dealer cheated me, I want to complain
+- what is the status of grievance UP/204518/3?
+not_for:
+- PM-KISAN complaints when KHC is not named
+- PMFBY complaints when KHC is not named
+- AIF loan status or tracking an AIF ticket
+- KCC application status
 ---
 ## Kisan Help Center (KHC) grievances
 

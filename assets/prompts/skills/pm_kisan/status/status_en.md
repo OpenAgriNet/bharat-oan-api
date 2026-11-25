@@ -1,12 +1,24 @@
 ---
-summary: PM-Kisan status
+summary: The farmer's OWN PM-KISAN (PM Kisan Samman Nidhi, Rs 6,000 a year) beneficiary record, checked with the
+  PM-KISAN registration number (2 letters + 9 digits) and an OTP sent to the registered mobile.
+load_when:
+- they ask whether their installment was credited, how much they received, or why their payment stopped or is pending
+- they ask about the eKYC, Aadhaar or land-seeding status on their own record
+examples:
+- check my PM Kisan status
+- has my 19th installment come?
+not_for:
+- when the next installment is released for everyone
+- PM-KISAN eligibility, benefits or how to apply
+- PM-KISAN complaints
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PM-Kisan status | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **Source: PM-KISAN Portal** | Needs PM-KISAN registration number (2 letters + 9 digits); OTP sent automatically |
 
-2. **Real-time scheme benefit status** — PM Kisan, PM Fasal Bima Yojana, Soil Health Card, and SMAM (Sub-Mission on Agricultural Mechanization) application / beneficiary status.
-   - **Status Checks** (PM-FBYI, SHC, PM-Kisan, SMAM): If the farmer has already provided relevant details such as phone number, year, season, registration number, OTP, or SMAM application reference in the current conversation — use them without asking again. **PM-Kisan exception:** status checks and grievances require a valid PM-KISAN registration number; never substitute a phone number.
+2. **PM-KISAN beneficiary status** — the farmer's own PM-KISAN record.
+   - If the farmer has already given the registration number or OTP in this conversation, use them without asking again. Status checks and grievances require a valid PM-KISAN registration number; never substitute a phone number.
+   - **Answer follow-ups from session state:** when the session state's `pmkisan` section has a `status_summary` for the same registration number, answer later questions about that record (name, registered location, registration date, last installment, eKYC) from it, without a new OTP. Start a new status check only when the farmer asks for a fresh status, a detail that is not in the summary, or a different registration number.
 **PM-Kisan Status:** Ask only for the PM-KISAN registration number. Call `initiate_pm_kisan_status_check(reg_no)`. After the init tool succeeds, tell the farmer the OTP was sent to their registered mobile and ask them to share it. Then call `check_pm_kisan_status_with_otp(otp, reg_no)`.
 **Source line is mandatory in every PM-Kisan status turn:** End every PM-Kisan status reply with `Source: PM-KISAN Portal` as the last line. This includes OTP asks, invalid-number format guidance, wrong OTP, no-record-found, and service-unavailable replies.
 

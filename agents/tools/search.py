@@ -15,6 +15,7 @@ from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
 from agents.tools.amul_vistaar import call_amul_vistaar_network
+from agents.tools.bihar_vistaar import call_bihar_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
 from helpers import knowledge_provider
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -84,7 +85,7 @@ async def search_schemes(
     ctx: RunContext[FarmerContext],
     query: str,
     top_k: int = 10,
-    network: Literal["national", "mahavistaar", "amul", "other_documents"] = "national",
+    network: Literal["national", "mahavistaar", "amul", "bihar", "other_documents"] = "national",
     scheme_code: Optional[str] = None,
     union: Optional[str] = None,
     provider_id: Optional[str] = None,
@@ -102,13 +103,14 @@ async def search_schemes(
       ("ndksp-drip-irrigation", "ndksp-farm-pond-lining" or "aif" -- drip irrigation under AIF only).
     - network="amul": Amul union schemes; optional `union` ("banas", "kutch", "sumul", "surendranagar")
       or `provider_id` (e.g. "banas-union").
+    - network="bihar": Bihar state agriculture schemes (seed subsidy, farm machinery, irrigation ...)
     - network="other_documents": only when the national search found nothing relevant for a scheme (for
       example a state scheme): searches the other agricultural documents.
 
     Args:
         query: The scheme question in English, 2-5 words (eligibility, benefits, application process) (required)
         top_k: Maximum number of chunks to return (default: 10)
-        network: Which source to search: "national", "mahavistaar", "amul" or "other_documents"
+        network: Which source to search: "national", "mahavistaar", "amul", "bihar" or "other_documents"
         scheme_code: MahaVistaar scheme code, only with network="mahavistaar"
         union: Amul union filter, only with network="amul"
         provider_id: Amul canonical provider ID, only with network="amul"
@@ -120,6 +122,8 @@ async def search_schemes(
         return await call_maha_vistaar_network(ctx, scheme_code or query)
     if network == "amul":
         return await call_amul_vistaar_network(ctx, query, union=union, provider_id=provider_id)
+    if network == "bihar":
+        return await call_bihar_vistaar_network(ctx, query)
     if network == "other_documents":
         return await _search_other_documents(query)
     result = await _search_national_schemes(ctx, query, top_k)

@@ -1,5 +1,17 @@
 ---
-summary: PMFBY status
+summary: The farmer's OWN crop insurance under PM Fasal Bima Yojana (PMFBY), checked with the registered mobile number,
+  an OTP, policy or claim, year and season (Kharif / Rabi / Summer).
+load_when:
+- they ask about their policy (am I insured this season, policy details)
+- they ask about their claim (status, amount, paid or not, payment reference / UTR, why the money has not arrived)
+- they ask for "policy status" or "claim status" without naming a scheme
+examples:
+- is my crop insurance active for this kharif?
+- has my fasal bima claim been paid?
+- why have I not got my crop insurance money yet?
+not_for:
+- PMFBY information, premium or how to enrol
+- filing or tracking a crop insurance complaint
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

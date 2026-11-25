@@ -31,6 +31,7 @@ from agents.tools.imd_advisory import agromet_note
 from agents.tools.npss import analyze_crop_image
 from agents.tools.terms import to_english
 from helpers import knowledge_provider
+from app.services.session_state import register_section, remember
 from helpers.advisory_pending import (
     CROP_MARKER,
     LOCATION_MARKER,
@@ -682,6 +683,15 @@ def _farmer_place(
     return Place(), ""
 
 
+# What the advisory flow last asked the farmer, as context for the bot (session state). It is a helper only: the
+# bot decides on its own whether the farmer's reply answers it (user, 2026-11-24).
+SESSION_SECTION = register_section("advisory")
+
+
+def _note_question(ctx, asked: Optional[str], crop: Optional[str]) -> None:
+    remember(ctx, SESSION_SECTION, asked_farmer=asked, crop=crop if asked else None)
+
+
 @observe(name="tool:search_advisory", as_type="tool")
 async def search_advisory(
     ctx: RunContext[FarmerContext],
@@ -734,6 +744,7 @@ async def search_advisory(
     """
     if image_url and image_url.strip():
         return await analyze_crop_image(ctx, image_url)
+    _note_question(ctx, None, None)  # set again below only when this answer ends with a question to the farmer
     query = to_english(query)
     days = _clean_days(days_after_sowing)
     season_value = normalize_season(season)
@@ -783,6 +794,7 @@ async def search_advisory(
     found_crops = list(dict.fromkeys(r["crop"] for r in chunks if r.get("crop")))
     if not crop_name and len(found_crops) > 1:
         followup = "" if asked_crop_in_previous_turn(ctx) else format_crop_followup(found_crops)
+        _note_question(ctx, "which crop they mean" if followup else None, None)
         return _answer(chunks, search_ctx, query, limit, days, named_place, place, followup) + await agromet_note(ctx, query=query)
     coffee_pdf = [r for r in chunks if is_coffee_pdf(r)]
     if coffee_pdf:
@@ -811,6 +823,7 @@ async def search_advisory(
         lf_update_current_observation(
             metadata={"season_requested": season_value, "season_match": False, "suggested_seasons": seasons}
         )
+        _note_question(ctx, "which of the available seasons they want", crop_hint)
         followup = format_season_followup(season_value, crop_name or f"`{query}`", seasons)
         return _answer(chunks, search_ctx, query, limit, days, named_place, place, followup) + await agromet_note(ctx, query=query)
 
@@ -831,6 +844,9 @@ async def search_advisory(
         restate = (f", `season`=\"{season_value}\"" if season_value else "") + (
             f", `days_after_sowing`={days}" if days is not None else ""
         )
+        asked = [x for x, need in (('season', need_season), ('days since sowing', need_days),
+                                   ('their place (state or district)', need_place)) if need]
+        _note_question(ctx, ' and '.join(asked), crop_hint)
         followup = format_details_followup(seasons, need_season, need_days, need_place, restate)
     elif asked_before:
         # Asked once already: whatever is still missing (or a place we could not match) is not asked again.

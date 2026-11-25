@@ -115,6 +115,26 @@ def test_mahavistaar_never_targets_bpp(load_module, monkeypatch, configured):
         assert "bpp_id" not in module.build_scheme_search_payload(code)["context"]
 
 
+def test_biharvistaar_payload_and_response(load_module, monkeypatch):
+    monkeypatch.setenv("BAP_ID", "bap-id")
+    module = load_module("agents/tools/bihar_vistaar.py")
+    context = module.build_scheme_search_payload(" seed subsidy ")
+    assert context["context"]["domain"] == "bihar-scheme:oan"
+    assert context["context"]["action"] == "search"
+    assert context["context"]["ttl"] == "PT30S"
+    assert context["context"]["timestamp"].endswith("Z")
+    assert context["message"]["intent"] == {"descriptor": {"name": "seed subsidy"}}
+    item = {"id": "SCHEME007", "descriptor": {"name": "Seed", "short_desc": "Short"}, "tags": [
+        {"name": "Benefits", "value": "Up to 100%", "display": True},
+        {"name": "Route", "value": "/x", "display": False},
+        {"name": "Empty", "value": "null", "display": True}]}
+    responses = [{"message": {"catalog": {"providers": [{"items": [item]}]}}}]
+    result = str(module.BiharCrossNetworkSchemeResponse(responses=responses))
+    assert "## Seed" in result and "- Benefits: Up to 100%" in result
+    assert "Route" not in result and "Empty" not in result
+    assert str(module.BiharCrossNetworkSchemeResponse()) == "No scheme data found for this scheme."
+
+
 def test_photon_preserves_configured_https_endpoint(load_module, monkeypatch):
     monkeypatch.setenv("PHOTON_HOST", "https://example.test:443/photon/")
     module = load_module("app/core/npss_geocodes.py")
@@ -153,7 +173,7 @@ def test_chat_returns_actual_stream_qid_in_exposed_header(load_module, monkeypat
     async def history(session_id):
         return session_id, []
 
-    async def ffs_context(session_id):
+    async def load_state(session_id):
         return {}
 
     captured = []
@@ -166,7 +186,8 @@ def test_chat_returns_actual_stream_qid_in_exposed_header(load_module, monkeypat
     stub("app.models.requests", ChatRequest=models.ChatRequest)
     stub("app.routers.chat_query_utils", ensure_session_id=lambda value: value or str(uuid.uuid4()),
          get_session_history=history, normalize_chat_query=lambda query: (query, False), prepare_image_analyze_payload=lambda **kwargs: None)
-    stub("app.services.ffs", prepare_chat_turn=ffs_context)
+    stub("app.services.ffs")
+    stub("app.services.session_state", load_state=load_state)
     stub("app.services.chat", stream_chat_messages=stream)
     router = load_module("app/routers/chat.py")
     app = FastAPI()

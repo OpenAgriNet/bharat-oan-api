@@ -137,7 +137,7 @@ async def forward_geocode(ctx: RunContext[FarmerContext], place_name: str) -> st
         if found:
             location, kind = found
             if location.latitude is not None and location.longitude is not None:
-                await remember_place(ctx.deps.session_id, location.latitude, location.longitude, kind)
+                await remember_place(ctx, place_name, location.latitude, location.longitude, kind)
             return location._location_string()
         else:
             logger.info(f"No results found for place: {place_name}")

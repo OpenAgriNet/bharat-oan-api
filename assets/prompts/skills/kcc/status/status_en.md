@@ -1,5 +1,14 @@
 ---
-summary: KCC application status
+summary: Status of the farmer's OWN Kisan Credit Card (KCC) loan application made on the Kisan Rin portal or Krishika app,
+  checked with the 10-digit mobile number used to apply and an OTP.
+load_when:
+- they ask whether their KCC application is approved, rejected or pending, the sanctioned amount, or the bank and branch
+examples:
+- is my Kisan Credit Card application approved?
+- which bank is processing my KCC?
+not_for:
+- KCC scheme information, interest rate or how to apply
+- KCC complaints and complaint status
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

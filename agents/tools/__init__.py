@@ -200,12 +200,12 @@ else:
     _SATHI_CROP_TOOLS = [
         Tool(
             get_sathi_crop_groups,
-            takes_ctx=False,
+            takes_ctx=True,
             strict=False,
         ),
         Tool(
             list_sathi_crops_in_group,
-            takes_ctx=False,
+            takes_ctx=True,
             strict=False,
         ),
     ]

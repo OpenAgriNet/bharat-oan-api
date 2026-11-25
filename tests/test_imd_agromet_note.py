@@ -37,17 +37,23 @@ class FakeCache:
         self.data[(namespace, key)] = value
 
 
+# Session state per session ID, as load_state/save_changed_state would carry it between turns.
+SESSION_STATES = {}
+
+
 def context(session_id="s1", allowed=None):
     tools = get_catalog().tools if allowed is None else set(allowed)
     return SimpleNamespace(deps=SimpleNamespace(
         session_id=session_id, latitude=19.9975, longitude=73.7898, lang_code="en",
         skills=SimpleNamespace(allowed_tools=tools),
+        session_state=SESSION_STATES.setdefault(session_id, {}), session_state_changed=set(),
     ))
 
 
 class AgrometNote(unittest.TestCase):
     def setUp(self):
         self.cache = FakeCache()
+        SESSION_STATES.clear()
         self.lookup = BULLETIN
         patches = [
             mock.patch.object(imd_advisory, "cache", self.cache),
@@ -188,7 +194,9 @@ class AgrometNote(unittest.TestCase):
     def place_advisory(self, found, place="Srinagar"):
         with mock.patch.object(imd_advisory, "locate", mock.AsyncMock(return_value=found)) as locate, \
                 mock.patch.object(imd_advisory, "remember_place", mock.AsyncMock()) as remember:
-            text = asyncio.run(imd_advisory.imd_agromet_advisory(context("p1"), place=place))
+            ctx = context("p1")
+            text = asyncio.run(imd_advisory.imd_agromet_advisory(ctx, place=place))
+        self.ctx = ctx
         return text, locate, remember
 
     def test_named_place_is_looked_up_by_the_tool(self):
@@ -197,7 +205,7 @@ class AgrometNote(unittest.TestCase):
                                                                longitude=74.82), "city"))
         locate.assert_awaited_once_with("Srinagar")
         imd_advisory._location_keys.assert_awaited_with(34.075, 74.82)
-        remember.assert_awaited_once_with("p1", 34.075, 74.82, "city")
+        remember.assert_awaited_once_with(self.ctx, "Srinagar", 34.075, 74.82, "city")
         self.assertIn("A current IMD agromet advisory is available", text)
 
     def test_named_state_asks_for_the_district(self):
@@ -274,9 +282,10 @@ class NamedPlace(unittest.TestCase):
         response = mock.Mock(json=lambda: {"features": [feature]}, raise_for_status=lambda: None)
         with mock.patch.object(maps, "_http_client", mock.Mock(get=mock.AsyncMock(return_value=response))), \
                 mock.patch.object(maps, "remember_place", mock.AsyncMock()) as remember:
-            text = asyncio.run(maps.forward_geocode(context("chat-1"), "Hazaribagh"))
+            ctx = context("chat-1")
+            text = asyncio.run(maps.forward_geocode(ctx, "Hazaribagh"))
         self.assertIn("Hazaribagh", text)
-        remember.assert_awaited_once_with("chat-1", 23.99, 85.36, None)
+        remember.assert_awaited_once_with(ctx, "Hazaribagh", 23.99, 85.36, None)
 
     def test_reverse_lookup_sends_no_bbox(self):
         from agents.tools import maps
@@ -298,13 +307,14 @@ class NamedPlace(unittest.TestCase):
 
     def test_state_is_recognised_only_at_its_own_point(self):
         from agents.tools import chat_place
-        store = FakeCache()
-        with mock.patch.object(chat_place, "cache", store):
-            asyncio.run(chat_place.remember_place("chat-2", 26.8105, 73.7684, "state"))
-            self.assertTrue(asyncio.run(chat_place.is_state_point("chat-2", 26.81, 73.768)))
-            self.assertFalse(asyncio.run(chat_place.is_state_point("chat-2", 29.548, 73.834)))
-            asyncio.run(chat_place.remember_place("chat-2", 29.548, 73.834, "city"))
-            self.assertFalse(asyncio.run(chat_place.is_state_point("chat-2", 29.548, 73.834)))
+        ctx = context("chat-2")
+        asyncio.run(chat_place.remember_place(ctx, "Rajasthan", 26.8105, 73.7684, "state"))
+        self.assertTrue(asyncio.run(chat_place.is_state_point(ctx, 26.81, 73.768)))
+        self.assertFalse(asyncio.run(chat_place.is_state_point(ctx, 29.548, 73.834)))
+        asyncio.run(chat_place.remember_place(ctx, "Bikaner", 29.548, 73.834, "city"))
+        self.assertFalse(asyncio.run(chat_place.is_state_point(ctx, 29.548, 73.834)))
+        self.assertEqual(ctx.deps.session_state["place"]["name"], "Bikaner")
+        self.assertEqual(ctx.deps.session_state_changed, {"place"})
 
 
 if __name__ == "__main__":

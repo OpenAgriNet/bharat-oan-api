@@ -1,5 +1,6 @@
 ---
-summary: Location
+summary: Converts a place name (village, town, district, state) to coordinates and back; skills that need a location
+  load it automatically.
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

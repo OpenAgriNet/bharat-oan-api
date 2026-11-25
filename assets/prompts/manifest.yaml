@@ -165,3 +165,16 @@ agents:
     - agristack.profile
     - weather.agromet
     - pm_kisan.installments
+    # Loaded from the first turn; every other enabled skill loads on demand with load_skill, picked from
+    # the skill descriptions that stay in the prompt. Product decision (2026-11-23): PM-KISAN, schemes,
+    # crop advice, mandi, weather and AgriStack. A preloaded skill loads only where it is enabled.
+    preloaded_skills:
+    - pm_kisan.status
+    - pm_kisan.grievances
+    - pm_kisan.installments
+    - schemes.information
+    - crop.advice
+    - mandi.prices
+    - weather.forecast
+    - location.resolve      # required by mandi.prices and weather.forecast
+    - agristack.profile     # the AgriStack status line in the user message relies on its tools
