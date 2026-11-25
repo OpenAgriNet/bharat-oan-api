@@ -46,9 +46,9 @@ def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.
 
 def _on_search(items, status="success", message="", query="aphids",
                location_status="not_requested", has_day_range="true", days_matched="false"):
-    """A KP /search response for the advisory profile."""
+    """A KP /search response for advisory documents."""
     return {
-        "effective_config": {"query": query, "search_profile": "advisory", "ranking_score_field": "_advisory_score"},
+        "effective_config": {"query": query, "document_kind": "advisory", "ranking_score_field": "_advisory_score"},
         "final_count": len(items),
         "hits": items,
         "advisory_search": {
@@ -82,7 +82,7 @@ def kp(monkeypatch):
 class TestPayload:
     def test_payload_uses_the_advisory_profile(self):
         payload = sa.build_advisory_search_payload("aphids in wheat")
-        assert payload == {"query": "aphids in wheat", "search_profile": "advisory"}
+        assert payload == {"query": "aphids in wheat", "document_kind": "advisory"}
 
 
 def _params(payload):
@@ -345,7 +345,7 @@ class TestSearchFirst:
         assert str(request.url) == "http://kp.test/kp-api/search"
         assert request.headers["Authorization"] == "Bearer tok"
         body = json.loads(request.read())
-        assert body["search_profile"] == "advisory" and body["query"] == "aphids in wheat"
+        assert body["document_kind"] == "advisory" and body["query"] == "aphids in wheat"
         assert "Harvest AKJ-1" in out and "ICAR" in out
 
     def test_the_first_search_sends_no_crop_filter(self, kp):

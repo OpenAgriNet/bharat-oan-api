@@ -41,7 +41,7 @@ def test_general_profile_keeps_document_citations_and_omits_videos(call):
          "page_start": 6, "page_end": 6},
         {"name": "Video title", "type": "video", "text": "Video result"},
     ]})
-    assert body == {"query": "cooperative registration", "search_profile": "default", "top_k": 10}
+    assert body == {"query": "cooperative registration", "top_k": 10}
     assert "Source: Cooperative handbook | Registration | p. 6" in result
     assert "Register with the state." in result
     assert "Video" not in result
@@ -56,18 +56,18 @@ def test_scheme_profile_keeps_confirmed_code_and_status_offer(call):
         ],
     }, profile="scheme", scheme_code=" PK ", top_k=75)
     assert body == {
-        "query": "PM Kisan eligibility", "search_profile": "scheme", "document_code": "pk", "top_k": 50,
+        "query": "PM Kisan eligibility", "document_kind": "scheme", "document_code": "pk", "top_k": 50,
     }
     assert "Eligibility details" in result and "PM-KISAN beneficiary" in result
     assert "Unrelated scheme" not in result
 
 
-def test_scheme_profile_discards_unrelated_widened_hits(call):
+def test_scheme_search_discards_unrelated_hits(call):
     result, body = call("eNAM registration", {
-        "scheme_search": {"status": "success", "resolved_scheme_code": "enam", "widened_to_all_schemes": True},
+        "scheme_search": {"status": "success", "resolved_scheme_code": "enam"},
         "hits": [{"scheme_code": "pk", "scheme_name": "PM Kisan", "text": "Other scheme details"}],
     }, profile="scheme")
-    assert body == {"query": "eNAM registration", "search_profile": "scheme", "top_k": 10}
+    assert body == {"query": "eNAM registration", "document_kind": "scheme", "top_k": 10}
     assert "No scheme information found" in result
     assert "PM Kisan" not in result
     assert "Status check available" not in result

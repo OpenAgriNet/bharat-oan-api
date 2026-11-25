@@ -84,8 +84,9 @@ async def search_documents(
     scheme_code = (scheme_code or "").strip().lower()
     if scheme_code and profile != "scheme":
         raise ModelRetry('Use profile="scheme" when passing a scheme code.')
-    payload = {"query": query, "search_profile": "scheme" if profile == "scheme" else "default",
-               "top_k": min(max(top_k, 1), 50)}
+    payload = {"query": query, "top_k": min(max(top_k, 1), 50)}
+    if profile == "scheme":
+        payload["document_kind"] = "scheme"
     if scheme_code:
         payload["document_code"] = scheme_code
 
@@ -132,7 +133,6 @@ async def search_documents(
             {key: result[key] for key in ("doc_id", "chunk_id", "scheme_code", "section", "score", "source")}
             for result in results
         ],
-        "widened_to_all_schemes": search_ctx.get("widened_to_all_schemes") == "true",
     })
     if not results:
         return search_ctx.get("message", "") if status == "scheme_unavailable" and search_ctx.get("message") else NO_RESULTS_MESSAGE

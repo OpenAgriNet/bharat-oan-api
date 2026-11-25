@@ -1,5 +1,5 @@
 """
-Crop and livestock advisory search through the Knowledge Provider (POST /search, search_profile advisory).
+Crop and livestock advisory search through the Knowledge Provider (POST /search, document_kind advisory).
 
 The one advisory tool: every crop, pest, disease and livestock question goes to KP, and a crop photo goes to
 NPSS for pest/disease identification. Regional crop/pest words are mapped to their English glossary term first.
@@ -201,7 +201,7 @@ def build_advisory_search_payload(
     state_lgd_code: Optional[int] = None,
     district_lgd_code: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """KP /search body for the advisory profile.
+    """KP /search body for advisory documents.
 
     The farmer's situation travels in `advisory`: KP filters on `crop` and only boosts `season`,
     `days_after_sowing` and the place (`state_lgd_code` / `district_lgd_code`).
@@ -217,7 +217,7 @@ def build_advisory_search_payload(
         )
         if value is not None and value != ""
     }
-    body: Dict[str, Any] = {"query": query, "search_profile": "advisory"}
+    body: Dict[str, Any] = {"query": query, "document_kind": "advisory"}
     top_k = _clean_top_k(top_k)
     if top_k:
         body["top_k"] = top_k

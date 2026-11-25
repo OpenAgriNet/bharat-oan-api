@@ -74,7 +74,7 @@ def test_search_does_not_append_system_announcement(search, monkeypatch, scheme,
     assert "23rd" not in result and "20 June 2026" not in result
     assert post.call_args.args[0] == "https://example.test/search"
     # Plain semantic search: no scheme code filter is sent.
-    assert post.call_args.kwargs["json"]["search_profile"] == "scheme"
+    assert post.call_args.kwargs["json"]["document_kind"] == "scheme"
     assert "document_code" not in post.call_args.kwargs["json"]
 
 
