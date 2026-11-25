@@ -116,10 +116,39 @@ payload. But the deployment currently **advertises v0.1 for a capability half
 its providers serve at v0.2**, and that is what federation peers read. So the
 move does not only close open items -- it removes a live inconsistency.
 
-It also means phase 1 needs a step that has nothing to do with code: **delete
-the `openagrinet:Grievance` SchemaRegistry row**, or re-running
-`register-providers` will leave v0.1 in place and print a warning into a log
+It also means phase 1 needs a step that has nothing to do with code: move the
+`openagrinet:Grievance` SchemaRegistry row to v0.2, or re-running
+`register-providers` leaves v0.1 in place and prints a warning into a log
 nobody reads.
+
+**Move it with `PUT`. Do not `DELETE` it.** The registry's delete is a soft
+delete -- it sets `_status = false` and the row stops answering search -- but
+the unique index on `capabilityCode` is a plain Postgres index that still holds
+the key. So after a `DELETE`:
+
+- `search` returns nothing, so `ensure_capability_schema` tries to insert;
+- the insert fails with `duplicate key value violates unique constraint
+  "public_V_SchemaRegistry_capabilityCode_sqlgIdx"`, and `setup.py` stops with
+  *"Nothing after this point was written"*;
+- `PUT /api/v1/SchemaRegistry/{osid}` answers `404 entity status is inactive`;
+- `POST` with the original `osid` fails on the same index.
+
+There is no way back through the API. The capability is unregisterable until
+someone runs `update "V_SchemaRegistry" set "_status" = 'true' where ...`
+against the registry database. This was found by following the earlier version
+of this step, which said to delete the row.
+
+The safe sequence is a single call before anything else:
+
+```
+curl -X PUT http://localhost:8081/api/v1/SchemaRegistry/{osid} \
+  -H 'Content-Type: application/json' \
+  -d '{"capabilityCode":"openagrinet:Grievance","name":"Grievance",
+       "version":"v0.2","schemaUrl":"<pack url>","status":"active"}'
+```
+
+`ensure_capability_schema` then finds the version it expects and leaves it
+alone, so `register-providers` is a no-op on that row rather than a failure.
 
 ## What the catalog edit actually is
 
@@ -216,7 +245,7 @@ be asked; see phase 1 step 7.
 
 **Neither blocks anything.** Both phases below ship without an answer.
 
-### Phase 1 — split the shared constant first, then PM-KISAN
+### Phase 1 — split the shared constant first, then PM-KISAN — **done 2026-11-25**
 
 **Yes, this moves both capabilities. But not at the same moment, and step 1 is
 what makes that true.** `GRIEVANCE_CONTEXT` is defined once in
@@ -234,8 +263,12 @@ cheaper than sequencing around it.
    URL. This is now PM-KISAN's alone -- it is also imported by
    `v2/pmkisan_grievance.py:46`, which is the same capability.
 3. `setup.py`'s `pmkisan` Grievance capability from `v0.1` to `v0.2`.
-4. **Delete the `openagrinet:Grievance` SchemaRegistry row** before re-running
-   `register-providers`, or the row stays at v0.1. Note what the row becomes:
+4. **`PUT` the `openagrinet:Grievance` SchemaRegistry row to v0.2** before
+   re-running `register-providers`, or the row stays at v0.1. **Not `DELETE` --
+   that is a soft delete the unique index does not forgive, and it leaves the
+   capability unregisterable through the API entirely.** See the section above
+   for the call and for how to recover a deployment where it has already
+   happened. Note what the row becomes:
    `pmkisan` is first in `PROVIDERS`, so it re-registers at v0.2 and `pmfby`
    then prints the warning instead. Right for PM-KISAN, KHC and AIF, wrong for
    PMFBY -- three of four rather than two. Phase 2 makes it four. That is a
@@ -280,7 +313,7 @@ that names no date, and one that names a category outside G001-G010. Check
 PMFBY grievance too: step 1 is meant to leave it untouched, and that is the
 claim being tested.
 
-### Phase 2 — PMFBY to v0.2
+### Phase 2 — PMFBY to v0.2 — **done 2026-11-25**
 
 1. PMFBY's own `GRIEVANCE_CONTEXT`, the one phase 1 step 1 created, to the v0.2
    context URL. This is the line that moves PMFBY, and after phase 1 it moves
@@ -324,26 +357,98 @@ claim being tested.
 `mock-pmfby`. That is the test — if it passes with no BAP configured, the last
 v1 dependency is gone. Then the api collection, then the agent.
 
-### Phase 3 — record
+### Phase 3 — record — **done 2026-11-25**
 
-Close PM-KISAN items 2, 3 and 5 and PMFBY item 5 in
-[../open-issues.md](../open-issues.md); correct PMFBY's stale `2 of 6` count and
-Open TODO 6 (`SchemeApplication/v0.2` exists, those two tools are live) and
-Open TODO 4 (phase 2 step 5 is that file); and record that `PMFBYCatalog` and
-`PMKISANCatalog` are now the catalogs in use rather than unreferenced schemas.
+Done: PM-KISAN items 2 and 3 closed and item 5 marked unblocked-not-closed in
+[../pmkisan/plan.md](../pmkisan/plan.md#open-todos); PMFBY items 3, 4, 5 and 6
+closed in [../pmfby/plan.md](../pmfby/plan.md#open-todos), with the stale
+`2 of 6` count corrected to **6 of 6**; the "mapping drift" note split into its
+two cases as item 11 of [../open-issues.md](../open-issues.md); and the registry
+row repaired, with the soft-delete trap written into the registry row there.
 
-Also split the "mapping drift" note, which has been one sentence covering two
-different situations:
+One instruction in this phase was wrong and is corrected rather than carried
+out. It said to "record that `PMFBYCatalog` and `PMKISANCatalog` are now the
+catalogs in use rather than unreferenced schemas." They are not. Grepping
+`schema/Grievance/v0.2/attributes.yaml` for both names plus `GrievanceFields`
+returns their definitions and a single `$ref`, and that `$ref` is
+`GrievanceFields`. Both catalog schemas are unreachable, and both now also
+contradict the catalogs they are named for — `PMFBYCatalog` caps `actions` at
+two and PMFBY publishes four; `PMKISANCatalog` pins `G001`-`G010` and PM-KISAN
+publishes `G011`-`G030`. Recorded as open-issues item 26 instead.
 
-- **PMFBY insurance:** `network-specs/api/external/pmfby/insurance/v0.2/
-  mappings/` holds four `deployable: false` sketches, 13 lines each, against
-  96-152 line deployed files. Not drift — a sketch and an implementation that
-  were never the same document. Say so, or delete the sketches.
-- **PM-KISAN grievance:** the drafts are marked `status: "existing"` and are
-  byte-identical to the deployed files for `init` and `status`. For `support`
-  they are not, and the deployed copy is the poorer one — see open-issues.
-  Two near-identical copies of a real mapping with no test that compares them
-  is the condition that produced that bug.
+Also found while verifying and recorded there: item 27, that a mapping is only
+"verified" against whatever `{PREFIX}_MAPPING_BASE_URL` resolves to; and item
+28, that the KHC prompt's PM-KISAN stop rule also blocks a status check, which
+was never meant to be stopped.
+
+## Verification — 2026-11-25
+
+Three layers, in the order that makes a failure attributable: the wire, then
+the tool, then the agent. A green layer below proves nothing about the layer
+above it, which is why all three are run.
+
+**1. The adapter, through the api collection.** 99 requests, 327 assertions,
+325 pass. The two failures are `AgricultureResource Capability - SATHI /
+Select`, which is open-issues item 3 and unrelated — `SATHI_API_KEY` is absent
+from `quick-start/.env`, so `setup.py` renders no SATHI binding at all
+(`grep -c sathi` on the rendered adapter config returns 0) and the adapter
+answers `NET_ENTITY_NOT_FOUND`. The `Grievance` folder on its own is 122
+assertions, all green, across PM-KISAN, PMFBY and KHC.
+
+The PMFBY journey is the part worth naming, because it is what phase 2 bought:
+
+| Request | What it proves |
+|---|---|
+| `1. Init - send the OTP` | `DRAFT`, challenge issued, 6 digits, `NUMERIC`, over `SMS`, `sentTo` masked |
+| `2. Confirm - answer the OTP` | `ACTIVE`, and neither the OTP sent nor the `farmerID` the session now holds comes back |
+| `3. Support - file the grievance` | a ticket number and `filedOn` |
+| `4. Refusal - file with no OTP answered` | **HTTP 400 and nothing filed.** A `support` on a fresh transaction id is refused by the adapter's session binding, not by the tool |
+
+Three stale assertions were found and fixed while running this, all of them
+fixtures that had stopped describing the system: the PMFBY status test compared
+the returned ticket against an unused `ticket-no` variable; the PM-KISAN support
+test expected category `G003` from the retired `G001`-`G010` list while the
+request has always sent `G011`; and the second copy of the PMFBY grievance
+binding assertion still expected two actions.
+
+**2. The tool entry points.** Driven directly, not through the agent, with
+`PMFBY_BECKN_VERSION=v2` and `PMKISAN_BECKN_VERSION=v2`:
+
+- PMFBY: `initiate_pmfby_grievance_otp` → `check_pmfby_grievance_otp` →
+  `pmfby_submit_grievance` → `pmfby_grievance_status`, filing and reading back
+  ticket `2025100023`. A fifth call with a session id that answered no OTP is
+  refused — and that refusal exposed a real defect, now fixed: the session
+  error arrives as `SCH_INVALID_FORMAT` and `_explain_failure` turned it into
+  "Please try again later", which is the wrong advice. Waiting never helps.
+  It now says to send a new OTP, matching `pmfby_scheme_status.py`.
+- PM-KISAN: `pmkisan_grievance_send_otp(purpose="check_status")` →
+  `pmkisan_grievance_status` answers with the grievance record.
+  `purpose="submit_grievance"` and `pmkisan_submit_grievance` return the
+  disabled message, which is correct — the `# ponytail:` guard is deliberate
+  and identical on v1.
+- The per-action discovery gate was checked directly against the live
+  catalogs. `_discover_grievance` resolves only what its catalog advertises:
+  PM-KISAN serves `init`, `status`, `support` and refuses `confirm`; PMFBY
+  serves all four and refuses `select`. Both log which action was asked for
+  and what the catalog offers.
+
+**3. The agent, with farmer sentences.** Through `agrinet_agent.run` with real
+message history:
+
+- "My PMFBY crop insurance claim for Kharif 2026 has not been settled… my
+  mobile is 9000000123" → OTP asked for → "The OTP is 123456" → application
+  number and complaint → **ticket 2025100024, filed.** Three turns, three tool
+  calls, no number invented.
+- "I want to check my PMFBY grievance. My ticket number is 2025100024" → the
+  case read back.
+- "Check my PM-KISAN grievance status… Registration number UP123456789" →
+  `pmkisan_grievance_send_otp` → `pmkisan_grievance_status` → the grievance
+  record. A vaguer phrasing routes to the payment record instead, which is
+  open-issues item 15 and pre-existing; a phrasing naming KHC hits the stop
+  rule in item 28.
+
+What none of this proves: every answer above came from `mock-pmfby` or
+`mock-pmkisan`. The wiring is verified. Neither provider has been reached.
 
 ## What this does not close
 

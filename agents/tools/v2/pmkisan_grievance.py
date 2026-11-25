@@ -12,13 +12,10 @@ change with it:
     refusal on one call.
 
   * Status reads ONE grievance, not all of them. v1's search returned every
-    record held against the registration; v2's PMKISANStatus requires
-    case.filedOn and the mapping matches a single record on it. So the v2 tool
-    takes a filing date the v1 tool never needed -- see pmkisan_grievance_status.
-
-Two gaps are known and deliberate rather than overlooked, both in
-pmkisan_submit_grievance; they are documented at _CATEGORY_CODES below and in
-migration-plan/pmkisan/plan.md.
+    record held against the registration; v2 returns the one the farmer asked
+    about. The optional filed_on picks it; without one, the newest answers. So
+    the v2 tool takes a filing date the v1 tool never needed, but a farmer who
+    does not have it is still served -- see pmkisan_grievance_status.
 """
 from __future__ import annotations
 
@@ -34,12 +31,14 @@ from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
 from agents.tools.pmkisan_grievance import (
+    GRIEVANCE_MAPPING,
     GRIEVANCE_TYPES,
     GrievanceTypeLiteral,
     _PMKISAN_GRIEVANCE_SUBMIT_DISABLED_MSG,
     _validate_pmkisan_registration_number,
     generate_transaction_id,
 )
+from agents.tools.v2.aif import _unusable
 from agents.tools.v2.pmkisan_scheme_status import (
     ACTIVE,
     DRAFT,
@@ -70,11 +69,16 @@ _UNAVAILABLE_MSG = (
 )
 
 
-async def _discover_grievance() -> Optional[Dict[str, Any]]:
-    """The PM-KISAN grievance resource, with its catalog provider.
+async def _discover_grievance(action: str) -> Optional[Dict[str, Any]]:
+    """The PM-KISAN grievance resource that can serve `action`, with its provider.
 
     The scheme code is not a nicety here: PMFBY publishes openagrinet:Grievance
     too, so matching on @type alone reaches the wrong desk.
+
+    The action is checked against the catalog rather than assumed. Without it a
+    tool sends status to a desk that never advertised one and the farmer is told
+    the service is down, when what is actually true is that the publish and the
+    registry drifted apart.
     """
     body = {
         "context": build_context("discover", str(uuid.uuid4())),
@@ -98,46 +102,40 @@ async def _discover_grievance() -> Optional[Dict[str, Any]]:
             f"{response.text[:300]}"
         )
         return None
-    return _first_resource(response.json(), who="PM-KISAN")
+    return _first_resource(
+        response.json(),
+        usable=lambda candidate: _unusable(candidate, action),
+        who="PM-KISAN",
+    )
 
-# The v0.1 pack enumerates these; anything else is SCH_INVALID_ENUM.
-_PUBLISHED_CATEGORIES = {
-    "G001": "Account number not correct",
-    "G002": "Online application pending for approval",
-    "G003": "Installment not received",
-    "G004": "Transaction failed",
-    "G005": "Problem in Aadhaar correction",
-    "G006": "Gender not correct",
-    "G007": "Payment related",
-    "G008": "Problem in OTP-based eKYC",
-    "G009": "Problem in biometric-based eKYC",
-    "G010": "Problem in facial-based eKYC",
-}
+def published_categories(found: Dict[str, Any]) -> Dict[str, str]:
+    """The complaint headings as the catalog advertises them, code to name."""
+    attributes = found["resource"].get("resourceAttributes") or {}
+    options = attributes.get("grievanceOptions") or {}
+    return {
+        str(entry["code"]): str(entry.get("name") or entry["code"])
+        for entry in options.get("categories") or []
+        if entry.get("code")
+    }
 
-# The seven of v1's twenty labels with an equivalent heading above. The other
-# thirteen are refused rather than filed under a near-enough one; why, and what
-# it would take to close the gap, is in migration-plan/pmkisan/plan.md.
-_CATEGORY_CODES = {
-    "LATEST_INSTALMENT_NOT_RECEIVED": "G003",
-    "PREVIOUS_INSTALMENTS_NOT_RECEIVED": "G003",
-    "TRANSACTION_FAILED": "G004",
-    "PROBLEM_WITH_BIOMETRIC_EKYC": "G009",
-    "PROBLEM_WITH_FACIAL_EKYC": "G010",
-    "PENDING_APPROVAL_FOR_SELF_REGISTRATION": "G002",
-    "PROBLEM_WITH_SEEDING_AADHAAR_IN_BANK_ACCOUNT": "G001",
-}
 
-def category_for(grievance_type: str) -> Tuple[str, str]:
+def category_for(grievance_type: str, found: Dict[str, Any]) -> Tuple[str, str]:
     """(category code, refusal to read to the farmer). Exactly one is non-empty.
+
+    The code is PM-KISAN's own, straight from the table v1 reads; the mapping
+    passes it to /LodgeGrievance as GrievanceType unchanged. The published
+    categories decide whether it can be sent, so a heading the desk withdraws
+    stops being offered without a release here.
 
     Module level rather than inline in pmkisan_submit_grievance, because that
     function returns the disabled message on its first line and everything below
     it is unreachable. This gate would otherwise ship having never run.
     """
-    code = _CATEGORY_CODES.get(grievance_type)
-    if code:
+    code = GRIEVANCE_MAPPING.get(grievance_type, "")
+    published = published_categories(found)
+    if code and code in published:
         return code, ""
-    headings = "\n".join(f"- {name}" for name in _PUBLISHED_CATEGORIES.values())
+    headings = "\n".join(f"- {name}" for name in published.values())
     return "", (
         "PM-KISAN does not currently accept this kind of grievance through "
         "this service. It accepts complaints under these headings only:\n"
@@ -147,13 +145,6 @@ def category_for(grievance_type: str) -> Tuple[str, str]:
 
 
 _OTP_SENT_MSG = "An OTP has been sent to the mobile number registered with PM-KISAN."
-
-_NO_FILING_DATE_MSG = (
-    "To look up a PM-KISAN grievance I need the date it was filed, because the "
-    "scheme identifies a complaint by its filing date. Please share that date "
-    "(for example 28-09-2026). It was shown when the grievance was submitted."
-)
-
 
 def _grievance_attributes(reg_no: str) -> Dict[str, Any]:
     return {
@@ -230,7 +221,7 @@ async def _send_grievance_otp(ctx: RunContext[FarmerContext], reg_no: str, purpo
             "beckn_version": "v2",
         }
     )
-    found = await _discover_grievance()
+    found = await _discover_grievance("init")
     if not found:
         logger.warning("PM-KISAN v2 discover found no grievance catalog")
         return _UNAVAILABLE_MSG
@@ -357,10 +348,6 @@ async def pmkisan_submit_grievance(
             raise ModelRetry(
                 f'Invalid grievance type: "{grievance_type}". Please select from: "{choices}".'
             )
-        category_code, refusal = category_for(grievance_type)
-        if refusal:
-            return refusal
-
         if not grievance_description or len(grievance_description.strip()) < 10:
             raise ModelRetry(
                 "Please provide a brief grievance description (at least 10 characters)."
@@ -382,10 +369,13 @@ async def pmkisan_submit_grievance(
                 "beckn_version": "v2",
             }
         )
-        found = await _discover_grievance()
+        found = await _discover_grievance("support")
         if not found:
             logger.warning("PM-KISAN v2 discover found no grievance catalog")
             return _UNAVAILABLE_MSG
+        category_code, refusal = category_for(grievance_type, found)
+        if refusal:
+            return refusal
         # The one PM-KISAN action carrying its payload on channels, not a contract.
         body = {
             "context": build_context("support", transaction_id),
@@ -469,9 +459,10 @@ async def pmkisan_grievance_status(
         raw: If True, return raw HTTP body (pretty JSON when possible).
         otp: 4-digit OTP received on the registered mobile.
         phone_number: Not used on v2. See pmkisan_grievance_send_otp.
-        filed_on: The date the grievance was filed, as DD-MM-YYYY. PM-KISAN identifies a
-            grievance by its filing date, so this is required. Ask the farmer for it; it
-            was shown when the grievance was submitted. Do not guess it.
+        filed_on: The date the grievance was filed, as DD-MM-YYYY. Optional. Pass it
+            when the farmer gives it and the grievance filed that day is returned;
+            leave it empty and their most recent grievance is returned instead. Ask
+            for it only if they volunteer having more than one. Do not guess it.
 
     Returns:
         Grievance status summary or OTP verification error.
@@ -488,8 +479,6 @@ async def pmkisan_grievance_status(
             )
 
         filed_on_iso = _iso_date(filed_on)
-        if not filed_on_iso:
-            return _NO_FILING_DATE_MSG
 
         transaction_id = generate_transaction_id(ctx.deps.session_id, reg_no_clean)
         lf_update_current_observation(
@@ -500,9 +489,11 @@ async def pmkisan_grievance_status(
             }
         )
         attributes = _grievance_attributes(reg_no_clean)
-        attributes["case"] = {"filedOn": filed_on_iso}
+        # Absent, not empty: the mapping reads its absence as "the newest one".
+        if filed_on_iso:
+            attributes["case"] = {"filedOn": filed_on_iso}
         attributes["challenge"] = {"response": {"method": "OTP", "value": otp_clean}}
-        found = await _discover_grievance()
+        found = await _discover_grievance("status")
         if not found:
             logger.warning("PM-KISAN v2 discover found no grievance catalog")
             return _UNAVAILABLE_MSG
@@ -520,12 +511,18 @@ async def pmkisan_grievance_status(
             if code == "BIZ_GENERIC_ERROR":
                 # Almost always a filing date matching no record, so name it back.
                 logger.info(
-                    f"No PM-KISAN grievance for {reg_no_clean} filed on {filed_on_iso}"
+                    f"No PM-KISAN grievance for {reg_no_clean}"
+                    + (f" filed on {filed_on_iso}" if filed_on_iso else "")
                 )
+                if filed_on_iso:
+                    return (
+                        f"PM-KISAN has no grievance recorded against registration "
+                        f"{reg_no_clean} filed on {_display_date(filed_on_iso)}. "
+                        "Please check the filing date and try again."
+                    )
                 return (
                     f"PM-KISAN has no grievance recorded against registration "
-                    f"{reg_no_clean} filed on {_display_date(filed_on_iso)}. "
-                    "Please check the filing date and try again."
+                    f"{reg_no_clean}."
                 )
             return explain_failure(response, "grievance status check")
 

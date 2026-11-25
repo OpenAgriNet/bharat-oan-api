@@ -351,40 +351,48 @@ worked on now.
    grievance writes. See risk 3.
 ### Blocked on the above
 
-3. **Phase 2 — replay the branch's API collection** against the local adapter.
-   Needs item 1. Nothing about PMFBY's actual responses is known until this runs,
-   so every field name in both mappings is still unverified — see risk 2.
-4. **Phase 3 — write `agents/tools/v2/pmfby_grievance.py`.** Not technically
-   blocked, but writing it before item 3 means writing against guessed
-   response shapes.
+3. ~~**Phase 2 — replay the branch's API collection** against the local
+   adapter.~~ **Done 2026-11-25 against `mock-pmfby`, not against PMFBY.** The
+   `PMFBY` folder is 36 assertions and green, covering both capabilities and
+   the grievance journey end to end. What item 1 still owes is the real host:
+   every field name in both mappings agrees with a mock we wrote, which proves
+   the wiring and proves nothing about PMFBY's spelling — see risk 2.
+4. ~~**Phase 3 — write `agents/tools/v2/pmfby_grievance.py`.**~~ **Done.**
+   The file carries all four grievance tools and moved to `Grievance/v0.2` on
+   2026-11-25. The caveat in item 3 stands: the response shapes it reads are
+   the mock's.
 
 ### Deferred by decision
 
-5. **Push the OTP challenge into the pack** — a `PMFBYInit` in `Grievance`, so
-   the gate protects the API rather than the agent's conversation flow. Lands
-   with the `v0.2` pack work. Detail under the OTP section above. Takes this
-   migration from 2 of 6 tools to 4 of 6.
-6. **PMFBY application status** — `initiate_pmfby_status_check` and
-   `check_pmfby_status_with_otp`, the other two of the six tools. Blocked on
-   `network-specs`, not on anything here: `SchemeApplication/v0.1` defines
-   `PMKISANApplicationCatalog`, `PMKISANApplicationInit` and
-   `PMKISANApplicationStatus`, and nothing else. Grepping every
-   `attributes.yaml` in the repo, the only PMFBY schemas that exist anywhere
-   are `PMFBYCatalog`, `PMFBYOption`, `PMFBYStatus`, `PMFBYSubject` and
-   `PMFBYSupport` — all five in `Grievance/v0.1`.
+5. ~~**Push the OTP challenge into the pack**~~ **Closed 2026-11-25 by
+   [../grievance-v0.2/plan.md](../grievance-v0.2/plan.md) phase 2.** It needed
+   no `PMFBYInit` schema in the end: `Grievance/v0.2` already carries
+   `challenge` on the catalog and `GrievanceCall` is open, so `init` and
+   `confirm` are two more registry actions on the same participant and two
+   more mappings, not new vocabulary. The gate is the adapter's session
+   binding, not a check in the tool — `sessionCaptureOn: confirm`,
+   `sessionSendOn: support`, bound to the mobile. Proved by the refusal case:
+   a `support` call on a fresh transaction id with no OTP answered is refused
+   with HTTP 400 and files nothing.
+6. ~~**PMFBY application status**~~ **Closed.** `initiate_pmfby_status_check`
+   and `check_pmfby_status_with_otp` are live on v2 in
+   `agents/tools/v2/pmfby_scheme_status.py`, and the registry carries
+   `pmfby|openagrinet:SchemeApplication` with `init`, `confirm`, `select` and
+   `status`.
 
-   What it needs: a `PMFBYApplicationCatalog` / `PMFBYApplicationInit` /
-   `PMFBYApplicationStatus` trio in `SchemeApplication/v0.1`, modelled on the
-   PM-KISAN three but keyed off a policy or application number rather than an
-   `enrolmentId`. `init` issues the OTP challenge, `status` carries the
-   response — the same shape the v1 tool already uses against the BAP
-   (`pmfby_scheme_status.py:513` posts `/init`, `:615` posts `/status`). Then
-   two mappings, a second capability on the `pmfby` participant, and a v2
-   module.
+   The reasoning above is kept because it was wrong in an instructive way. It
+   concluded the capability needed a `PMFBYApplicationCatalog` /
+   `PMFBYApplicationInit` / `PMFBYApplicationStatus` trio, because
+   `SchemeApplication/v0.1` named only PM-KISAN's three. `SchemeApplication/
+   v0.2` does not work that way: the catalog schema is generic and the call
+   schema is open, so a new scheme is a catalog, two mappings and a registry
+   binding — not three new schemas. `Grievance/v0.2` is the same shape, which
+   is why item 5 above also closed without the `PMFBYInit` it asked for.
 
-   Both PMFBY pack gaps — this and `PMFBYInit` (item 5) — are the same kind of
-   work and should be specified together. Doing both takes PMFBY from 2 of 6
-   tools to 6 of 6.
+   **PMFBY is now 6 of 6 tools on v2**, all on one `_beckn_v2("PMFBY")` flag
+   in `agents/tools/__init__.py`. What is still not true is "PMFBY works" —
+   every one of the six has only ever answered against `mock-pmfby`. That is
+   item 1.
 7. **The mock provider** — CI only, written after the real API has answered,
    not before. See "The mock — deferred, for CI only".
 8. **Keep the chart and quick-start in step.** Both now carry PMFBY, but

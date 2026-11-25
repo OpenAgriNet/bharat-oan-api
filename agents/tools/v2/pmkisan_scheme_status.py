@@ -51,7 +51,7 @@ SCHEME_APPLICATION_CONTEXT = (
 )
 SCHEME_APPLICATION_TYPE = "openagrinet:SchemeApplication"
 GRIEVANCE_CONTEXT = (
-    "https://openagrinet.github.io/network-specs/schema/Grievance/v0.1/context.jsonld"
+    "https://openagrinet.github.io/network-specs/schema/Grievance/v0.2/context.jsonld"
 )
 GRIEVANCE_TYPE = "openagrinet:Grievance"
 

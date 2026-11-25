@@ -487,23 +487,28 @@ reconstruct it from the sections above. Nothing here is being worked on now.
 
 ### Pack gaps — the real host does not fix these
 
-2. **The thirteen grievance types with no v2 category.** Detail, both options
-   and the full table are under "TODO — close the category gap". Not blocking
-   today: `grievance_type` is only read by `pmkisan_submit_grievance`
-   (`v2/pmkisan_grievance.py:313`), which sits behind the disabled return at
-   `:308`. It blocks the day lodging is re-enabled.
-3. **`pmkisan_grievance_status` demands a `filed_on` the farmer may not have.**
-   Live now, on every status check. Detail and both options are under "TODO —
-   let a farmer check a grievance without knowing the date".
+2. ~~**The thirteen grievance types with no v2 category.**~~ **Closed
+   2026-11-25 by the move to `Grievance/v0.2`.** The gap was `Grievance/v0.1`
+   pinning `grievanceOptions.categories[].code` to a fixed `G001`-`G010`
+   enum. `v0.2` makes the code a free string (`minLength: 1`), so the catalog
+   now publishes all twenty codes the tool knows — `G011` through `G030` — and
+   `category_for` reads them from the catalog rather than from a table in the
+   tool. Verified: `GRIEVANCE_MAPPING` holds twenty labels and every one of
+   them resolves against the published catalog.
+3. ~~**`pmkisan_grievance_status` demands a `filed_on` the farmer may not
+   have.**~~ **Closed 2026-11-25.** `filed_on` now defaults to `""` and the
+   tool answers with the newest grievance on the registration number when the
+   farmer has no date. Covered by the api collection — `Grievance / PM-KISAN /
+   Status / Status - read the newest grievance, no filing date`.
 4. **The invented 10-minute OTP validity window.** `grievance.init.yaml:28`
    hardcodes `$otpWindowMillis := 10 * 60 * 1000` and writes `expiresAt` from
    it. Nothing in PM-KISAN's reply says ten minutes and the real host will not
    tell us either — somebody has to ask PM-KISAN. We report it to the farmer
    as fact. See risk 3.
 
-   Items 2, 3 and 4 are one `v0.2` pack revision, not three. Do them together.
-   PMFBY has two more of the same kind — see `../pmfby/plan.md`, Open TODOs
-   items 5 and 6.
+   Items 2 and 3 closed with the `v0.2` move; item 4 is the one that is
+   left, and it is the one no pack revision can settle — somebody has to ask
+   PM-KISAN how long the OTP lives.
 
 ### Not ours to decide
 
@@ -512,8 +517,15 @@ reconstruct it from the sections above. Nothing here is being worked on now.
    disabled message on both v1 and v2; the guards carry the same
    `# ponytail:` note saying what to delete. It is the only one of the five
    tools that writes to a government system. Whoever switched it off has not
-   been asked why, and this migration deliberately did not lift it. Item 2
-   must close first.
+   been asked why, and this migration deliberately did not lift it.
+
+   **Unblocked 2026-11-25, not closed.** Item 2 was the technical blocker and
+   it is gone — every grievance type now has a published category. What is
+   left is a decision nobody here can make. The adapter path underneath it is
+   proven: `Grievance / PM-KISAN / Support / Support - lodge with the OTP`
+   files a grievance end to end against `mock-pmkisan` and reads back the
+   ticket, with the tool's guard the only thing between a farmer and a real
+   filing.
 
 ### Smaller, still open
 
