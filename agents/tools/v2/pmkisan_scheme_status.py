@@ -20,7 +20,7 @@ farmer as written. This is the third behavioural difference, and the reason the
 two versions cannot be diffed blind.
 
 The output is NOT byte-comparable with v1. v1 rendered whatever tag soup the
-gateway returned; v2 gets named fields out of the v0.1 schema pack and renders
+gateway returned; v2 gets named fields out of the v0.2 schema pack and renders
 them here, so the two versions must be read side by side rather than diffed.
 See migration-plan/pmkisan/plan.md.
 """
@@ -39,16 +39,16 @@ from pydantic_ai.tools import RunContext
 
 from agents.deps import FarmerContext
 from agents.tools.pmkisan_scheme_status import generate_transaction_id
-from agents.tools.v2.aif import _first_resource, post_action
+from agents.tools.v2.aif import (
+    _first_resource,
+    post_action,
+    scheme_application_context,
+)
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
 
 logger = get_logger(__name__)
 
-SCHEME_APPLICATION_CONTEXT = (
-    "https://openagrinet.github.io/network-specs/schema/"
-    "SchemeApplication/v0.1/context.jsonld"
-)
 SCHEME_APPLICATION_TYPE = "openagrinet:SchemeApplication"
 GRIEVANCE_CONTEXT = (
     "https://openagrinet.github.io/network-specs/schema/Grievance/v0.2/context.jsonld"
@@ -240,7 +240,7 @@ def applicant_attributes(reg_no: str, phone_number: str) -> Dict[str, Any]:
     lookup, absent means a Mobile lookup.
     """
     attributes: Dict[str, Any] = {
-        "@context": SCHEME_APPLICATION_CONTEXT,
+        "@context": scheme_application_context(),
         "@type": SCHEME_APPLICATION_TYPE,
         "informationMode": "OnDemand",
         "scheme": dict(SCHEME),

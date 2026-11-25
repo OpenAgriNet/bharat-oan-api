@@ -83,6 +83,8 @@ Both return 200. What they contain is one flat schema **per scheme per call**:
 | `Grievance/v0.1` | `PMKISANCatalog`, `PMKISANInit`, `PMKISANStatus`, `PMKISANSupport` | all four grievance calls |
 | `SchemeApplication/v0.1` | `PMKISANApplicationCatalog`, `PMKISANApplicationInit`, `PMKISANApplicationStatus` | all three application calls |
 
+Both capabilities have since moved to v0.2, where the per-action schemas are gone and one open call schema stands for every action: Grievance on 2026-11-25 (`../grievance-v0.2/plan.md`), SchemeApplication the same day (`../scheme-application-v0.2/plan.md`). The table is the v0.1 pack as it stood when this plan was written.
+
 So every action this migration needs is already described. Each schema names
 its `mustSend`, `maySend` and `comesBack` fields explicitly, which is what the
 v2 tool has to satisfy and what will decide which v1 fields survive.

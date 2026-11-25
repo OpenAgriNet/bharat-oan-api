@@ -48,9 +48,9 @@ from helpers.utils import get_logger, to_ascii_digits
 
 logger = get_logger(__name__)
 
-# v0.2, not v0.1. AIF is the first capability on the newer packs; PM-KISAN and
-# PMFBY stay on v0.1 and are validated against their own packs in the same
-# adapter, because the validator resolves a pack from the payload's @context.
+# v0.2, shared by every SchemeApplication provider: AIF, KCC, PMFBY and PM-KISAN.
+# The validator resolves a pack from the payload's @context, so this one function
+# is what decides which pack each of them is checked against.
 #
 # The base is overridable because v0.2 is not published yet: until it is, a
 # deployment serves the packs itself and names that host in the adapter's

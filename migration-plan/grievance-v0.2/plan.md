@@ -107,6 +107,8 @@ registry holds:
 | `openagrinet:Grievance` | **v0.1** | KHC, AIF |
 | `openagrinet:SchemeApplication` | **v0.1** | KCC, AIF, PMFBY insurance |
 
+Both rows read v0.2 as of 2026-11-25. The table is what they held when this plan was written.
+
 `PROVIDERS` is iterated in insertion order and `pmkisan` is first, so v0.1 won
 and stayed. `ensure_capability_schema` refuses to move a row already held: it
 prints a warning and leaves it (`setup.py:604-612`).
@@ -462,7 +464,7 @@ Said plainly, so the move is not oversold:
 | The four prompt-fabrication bugs (items 13, 15, 16, 21) | identical on v1, parked by decision |
 | Pages builds from `main`, so every canonical `v0.2` URL 404s | a merge, not code — and the bigger deployment risk than this move. It does not break the move, because `extendedSchema_contextRewrite` already redirects both v0.2 prefixes to `raw.githubusercontent` on `bv-migration`, and `operationRef` is never fetched |
 | Re-enabling PM-KISAN's grievance lodge path | **unblocked** by phase 1, but still someone's decision. It writes to a government system |
-| `openagrinet:SchemeApplication` is registered at v0.1 while KCC, AIF and PMFBY insurance all serve v0.2 | the same registry-row problem as Grievance, one capability over. Deliberately out of scope here, but it should be the next thing after this |
+| ~~`openagrinet:SchemeApplication` is registered at v0.1 while KCC, AIF and PMFBY insurance all serve v0.2~~ | **Closed 2026-11-25.** It was the next thing after this. PM-KISAN moved to v0.2 and the row with it -- `migration-plan/scheme-application-v0.2/plan.md` |
 
 ## Risks
 
