@@ -78,7 +78,7 @@ A third agent run asked a grievance question -- "I filed a PM Kisan complaint
 earlier ... what happened to it?" -- and the agent answered it with the
 application status, presenting the instalment as the complaint's outcome. That
 is a real bug, but not this one: the same sentence picks the same wrong tool on
-v1, where tool names and docstrings are identical. Open-issues item 29.
+v1, where tool names and docstrings are identical. Open-issues item 15, which already had it; this run is the reconfirmation.
 
 Every answer came from `mock-pmkisan`. PM-KISAN's real endpoints have never
 been reached from here.
