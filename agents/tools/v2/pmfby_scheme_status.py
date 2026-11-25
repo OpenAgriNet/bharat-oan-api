@@ -28,7 +28,6 @@ migration-plan/pmfby/plan.md.
 """
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from typing import Any, Dict, List, Literal, Optional
@@ -131,16 +130,11 @@ def _explain_failure(response: httpx.Response, what: str) -> str:
 
 
 def _discover_context() -> Dict[str, Any]:
-    """The discover envelope, addressed to the audience PMFBY publishes to.
-
-    visibleTo is matched by array overlap, and the PMFBY catalog is published
-    to this network rather than to "*", so the query has to name the network --
-    the same selector the PM-KISAN tool uses, and the same one the PMFBY folder
-    of the API collection sends.
+    """The discover envelope. One network id serves every action, discover
+    included: the PMFBY catalog is published visible to OAN_NETWORK_ID and
+    visibleTo is matched literally, so naming anything else finds nothing.
     """
-    context = build_context("discover", str(uuid.uuid4()))
-    context["networkId"] = os.getenv("OAN_NETWORK_ID", "oan.dev")
-    return context
+    return build_context("discover", str(uuid.uuid4()))
 
 
 async def _discover(action: str) -> Optional[Dict[str, Any]]:

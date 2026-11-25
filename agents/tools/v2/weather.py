@@ -66,14 +66,6 @@ _STATISTIC_LABEL = {
     "sum": "",
 }
 
-# Which catalog audience to discover in -- not who we are, senderId is that.
-# visible_to is matched by array overlap, and a public catalog holds the literal
-# "*", so "*" is what finds it. Mausamgram's catalog is public; mandi's is
-# scoped to oan.dev. The spec allows an array here to name both at once, but
-# the adapter currently refuses it (see plan.md).
-_DISCOVER_NETWORK_ID = os.getenv("OAN_PUBLIC_NETWORK_ID", "*")
-
-
 def _adapter_url(action: str) -> str:
     base = os.getenv("OAN_ADAPTER_URL", "http://network-adapter:9201/consumer")
     return base.rstrip("/") + "/" + action
@@ -86,9 +78,7 @@ def _context(action: str) -> dict:
         "domain": os.getenv("OAN_DOMAIN", "agriculture"),
         "action": action,
         "version": "2.0.0",
-        # select is routed by binding key and signed as this node, so only
-        # discover takes the audience selector.
-        "networkId": _DISCOVER_NETWORK_ID if action == "discover" else network_id,
+        "networkId": network_id,
         "senderId": network_id,
         "receiverId": network_id,
         "transactionId": str(uuid.uuid4()),

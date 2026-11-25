@@ -76,11 +76,6 @@ GRIEVANCE_TYPE = "openagrinet:Grievance"
 SCHEME = {"code": "AIF"}
 SOURCE_LINE = "**Source:** AIF Portal"
 
-# Which catalog audience to discover in -- not who we are, senderId is that.
-# visibleTo is matched by array overlap and AIF's catalog carries "*", so "*"
-# is what finds it. Same selector weather, mandi and sathi use.
-_DISCOVER_NETWORK_ID = os.getenv("OAN_PUBLIC_NETWORK_ID", "*")
-
 # Every AIF catalog resource carries one of these descriptor codes. The code,
 # not @type, is what tells the two capabilities apart.
 _LOAN_CODE = "aif-loan-status"
@@ -119,7 +114,7 @@ def build_context(action: str, transaction_id: str) -> Dict[str, Any]:
         "domain": os.getenv("OAN_DOMAIN", "agriculture"),
         "action": action,
         "version": "2.0.0",
-        "networkId": _DISCOVER_NETWORK_ID if action == "discover" else network_id,
+        "networkId": network_id,
         "senderId": network_id,
         "receiverId": network_id,
         "transactionId": transaction_id,

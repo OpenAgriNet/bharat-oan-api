@@ -151,7 +151,7 @@ V1_ON_SEARCH = {"catalog": {
 def test_discover_asks_the_public_catalog_for_smam_benefits(adapter):
     _check()
     body = adapter.bodies["discover"]
-    assert body["context"]["networkId"] == "*"
+    assert body["context"]["networkId"] == "oan.test"
     assert '@.descriptor.code == "smam-benefits"' in body["message"]["intent"]["filters"]["expression"]
 
 

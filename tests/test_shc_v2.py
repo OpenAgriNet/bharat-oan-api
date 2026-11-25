@@ -108,7 +108,6 @@ class FakeAdapter:
 def adapter(monkeypatch):
     monkeypatch.setenv("OAN_ADAPTER_URL", "http://adapter.test/consumer")
     monkeypatch.setenv("OAN_NETWORK_ID", "oan.test")
-    monkeypatch.delenv("OAN_PUBLIC_NETWORK_ID", raising=False)
     monkeypatch.setattr(shc, "lf_update_current_observation", lambda **kwargs: None)
     monkeypatch.setattr(provider_openapi, "_OPENAPI_CACHE", {})
     monkeypatch.setattr(v1, "generate_file_hash", lambda phone, cycle: "fixedhash")
@@ -154,7 +153,7 @@ def _v1_render(reports):
 def test_discover_asks_the_public_catalog_for_shc_reports(adapter):
     _check()
     body = adapter.bodies["discover"]
-    assert body["context"]["networkId"] == "*"
+    assert body["context"]["networkId"] == "oan.test"
     assert '@.descriptor.code == "shc-reports"' in body["message"]["intent"]["filters"]["expression"]
     assert "spatial" not in body["message"]["intent"]
 

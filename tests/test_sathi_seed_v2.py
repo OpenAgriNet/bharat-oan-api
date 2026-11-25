@@ -147,7 +147,6 @@ def adapter(monkeypatch):
     monkeypatch.setenv("OAN_ADAPTER_URL", "http://adapter.test/consumer")
     monkeypatch.setenv("OAN_NETWORK_ID", "oan.test")
     monkeypatch.setenv("OAN_DOMAIN", "agriculture")
-    monkeypatch.delenv("OAN_PUBLIC_NETWORK_ID", raising=False)
     monkeypatch.setattr(sathi_seed, "lf_update_current_observation", lambda **kwargs: None)
     monkeypatch.setattr(provider_openapi, "_OPENAPI_CACHE", {})
     monkeypatch.delenv("PROVIDER_OPENAPI_CACHE_TTL_SECONDS", raising=False)
@@ -187,7 +186,7 @@ def _v1_render(lots, location):
 def test_discover_asks_the_public_catalog_with_lon_lat_point(adapter):
     _search()
     body = adapter.bodies["discover"]
-    assert body["context"]["networkId"] == "*"
+    assert body["context"]["networkId"] == "oan.test"
     assert body["context"]["action"] == "discover"
     assert body["context"]["senderId"] == "oan.test"
     assert body["context"]["schemaContext"] == [

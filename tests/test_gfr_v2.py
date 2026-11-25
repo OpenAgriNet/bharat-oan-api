@@ -160,7 +160,6 @@ class FakeAdapter:
 def adapter(monkeypatch):
     monkeypatch.setenv("OAN_ADAPTER_URL", "http://adapter.test/consumer")
     monkeypatch.setenv("OAN_NETWORK_ID", "oan.test")
-    monkeypatch.delenv("OAN_PUBLIC_NETWORK_ID", raising=False)
     monkeypatch.setattr(gfr, "lf_update_current_observation", lambda **kwargs: None)
     monkeypatch.setattr(provider_openapi, "_OPENAPI_CACHE", {})
     fake = FakeAdapter()
@@ -191,7 +190,7 @@ def _v1_registry_item(code, name, state_id):
 def test_registry_discovers_the_state_at_the_point(adapter):
     _registry()
     body = adapter.bodies["discover"]
-    assert body["context"]["networkId"] == "*"
+    assert body["context"]["networkId"] == "oan.test"
     assert {c.split("#")[1] for c in body["context"]["schemaContext"]} == {RESOURCE, ADVISORY}
     assert '@.descriptor.code == "gfr-advice"' in body["message"]["intent"]["filters"]["expression"]
     assert body["message"]["intent"]["spatial"][0]["geometry"]["coordinates"] == [LON, LAT]

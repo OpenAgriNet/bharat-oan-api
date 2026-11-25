@@ -65,8 +65,7 @@ def _context(action: str, transaction_id: str) -> dict:
         "domain": os.getenv("OAN_DOMAIN", "agriculture"),
         "action": action,
         "version": "2.0.0",
-        # The GFR catalog is public, so discover must ask the "*" audience.
-        "networkId": os.getenv("OAN_PUBLIC_NETWORK_ID", "*") if action == "discover" else network_id,
+        "networkId": network_id,
         "senderId": network_id,
         "receiverId": network_id,
         "transactionId": transaction_id,
