@@ -71,6 +71,15 @@ nothing blocking. A second run on the mobile path returned the two blockers
 (Income Tax Payee, Land Seeding KYS) and explained them on a follow-up with no
 further tool call.
 
+All three agent runs were repeated after a rebase brought a new SMAM provider
+onto the branch; the answers were the same.
+
+A third agent run asked a grievance question -- "I filed a PM Kisan complaint
+earlier ... what happened to it?" -- and the agent answered it with the
+application status, presenting the instalment as the complaint's outcome. That
+is a real bug, but not this one: the same sentence picks the same wrong tool on
+v1, where tool names and docstrings are identical. Open-issues item 29.
+
 Every answer came from `mock-pmkisan`. PM-KISAN's real endpoints have never
 been reached from here.
 
