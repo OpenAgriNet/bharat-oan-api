@@ -106,9 +106,13 @@ mentions a type:
 | resource | descriptor.code | published `@type` | actions advertised |
 |---|---|---|---|
 | `res-aif-loan-status` | `aif-loan-status` | `openagrinet:SchemeApplication` | `init`, `status` |
-| `res-aif-tickets` | `aif-support-tickets` | `openagrinet:AgricultureResource` | `status` |
+| `res-aif-tickets` | `aif-support-tickets` | `openagrinet:Grievance` | `status` |
 
-The catalog is `capability-examples/AgricultureResource/publish/ondemand-aif.json`
+The two types differ, but the filter still reads `descriptor.code`: AIF answers
+one discover with both resources, and a type alone would not say which of the
+two a caller asked for.
+
+The catalog is `capability-examples/Grievance/publish/ondemand-aif.json`
 in `helmcharts`, and the API collection publishes and discovers it under
 **AIF - loan and grievance status**.
 

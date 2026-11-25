@@ -293,7 +293,7 @@ Steps 2 and 3 are independent and can run together.
    publishes under was corrected on 2026-11-24. Both capabilities are one
    catalog with two resources told apart by `descriptor.code`; see
    [../discovery.md](../discovery.md#how-aif-publishes). The catalog lives at
-   `helmcharts/quick-start/capability-examples/AgricultureResource/publish/ondemand-aif.json`
+   `helmcharts/quick-start/capability-examples/Grievance/publish/ondemand-aif.json`
    and in the API collection under **AIF - loan and grievance status**.
 
    It first published both resources as `AgricultureResource/v0.2` because the
@@ -306,25 +306,43 @@ Steps 2 and 3 are independent and can run together.
    in `x-draft.catalogCandidate`). Nothing in `aif.py` changed: `_discover`
    filters on `descriptor.code`, never on `@type`.
 
-7. **`res-aif-tickets` cannot move to `Grievance/v0.2`,** even though AIF's
-   tickets draft names that type. The pack requires `grievanceOptions` with at
-   least one category, and publishing one without it is refused:
-   `SCH_REQUIRED_FIELD_MISSING: property "grievanceOptions" is missing`. AIF
-   publishes no complaint-category list anywhere, and it has no filing call at
-   all — `subQueryType` arrives only inside a ticket it has already created.
-   Inventing codes to satisfy the schema would put fiction in a catalog, so it
-   stays `AgricultureResource/v0.2`. The pack should make `grievanceOptions`
-   required only when `actions` advertises `support`; a read-only grievance
-   resource has no categories to offer. Raise that with `Grievance/v0.3`.
+7. ~~**`res-aif-tickets` cannot move to `Grievance/v0.2`.**~~ Resolved on
+   2026-11-25 by fixing the pack rather than the resource. The blocker was that
+   `GrievanceFields` required `grievanceOptions` unconditionally, so publishing
+   AIF's tickets was refused with `SCH_REQUIRED_FIELD_MISSING: property
+   "grievanceOptions" is missing`. AIF publishes no complaint-category list
+   anywhere and has no filing call at all — `subQueryType` arrives only inside
+   a ticket it has already created — so inventing codes to satisfy the schema
+   would have put fiction in a catalog.
+
+   `Grievance/v0.2/attributes.yaml` now requires `grievanceOptions` only of a
+   resource whose `actions` advertises `support`, which is what asking for
+   categories is actually about: they are what a caller needs in order to file.
+   All three existing grievance resources advertise `support`, so none of them
+   validates any more loosely than before. `res-aif-tickets` publishes as
+   `Grievance/v0.2` with `informationMode`, `scheme`, and the one `status`
+   action, and the capability is reachable: it was answering
+   `NET_ENTITY_NOT_FOUND` before, because the adapter is bound on
+   `aif|openagrinet:Grievance` and the tool was sending
+   `AgricultureResource` straight from the catalog.
+
+   The contract agreed all along — `operationId: AifTickets`, a description
+   reading `grievance_status`, `api/external/README.md` listing the pack as
+   Grievance, `aif.yaml.tmpl` carrying a `openagrinet:Grievance` binding, and
+   `aif.py` already using `GRIEVANCE_TYPE`. Only `catalog.json` and the
+   operation's `x-oan-binding.resourceType` said otherwise. `aif.py` is
+   unchanged: `pack_attributes` echoes the published `@type`, so correcting the
+   catalog was enough.
 
 8. **`AgricultureResource/v0.2` is missing from the adapter's
    `extendedSchema_contextRewrite`.** Only `SchemeApplication/v0.2` and
    `Grievance/v0.2` are listed, so an `AgricultureResource` resource pinning
    the canonical context is refused with `SCH_SCHEMA_ADAPTATION_FAILED: HTTP
    404 fetching .../schema/AgricultureResource/v0.2/attributes.yaml`. That is
-   why AIF's ticket resource and SATHI's catalog still carry raw
-   `refs/heads/bv-migration` URLs while KCC, PMFBY and AIF's loan resource
-   carry pinned ones. Add the third entry in
+   why SATHI's catalog still carries raw `refs/heads/bv-migration` URLs while
+   KCC, PMFBY and both AIF resources carry pinned ones. AIF's tickets left this
+   set with item 7: `Grievance/v0.2` is rewritten, so moving the resource onto
+   that pack let it pin the canonical context too. Add the third entry in
    `network-adapter.yaml.tmpl` so all three packs read the same, or merge to
    `main` and delete the rewrite entirely.
 
