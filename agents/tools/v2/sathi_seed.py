@@ -23,6 +23,7 @@ from agents.tools.v2.provider_openapi import (
     SchemaUnavailable,
     openapi_document,
     request_schema,
+    rewritten_url,
     select_operation_ref,
 )
 from app.config import DEFAULT_HTTP_TIMEOUT
@@ -33,10 +34,10 @@ load_dotenv()
 
 logger = get_logger(__name__)
 
-# Branch URLs until the SATHI schemas are published; swap here when they move.
-AGRICULTURE_RESOURCE_CONTEXT = (
-    "https://raw.githubusercontent.com/OpenAgriNet/network-specs/bv-features/"
-    "schema/AgricultureResource/v0.2/context.jsonld"
+# Named as published, then redirected by PROVIDER_OPENAPI_URL_REWRITE while v0.2 is unpublished.
+AGRICULTURE_RESOURCE_CONTEXT = rewritten_url(
+    os.getenv("OAN_SCHEMA_BASE", "https://openagrinet.github.io/network-specs/schema").rstrip("/")
+    + "/AgricultureResource/v0.2/context.jsonld"
 )
 _SCHEMA_TYPE = "openagrinet:AgricultureResource"
 # Every SATHI district resource in the catalog carries this descriptor code.

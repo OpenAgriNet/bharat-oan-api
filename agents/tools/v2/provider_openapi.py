@@ -35,7 +35,7 @@ def _cache_ttl_seconds() -> float:
     return float(os.getenv("PROVIDER_OPENAPI_CACHE_TTL_SECONDS", _OPENAPI_CACHE_TTL_SECONDS_DEFAULT))
 
 
-def _rewritten(url: str) -> str:
+def rewritten_url(url: str) -> str:
     """The URL to actually fetch.
 
     A catalog names the published spec, which is right for everyone reading it
@@ -49,7 +49,7 @@ def _rewritten(url: str) -> str:
         prefix, _, replacement = pair.strip().partition("=")
         if prefix and url.startswith(prefix):
             rewritten = replacement + url[len(prefix):]
-            logger.info(f"Reading provider OpenAPI {url} from {rewritten}")
+            logger.info(f"Reading {url} from {rewritten}")
             return rewritten
     return url
 
@@ -62,7 +62,7 @@ async def openapi_document(url: str) -> dict:
     logger.info(f"Fetching provider OpenAPI {url}")
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-            response = await client.get(_rewritten(url))
+            response = await client.get(rewritten_url(url))
         response.raise_for_status()
         document = yaml.safe_load(response.text)
     except (httpx.HTTPError, yaml.YAMLError) as e:
