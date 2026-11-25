@@ -66,7 +66,10 @@ else:
         pmkisan_submit_grievance,
         pmkisan_grievance_status,
     )
-from agents.tools.smam_scheme_status import check_smam_scheme_status
+if _beckn_v2("SMAM"):
+    from agents.tools.v2.smam_scheme_status import check_smam_scheme_status
+else:
+    from agents.tools.smam_scheme_status import check_smam_scheme_status
 # All four PMFBY grievance tools move together on one flag. They have to: the
 # OTP the first two exchange buys the session the filing spends, so a farmer
 # who verified on one version cannot file on the other.
