@@ -88,7 +88,8 @@ def resolve_place(*texts: object, allow_short: bool = True) -> Place:
     district_code: Optional[int] = None
     for _, codes in _find(padded, district_index, allow_short):
         in_state = [c for c in codes if state_code is not None and district_info[c][1] == state_code]
-        district_code = in_state[0] if in_state else codes[0]
+        # A district that is not in the state the farmer named ("Agra, Karnataka") is dropped: keep the state.
+        district_code = in_state[0] if in_state else (codes[0] if state_code is None else None)
         break
 
     if district_code is not None and state_code is None:

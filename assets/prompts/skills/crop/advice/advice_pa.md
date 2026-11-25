@@ -1,15 +1,18 @@
 ---
-summary: 'ਫਸਲ/ਬੀਜ ਜਾਣਕਾਰੀ; ਫਸਲ ਦੇ ਕੀੜੇ ਅਤੇ ਬਿਮਾਰੀਆਂ; ਪਸ਼ੂ ਧਨ ਦੀਆਂ ਬਿਮਾਰੀਆਂ ਅਤੇ ਸਮੱਸਿਆਵਾਂ; ਸ਼ਬਦ ਖੋਜ'
+summary: 'ਫਸਲ/ਬੀਜ ਜਾਣਕਾਰੀ; ਫਸਲ ਦੇ ਕੀੜੇ ਅਤੇ ਬਿਮਾਰੀਆਂ; ਪਸ਼ੂ ਧਨ ਦੀਆਂ ਬਿਮਾਰੀਆਂ ਅਤੇ ਸਮੱਸਿਆਵਾਂ; Crop photo'
 ---
+Every crop, pest, disease and livestock question goes to `search_advisory`, the one advisory tool.
+
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| ਫਸਲ/ਬੀਜ ਜਾਣਕਾਰੀ | `search_documents` | ਟੂਲ ਦੇ ਜਵਾਬ ਤੋਂ ਸਰੋਤ ਦਾ ਨਾਮ | ਮੁੱਢਲਾ ਜਾਣਕਾਰੀ ਸਰੋਤ |
-| ਫਸਲ ਦੇ ਕੀੜੇ ਅਤੇ ਬਿਮਾਰੀਆਂ | `search_pests_diseases` | ਟੂਲ ਦੇ ਜਵਾਬ ਤੋਂ ਸਰੋਤ ਦਾ ਨਾਮ | **ਸਿਰਫ਼** ਫਸਲ ਦੇ ਕੀੜਿਆਂ/ਬਿਮਾਰੀਆਂ ਲਈ: ਪਛਾਣ, ਲੱਛਣ, ਇਲਾਜ, ਕੰਟਰੋਲ Needs a named crop: pass it as `crop`; if none has been named in this conversation, ask which crop first (one short question) before searching. |
-| ਪਸ਼ੂ ਧਨ ਦੀਆਂ ਬਿਮਾਰੀਆਂ ਅਤੇ ਸਮੱਸਿਆਵਾਂ | `search_documents` | ਟੂਲ ਦੇ ਜਵਾਬ ਤੋਂ ਸਰੋਤ ਦਾ ਨਾਮ | ਗਾਂ, ਮੱਝ, ਬੱਕਰੀ, ਮੁਰਗੀ ਆਦਿ ਲਈ ਵਰਤੋ: ਬਿਮਾਰੀਆਂ, ਸਿਹਤ ਸਮੱਸਿਆਵਾਂ, ਦੇਖਭਾਲ |
-| ਸ਼ਬਦ ਖੋਜ | `search_terms` | — | ਸਿਰਫ਼ ਫਸਲ/ਕੀਟ/ਖੇਤੀਬਾੜੀ ਗਿਆਨ ਖੋਜਾਂ ਤੋਂ ਪਹਿਲਾਂ ਵਰਤੋ। ਮੌਸਮ, ਮੰਡੀ, ਸਕੀਮ, ਸਥਿਤੀ, ਸ਼ਿਕਾਇਤ, **ਅਧਿਕਾਰਤ ਖਾਦ ਖੁਰਾਕ (GFR)**, ਅਤੇ **SATHI ਬੀਜ ਉਪਲਬਧਤਾ** ਸਵਾਲਾਂ ਲਈ ਛੱਡ ਦਿਓ |
+| ਫਸਲ/ਬੀਜ ਜਾਣਕਾਰੀ | `search_advisory` | Source line from the tool result | Follow the **Crop advisory flow** below: search straight away with a short English query that includes the crop (2–5 words), the `crop` parameter and the farmer's own words for it as `crop_words`; if no crop has been named in this question, search without `crop` (the tool answers for each crop found and asks which crop); never answer from general knowledge, and ask nothing before searching. Pass `season` and `days_after_sowing` only if the farmer already said them. Covers crop/seed information, crop practices and harvesting. Not for government schemes. |
+| ਫਸਲ ਦੇ ਕੀੜੇ ਅਤੇ ਬਿਮਾਰੀਆਂ | `search_advisory` | Source line from the tool result | **ਸਿਰਫ਼** ਫਸਲ ਦੇ ਕੀੜਿਆਂ/ਬਿਮਾਰੀਆਂ ਲਈ: ਪਛਾਣ, ਲੱਛਣ, ਇਲਾਜ, ਕੰਟਰੋਲ. Same **Crop advisory flow**: pass the crop as `crop` and the farmer's words for it as `crop_words`; if none has been named in this question, search without `crop`. |
+| ਪਸ਼ੂ ਧਨ ਦੀਆਂ ਬਿਮਾਰੀਆਂ ਅਤੇ ਸਮੱਸਿਆਵਾਂ | `search_advisory` | Source line from the tool result | ਗਾਂ, ਮੱਝ, ਬੱਕਰੀ, ਮੁਰਗੀ ਆਦਿ ਲਈ ਵਰਤੋ: ਬਿਮਾਰੀਆਂ, ਸਿਹਤ ਸਮੱਸਿਆਵਾਂ, ਦੇਖਭਾਲ. Leave `crop` empty and put the animal in the English `query` (for example "cow fever"). |
+| Crop photo | `search_advisory` with `image_url` | NPSS result | Only when the farmer uploaded a crop photo: pass its URL as `image_url`. The tool identifies the pest or disease (National Pest Surveillance System). |
 
 6. **ਫਸਲ ਅਤੇ ਖੇਤੀਬਾੜੀ ਸਲਾਹ** — ਫਸਲਾਂ, ਬੀਜ, ਅਤੇ ਖੇਤੀ ਦੇ ਤਰੀਕੇ (ICAR, PoP, ਅਤੇ ਪ੍ਰਮਾਣਿਤ ਸਰੋਤਾਂ ਤੋਂ)।
 7. **ਕੀਟ ਸਲਾਹ** — ਪ੍ਰਮਾਣਿਤ ਖੇਤੀਬਾੜੀ ਸਰੋਤਾਂ ਤੋਂ ਪਛਾਣ, ਰੋਕਥਾਮ, ਅਤੇ ਇਲਾਜ।
-3. **ਸ਼ਬਦ ਦੀ ਪਛਾਣ (ਸਿਰਫ਼ ਫਸਲ/ਕੀਟ ਸਵਾਲਾਂ ਲਈ)** — `search_terms` (threshold 0.5) ਦੀ ਵਰਤੋਂ ਸਿਰਫ਼ ਫਸਲ ਸਲਾਹ, ਕੀਟ/ਬਿਮਾਰੀ, ਅਤੇ ਆਮ ਖੇਤੀਬਾੜੀ ਗਿਆਨ ਦੇ ਸਵਾਲਾਂ ਲਈ ਕਰੋ। ਉਸ ਭਾਸ਼ਾ ਦੇ ਸ਼ਬਦਾਵਲੀ ਸ਼ਬਦਾਂ ਵਿੱਚ ਖੋਜ ਕਰਨ ਲਈ ਉਪਭੋਗਤਾ ਦਾ `language` ਕੋਡ (en/hi/as/bn/gu/kn/mai/ml/mr/or/pa/ta/te) ਪਾਸ ਕਰੋ। ਕਈ ਸ਼ਬਦਾਂ ਲਈ ਸਮਾਨਾਂਤਰ ਕਾਲਾਂ ਕਰੋ। **ਇਹਨਾਂ ਲਈ `search_terms` ਨੂੰ ਪੂਰੀ ਤਰ੍ਹਾਂ ਛੱਡ ਦਿਓ:** ਮੌਸਮ, ਮੰਡੀ ਭਾਅ, ਸਕੀਮ ਦੀ ਜਾਣਕਾਰੀ, ਸਥਿਤੀ ਦੀ ਜਾਂਚ, ਸ਼ਿਕਾਇਤ ਸਵਾਲ, ਅਤੇ **SATHI ਬੀਜ ਉਪਲਬਧਤਾ / ਬੀਜ ਖਰੀਦਣਾ** — ਇਹਨਾਂ ਦੇ ਸਮਰਪਿਤ ਟੂਲ ਪ੍ਰਵਾਹ ਹਨ ਜਿਨ੍ਹਾਂ ਨੂੰ ਸ਼ਬਦ ਖੋਜ ਦੀ ਲੋੜ ਨਹੀਂ ਹੈ।
-   - **ਫਸਲ/ਕੀਟ/ਮੰਡੀ ਸਵਾਲ** ਜੇਕਰ ਕਿਸਾਨ ਨੇ ਇਸ ਗੱਲਬਾਤ ਵਿੱਚ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਫਸਲ, ਕੀਟ, ਜਾਂ ਸਥਾਨ ਦਾ ਨਾਮ ਲਿਆ ਹੈ, ਤਾਂ ਇਸਨੂੰ ਫਾਲੋ-ਅੱਪ ਸਵਾਲਾਂ ਵਿੱਚ ਅੱਗੇ ਲੈ ਜਾਓ (ਜਿਵੇਂ ਕਿ, "ਉੱਲੀਨਾਸ਼ਕ ਬਾਰੇ ਕੀ?" ਉਸੇ ਫਸਲ ਨੂੰ ਮੰਨਦਾ ਹੈ)। ਕਿਸਾਨ ਨੂੰ ਪਹਿਲਾਂ ਤੋਂ ਪ੍ਰਦਾਨ ਕੀਤੇ ਗਏ ਸੰਦਰਭ ਨੂੰ ਦੁਹਰਾਉਣ ਲਈ ਨਾ ਕਹੋ।
-8. **ਖੋਜ ਸਵਾਲ** — `search_terms` ਨਤੀਜਿਆਂ ਤੋਂ ਪ੍ਰਮਾਣਿਤ ਸ਼ਬਦਾਂ ਦੀ ਵਰਤੋਂ ਕਰੋ। ਹਮੇਸ਼ਾ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਖੋਜ ਕਰੋ (2–5 ਸ਼ਬਦ)। ਕਈ ਵੱਖ-ਵੱਖ ਸ਼ਬਦਾਂ ਦੀ ਖੋਜ ਕਰਦੇ ਸਮੇਂ ਸਮਾਨਾਂਤਰ ਕਾਲਾਂ ਦੀ ਵਰਤੋਂ ਕਰੋ।
+- **ਫਸਲ/ਕੀਟ/ਮੰਡੀ ਸਵਾਲ** ਜੇਕਰ ਕਿਸਾਨ ਨੇ ਇਸ ਗੱਲਬਾਤ ਵਿੱਚ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਫਸਲ, ਕੀਟ, ਜਾਂ ਸਥਾਨ ਦਾ ਨਾਮ ਲਿਆ ਹੈ, ਤਾਂ ਇਸਨੂੰ ਫਾਲੋ-ਅੱਪ ਸਵਾਲਾਂ ਵਿੱਚ ਅੱਗੇ ਲੈ ਜਾਓ (ਜਿਵੇਂ ਕਿ, "ਉੱਲੀਨਾਸ਼ਕ ਬਾਰੇ ਕੀ?" ਉਸੇ ਫਸਲ ਨੂੰ ਮੰਨਦਾ ਹੈ)। ਕਿਸਾਨ ਨੂੰ ਪਹਿਲਾਂ ਤੋਂ ਪ੍ਰਦਾਨ ਕੀਤੇ ਗਏ ਸੰਦਰਭ ਨੂੰ ਦੁਹਰਾਉਣ ਲਈ ਨਾ ਕਹੋ।
+8. **Search queries** — Always search in English (2–5 words). `search_advisory` maps regional crop and pest names to English itself.
+
+{% include "skills/crop/advice/flow.md" %}

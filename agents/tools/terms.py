@@ -1,9 +1,7 @@
 import json
 import re
-from enum import Enum
 from pydantic import BaseModel, Field, field_validator
-from rapidfuzz import fuzz, process
-from langfuse import observe
+from rapidfuzz import process
 
 # Load term pairs from JSON file with UTF-8 encoding
 term_pairs = json.load(open('assets/glossary_terms.json', 'r', encoding='utf-8'))
@@ -53,23 +51,6 @@ def _normalize_lang_values(value) -> list[str]:
     raise TypeError(
         f"Glossary language value must be str or list[str], got {type(value).__name__}"
     )
-
-
-class Language(str, Enum):
-    ENGLISH = "en"
-    HINDI = "hi"
-    TRANSLITERATION = "transliteration"
-    ASSAMESE = "as"
-    BENGALI = "bn"
-    GUJARATI = "gu"
-    KANNADA = "kn"
-    MAITHILI = "mai"
-    MALAYALAM = "ml"
-    MARATHI = "mr"
-    ODIA = "or"
-    PUNJABI = "pa"
-    TAMIL = "ta"
-    TELUGU = "te"
 
 
 class TermPair(BaseModel):
@@ -131,72 +112,38 @@ TERM_PAIRS = [TermPair(**pair) for pair in term_pairs]
 
 
 
-@observe(name="tool:search_terms", as_type="tool")
-async def search_terms(
-    term: str,
-    max_results: int = 5,
-    threshold: float = 0.7,
-    language: Language | None = None,
-) -> str:
-    """Search for terms using fuzzy partial string matching across all fields.
+# Every non-English surface form (all languages and transliterations) -> its English term.
+REGIONAL_TO_EN = {
+    variant.lower(): tp.en
+    for tp in TERM_PAIRS
+    for lang in SUPPORTED_LANGS
+    if lang != "en"
+    for variant in tp.get_terms(lang)
+    if len(variant) >= 3
+}
+_MAX_TERM_WORDS = max((len(k.split()) for k in REGIONAL_TO_EN), default=1)
 
-    Args:
-        term: The term to search for
-        max_results: Maximum number of results to return
-        threshold: Minimum similarity score (0-1) to consider a match (default is 0.7)
-        language: Optional language to restrict search to (en/hi/transliteration/as/bn/gu/kn/mai/ml/mr/or/pa/ta/te).
-            IMPORTANT: pick this based on the actual script/language the query
-            `term` is written in — not on what field you expect the answer to
-            come from. Latin/Roman script is not the same as English: a
-            romanized Indic-language word (e.g. "murjhaane ka rog", "beej")
-            belongs to "transliteration", not "en" — "en" is only for terms
-            that are actually English words (e.g. "Wilt", "Seed"). Likewise,
-            a Devanagari term is "hi", a Bengali-script term is "bn", and so
-            on for every other supported language — always match the code to
-            the query's script, never guess. Mismatching them causes fuzzy
-            matching to fail even when the right entry exists. If you are not
-            sure which language/script the query is in, omit `language`
-            entirely so every field is searched.
 
-    Returns:
-        str: Formatted string with matching results and their scores
+def to_english(text: str) -> str:
+    """Replace glossary words written in a regional language or transliteration with the English term.
+
+    Used by search_advisory on its query and crop, so a crop or pest the model passed as e.g. "bhindi"
+    is searched as "Okra". Exact matches only (longest phrase first); English words are left alone.
     """
-    if not 0 <= threshold <= 1:
-        raise ValueError("threshold must be between 0 and 1")
-
-    matches = []
-    term_lower = term.lower()
-
-    # Determine which languages to search
-    # Accept either a Language enum member or a plain string (e.g. "transliteration")
-    # so callers that don't go through pydantic validation still work.
-    if language:
-        search_langs = [language.value if isinstance(language, Language) else language]
-    else:
-        search_langs = list(SUPPORTED_LANGS)
-
-    for term_pair in TERM_PAIRS:
-        max_score = 0.0
-
-        # Score every surface form for each language and keep the best.
-        # That way dialect/synonym variants (not only the primary string) match.
-        for lang in search_langs:
-            for lang_term in term_pair.get_terms(lang):
-                score = fuzz.ratio(term_lower, lang_term.lower()) / 100.0
-                max_score = max(max_score, score)
-
-        if max_score >= threshold:
-            matches.append((term_pair, max_score))
-
-    matches.sort(key=lambda x: x[1], reverse=True)
-
-    if matches:
-        matches = matches[:max_results]
-        return f"Matching Terms for `{term}`\n\n" + "\n".join(
-            f"{m[0]} [{m[1]:.0%}]" for m in matches
-        )
-    else:
-        return f"No matching terms found for `{term}`"
+    words = (text or "").split()
+    out, i = [], 0
+    while i < len(words):
+        for n in range(min(_MAX_TERM_WORDS, len(words) - i), 0, -1):
+            phrase = " ".join(words[i:i + n]).lower().strip(".,?!")
+            english = REGIONAL_TO_EN.get(phrase)
+            if english and phrase not in EN_INDEX_KEYS:
+                out.append(english)
+                i += n
+                break
+        else:
+            out.append(words[i])
+            i += 1
+    return " ".join(out)
 
 
 ### Utility functions for Correcting Document Search Results
@@ -204,6 +151,7 @@ async def search_terms(
 # Build English index from glossary
 EN_INDEX = {tp.en.lower(): tp for tp in TERM_PAIRS}
 EN_TERMS = list(EN_INDEX.keys())
+EN_INDEX_KEYS = set(EN_TERMS)
 
 def build_glossary_pattern(terms):
     sorted_terms = sorted(terms, key=len, reverse=True)

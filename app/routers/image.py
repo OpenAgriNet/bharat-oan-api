@@ -66,7 +66,7 @@ async def serve_image(image_id: UUID):
     """
     Serve an uploaded image by its ID.
 
-    This endpoint is used by the `analyze_crop_image` tool to download
+    This endpoint is used by `search_advisory` (photo diagnosis, image_url) to download
     the image bytes before forwarding them to the NPSS API.
 
     NOTE: No auth required — image IDs are UUIDs (unguessable) and

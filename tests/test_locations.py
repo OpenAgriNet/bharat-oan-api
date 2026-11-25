@@ -77,3 +77,9 @@ def test_data_file_is_consistent():
 def test_districts_seen_in_the_dev_records_resolve(text, state, district):
     place = resolve_place(text)
     assert (place.state_code, place.district_code) == (state, district)
+
+
+def test_a_district_not_in_the_named_state_is_dropped_and_the_state_kept():
+    place = resolve_place("Agra, Karnataka")
+    assert place.state_name == "Karnataka" and place.district_code is None and place.label == "Karnataka"
+    assert resolve_place("Agra").district_name == "Agra"  # a district alone still finds its state

@@ -1,31 +1,24 @@
-"""Guard: while `search_advisory` has a question for the farmer pending, other crop searches wait.
+"""Conversation checks for `search_advisory`'s follow-up questions to the farmer.
 
-`search_advisory` returns a result that tells the agent to ask the farmer something (the season, the
-sowing days, or an offer of other seasons) and to give no advice yet. Those results carry
-`PENDING_MARKER`. Without a guard a model can skip that question by calling `search_documents` or
-`search_pests_diseases` in the same turn and answering from them. The check is on the message history,
-so it works the same for every model.
+`search_advisory` answers with general advice and, when a detail would make it more specific (the crop, the
+season and sowing days, the place, or another season), tells the agent to end the answer with ONE follow-up
+question. Those results carry `PENDING_MARKER`, plus a marker naming what was asked, so the farmer's reply
+continues the same question and each follow-up is asked only once. The checks below read the message history,
+so they work the same for every model.
 """
 import re
 
 from helpers.locations import resolve_place
-from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart, UserPromptPart
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
 
 # Kept as an HTML comment: it is not meant to be shown to the farmer.
 PENDING_MARKER = "<!-- advisory-question-pending -->"
-# Added to the pending question that asks for the farmer's place (state / district).
+# Added to the follow-up that asks for the farmer's place (state / district).
 LOCATION_MARKER = "<!-- advisory-location-question -->"
-
-PENDING_RETRY = (
-    "Do not search yet. The crop advisory search asked you to put a question to the farmer first. "
-    "Ask that question now, give no advice, and wait for the farmer's answer."
-)
-
-ADVISORY_FIRST_RETRY = (
-    "Call `search_advisory` first for this crop question, with the same crop, then continue. "
-    "Do not answer from this tool alone."
-)
-
+# Added to the follow-up that asks for the season and/or the sowing days, or offers another season.
+SEASON_MARKER = "<!-- advisory-season-question -->"
+# Added to the follow-up that asks which crop (the advice found was for several crops).
+CROP_MARKER = "<!-- advisory-crop-question -->"
 
 def _current_turn(ctx) -> list:
     """Messages since the farmer's latest message."""
@@ -40,44 +33,8 @@ def _current_turn(ctx) -> list:
     return messages[turn_start:]
 
 
-def advisory_not_searched(ctx) -> bool:
-    """True when `search_advisory` is available but has not been called yet in the current turn."""
-    skills = getattr(getattr(ctx, "deps", None), "skills", None)
-    if skills is not None and "search_advisory" not in skills.visible:
-        return False  # ICAR advisory is switched off for this deployment
-    for message in _current_turn(ctx):
-        if isinstance(message, ModelResponse) and any(
-            isinstance(p, ToolCallPart) and p.tool_name == "search_advisory" for p in message.parts
-        ):
-            return False
-    return True
-
-
-def advisory_question_pending(ctx) -> bool:
-    """True when `search_advisory` returned a question for the farmer earlier in the current turn."""
-    messages = getattr(ctx, "messages", None)
-    if not messages:
-        return False
-    messages = list(messages)
-    turn_start = 0
-    for index, message in enumerate(messages):
-        if isinstance(message, ModelRequest) and any(isinstance(p, UserPromptPart) for p in message.parts):
-            turn_start = index
-    for message in messages[turn_start:]:
-        if not isinstance(message, ModelRequest):
-            continue
-        for part in message.parts:
-            if (
-                isinstance(part, ToolReturnPart)
-                and part.tool_name == "search_advisory"
-                and PENDING_MARKER in str(part.content)
-            ):
-                return True
-    return False
-
-
 # --- Hard guards: the model may not fill in what only the farmer can say -----------------------------------
-# A weaker model sometimes passes `season`, `days_after_sowing` or `answer_now` that the farmer never gave,
+# A weaker model sometimes passes a `season` or `days_after_sowing` that the farmer never gave,
 # so the tool never asks. These checks read the conversation instead of trusting the arguments. They work
 # the same for every model. They do nothing when there is no history to read (direct calls, tests).
 
@@ -94,6 +51,22 @@ _NUMBER_WORDS = re.compile(
     r"week|weeks|month|months|yesterday)\b",
     re.IGNORECASE,
 )
+
+# Words in a reply to the season / days / place question that are not a place.
+_NOT_PLACE_WORDS = re.compile(
+    r"\d+|\b(days?|ago|sowed|sown|sowing|after|before|season|crop|it|is|in|my|the|and|of|about|around|"
+    r"i|don't|dont|do|not|know|sure|no|idea)\b",
+    re.IGNORECASE,
+)
+
+
+def place_words(text: str) -> str:
+    """What is left of the farmer's reply once the season, the sowing days and filler words are taken out ('' when
+    nothing is left). A reply like "Rabi, 45 days" names no place, so it is not reported as a place we could not
+    match; "Rabi, 45 days, Bangalore" leaves "Bangalore"."""
+    rest = _NOT_PLACE_WORDS.sub(" ", _NUMBER_WORDS.sub(" ", _SEASON_WORDS.sub(" ", text or "")))
+    return " ".join(re.sub(r"[^\w\s]", " ", rest).split())
+
 
 # The agent's prompt is "**Conversation**\n\n<last message pairs>\n\n---\n\n<the farmer's message>", so the
 # farmer's own words are only what follows the last separator. Reading the whole prompt would pick up
@@ -133,46 +106,50 @@ def _earlier_turns(ctx) -> list:
     return messages[: len(messages) - len(_current_turn(ctx))]
 
 
+def _previous_turn(ctx) -> list:
+    """The messages of the farmer's turn right before the current one ([] when there is none)."""
+    turns = _split_turns(ctx)
+    return turns[-2] if len(turns) >= 2 else []
+
+
 def asked_in_previous_turn(ctx) -> bool:
-    """True when the turn right before this one ended with a `search_advisory` question for the farmer.
+    """True when the turn right before this one ended with a question for the farmer (from `search_advisory`, or a
+    short one the model wrote itself).
 
     Only then is this message the farmer's answer to that question. A question asked further back does
     not count: a new question later in the chat has to be asked about again."""
-    earlier = _earlier_turns(ctx)
-    start = 0
-    for index, message in enumerate(earlier):
-        if isinstance(message, ModelRequest) and any(isinstance(p, UserPromptPart) for p in message.parts):
-            start = index
-    return any(
-        isinstance(message, ModelRequest) and any(_is_pending_return(p) for p in message.parts)
-        for message in earlier[start:]
-    )
+    return _turn_asked(_previous_turn(ctx))
 
 
-def _tool_history_missing(ctx) -> bool:
-    """True when earlier turns exist but none of their tool results were kept, so nothing can be checked."""
-    earlier = _earlier_turns(ctx)
-    has_earlier_turn = any(
-        isinstance(m, ModelRequest) and any(isinstance(p, UserPromptPart) for p in m.parts) for m in earlier
-    )
-    has_tool_part = any(
-        isinstance(m, ModelRequest) and any(isinstance(p, ToolReturnPart) for p in m.parts) for m in earlier
-    )
-    return has_earlier_turn and not has_tool_part
+_PLACE_QUESTION = re.compile(r"\bstate\b.{0,40}\bdistrict\b|\bdistrict\b.{0,40}\bstate\b", re.IGNORECASE | re.DOTALL)
+
+
+def _turn_asked_location(turn: list) -> bool:
+    """True when this turn asked the farmer for their place: through `search_advisory`, or in the model's own words."""
+    if _turn_asked(turn, LOCATION_MARKER):
+        return True
+    if not _asked_without_search(turn):
+        return False
+    for message in reversed(turn):
+        if isinstance(message, ModelResponse):
+            text = " ".join(str(p.content) for p in message.parts if isinstance(p, TextPart))
+            return _PLACE_QUESTION.search(text) is not None
+    return False
 
 
 def asked_location_in_previous_turn(ctx) -> bool:
     """True when the turn right before this one asked the farmer for their place (state / district)."""
-    earlier = _earlier_turns(ctx)
-    start = 0
-    for index, message in enumerate(earlier):
-        if isinstance(message, ModelRequest) and any(isinstance(p, UserPromptPart) for p in message.parts):
-            start = index
-    return any(
-        isinstance(message, ModelRequest)
-        and any(_is_pending_return(p) and LOCATION_MARKER in str(p.content) for p in message.parts)
-        for message in earlier[start:]
-    )
+    return _turn_asked_location(_previous_turn(ctx))
+
+
+def asked_season_in_previous_turn(ctx) -> bool:
+    """True when the turn right before this one asked for the season / sowing days (or offered another season)."""
+    return _turn_asked(_previous_turn(ctx), SEASON_MARKER)
+
+
+def asked_crop_in_previous_turn(ctx) -> bool:
+    """True when the turn right before this one asked which crop."""
+    return _turn_asked(_previous_turn(ctx), CROP_MARKER)
 
 
 def _split_turns(ctx) -> list:
@@ -197,12 +174,30 @@ def _turn_text(turn: list) -> str:
     return ""
 
 
+def _asked_without_search(turn: list) -> bool:
+    """True when the turn ended with a short question the model wrote itself, without calling `search_advisory`
+    (it has a question but no Source line). The farmer's next message still answers it."""
+    if any(
+        isinstance(m, ModelRequest) and any(isinstance(p, ToolReturnPart) and p.tool_name == "search_advisory" for p in m.parts)
+        for m in turn
+    ):
+        return False
+    for message in reversed(turn):
+        if isinstance(message, ModelResponse):
+            text = " ".join(str(p.content) for p in message.parts if isinstance(p, TextPart)).strip()
+            return text.endswith("?") and "source:" not in text.lower()
+    return False
+
+
 def _turn_asked(turn: list, marker: str = "") -> bool:
-    """True when `search_advisory` ended this turn with a question for the farmer (with `marker` when given)."""
-    return any(
+    """True when this turn ended with a question for the farmer: from `search_advisory` (with `marker` when given),
+    or, when no marker is asked for, one the model wrote itself without searching."""
+    if any(
         isinstance(message, ModelRequest) and any(_is_pending_return(p) and marker in str(p.content) for p in message.parts)
         for message in turn
-    )
+    ):
+        return True
+    return not marker and _asked_without_search(turn)
 
 
 def answer_chain(ctx) -> list:
@@ -221,7 +216,7 @@ def answer_chain(ctx) -> list:
         index -= 1
         chain.insert(0, index)
     return [
-        (_turn_text(turns[i]), i > 0 and _turn_asked(turns[i - 1], LOCATION_MARKER))
+        (_turn_text(turns[i]), i > 0 and _turn_asked_location(turns[i - 1]))
         for i in chain
     ]
 
@@ -266,8 +261,71 @@ def farmer_gave_days(ctx) -> bool:
     )
 
 
-def may_answer_now(ctx) -> bool:
-    """`answer_now` is honoured only when this message answers our question (never in the turn it was asked)."""
+# --- Crop check ---------------------------------------------------------------------------------
+# A model that sees earlier turns of the chat sometimes reuses their crop for a new question. The crop has to be
+# in the farmer's own words for this question (the current message, plus the answers that belong to it).
+
+# Coffee in English and in the supported scripts; arabica and robusta are coffee varieties, so they name the crop too.
+_COFFEE_WORDS = re.compile(
+    r"coffee|coffe\b|kaffee|arabica|robusta|कॉफी|कॉफ़ी|कोफी|কফি|કોફી|ಕಾಫಿ|കാപ്പി|କଫି|ਕੌਫੀ|காபி|కాఫీ",
+    re.IGNORECASE,
+)
+
+
+# Other names a farmer uses for the same crop; the model often passes the standard English name (paddy -> Rice).
+_CROP_SYNONYMS = [
+    {"rice", "paddy", "dhan", "dhaan", "धान", "ધાન", "நெல்", "వరి", "ধান", "ଧାନ", "ಭತ್ತ", "നെല്ല്"},
+    {"wheat", "gehun", "gehu", "गेहूं", "गेहू", "ઘઉં", "গম", "ଗହମ", "ಗೋಧಿ", "கோதுமை", "గోధుమ", "ਕਣਕ"},
+    {"sorghum", "jowar", "ज्वार", "jwari", "jawar"},
+    {"maize", "corn", "makka", "makai", "मक्का", "मकई"},
+    {"kodo millet", "kodo"},
+    {"pearl millet", "bajra", "बाजरा"},
+    {"chickpea", "gram", "chana", "चना"},
+    {"pigeon pea", "pigeonpea", "tur", "toor", "arhar", "अरहर", "तूर"},
+    {"sugarcane", "ganna", "गन्ना"},
+    {"cotton", "kapas", "कपास"},
+    {"soybean", "soyabean", "soya", "सोयाबीन"},
+    {"groundnut", "peanut", "mungfali", "मूंगफली"},
+]
+
+
+def _in_text(word: str, text: str) -> bool:
+    """`word` in `text`: whole word for Latin words (so "tur" is not found in "nature"), plain match otherwise."""
+    if word.isascii():
+        return re.search(rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9])", text) is not None
+    return word in text
+
+
+def _chain_text(ctx) -> str:
+    return " ".join(" ".join(text.lower().split()) for text, _ in answer_chain(ctx))
+
+
+def farmer_named_crop(ctx, crop: str, crop_words: str = "") -> bool:
+    """True when the crop is in the farmer's own words for this question.
+
+    `crop` is the English name the model passed; `crop_words` are the farmer's exact words for it (any script).
+    Either one found in the farmer's messages is enough. Coffee also counts when only arabica or robusta is named."""
     if not _has_history(ctx):
         return True
-    return asked_in_previous_turn(ctx) or _tool_history_missing(ctx)
+    text = _chain_text(ctx)
+    if _COFFEE_WORDS.search(str(crop or "")) and _COFFEE_WORDS.search(text):
+        return True
+    for candidate in (crop, crop_words):
+        wanted = " ".join(str(candidate or "").lower().split())
+        if wanted and wanted in text:
+            return True
+        for group in _CROP_SYNONYMS:
+            if wanted in group and any(_in_text(name, text) for name in group):
+                return True
+    return False
+
+
+def describe_turns(ctx, crop: str = "") -> str:
+    """One line for the logs, with no farmer text: per turn, `*` when it ended with a search_advisory question
+    and whether the crop is in that turn's words."""
+    wanted = " ".join(str(crop or "").lower().split())
+    turns = _split_turns(ctx)
+    return " | ".join(
+        f"[{i}{'*' if _turn_asked(t) else ''}] crop_in_turn={bool(wanted) and wanted in ' '.join(_turn_text(t).lower().split())}"
+        for i, t in enumerate(turns)
+    )

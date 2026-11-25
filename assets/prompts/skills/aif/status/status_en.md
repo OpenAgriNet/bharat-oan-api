@@ -6,7 +6,7 @@ summary: AIF loan status; AIF grievance status
 | AIF loan status | `initiate_aif_otp` → `verify_aif_otp` → `check_aif_loan_status` | **Source: AIF Portal** | Needs: AIF beneficiary ID, then OTP, then loan application number |
 | AIF grievance status | `initiate_aif_otp` → `verify_aif_otp` → `check_aif_grievance_status` | **Source: AIF Portal** | Tracking only, no filing. Needs: AIF beneficiary ID, then OTP. Never ask for a ticket number |
 
-**AIF Status (loan applications and support tickets):** Use these tools when the farmer asks about the **status** of their own AIF loan application or AIF complaint. Do **not** use `search_schemes` or `call_maha_vistaar_network("aif")` for a status question — those are for scheme information only.
+**AIF Status (loan applications and support tickets):** Use these tools when the farmer asks about the **status** of their own AIF loan application or AIF complaint. Do **not** use `search_schemes` for a status question — those are for scheme information only.
 
 1. Ask for the AIF beneficiary ID. Call `initiate_aif_otp(beneficiary_id)`. This call is **mandatory** — it is what sends the OTP. Nothing else sends it.
    - Call it even when the farmer gives the beneficiary ID in the same message as their question. The ID being present does **not** mean the OTP was sent.

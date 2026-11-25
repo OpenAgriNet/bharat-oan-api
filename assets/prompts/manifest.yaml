@@ -11,13 +11,7 @@ skills:
   schemes.information:
     prompt_dir: skills/schemes/information
     tools:
-    - call_amul_vistaar_network
-    - call_maha_vistaar_network
     - search_schemes
-    - search_terms
-    - search_video
-    requires:
-    - documents.search
   pm_kisan.status:
     prompt_dir: skills/pm_kisan/status
     tools:
@@ -75,17 +69,7 @@ skills:
   crop.advice:
     prompt_dir: skills/crop/advice
     tools:
-    - analyze_crop_image
-    - search_pests_diseases
-    - search_terms
-    requires:
-    - documents.search
-  crop.icar:
-    prompt_dir: skills/crop/icar
-    tools:
     - search_advisory
-    requires:
-    - crop.advice
   weather.forecast:
     prompt_dir: skills/weather/forecast
     tools:
@@ -142,10 +126,6 @@ skills:
   pm_kisan.installments:
     prompt_dir: skills/pm_kisan/installments
     tools: []
-  documents.search:
-    prompt_dir: skills/documents/search
-    tools:
-    - search_documents
 agents:
   chat:
     prompt_dir: chat
@@ -163,7 +143,7 @@ agents:
     - pa
     - ta
     - te
-    # bh-main comments out: ffs.booking, agristack.profile, khc.grievances, crop.icar
+    # bh-main comments out: ffs.booking, agristack.profile, khc.grievances
     enabled_skills:
     - ffs.booking
     - schemes.information
@@ -177,7 +157,6 @@ agents:
     - kcc.status
     - khc.grievances
     - crop.advice
-    - crop.icar
     - weather.forecast
     - location.resolve
     - mandi.prices
@@ -186,4 +165,3 @@ agents:
     - agristack.profile
     - weather.agromet
     - pm_kisan.installments
-    - documents.search
