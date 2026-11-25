@@ -14,9 +14,11 @@ from agents.deps import FarmerContext
 from agents.tools.aif import _build_payload, _descriptor, _endpoint, _outcome_tag, _values
 from agents.tools.kcc import _mobile
 from app.config import DEFAULT_HTTP_TIMEOUT
+from app.services.session_state import register_section, remember
 from helpers.utils import get_logger, get_prompt, to_ascii_digits
 
 logger = get_logger(__name__)
+SECTION = register_section("khc")
 SOURCE = "**Source:** Kisan Helpline Center"
 _STATUS_ID_PROMPT = (
     "Please share the grievance ID you received by SMS on your registered mobile number. "
@@ -66,6 +68,14 @@ def _turns(messages) -> list[tuple[str, str]]:
     return turns
 
 
+_KHC_WORDS = re.compile(
+    r"\bkhc\b|\bk\.h\.c\b|"
+    r"\bkisan\s*(?:help\s*-?\s*(?:line\s*)?|heliline\s*)cent(?:er|re)\b|"
+    r"किसान\s*हेल्प(?:लाइन)?\s*सेंटर|केएचसी",
+    re.IGNORECASE,
+)
+
+
 def khc_service_note(messages, current_query: str = "") -> str:
     """Always provide status routing, plus a scoped reminder of an earlier KHC choice.
 
@@ -77,7 +87,13 @@ def khc_service_note(messages, current_query: str = "") -> str:
         "status_id_prompt": _STATUS_ID_PROMPT,
         "status_otp_prompt": _STATUS_OTP_PROMPT,
     })
-    return routing + get_prompt("skills/khc/grievances/service_selected", context={})
+    turns = _turns(messages)
+    if current_query:
+        turns.append(("farmer", current_query))
+    for who, text in turns:
+        if who == "farmer" and _KHC_WORDS.search(text):
+            return routing + get_prompt("skills/khc/grievances/service_selected", context={})
+    return routing
 
 
 def _asked_for_problem(text: str) -> bool:
@@ -161,8 +177,9 @@ def _render_location(fields: dict[str, str], place: str) -> str:
     if not matches:
         ask = {
             "state": (
-                "No state was given. Ask 'Please share the name of your state', then call this tool again once "
-                "the state and district are known."
+                "No state was given. Do not ask anything because of this message: go back to the KHC step order "
+                "and ask the first step that is not done yet (the scheme comes before the state), then call this "
+                "tool again once the state and district are known."
             ),
             "district": "Ask 'Can you please share your district name', then call this tool again with that district.",
             "geocode": (
@@ -305,6 +322,107 @@ def _render_tree(fields: dict[str, str], scheme_name: str = "", concern: str = "
     )
 
 
+# Fields that hold the in-progress grievance's KHC IDs; a later register_khc_grievance call needs them.
+_PROBLEM_FIELDS = ("problem_category", "problem_category_id", "problem_subcategory", "problem_subcategory_id",
+                   "problem_options")
+_GRIEVANCE_FIELDS = ("state", "state_id", "village", "village_id", "scheme", "scheme_id", "division_id",
+                     *_PROBLEM_FIELDS)
+# Keep the matched catalogue for a later turn only when it is short; a long one is left out of the session state.
+_MAX_REMEMBERED_OPTIONS = 20
+
+
+def _saved(ctx) -> dict:
+    return (getattr(ctx.deps, "session_state", None) or {}).get(SECTION, {})
+
+
+def _remember_state(ctx, state: dict) -> None:
+    """The grievance state; a different state drops the village, scheme and problem chosen for the old one."""
+    if _saved(ctx).get("state_id") not in (None, state["id"]):
+        remember(ctx, SECTION, **dict.fromkeys(_GRIEVANCE_FIELDS))
+    remember(ctx, SECTION, state=state.get("name"), state_id=state["id"])
+
+
+def _remember_scheme(ctx, scheme_id, name, division_id) -> None:
+    if _saved(ctx).get("scheme_id") not in (None, scheme_id):
+        remember(ctx, SECTION, **dict.fromkeys(_PROBLEM_FIELDS))
+    remember(ctx, SECTION, scheme=name, scheme_id=scheme_id, division_id=division_id)
+
+
+def _remember_location(ctx, fields: dict[str, str]) -> None:
+    """Save the place only when exactly one village matched; with several, the farmer picks by name first."""
+    villages = [m for m in json.loads(fields.get("matches", "[]")) if m.get("level") == "village"]
+    if len(villages) == 1 and (villages[0].get("state") or {}).get("id"):
+        _remember_state(ctx, villages[0]["state"])
+        remember(ctx, SECTION, village=villages[0].get("name"), village_id=villages[0]["id"])
+
+
+def _remember_tree(ctx, fields: dict[str, str], concern: str) -> None:
+    """Save the resolved state and scheme, and the category/sub-category IDs the model picks from.
+
+    The tool does not match the complaint (the model does), so with one category and one sub-category
+    the IDs are saved directly; otherwise a short catalogue is kept so a later turn can still map the
+    confirmed names to IDs. A long catalogue is not saved.
+    """
+    state = json.loads(fields.get("state", "null"))
+    if fields.get("needs", "").strip('"') == "state" or not isinstance(state, dict):
+        return
+    _remember_state(ctx, state)
+    if fields.get("needs", "").strip('"') == "scheme":
+        return
+    scheme = json.loads(fields.get("scheme", "null"))
+    _remember_scheme(ctx, scheme["id"], scheme.get("name"), scheme["division"])
+    if not concern:
+        return
+    categories = json.loads(fields.get("categories", "[]"))
+    subs = [(category, sub) for category in categories for sub in category["subCategories"]]
+    if len(subs) == 1:
+        (category, sub), = subs
+        remember(ctx, SECTION, problem_category=category["name"], problem_category_id=category["id"],
+                 problem_subcategory=sub["name"], problem_subcategory_id=sub["id"], problem_options=None)
+        return
+    remember(ctx, SECTION, **dict.fromkeys(_PROBLEM_FIELDS))
+    if len(subs) <= _MAX_REMEMBERED_OPTIONS:
+        remember(ctx, SECTION, problem_options=[
+            {"category": c["name"], "category_id": c["id"],
+             "subcategories": {s["name"]: s["id"] for s in c["subCategories"]}}
+            for c in categories if c["subCategories"]
+        ])
+
+
+# reference_type -> (ID key, name key, session fields for ID and name) for the lists register_khc_grievance needs.
+_REFERENCE_FIELDS = {
+    "states": ("stateid", "statename"), "villages": ("villageid", "villagename"),
+    "schemes": ("scheme", "schemename"), "categories": ("problemcategory", "categoryname"),
+    "sub-categories": ("problemsubcategory", "subcategoryname"),
+}
+
+
+def _remember_reference(ctx, reference_type: str, options: list, total: str) -> None:
+    """Save an ID from a fallback lookup only when exactly one row was returned; a list is the farmer's pick."""
+    keys = _REFERENCE_FIELDS.get(reference_type)
+    if not keys or len(options) != 1 or str(total).strip('"') not in ("1", ""):
+        return
+    row = options[0]
+    try:
+        row_id = int(row[keys[0]])
+    except (KeyError, TypeError, ValueError):
+        return
+    name = row.get(keys[1])
+    if reference_type == "states":
+        _remember_state(ctx, {"id": row_id, "name": name})
+    elif reference_type == "villages":
+        remember(ctx, SECTION, village=name, village_id=row_id)
+    elif reference_type == "schemes":
+        if str(row.get("division", "")).isdigit():
+            _remember_scheme(ctx, row_id, name, int(row["division"]))
+    elif reference_type == "categories":
+        if _saved(ctx).get("problem_category_id") != row_id:
+            remember(ctx, SECTION, problem_category=name, problem_category_id=row_id,
+                     problem_subcategory=None, problem_subcategory_id=None)
+    else:
+        remember(ctx, SECTION, problem_subcategory=name, problem_subcategory_id=row_id)
+
+
 async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> str:
     failure = _UNCONFIRMED if (
         action == "init" and values.get("request_type", "create_grievance") == "create_grievance"
@@ -347,6 +465,7 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 and values.get("request_type") == "create_grievance"
             ):
                 mobile_hint = values.get("farmerMobileNumber")
+                remember(ctx, SECTION, otp_step=None)
                 return (
                     "KHC asked to re-verify mobile before submission. Send a fresh OTP to the same mobile number"
                     + (f" ({mobile_hint})" if mobile_hint else "")
@@ -360,6 +479,7 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 return message or failure
             raise ValueError("Missing KHC outcome tag")
         if code == "status_otp_sent":
+            remember(ctx, SECTION, grievance_number=values["grievanceNo"], status_otp_step="sent")
             return (
                 "OTP sent to the mobile registered on this grievance. "
                 f"Tell the farmer in their selected language: '{_STATUS_OTP_PROMPT}' "
@@ -370,6 +490,7 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 "Do not send again while waiting. Resend only if requested; a new OTP invalidates the old one."
             )
         if code == "otp_sent":
+            remember(ctx, SECTION, mobile=values["farmerMobileNumber"], otp_step="sent", farmer_type=None)
             return (
                 "OTP sent successfully. Ask the farmer for the OTP received on their mobile. "
                 "When they supply six digits, call verify_khc_otp with the same mobile and the supplied OTP. "
@@ -379,6 +500,8 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
             if fields.get("isRegistered") not in ("true", "false"):
                 raise ValueError("Missing KHC registration state")
             registered = fields["isRegistered"] == "true"
+            remember(ctx, SECTION, mobile=values["farmerMobileNumber"], otp_step="verified",
+                     farmer_type="existing" if registered else "new")
             return (
                 "Mobile verified successfully. Farmer is "
                 + ("already registered" if registered else "not yet registered")
@@ -395,13 +518,18 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                 )
             )
         if code == "khc_location":
-            return f"{_render_location(fields, values.get('name', ''))}\n{SOURCE}"
+            text = _render_location(fields, values.get('name', ''))
+            _remember_location(ctx, fields)
+            return f"{text}\n{SOURCE}"
         if code == "khc_grievance_tree":
-            return f"{_render_tree(fields, values.get('scheme_name', ''), values.get('concern', ''))}\n{SOURCE}"
+            text = _render_tree(fields, values.get('scheme_name', ''), values.get('concern', ''))
+            _remember_tree(ctx, fields, values.get('concern', ''))
+            return f"{text}\n{SOURCE}"
         if code == "khc_reference":
             options = json.loads(fields.get("options", "null"))
             if not isinstance(options, list) or not all(isinstance(option, dict) for option in options):
                 raise ValueError("Invalid reference options")
+            _remember_reference(ctx, values.get("reference_type", ""), options, fields.get("total", ""))
             hold_back = (
                 "Do not show these names to the farmer unless they have described their problem in their own "
                 "words and none of them fits it, or they explicitly requested alternatives. "
@@ -451,6 +579,11 @@ async def _call(ctx: RunContext[FarmerContext], action: str, **values: str) -> s
                         raise ValueError(f"Invalid KHC {field}")
                     lines.append(f"{label}: {json.dumps(details, ensure_ascii=False)}")
         lines.append(SOURCE)
+        if action == "status":
+            remember(ctx, SECTION, grievance_number=fields["grievanceNo"], status_otp_step=None)
+        else:
+            # The grievance is filed: its in-progress IDs are done with; mobile and verification stay.
+            remember(ctx, SECTION, grievance_number=fields["grievanceNo"], **dict.fromkeys(_GRIEVANCE_FIELDS))
         return "\n".join(lines)
     except (httpx.RequestError, ValueError, TypeError, AttributeError, KeyError):
         logger.error("khc.request_or_response_failed action=%s", action)

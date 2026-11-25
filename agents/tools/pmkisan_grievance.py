@@ -22,7 +22,9 @@ from agents.deps import FarmerContext
 from agents.tools.pmkisan_scheme_status import (
     SchemeInitResponse,
     SchemeStatusResponse,
+    is_otp_verified,
 )
+from app.services.session_state import register_section, remember
 from langfuse import observe
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
@@ -64,6 +66,8 @@ GRIEVANCE_TYPES: List[str] = list(GRIEVANCE_MAPPING.keys())
 # Literal built from the actual enum values so the LLM's tool schema exposes the
 # exact valid strings instead of a plain str that invites paraphrased guesses.
 GrievanceTypeLiteral = Literal[tuple(GRIEVANCE_TYPES)] if GRIEVANCE_TYPES else str
+
+SESSION_SECTION = register_section("pmkisan")  # shared with pmkisan_scheme_status
 
 _REGISTRATION_NUMBER_LABEL = "Registration Number"
 _BAP_ENDPOINT_NOT_CONFIGURED_MSG = "BAP_ENDPOINT is not configured in environment."
@@ -321,6 +325,17 @@ def _format_grievance_response_formatted(response: httpx.Response) -> str:
             return resp_text
 
 
+def _grievance_id(response: httpx.Response) -> Optional[str]:
+    """The grievance-id tag of a submit response, if any."""
+    try:
+        model = GatewayResponse.model_validate(response.json())
+    except Exception:
+        return None
+    if model.error is not None:
+        return None
+    return (model._response_tags_kv().get("grievance-id") or "").strip() or None
+
+
 def _format_otp_init_response(response: httpx.Response) -> str:
     resp_text = (response.text or "").strip()
     if not resp_text:
@@ -434,25 +449,6 @@ def _build_pm_kisan_otp_status_payload(
     }
 
 
-def _is_otp_verified(response_model: SchemeStatusResponse) -> bool:
-    for response_item in response_model.responses or []:
-        order = response_item.message.order
-        if (order.state or "").upper() == "COMPLETED":
-            return True
-
-        for fulfillment in order.fulfillments or []:
-            descriptor = fulfillment.state.descriptor if fulfillment.state else None
-            if not descriptor:
-                continue
-
-            code = (descriptor.code or "").lower()
-            short_desc = (descriptor.short_desc or "").lower()
-            if code == "completed" or "otp verified" in short_desc:
-                return True
-
-    return False
-
-
 async def _request_pm_kisan_otp(
     ctx: RunContext[FarmerContext],
     reg_no: str,
@@ -487,6 +483,7 @@ async def _request_pm_kisan_otp(
     if response.status_code != 200:
         return f"Unable to send OTP for PM-KISAN grievance {purpose}. {_format_http_response_raw(response)}"
 
+    remember(ctx, SESSION_SECTION, reg_no=reg_no_clean, grievance_otp_step="sent")
     formatted = _format_otp_init_response(response).strip()
     return f"{formatted}\nPlease provide the 4-digit OTP to {purpose}."
 
@@ -540,7 +537,9 @@ async def _verify_pm_kisan_otp(
     except Exception:
         return f"OTP verification failed. {_format_http_response_raw(response)}"
 
-    if _is_otp_verified(response_model):
+    if is_otp_verified(response_model):
+        # Verified and used within this call; the next grievance call needs a new OTP.
+        remember(ctx, SESSION_SECTION, reg_no=reg_no_clean, grievance_otp_step=None)
         return None
 
     response_summary = str(response_model).strip()
@@ -775,6 +774,10 @@ async def _submit_grievance_init_request(
 
     if response.status_code != 200:
         logger.error(f"Grievance submission failed with status {response.status_code}")
+    else:
+        grievance_no = _grievance_id(response)
+        if grievance_no:
+            remember(ctx, SESSION_SECTION, grievance_no=grievance_no)
 
     return _format_grievance_tool_response(response, raw)
 

@@ -1,5 +1,11 @@
 ---
-summary: Weather forecast
+summary: Weather at a place - today's conditions and the coming days' forecast (temperature, rain, humidity, wind).
+load_when:
+- they ask about rain, temperature or wind now or in the coming days, or whether it is safe to spray or sow
+examples:
+- will it rain this week in Nashik?
+not_for:
+- the IMD district agromet advisory
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

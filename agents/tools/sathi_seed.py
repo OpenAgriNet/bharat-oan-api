@@ -15,7 +15,10 @@ from app.config import get_default_httpx_timeout
 from app.core.cache import cache
 from agents.deps import FarmerContext
 from helpers.utils import get_logger
+from pydantic_ai import ModelRetry
 from pydantic_ai.tools import RunContext
+
+from app.services.session_state import register_section, remember
 
 load_dotenv()
 
@@ -447,8 +450,13 @@ async def _http_get_json(url: str, params: dict[str, Any] | None = None) -> dict
 # ---------------------------------------------------------------------------
 
 
+# Crop codes listed in an earlier turn: old tool results are not resent (HISTORY_TOOL_TURNS), so without this
+# the model invented codes such as "SOYBEAN" on the next turn (combined eval 2026-11-23, unit 1006).
+SESSION_SECTION = register_section("sathi")
+
+
 @observe(name="tool:get_sathi_crop_groups", as_type="tool")
-async def get_sathi_crop_groups() -> str:
+async def get_sathi_crop_groups(ctx: RunContext[FarmerContext]) -> str:
     """Official SATHI crop groups (group_code, group_name); use group_code with list_sathi_crops_in_group."""
     try:
         cached = await cache.get(CROP_GROUPS_CACHE_KEY, namespace=SATHI_CACHE_NS)
@@ -471,6 +479,8 @@ async def get_sathi_crop_groups() -> str:
                 lines.append(f"- group_code={gc} | group_name={gn}")
         if len(lines) <= 2:
             return "No crop groups returned from SATHI master API."
+        groups = {str(g["group_name"]): str(g["group_code"]) for g in active if g.get("group_code") and g.get("group_name")}
+        remember(ctx, SESSION_SECTION, group_codes=groups)
         return "\n".join(lines)
     except Exception:
         logger.exception("SATHI get_sathi_crop_groups failed")
@@ -478,11 +488,16 @@ async def get_sathi_crop_groups() -> str:
 
 
 @observe(name="tool:list_sathi_crops_in_group", as_type="tool")
-async def list_sathi_crops_in_group(group_code: str) -> str:
+async def list_sathi_crops_in_group(ctx: RunContext[FarmerContext], group_code: str) -> str:
     """Crops in a SATHI group; pick crop_code for search_sathi_seed_availability."""
     gc = (group_code or "").strip().upper()
     if not gc:
         return "group_code is required (e.g. A02 from get_sathi_crop_groups)."
+    known = set(((getattr(ctx.deps, "session_state", None) or {}).get(SESSION_SECTION) or {}).get("group_codes", {}).values())
+    if not any(ch.isdigit() for ch in gc) and gc not in known:
+        # A group name instead of a code (format check only; the model picks the group).
+        raise ModelRetry("group_code must be a code such as A04 from get_sathi_crop_groups (see the session state's "
+                         "sathi group_codes, or list the groups again), not a group name.")
 
     try:
         rows = await _fetch_crops_for_group_from_api(gc)
@@ -493,6 +508,8 @@ async def list_sathi_crops_in_group(group_code: str) -> str:
                 lines.append(f"- crop_code={cc} | crop_name={cn}")
         if len(lines) <= 2:
             return f"No crops listed for group {gc}. Check the group_code or try another group."
+        crops = {str(r["crop_name"]): str(r["crop_code"]) for r in rows if r.get("crop_code") and r.get("crop_name")}
+        remember(ctx, SESSION_SECTION, group_code=gc, crop_codes=crops)
         return "\n".join(lines)
     except Exception:
         logger.exception("SATHI list_sathi_crops_in_group failed")
@@ -577,6 +594,11 @@ async def search_sathi_seed_availability(
     cc = (crop_code or "").strip().upper()
     if not cc:
         return "crop_code is required from the SATHI crop list."
+    known = set(((getattr(ctx.deps, "session_state", None) or {}).get(SESSION_SECTION) or {}).get("crop_codes", {}).values())
+    if not any(ch.isdigit() for ch in cc) and cc not in known:
+        # A crop name instead of a code (format check only; the model picks the crop).
+        raise ModelRetry("crop_code must be a code such as A0410 from list_sathi_crops_in_group (see the session "
+                         "state's sathi crop_codes, or list the crop group again), not a crop name.")
 
     bap_endpoint = os.getenv("BAP_ENDPOINT")
     if not bap_endpoint:

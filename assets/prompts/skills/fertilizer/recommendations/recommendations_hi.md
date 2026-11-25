@@ -16,4 +16,6 @@ summary: सरकारी उर्वरक सिफारिश (GFR)
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id की सूची), **phone_no**, **cycle**, वैकल्पिक **district_id**, **latitude**, **longitude**, और स्टेप 2 के अनुसार **natural_farming** पास करें।
 6. टूल आउटपुट को किसान-भाषा में संक्षेप करें। सफल होने पर अपनी अलग पंक्ति में **स्रोत: GFR फसल सिफारिश** दें।
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}

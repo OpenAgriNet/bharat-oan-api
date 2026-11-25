@@ -24,6 +24,7 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from agents.tools.search import _catalog_search_context_map, _item_chunk_details_map
 from app.config import DEFAULT_HTTP_TIMEOUT
+from app.services.session_state import register_section, remember
 from helpers.advisory_pending import (
     LOCATION_MARKER,
     PENDING_MARKER,
@@ -32,7 +33,6 @@ from helpers.advisory_pending import (
     farmer_gave_days,
     farmer_gave_season,
     farmer_wrote,
-    may_answer_now,
 )
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.locations import Place, resolve_place
@@ -728,6 +728,15 @@ def _farmer_place(
     return Place(), ""
 
 
+# What the advisory flow last asked the farmer, as context for the bot (session state). It is a helper only: the
+# bot decides on its own whether the farmer's reply answers it and when to pass answer_now (user, 2026-11-24).
+SESSION_SECTION = register_section("advisory")
+
+
+def _note_question(ctx, asked: Optional[str], crop: Optional[str]) -> None:
+    remember(ctx, SESSION_SECTION, asked_farmer=asked, crop=crop if asked else None)
+
+
 @observe(name="tool:search_advisory", as_type="tool")
 async def search_advisory(
     ctx: RunContext[FarmerContext],
@@ -780,9 +789,6 @@ async def search_advisory(
     if days is not None and not farmer_gave_days(ctx):
         logger.info("search_advisory: ignoring days_after_sowing %r the farmer did not give", days)
         days = None
-    if answer_now and not may_answer_now(ctx):
-        logger.info("search_advisory: ignoring answer_now before the farmer was asked")
-        answer_now = False
     # The farmer's place comes only from the farmer. Their own words win over what the model passes, and the
     # model may not carry a place over from earlier in the chat.
     place, named_place = _farmer_place(ctx, state, district, location)
@@ -828,6 +834,7 @@ async def search_advisory(
         lf_update_current_observation(
             metadata={"season_requested": season_value, "season_match": False, "suggested_seasons": seasons}
         )
+        _note_question(ctx, "which of the available seasons they want", crop_hint)
         return format_season_suggestion(season_value, crop_name or f"`{query}`", seasons)
 
     # Ask the farmer for the season (when they gave none) and the days whenever the advisories carry that detail.
@@ -835,6 +842,8 @@ async def search_advisory(
     day_range = str(search_ctx.get("has_day_range") or "").strip().lower() == "true"
     need_season, need_days = bool(seasons), day_range and days is None
     if (need_season or need_days) and not answer_now:
+        _note_question(ctx, " and ".join(x for x, need in [("season", need_season), ("days since sowing", need_days)]
+                                         if need), crop_hint)
         return format_details_question(seasons, need_season, need_days, query)
 
     # Then the farmer's place, only when the advisories we would answer from are tied to places.
@@ -844,7 +853,9 @@ async def search_advisory(
         restate = (f", `season`=\"{season_value}\"" if season_value else "") + (
             f", `days_after_sowing`={days}" if days is not None else ""
         )
+        _note_question(ctx, "their place (state or district)", crop_hint)
         return format_location_question(query, restate)
+    _note_question(ctx, None, None)
     return _answer(season_ok, search_ctx, query, limit, days, named_place, place)
 
 

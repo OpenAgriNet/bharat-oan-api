@@ -307,7 +307,7 @@ def test_every_language_prompt_includes_agristack_rules():
 
     for lang in ("en", "hi", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te"):
         prompt = render_prompt(
-            SkillState(), lang,
+            SkillState(preloaded_skills='all'), lang,
             context={
                 "today_date": "x",
                 "crop_season": "x",

@@ -31,3 +31,7 @@ summary: ବିହନ ଉପଲବ୍ଧତା, ଡିଲର, ଷ୍ଟକ୍ (S
 - ଶେଷ କରନ୍ତୁ: **ଉତ୍ସ: ସାଥୀ (SATHI)**
 
 ବିହନ ଷ୍ଟକ୍ କିମ୍ବା ଡିଲର ଡାଟା **କେବେବି** ଉଦ୍ଭାବନ କରନ୍ତୁ ନାହିଁ। ଯଦି ଏକ ପଦକ୍ଷେପ ବିଫଳ ହୁଏ, ତେବେ ସେପରି କୁହନ୍ତୁ ଏବଂ ଯଦି ଉପଯୁକ୍ତ ହୁଏ ତେବେ ଏକ ବିକଳ୍ପ (ଅନ୍ୟ ଏକ ଫସଲ କିମ୍ବା ନିକଟବର୍ତ୍ତୀ ସ୍ଥାନ) ପରାମର୍ଶ ଦିଅନ୍ତୁ।
+
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** use the place and crop the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece. This replaces the "ask for district name" step when AgriStack supplies the location. The Maharashtra-only coverage check still applies to whichever location is used.
+{% endif %}

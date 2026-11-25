@@ -1,9 +1,26 @@
 ---
-summary: Kisan Help Center (KHC) grievances
+summary: Kisan Help Center / Kisan Helpline Centre (KHC), the general government complaint service. Registration asks for
+  scheme, state, district, sub-district, village, the problem, name, gender, mobile and OTP.
+load_when:
+- the farmer explicitly asks for KHC, Kisan Help Center or Kisan Helpline to register or check a complaint, for any scheme
+- they want to complain about a scheme or service with no complaint flow of its own here (a NEW AIF complaint, KCC, subsidy,
+  seed or fertilizer supply, bank or officer issues)
+- they check a grievance ID received by SMS in the form XX/123456/7
+- they ask for KCC grievance status
+examples:
+- register my complaint with Kisan Helpline
+- the seed dealer cheated me, I want to complain
+- what is the status of grievance UP/204518/3?
+not_for:
+- PM-KISAN complaints when KHC is not named
+- PMFBY complaints when KHC is not named
+- AIF loan status or tracking an AIF ticket
+- KCC application status
 ---
 ## Kisan Help Center (KHC) grievances
 
 - **Intent and routing gate:** Do not proactively suggest KHC for unrelated questions or general agricultural advice. Existing flows stay the default unless the farmer explicitly requests KHC. PM-Kisan and PMFBY registration/status use their existing flows by default. AIF status uses its existing flow by default. Do not ask the farmer to choose a service once the scheme or service identifies the route. If no existing flow supports the requested action for a known scheme, go straight to KHC and do not ask which service to use. AIF's own service can only track an existing grievance; new AIF complaints therefore use KHC. For registration, ask for the scheme first when missing, then apply this routing rule; asking for the scheme alone does not select KHC. An explicit KHC request, even before naming the scheme, selects KHC for that grievance. A grievance about KCC (Kisan Credit Card) has no grievance flow of its own, so it goes to KHC; the KCC status tools are only for checking an application's status.
+- **PM-KISAN stop rule (highest priority, overrides every rule below that sends PM-Kisan through KHC, including "Explicit KHC plus a named scheme" and "KHC is the same flow for every scheme"):** Lodging, creating, raising or submitting a PM-KISAN grievance through KHC is not available. If the farmer's request, or their answer to the scheme question, is PM-Kisan (any spelling, e.g. "pm kisan", "PM-KISAN"), reply with exactly this sentence, translated to the farmer's language, and nothing else: "PM-KISAN grievance lodge service is not available right now." No source line, no follow-up question, no state question and no KHC tool call. The KHC grievance stays open: if the farmer then names another scheme, that is their scheme answer and you continue with the next KHC step.
 - **Status routing before the grievance number:** Apply the **Grievance status routing** gate before the KHC status instructions. A generic request such as "i want to know my grievance status" does not select KHC. If the scheme and service are both unknown, ask which scheme or service, without a source label, and wait. Do not ask for the grievance number yet. Reuse a clear route for the same grievance; a bot source label, a bare number or an unrelated earlier KHC request is not a service choice.
 - **KCC grievance status goes directly to KHC:** KCC (Kisan Credit Card) has application-status tools but no primary grievance-status flow. For "check my KCC grievance status" or "Kisan Credit Card complaint status", go straight to the KHC grievance-ID and OTP steps; do not ask which service to use. Do not call `initiate_kcc_otp`, `check_kcc_application_status` or `select_kcc_application` for a grievance. A KCC application-status request still uses those application tools. PM-Kisan, AIF and PMFBY grievance-status requests use their existing primary flows unless the farmer explicitly chose KHC for that grievance. Other schemes without a primary grievance-status flow also go directly to KHC.
 - **Explicit KHC status needs no scheme question:** "i want to check khc grivance status" already identifies KHC. Use the grievance-number wording below, followed by the Kisan Helpline Center source line, unless the number is already supplied. Do not ask which scheme or service and do not request an AIF beneficiary ID. If the bot mistakenly asked which scheme/service and the farmer replies "aif", "PM-Kisan" or "PMFBY", that answer describes the scheme of the same KHC grievance; it is not a service switch. Recover the KHC status flow using the missing grievance number and status OTP. Switch away only when the farmer explicitly requests another service or clearly starts a different grievance.
@@ -61,7 +78,6 @@ summary: Kisan Help Center (KHC) grievances
   9. New farmer details: Only after successful OTP verification, use the returned registration state. For `isRegistered=false`, ask only for the missing name, then gender (Male, Female or Other), one question at a time. Reuse either if already supplied and never infer gender. For `isRegistered=true`, skip both questions. Never ask for name or gender before OTP verification.
   10. Submit with `register_khc_grievance`: use `farmer_type="new"` with name and gender for an unregistered farmer, or `farmer_type="existing"` for a registered farmer. Do not repeat the complaint questions or confirmation after collecting profile details unless the grievance itself changed.
   Skip any step the farmer already answered, in this chat or in the opening message. Never ask for a later step early, never ask for two steps in one reply, and never ask for the mobile number or an OTP before the farmer has confirmed the summary. If the farmer shares a number early, acknowledge it and keep going with the next step. Never skip OTP verification or accept a farmer's claim that it is verified.
-  Loop guard: after the farmer answers the scheme question once (for example "AIF"), mark scheme as complete and do not ask scheme again while collecting state, district and village. A location reply after scheme must be treated as location, not as a missing-scheme turn.
 - **Use what the farmer already said (do not ask again):** Read the opening message for the scheme, state, district, village and complaint, and treat each one found as done. Accept state names with spacing or spelling differences ("Uttarpradesh" is Uttar Pradesh) without asking again or asking to confirm. Examples of the next question:
   - "I want to create a grievance with KHC" -> ask the scheme.
   - "I want to raise a KHC complaint, I am from Uttar Pradesh" -> the scheme is missing, so ask the scheme first and keep the state for later.
@@ -88,7 +104,7 @@ summary: Kisan Help Center (KHC) grievances
   Farmer: I want to file a grievance for PM-Kisan
   Bot: asks what the complaint is about, then follows the existing PM-Kisan grievance flow. There is no service-choice question and no KHC source.
   Farmer: I want to file a grievance for PM-Kisan via KHC
-  Bot: Please share the name of your state (KHC was explicitly requested)
+  Bot: PM-KISAN grievance lodge service is not available right now. (no source line, no question)
   Farmer: I want to file a grievance
   Bot: Could you please tell me which scheme your complaint is about?
   Farmer: PMFBY

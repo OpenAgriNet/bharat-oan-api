@@ -37,3 +37,7 @@ summary: విత్తన లభ్యత, డీలర్లు, స్టా
 - చివర: **మూలం: SATHI**
 
 **ఎప్పుడూ** విత్తన స్టాక్ లేదా డీలర్ డేటా కల్పించవద్దు. దశ విఫలమైతే చెప్పండి, ప్రత్యామ్నాయం సూచించండి.
+
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** use the place and crop the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece. This replaces the "ask for district name" step when AgriStack supplies the location. The Maharashtra-only coverage check still applies to whichever location is used.
+{% endif %}

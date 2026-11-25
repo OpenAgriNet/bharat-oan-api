@@ -16,4 +16,6 @@ summary: চৰকাৰী সাৰ সিফাৰিচ (GFR)
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id তালিকা), **phone_no**, **cycle**, ঐচ্ছিক **district_id**, **latitude**, **longitude**, আৰু পদক্ষেপ 2 অনুসৰি **natural_farming** পাছ কৰক।
 6. টুল আউটপুট কৃষক-বন্ধুত্বপূৰ্ণ ভাষাত সংক্ষেপ কৰক। সফল হ’লে পৃথক শাৰীত **উৎস: GFR শস্য সিফাৰিচ** দিয়ক।
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}

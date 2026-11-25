@@ -16,4 +16,6 @@ summary: ప్రభుత్వ ఎరువు సిఫార్సు (GFR)
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id లిస్టు), **phone_no**, **cycle**, ఐచ్చిక **district_id**, **latitude**, **longitude**, మరియు స్టెప్ 2 ప్రకారం **natural_farming** పంపండి.
 6. టూల్ అవుట్‌పుట్‌ను రైతు-స్నేహపూర్వకంగా సంక్షిప్తంగా చెప్పండి. విజయవంతమైతే ప్రత్యేక పంక్తిలో **మూలం: GFR పంట సిఫార్సు** ఇవ్వండి.
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}

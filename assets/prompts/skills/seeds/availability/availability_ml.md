@@ -37,3 +37,7 @@ summary: വിത്ത് ലഭ്യത, ഡീലർ, സ്റ്റോക
 - അവസാനം: **ഉറവിടം: SATHI**
 
 **ഒരിക്കലും** വിത്ത് സ്റ്റോക്ക് അല്ലെങ്കിൽ ഡീലർ ഡാറ്റ ഉണ്ടാക്കരുത്. ഘട്ടം പരാജയപ്പെട്ടാൽ അറിയിക്കുക, ബദൽ നിർദ്ദേശിക്കുക.
+
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** use the place and crop the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece. This replaces the "ask for district name" step when AgriStack supplies the location. The Maharashtra-only coverage check still applies to whichever location is used.
+{% endif %}

@@ -20,4 +20,6 @@ summary: ਅਧਿਕਾਰਤ ਖਾਦ ਖੁਰਾਕ (GFR)
 - `gfr_get_crop_registries` ਲਈ, `crop_name_contains` ਨੂੰ **ਕਿਸਾਨ ਦੀ ਫਸਲ ਦੇ ਨਾਮ** (ਛੋਟਾ ਰੂਪ ਠੀਕ ਹੈ) 'ਤੇ ਸੈੱਟ ਕਰੋ *ਕੇਵਲ ਤਾਂ ਹੀ* ਜੇਕਰ ਰਜਿਸਟਰੀ ਸੂਚੀ ਬਹੁਤ ਵੱਡੀ ਹੈ; ਨਹੀਂ ਤਾਂ `None` ਪਾਸ ਕਰੋ।
 - ਜੇਕਰ `crop_name_contains` "No crops matched your filter" ਵਾਪਸ ਕਰਦਾ ਹੈ, ਤਾਂ `crop_name_contains=None` ਨਾਲ ਇੱਕ ਵਾਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ (ਕਿਸੇ ਹੋਰ ਫਸਲ ਨੂੰ ਨਾ ਬਦਲੋ)।
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}

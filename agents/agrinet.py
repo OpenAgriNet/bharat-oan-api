@@ -53,4 +53,6 @@ def get_system_prompt(ctx: RunContext[FarmerContext]):
     )
     deps.skills.restore(ctx.messages)
     context['khc_service_note'] = khc_service_note(ctx.messages, current_query=deps.query)
+    # Skill text that only applies to a farmer logged in to AgriStack with consent checks this.
+    context['agristack_status'] = deps.agristack_status
     return render_prompt(deps.skills, lang_code, context)

@@ -538,7 +538,7 @@ def test_all_language_prompts_include_khc_rules():
     from agents.skill_policy import SkillState
 
     for language in ("en", "hi", "as", "bn", "gu", "kn", "mai", "ml", "mr", "or", "pa", "ta", "te"):
-        prompt = render_prompt(SkillState(), language, context={
+        prompt = render_prompt(SkillState(preloaded_skills="all"), language, context={
             "today_date": "x", "crop_season": "x", "last_weekday_table": "",
             "vector_scheme_count": 0, "vector_schemes_bullets": "", "vector_schemes_identifiers": "",
         })
@@ -1066,7 +1066,7 @@ def test_find_location_sends_known_details_and_reports_one_village(monkeypatch):
 
 
 @pytest.mark.parametrize("needs,expected", [
-    ("state", "Please share the name of your state"),
+    ("state", "the scheme comes before the state"),
     ("district", "Can you please share your district name"),
     ("geocode", "forward_geocode"),
 ])
@@ -1741,10 +1741,6 @@ def test_explicit_khc_pm_kisan_request_does_not_mix_workflows(later_turns):
     assert "Never ask for a PM-Kisan registration number" in note
     assert "Do not combine KHC and scheme-service questions" in note
     assert "If the scheme is already named, skip the scheme question" in note
-    assert "Apply the same stop gate when PM-KISAN is identified later" in note
-    assert "Loop guard (answered steps stay answered)" in note
-    assert 'Farmer: "AIF" -> Ask: "Please share the name of your state"' in note
-    assert '"AIF" -> "Please share the name of your state" -> "uttar pradesh" -> "Can you please share your district name"' in note
     assert "Ask only the first missing KHC detail" in note
     assert "These KHC rules override the general follow-up and source-order rules" in note
     assert "put the source last with nothing after it" in note

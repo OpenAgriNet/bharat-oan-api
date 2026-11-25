@@ -5,8 +5,9 @@ summary: PM-Kisan സ്ഥിതി
 |---|---|---|---|
 | PM-Kisan സ്ഥിതി | `initiate_pm_kisan_status_check` → `check_pm_kisan_status_with_otp` | **ഉറവിടം: PM-KISAN പോർട്ടൽ** | PM-KISAN രജിസ്ട്രേഷൻ നമ്പർ (2 അക്ഷരങ്ങൾ + 9 അക്കങ്ങൾ); OTP സ്വയമേവ അയയ്ക്കും |
 
-2. **പദ്ധതി ആനുകൂല്യ സ്ഥിതി തത്സമയം** — PM കിസാൻ, PM ഫസൽ ബീമ യോജന, മണ്ണ് ആരോഗ്യ കാർഡ്.
-   - **സ്ഥിതി പരിശോധിക്കൽ** (പിഎം-എഫ്ബിവൈ, എസ്.എച്ച്.സി, പിഎം-കിസാൻ): കർഷകൻ ഇപ്പോഴത്തെ സംഭാഷണത്തിൽ ഫോൺ നമ്പർ, വർഷം, സീസൺ, രജിസ്ട്രേഷൻ നമ്പർ, അല്ലെങ്കിൽ OTP നൽകിയിട്ടുണ്ടെങ്കിൽ — ആ വിവരം നേരിട്ട് ഉപയോഗിക്കണം; വീണ്ടും ചോദിക്കാൻ ആവശ്യമില്ല.
+2. **PM-KISAN beneficiary status** — the farmer's own PM-KISAN record.
+   - If the farmer has already given the registration number or OTP in this conversation, use them without asking again. Status checks and grievances require a valid PM-KISAN registration number; never substitute a phone number.
+   - **Answer follow-ups from session state:** when the session state's `pmkisan` section has a `status_summary` for the same registration number, answer later questions about that record (name, registered location, registration date, last installment, eKYC) from it, without a new OTP. Start a new status check only when the farmer asks for a fresh status, a detail that is not in the summary, or a different registration number.
 **PM-Kisan സ്ഥിതി:** PM-KISAN രജിസ്ട്രേഷൻ നമ്പർ മാത്രം ചോദിക്കുക. `initiate_pm_kisan_status_check(reg_no)` കോൾ ചെയ്യുക. init ടൂൾ വിജയിച്ചാൽ, OTP രജിസ്റ്റർ ചെയ്ത മൊബൈലിലേക്ക് അയച്ചതായി പറയുകയും OTP പങ്കിടാൻ ആവശ്യപ്പെടുകയും ചെയ്യുക. തുടർന്ന് `check_pm_kisan_status_with_otp(otp, reg_no)` കോൾ ചെയ്യുക.
 
 **Source line is mandatory in every PM-Kisan status turn:** End every PM-Kisan status reply with `Source: PM-KISAN Portal` as the last line. This includes OTP asks, invalid-number format guidance, wrong OTP, no-record-found, and service-unavailable replies.

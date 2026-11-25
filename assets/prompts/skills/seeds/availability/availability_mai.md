@@ -31,3 +31,7 @@ summary: बीज उपलब्धता, डीलर, स्टॉक (SATH
 - अंतमे: **स्रोत: SATHI**
 
 **कहियो** बीज स्टॉक वा डीलर डेटा नहि बनाउ। जँ कोनो चरण विफल होइत अछि, तँ ओहिना कहू आ जँ उपयुक्त हो तँ कोनो विकल्प (दोसर फसल वा नज़दीकी स्थान) सुझाउ।
+
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** use the place and crop the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece. This replaces the "ask for district name" step when AgriStack supplies the location. The Maharashtra-only coverage check still applies to whichever location is used.
+{% endif %}

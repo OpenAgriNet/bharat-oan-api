@@ -1,5 +1,12 @@
 ---
-summary: Mandi prices
+summary: Market (mandi / APMC) prices of a crop or commodity.
+load_when:
+- they ask for today's, the latest or a given date's modal, minimum or maximum price at a mandi or in a district,
+  or to compare nearby mandis
+examples:
+- potato rate in Pune mandi today
+not_for:
+- MSP or eNAM trading how-to
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

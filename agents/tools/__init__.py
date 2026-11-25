@@ -11,6 +11,7 @@ from helpers.gemma_schema import gemma_compatible
 from agents.tools.ffs import ffs_send_otp, ffs_verify_otp, ffs_get_entitlement, ffs_find_shops, ffs_create_booking
 
 from agents.tools.amul_vistaar import call_amul_vistaar_network
+from agents.tools.bihar_vistaar import call_bihar_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
 from agents.tools.pmkisan_scheme_status import (
     initiate_pm_kisan_status_check,
@@ -100,6 +101,11 @@ TOOLS = [
     ),
     Tool(
         call_maha_vistaar_network,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        call_bihar_vistaar_network,
         takes_ctx=True,
         strict=False,
     ),
@@ -305,12 +311,12 @@ TOOLS = [
     ),
     Tool(
         get_sathi_crop_groups,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(
         list_sathi_crops_in_group,
-        takes_ctx=False,
+        takes_ctx=True,
         strict=False,
     ),
     Tool(

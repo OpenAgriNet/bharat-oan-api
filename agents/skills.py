@@ -5,6 +5,10 @@ from pydantic_ai import ModelRetry, RunContext, Tool
 
 from agents.skill_catalog import get_catalog
 from agents.skill_policy import SkillState
+from app.services.session_state import register_section, remember
+
+# Skills loaded with load_skill. Hidden from the model: the system prompt already carries their instructions.
+SKILLS = register_section('skills', view=lambda state: None)
 
 
 def skill_instructions(name: str, state: SkillState) -> str:
@@ -15,7 +19,10 @@ def skill_instructions(name: str, state: SkillState) -> str:
         body = ('Supporting skills (already loaded): ' + ', '.join(required) + '. '
                 'Apply this workflow\'s prerequisites and clarification rules before using '
                 'supporting tools. Loading skills does not execute their tools.\n\n' + body)
-    return body
+    # Every skill's instructions get a heading and a scope line, so one skill's rules (e.g. mandi's "ask for one
+    # commodity") are not applied to another skill's requests (combined eval 2026-11-23, unit 2179).
+    return (f'## Skill: {name}\nThe instructions in this section apply only to requests handled by the {name} '
+            f'skill.\n\n' + body)
 
 
 def render_prompt(state: SkillState, language: str, context: dict) -> str:
@@ -28,18 +35,24 @@ def render_prompt(state: SkillState, language: str, context: dict) -> str:
     active = state.active
     chunks.extend(skill_instructions(name, state) for name in catalog.resolve(active))
     pending = state.permitted - active
-    if 'ffs.booking' in pending:
-        chunks.append(catalog.env.get_template('skills/ffs/booking/routing.md').render(**context))
+    if 'khc.grievances' in pending and context.get('khc_service_note'):
+        # KHC status routing must hold before its workflow is loaded (see khc_service_note).
+        chunks.append(context['khc_service_note'].strip())
     if pending:
-        summaries = [f'- {name}: {catalog.render_summary(name, language, context, state.agent)}'
-                     for name in catalog.manifest.skills if name in pending]
+        # Every enabled skill keeps its description, loaded or not, so the model sees the whole map of services.
+        summaries = [f'- {name}{" (loaded)" if name in active else ""}: '
+                     f'{catalog.render_summary(name, language, context, state.agent)}'
+                     for name in catalog.manifest.skills if name in state.permitted]
         chunks.append(
             '## Available skills\nLoad a relevant skill with load_skill before using its workflow. '
+            'When the request fits a skill that is not loaded, load it first, before asking the farmer for any '
+            'details: the skill says what to ask. '
             'Call only tools whose definitions are available in the current request. '
             'Skill IDs are not tool names or namespaces. Call load_skill on its own and wait for '
             'its result; use the newly exposed business tools in the next step. '
             'Loading is not execution. Reuse information already supplied; ask only for missing or '
-            'ambiguous information. Do not narrate loading. Loaded skills remain available for this session.\n'
+            'ambiguous information. Do not narrate loading. Loaded skills remain available for this session '
+            'and are marked (loaded): use their instructions above, do not load them again.\n'
             + '\n'.join(summaries))
     if state.permitted != set(catalog.manifest.skills):
         chunks.append('Only enabled skills and their available tools may be used or offered. '
@@ -63,8 +76,15 @@ async def load_skill(ctx: RunContext[Any], skill: str) -> dict:
     # Render everything before mutating state: a bad dependency must not partially load.
     instructions = '\n\n'.join(skill_instructions(name, state) for name in newly_loaded)
     state.loaded_skills.update(newly_loaded)
+    remember(ctx, SKILLS, loaded=sorted(state.loaded_skills))
     return {'skill': skill, 'loaded': True, 'instructions': instructions,
             'loaded_skills': newly_loaded, 'loaded_tools': sorted(catalog.tools_for({skill}))}
+
+
+def restore_loaded_skills(deps: Any) -> None:
+    """Skills loaded in earlier turns, from session state (the system prompt then includes their instructions)."""
+    saved = (deps.session_state.get(SKILLS) or {}).get('loaded') or []
+    deps.skills.loaded_skills |= set(saved) & deps.skills.permitted
 
 
 SKILL_LOADER = Tool(load_skill, takes_ctx=True, sequential=True, strict=False)

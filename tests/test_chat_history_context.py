@@ -66,16 +66,19 @@ def test_trimming_keeps_tool_pairs_without_reviving_first_turn_snapshot():
         history.extend([ModelRequest(parts=[UserPromptPart(old_prompt(f'turn {index}', f'old-{index}'))]),
                         ModelResponse(parts=[ToolCallPart('lookup', {}, tool_call_id=f'call-{index}')]),
                         ModelRequest(parts=[ToolReturnPart('lookup', {'result': index}, tool_call_id=f'call-{index}')]),
-                        ModelResponse(parts=[TextPart(f'answer {index}')], usage=RequestUsage(input_tokens=10))])
-    trimmed = utils.trim_history(utils.clean_chat_history(history), max_tokens=20)
+                        ModelResponse(parts=[TextPart(f'answer {index}')], usage=RequestUsage(input_tokens=64_000))])
+    convos = utils.group_convos(utils.clean_chat_history(history))
+    # Two turns fit; the repeated 64k system-prompt usage on each response must not count.
+    budget = utils.convo_token_usage(convos[0]) + utils.convo_token_usage(convos[2])
+    trimmed = utils.trim_history(utils.clean_chat_history(history), max_tokens=budget)
     serialized = json.dumps(to_jsonable_python(trimmed))
     assert '**FFS workflow:**' not in serialized
     assert 'turn 0' in serialized and 'turn 2' in serialized and 'turn 1' not in serialized
     calls = [p.tool_call_id for m in trimmed for p in m.parts if p.part_kind == 'tool-call']
     returns = [p.tool_call_id for m in trimmed for p in m.parts if p.part_kind == 'tool-return']
     assert calls == returns == ['call-0', 'call-2']
-    prompt = FarmerContext(session_id='trim-test', query='continue', ffs_context={'stage': 'current'}).get_user_message()
-    assert (serialized + prompt).count('**FFS workflow:**') == 1
+    prompt = FarmerContext(session_id='trim-test', query='continue', session_state={'pmkisan': {'stage': 'current'}}).get_user_message()
+    assert (serialized + prompt).count('**Session state') == 1
 
 
 async def exercise_chat_history(monkeypatch, model):
@@ -117,10 +120,10 @@ async def exercise_chat_history(monkeypatch, model):
     for turn, query in enumerate(['Check the mock allowance.', 'Which product and quantity did I ask to buy?'], 1):
         parts = [part async for part in chat.stream_chat_messages(
             query, 'history-audit', 'en', 'en', 'test-user', history, BackgroundTasks(),
-            qid=f'turn-{turn}', ffs_context={'stage': f'current-state-{turn}', 'order': [{'product': 'urea', 'bags': 1}]})]
+            qid=f'turn-{turn}', session_state={'pmkisan': {'stage': f'current-state-{turn}', 'order': [{'product': 'urea', 'bags': 1}]}})]
         outputs.append(''.join(parts))
         history = await utils._get_message_history('history-audit')
-        assert '**FFS workflow:**' not in json.dumps(to_jsonable_python(history))
+        assert '**Session state' not in json.dumps(to_jsonable_python(history))
         assert '**Conversation**' not in json.dumps(to_jsonable_python(history))
     assert 'I want maize for Shirur.' in moderation_inputs[0]
     assert 'obsolete-state' not in moderation_inputs[0]

@@ -69,6 +69,21 @@ class Settings(BaseSettings):
     # this exact Redis key is read; otherwise it defaults to master-catalog:<tier>:snapshot.
     master_catalog_redis_key: str = os.getenv("MASTER_CATALOG_REDIS_KEY", "")
 
+    # Turns whose tool calls/results are resent to the model. Empty = all kept turns (bh-dev behaviour);
+    # 0 = none (question/answer text + session state only).
+    history_tool_turns: Optional[int] = (
+        int(os.getenv("HISTORY_TOOL_TURNS")) if os.getenv("HISTORY_TOOL_TURNS", "").strip() else None
+    )
+
+    # Conversation tokens resent (newest turns, at least HISTORY_MIN_TURNS). Empty = bh-dev's 64k trim.
+    history_conversation_tokens: Optional[int] = (
+        int(os.getenv("HISTORY_CONVERSATION_TOKENS")) if os.getenv("HISTORY_CONVERSATION_TOKENS", "").strip() else None
+    )
+    history_min_turns: int = int(os.getenv("HISTORY_MIN_TURNS", "3"))
+    # Older turns beyond HISTORY_TOOL_TURNS: "drop" removes their tool calls and results; "stub" keeps the calls
+    # and replaces each result with a short placeholder.
+    history_old_tool_results: str = os.getenv("HISTORY_OLD_TOOL_RESULTS", "drop").strip().lower()
+
     # Cache Configuration
     default_cache_ttl: int = 60 * 60 * 24  # 24 hours
     suggestions_cache_ttl: int = 60 * 30    # 30 minutes

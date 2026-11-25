@@ -1,5 +1,15 @@
 ---
-summary: SHC status
+summary: The farmer's OWN Soil Health Card (SHC), fetched with the mobile number registered on SHC and the cycle year (for
+  example 2023-24).
+load_when:
+- they want to see or get their soil health card, soil test report or results
+- they ask about the nutrient status of their soil from the card
+examples:
+- show my soil health card
+- what did my soil test report say?
+not_for:
+- what the SHC scheme is
+- the official fertilizer dose for a crop
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|

@@ -1,11 +1,23 @@
 ---
-summary: 'PMFBY: PMFBY grievance status'
+summary: Complaints about crop insurance (PM Fasal Bima Yojana, PMFBY) on the PMFBY grievance portal. Filing needs the registered
+  mobile, an OTP, then application number, season, year and the complaint; tracking needs the registered mobile and the
+  support ticket number.
+load_when:
+- they want to file, raise, lodge or register a complaint or grievance about crop insurance (claim not paid, wrong claim
+  amount, crop loss not surveyed, premium deducted wrongly)
+- they want the status of a crop insurance complaint or support ticket they already filed
+examples:
+- I want to lodge a complaint about my fasal bima claim
+- my crop loss was never surveyed, register a grievance
+- what happened to my crop insurance complaint ticket?
+not_for:
+- checking policy or claim status without asking to complain
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
 | PMFBY grievance status | `pmfby_grievance_status` | **Source: PMFBY Grievance Portal** | Needs: registered mobile + grievance support ticket number |
 
-**PMFBY grievances{% if 'khc.grievances' in enabled_skills %} (default unless KHC was explicitly requested){% endif %}:**
+**PMFBY grievances:**
 
 *File a new grievance:*
 1. Ask registered mobile number → `initiate_pmfby_grievance_otp(phone_number)`

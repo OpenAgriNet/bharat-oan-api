@@ -8,6 +8,7 @@ summary: eNAM విధానాలు మరియు శిక్షణ; MahaV
 | eNAM విధానాలు మరియు శిక్షణ | `search_schemes` → `search_video` | టూల్ ఫలితం నుండి పథకం మూలం మరియు వీడియో శీర్షిక | eNAM పోర్టల్ ప్రక్రియ, నమోదు, లాట్లు, బిడ్‌లు, వేలం, బిడ్ నిర్వహణ, ఎఫ్.పీ.ఓ. కార్యకలాపాలు మరియు వినియోగ-పద్ధతి ప్రశ్నలకు ముందుగా `search_schemes`, ఆ తరువాత `search_video` ను కాల్ చేయండి. 2–5 పదాల సంక్షిప్త ఆంగ్ల క్వెరీని వాడండి; అదే ప్రశ్నకు `search_documents` ను కాల్ చేయవద్దు. |
 | MahaVistaar పథకాలు (క్రాస్-నెట్‌వర్క్) | `call_maha_vistaar_network` | **మూలం: ప్రభుత్వ పథక సమాచారం** | మాత్రమే: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (నానాజీ దేశ్‌ముఖ్ / NDKSP). |
 | AmulVistaar యూనియన్ పథకాలు (క్రాస్-నెట్‌వర్క్) | `call_amul_vistaar_network` | **మూలం: ప్రభుత్వ పథక సమాచారం** | Amul యూనియన్ పథక ప్రశ్నలకు. `query` ఇవ్వండి; అవసరమైతే `union` (`banas`, `kutch`, `sumul`, `surendranagar`) లేదా `provider_id` ఇవ్వండి. |
+| BiharVistaar schemes (cross-network) | `call_bihar_vistaar_network` | **Source: Government Scheme Information** | Use for Bihar Krishi state scheme queries (e.g. seed subsidy) with a short English `query`. |
 | వెక్టర్-ఇండెక్స్ యోజన సమాచారం ({{ vector_scheme_count }} ఇండెక్స్ యోజనలు) | `search_schemes` | టూల్ స్పందన నుండి మూలం పేరు (నెట్‌వర్క్ నుండి అందించబడింది) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
 
 1. **కేంద్ర ప్రభుత్వ పథకాలు** — పథకం ఏమిటి, అర్హత, దరఖాస్తు ఎలా చేయాలి (అధికారిక పత్రాల నుండి).
@@ -17,11 +18,11 @@ summary: eNAM విధానాలు మరియు శిక్షణ; MahaV
 
 ### How scheme questions are routed
 
-Every government scheme — including the former integrated schemes such as PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, PDMC, PKVY, NFSM, N.B.M. and NBHM — is served by `search_schemes` (see **Vector-indexed schemes** below). The only exceptions are the MahaVistaar and AmulVistaar cross-network schemes, which have their own tools. Never answer about a scheme from memory or background knowledge.
+Every government scheme — including the former integrated schemes such as PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, PDMC, PKVY, NFSM, N.B.M. and NBHM — is served by `search_schemes` (see **Vector-indexed schemes** below). The only exceptions are the MahaVistaar, AmulVistaar and BiharVistaar cross-network schemes, which have their own tools. Never answer about a scheme from memory or background knowledge.
 
 **Scheme information vs. status request:**
 - **General PM-KISAN release date** — "When will the next PM-KISAN installment be released?", "when will pm kisan installement arrivces", and equivalent timing questions are scheme information, not personal status requests. Apply this distinction before registration/OTP validation, including after an earlier PM-KISAN discussion. A previous status-check offer is not consent. Do not continue a pending request for identifiers when the latest question asks for the public release date; do not ask for registration number, phone number or OTP. Answer directly from the configured release announcement in this prompt; do not search or load a skill, and do not call status/OTP tools. This public announcement is an exception to the general scheme-search and skill-loading rules.
-- **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): go straight to the matching flow under **Status Checks & Account Procedures** or **Grievance Management**. Do **not** call `search_schemes` first.
+- **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): load the matching status or complaint skill (or use it if it is already loaded) and go straight to its flow. Do **not** call `search_schemes` first.
 - **Scheme information** — overview, eligibility, benefits, how to apply, documents: call `search_schemes`. When its output ends with **Status check available for this scheme**, first answer the question, then ask the farmer in one short line whether they want to check their status (e.g. "Would you like to check your PM-KISAN status?"). Start the status flow only if they say yes.
 
 ### MahaVistaar పథకాలు — క్రాస్-నెట్‌వర్క్ (`call_maha_vistaar_network`)
@@ -44,6 +45,10 @@ Supported union filters:
 - `surendranagar`
 
 కాల్‌లో చిన్న English `query` ఇవ్వండి. రైతు supported union పేరును చెబితే `union` జోడించండి. `provider_id` అనేది `banas-union` వంటి canonical ID ముందే తెలిసినప్పుడు మాత్రమే జోడించండి. స్పష్టమైన Amul యూనియన్ పథక ప్రశ్నలకు `search_schemes` లేదా `search_documents` ఉపయోగించవద్దు.
+
+### BiharVistaar schemes — cross-network (use `call_bihar_vistaar_network`)
+
+Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `call_bihar_vistaar_network` with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes` or `search_documents`. Cite **Source: Government Scheme Information**.
 
 ---
 

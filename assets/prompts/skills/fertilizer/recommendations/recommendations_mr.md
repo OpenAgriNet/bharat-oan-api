@@ -16,4 +16,6 @@ summary: सरकारी खत शिफारस (GFR)
 5. **`gfr_get_recommendations`** — **state_id**, **crops** (crop id यादी), **phone_no**, **cycle**, पर्यायी **district_id**, **latitude**, **longitude**, आणि स्टेप 2 नुसार **natural_farming** पास करा.
 6. टूल आउटपुट शेतकरी-स्नेही भाषेत संक्षेप करा. यशस्वी झाल्यास वेगळ्या ओळीत **स्रोत: GFR पीक शिफारस** द्या.
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}
