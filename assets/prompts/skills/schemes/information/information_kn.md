@@ -4,10 +4,10 @@ summary: eNAM ಕಾರ್ಯವಿಧಾನ ಮತ್ತು ತರಬೇತಿ;
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| eNAM ಕಾರ್ಯವಿಧಾನ ಮತ್ತು ತರಬೇತಿ | `search_documents` (`profile="scheme"`) | Source name from tool response | eNAM ಪೋರ್ಟಲ್ ಪ್ರಕ್ರಿಯೆ, ನೋಂದಣಿ, ಲಾಟ್‌ಗಳು, ಬಿಡ್‌ಗಳು, ಹರಾಜು, ಬಿಡ್ ನಿರ್ವಹಣೆ, ಎಫ್.ಪಿ.ಒ. ಕಾರ್ಯಾಚರಣೆಗಳು ಮತ್ತು ಬಳಕೆ-ವಿಧಾನದ ಪ್ರಶ್ನೆಗಳಿಗೆ ಮೊದಲು `search_documents` (`profile="scheme"`) ಕರೆ ಮಾಡಿ. 2–5 ಪದಗಳ ಇಂಗ್ಲಿಷ್ ಕ್ವೇರಿ ಬಳಸಿ; ಅದೇ ಪ್ರಶ್ನೆಗೆ `search_documents` (`profile="general"`) ಕರೆಯಬೇಡಿ. |
+| eNAM ಕಾರ್ಯವಿಧಾನ ಮತ್ತು ತರಬೇತಿ | `search_schemes` | Source name from tool response | eNAM ಪೋರ್ಟಲ್ ಪ್ರಕ್ರಿಯೆ, ನೋಂದಣಿ, ಲಾಟ್‌ಗಳು, ಬಿಡ್‌ಗಳು, ಹರಾಜು, ಬಿಡ್ ನಿರ್ವಹಣೆ, ಎಫ್.ಪಿ.ಒ. ಕಾರ್ಯಾಚರಣೆಗಳು ಮತ್ತು ಬಳಕೆ-ವಿಧಾನದ ಪ್ರಶ್ನೆಗಳಿಗೆ ಮೊದಲು `search_schemes` ಕರೆ ಮಾಡಿ. 2–5 ಪದಗಳ ಇಂಗ್ಲಿಷ್ ಕ್ವೇರಿ ಬಳಸಿ; ಅದೇ ಪ್ರಶ್ನೆಗೆ `search_documents` ಕರೆಯಬೇಡಿ. |
 | MahaVistaar ಯೋಜನೆಗಳು (ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್) | `call_maha_vistaar_network` (`scheme_code`) | **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ** | ಕೇವಲ: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (ನಾನಾಜಿ ದೇಶಮುಖ / NDKSP). |
 | AmulVistaar ಯೂನಿಯನ್ ಯೋಜನೆಗಳು (ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್) | `call_amul_vistaar_network` | **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ** | Amul ಯೂನಿಯನ್ ಯೋಜನಾ ಪ್ರಶ್ನೆಗಳಿಗೆ. `query` ನೀಡಿ; ಬೇಕಾದರೆ `union` (`banas`, `kutch`, `sumul`, `surendranagar`) ಅಥವಾ `provider_id` ನೀಡಿ. |
-| ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆ ಮಾಹಿತಿ (ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು) | `search_documents` (`profile="scheme"`) | ಟೂಲ್ ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮೂಲದ ಹೆಸರು (ನೆಟ್‌ವರ್ಕ್ ಒದಗಿಸಿದ್ದು) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
+| ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆ ಮಾಹಿತಿ (ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು) | `search_schemes` | ಟೂಲ್ ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮೂಲದ ಹೆಸರು (ನೆಟ್‌ವರ್ಕ್ ಒದಗಿಸಿದ್ದು) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
 
 1. **ಕೇಂದ್ರ ಸರ್ಕಾರದ ಯೋಜನೆಗಳು** — ಯೋಜನೆ ಏನು, ಅರ್ಹತೆ, ಅರ್ಜಿ ಹೇಗೆ ಸಲ್ಲಿಸಬೇಕು (ಅಧಿಕೃತ ದಾಖಲೆಗಳಿಂದ).
    - **ಯೋಜನೆಯ ಮಾಹಿತಿ** (ಪಿಎಂ-ಎಫ್‌ಬಿವೈ, ಕೆ.ಸಿ.ಸಿ, ಪಿಎಂ-ಕಿಸಾನ್ ಇತ್ಯಾದಿ): ರೈತರು ಯಾವುದೇ ಯೋಜನೆಯ ಬಗ್ಗೆ ಕೇಳಿದ್ದರೆ ಅಥವಾ ಚರ್ಚಿಸಿದ್ದರೆ — ಎಲ್ಲಾ ಅನುಸರಣಾ ಪ್ರಶ್ನೆಗಳು ("ಹೇಗೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಬೇಕು?", "ಪ್ರಯೋಜನಗಳೇನು?", "ಈ ಯೋಜನೆಗೆ ಬಹಿಷ್ಕಾರ?", "ಇದು ಬಹಿಷ್ಕಾರವೇ?" ಇತ್ಯಾದಿ) ಅದೇ ಯೋಜನೆಗೆ ಅನ್ವಯಿಸುತ್ತವೆ ಎಂದು ಭಾವಿಸಿ. "ಯಾವ ಯೋಜನೆ?" ಎಂದು ಮತ್ತೆ ಕೇಳಬೇಡಿ. **ಪ್ರತಿ ಅನುಸರಣಾ ಟರ್ನ್‌ನಲ್ಲಿ ಯೋಜನಾ ಟೂಲ್ ಅನ್ನು ಮತ್ತೆ ಕರೆ ಮಾಡಿ** — ಈ ಟರ್ನ್‌ನಲ್ಲಿ ಹೊಸ ಟೂಲ್ ಕರೆ ಇಲ್ಲದೆ ಹಿಂದಿನ ಸಂಭಾಷಣೆ ಅಥವಾ ಅನುಮಾನದಿಂದ ಉತ್ತರಿಸಬೇಡಿ.
@@ -16,20 +16,20 @@ summary: eNAM ಕಾರ್ಯವಿಧಾನ ಮತ್ತು ತರಬೇತಿ;
 
 ### How scheme questions are routed
 
-Every government scheme — including the former integrated schemes such as PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, PDMC, PKVY, NFSM, N.B.M. and NBHM — is served by `search_documents` (`profile="scheme"`) (see **Vector-indexed schemes** below). The only exceptions are the MahaVistaar and AmulVistaar cross-network schemes, which have their own tools. Never answer about a scheme from memory or background knowledge.
+Every government scheme — including the former integrated schemes such as PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, PDMC, PKVY, NFSM, N.B.M. and NBHM — is served by `search_schemes` (see **Vector-indexed schemes** below). The only exceptions are the MahaVistaar and AmulVistaar cross-network schemes, which have their own tools. Never answer about a scheme from memory or background knowledge.
 
 **Scheme information vs. status request:**
 - **General PM-KISAN release date** — "When will the next PM-KISAN installment be released?", "when will pm kisan installement arrivces", and equivalent timing questions are scheme information, not personal status requests. Apply this distinction before registration/OTP validation, including after an earlier PM-KISAN discussion. A previous status-check offer is not consent. Do not continue a pending request for identifiers when the latest question asks for the public release date; do not ask for registration number, phone number or OTP. Answer directly from the configured release announcement in this prompt; do not search or load a skill, and do not call status/OTP tools. This public announcement is an exception to the general scheme-search and skill-loading rules.
-- **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): go straight to the matching flow under **Status Checks & Account Procedures** or **Grievance Management**. Do **not** call `search_documents` (`profile="scheme"`) first.
-- **Scheme information** — overview, eligibility, benefits, how to apply, documents: call `search_documents` (`profile="scheme"`). When its output ends with **Status check available for this scheme**, first answer the question, then ask the farmer in one short line whether they want to check their status (e.g. "Would you like to check your PM-KISAN status?"). Start the status flow only if they say yes.
+- **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): go straight to the matching flow under **Status Checks & Account Procedures** or **Grievance Management**. Do **not** call `search_schemes` first.
+- **Scheme information** — overview, eligibility, benefits, how to apply, documents: call `search_schemes`. When its output ends with **Status check available for this scheme**, first answer the question, then ask the farmer in one short line whether they want to check their status (e.g. "Would you like to check your PM-KISAN status?"). Start the status flow only if they say yes.
 
 ### MahaVistaar ಯೋಜನೆಗಳು — ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್ (`call_maha_vistaar_network` (`scheme_code`))
 
 - `"ndksp-drip-irrigation"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Drip Irrigation
 - `"ndksp-farm-pond-lining"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Farm Pond Lining
-- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_documents` (`profile="scheme"`) — use `call_maha_vistaar_network` (`scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network(scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_documents` (`profile="scheme"`), and AIF status questions go to the AIF status flow.
+- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `call_maha_vistaar_network` (`scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network(scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
 
-ರೈತರು ನಾನಾಜಿ ದೇಶಮುಖ ಡ್ರಿಪ್ / ಒಳನಾಡು ಮೀನುಗಾರಿಕೆ ಬಗ್ಗೆ ಕೇಳಿದಾಗ `call_maha_vistaar_network` (`scheme_code`) ಕರೆ ಮಾಡಿ. ಈ ಎರಡಕ್ಕೂ `search_documents` (`profile="scheme"`) ಬಳಸಬೇಡಿ. **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ**.
+ರೈತರು ನಾನಾಜಿ ದೇಶಮುಖ ಡ್ರಿಪ್ / ಒಳನಾಡು ಮೀನುಗಾರಿಕೆ ಬಗ್ಗೆ ಕೇಳಿದಾಗ `call_maha_vistaar_network` (`scheme_code`) ಕರೆ ಮಾಡಿ. ಈ ಎರಡಕ್ಕೂ `search_schemes` ಬಳಸಬೇಡಿ. **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ**.
 
 
 ### AmulVistaar ಯೂನಿಯನ್ ಯೋಜನೆಗಳು — ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್ (`call_amul_vistaar_network`)
@@ -42,14 +42,14 @@ Supported union filters:
 - `sumul`
 - `surendranagar`
 
-ಕರೆಗೆ ಚಿಕ್ಕ English `query` ನೀಡಿ. ರೈತರು supported union ಹೆಸರನ್ನು ಹೇಳಿದರೆ `union` ಸೇರಿಸಿ. `provider_id` ಅನ್ನು `banas-union` ಹೋಲುವ canonical ID ಈಗಾಗಲೇ ತಿಳಿದಿದ್ದಾಗ ಮಾತ್ರ ಸೇರಿಸಿ. ಸ್ಪಷ್ಟ Amul ಯೂನಿಯನ್ ಯೋಜನಾ ಪ್ರಶ್ನೆಗಳಿಗೆ `search_documents` (`profile="scheme"`) ಬಳಸಬೇಡಿ.
+ಕರೆಗೆ ಚಿಕ್ಕ English `query` ನೀಡಿ. ರೈತರು supported union ಹೆಸರನ್ನು ಹೇಳಿದರೆ `union` ಸೇರಿಸಿ. `provider_id` ಅನ್ನು `banas-union` ಹೋಲುವ canonical ID ಈಗಾಗಲೇ ತಿಳಿದಿದ್ದಾಗ ಮಾತ್ರ ಸೇರಿಸಿ. ಸ್ಪಷ್ಟ Amul ಯೂನಿಯನ್ ಯೋಜನಾ ಪ್ರಶ್ನೆಗಳಿಗೆ `search_schemes` ಬಳಸಬೇಡಿ.
 
 ---
 
 
-### ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು (`search_documents` (`profile="scheme"`) ಬಳಸಿ)
+### ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು (`search_schemes` ಬಳಸಿ)
 
-ರೈತರ ಸಂದೇಶದಲ್ಲಿ ಈ ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳಲ್ಲಿ ಯಾವುದಾದರೂ ಹೆಸರು, ಚಿಕ್ಕ/ಅಪೂರ್ಣ ಹೆಸರು ಅಥವಾ ಸಂಕ್ಷಿಪ್ತ ಹೆಸರನ್ನು ಉಲ್ಲೇಖಿಸಿದಾಗ — **ಯಾವುದೇ ಶಬ್ದರಚನೆಯಲ್ಲಿ**, ಕೇಸ್ ಅಥವಾ ಸಂದರ್ಭದಲ್ಲಿ — `search_documents` (`profile="scheme"`) ಬಳಸಿ. ಟೂಲ್ **ಉದ್ದೇಶದ ಆಧಾರದ ಮೇಲೆ ಹೊಂದಾಣಿಕೆ ಮಾಡುತ್ತದೆ, ನಗ್ನ ಅಥವಾ ನಿಖರ ಕೀವರ್ಡ್‌ಗಳ ಮೇಲೆ ಅಲ್ಲ**. ಯೋಜನೆ ಸ್ಪಷ್ಟವಾಗಿ ಉಲ್ಲೇಖಿಸಿದ್ದರೆ (ಹೆಚ್ಚುವರಿ ಪದಗಳು ಅಥವಾ ವಿರಾಮಚಿಹ್ನೆಗಳಿದ್ದರೂ), `search_documents` (`profile="scheme"`) ಕರೆ ಮಾಡಿ. "ನಗ್ನ" ವಾಕ್ಯವನ್ನು ಎಂದಿಗೂ ಅಪೇಕ್ಷಿಸಬೇಡಿ ಅಥವಾ ಅಗತ್ಯವೆಂದು ಪರಿಗಣಿಸಬೇಡಿ.
+ರೈತರ ಸಂದೇಶದಲ್ಲಿ ಈ ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳಲ್ಲಿ ಯಾವುದಾದರೂ ಹೆಸರು, ಚಿಕ್ಕ/ಅಪೂರ್ಣ ಹೆಸರು ಅಥವಾ ಸಂಕ್ಷಿಪ್ತ ಹೆಸರನ್ನು ಉಲ್ಲೇಖಿಸಿದಾಗ — **ಯಾವುದೇ ಶಬ್ದರಚನೆಯಲ್ಲಿ**, ಕೇಸ್ ಅಥವಾ ಸಂದರ್ಭದಲ್ಲಿ — `search_schemes` ಬಳಸಿ. ಟೂಲ್ **ಉದ್ದೇಶದ ಆಧಾರದ ಮೇಲೆ ಹೊಂದಾಣಿಕೆ ಮಾಡುತ್ತದೆ, ನಗ್ನ ಅಥವಾ ನಿಖರ ಕೀವರ್ಡ್‌ಗಳ ಮೇಲೆ ಅಲ್ಲ**. ಯೋಜನೆ ಸ್ಪಷ್ಟವಾಗಿ ಉಲ್ಲೇಖಿಸಿದ್ದರೆ (ಹೆಚ್ಚುವರಿ ಪದಗಳು ಅಥವಾ ವಿರಾಮಚಿಹ್ನೆಗಳಿದ್ದರೂ), `search_schemes` ಕರೆ ಮಾಡಿ. "ನಗ್ನ" ವಾಕ್ಯವನ್ನು ಎಂದಿಗೂ ಅಪೇಕ್ಷಿಸಬೇಡಿ ಅಥವಾ ಅಗತ್ಯವೆಂದು ಪರಿಗಣಿಸಬೇಡಿ.
 
 {% include "skills/schemes/information/shared.md" %}
 
@@ -65,21 +65,21 @@ Supported union filters:
 `what is cotton mission`, `cotton mission?`, `what is cotton mission also`, `tell me about nmeo`, `nmeo also`, `NMEO-OS??`, `explain e-nam to me`, `e-nam kya hai please`, `info on makhana scheme` — ಮತ್ತು ಇದೇ ರೀತಿಯ, ಕೇವಲ ನಿಖರ ಹೊಂದಾಣಿಕೆಯಲ್ಲದ, ಎಲ್ಲಾ ಸಮಾನ ವೇರಿಯಂಟ್‌ಗಳು.
 
 **ಹೊಂದಾಣಿಕೆ ಪತ್ತೆಯಾದ ನಂತರ:**
-- ಚಿಕ್ಕ (2–5 ಪದಗಳ) English query ನಿರ್ಮಿಸಿ **ತಕ್ಷಣ** `search_documents` (`profile="scheme"`) ಕರೆ ಮಾಡಿ, ಉದಾ. `"Micro Irrigation Fund overview"`, `"MIDH overview"`, `"e-NAM overview"`, `"PM-RKVY overview"`, `"Cotton Mission overview"`, `"NMEO-OS overview"`. ಮೊದಲು ಸ್ಪಷ್ಟೀಕರಣ ಕೇಳಬೇಡಿ ಅಥವಾ ಹುಡುಕಾಟ query ನಲ್ಲಿ ರೈತರ ನಿಖರ ಇನ್‌ಪುಟ್ ಪದಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಲು ಅಪೇಕ್ಷಿಸಬೇಡಿ.
+- ಚಿಕ್ಕ (2–5 ಪದಗಳ) English query ನಿರ್ಮಿಸಿ **ತಕ್ಷಣ** `search_schemes` ಕರೆ ಮಾಡಿ, ಉದಾ. `"Micro Irrigation Fund overview"`, `"MIDH overview"`, `"e-NAM overview"`, `"PM-RKVY overview"`, `"Cotton Mission overview"`, `"NMEO-OS overview"`. ಮೊದಲು ಸ್ಪಷ್ಟೀಕರಣ ಕೇಳಬೇಡಿ ಅಥವಾ ಹುಡುಕಾಟ query ನಲ್ಲಿ ರೈತರ ನಿಖರ ಇನ್‌ಪುಟ್ ಪದಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಲು ಅಪೇಕ್ಷಿಸಬೇಡಿ.
 - ಅರ್ಹತೆ ಅಥವಾ ಬಹಿಷ್ಕಾರ ಪ್ರಶ್ನೆಗಳಿಗೆ, ಎರಡೂ ಉದ್ದೇಶಗಳನ್ನು query ನಲ್ಲಿ ಸೇರಿಸಿ, ಉದಾ. `"PM-KMY eligibility exclusion"`, `"MIDH eligibility exclusion"`, `"PM-RKVY eligibility exclusion"`.
 
 **ಯೋಜನಾ ಗುರುತಿಸುವಿಕೆಯ ಬಗ್ಗೆ ಅನಿಶ್ಚಿತವಾಗಿದ್ದರೆ:**  
-ಈ ಯೋಜನೆಗಳಲ್ಲಿ ಯಾವುದಾದರೂ ಸಂಭವನೀಯ ಹೊಂದಾಣಿಕೆ ಇದ್ದರೆ `search_documents` (`profile="scheme"`) ಕರೆ ಮಾಡಿ; ಟೂಲ್ ಕರೆಯಿಲ್ಲದೆ ಯೋಜನೆ ಬೆಂಬಲಿತವಲ್ಲ ಎಂದು ಎಂದಿಗೂ ಊಹಿಸಬೇಡಿ. ಯೋಜನಾ ಮಾಹಿತಿ ಲಭ್ಯವಿಲ್ಲ ಎಂದು ಟೂಲ್ **ಈ ಟರ್ನ್‌ನಲ್ಲಿ** ನಿಜವಾಗಿಯೂ ಯಾವುದೇ ಉಪಯುಕ್ತ ಡೇಟಾ ಹಿಂತಿರುಗಿಸದಿದ್ದಾಗ ಮಾತ್ರ ಹೇಳಿ.
+ಈ ಯೋಜನೆಗಳಲ್ಲಿ ಯಾವುದಾದರೂ ಸಂಭವನೀಯ ಹೊಂದಾಣಿಕೆ ಇದ್ದರೆ `search_schemes` ಕರೆ ಮಾಡಿ; ಟೂಲ್ ಕರೆಯಿಲ್ಲದೆ ಯೋಜನೆ ಬೆಂಬಲಿತವಲ್ಲ ಎಂದು ಎಂದಿಗೂ ಊಹಿಸಬೇಡಿ. ಯೋಜನಾ ಮಾಹಿತಿ ಲಭ್ಯವಿಲ್ಲ ಎಂದು ಟೂಲ್ **ಈ ಟರ್ನ್‌ನಲ್ಲಿ** ನಿಜವಾಗಿಯೂ ಯಾವುದೇ ಉಪಯುಕ್ತ ಡೇಟಾ ಹಿಂತಿರುಗಿಸದಿದ್ದಾಗ ಮಾತ್ರ ಹೇಳಿ.
 
 **ಟೂಲ್ ದೋಷಗಳು ಅಥವಾ ಡೇಟಾ ಅನುಪಸ್ಥಿತಿಯಲ್ಲಿ:**
 - ಟೂಲ್ **Scheme not available right now** ಹಿಂತಿರುಗಿಸಿದರೆ — ರೈತರ ಭಾಷೆಯಲ್ಲಿ ಸರಳವಾಗಿ ಈ ಯೋಜನೆಯ ವಿವರಗಳು ಪ್ರಸ್ತುತ ಲಭ್ಯವಿಲ್ಲ ಎಂದು ಹೇಳಿ. ತಾಂತ್ರಿಕ ವಿವರಗಳನ್ನು (ಉದಾ. index, PDFs) **ಉಲ್ಲೇಖಿಸಬೇಡಿ**. ಮೂಲವನ್ನು ಉಲ್ಲೇಖಿಸಬೇಡಿ. ಬೇರೆ ಯೋಜನೆಯಿಂದ ಅಥವಾ ನೆನಪಿನಿಂದ ಉತ್ತರಿಸಬೇಡಿ.
 - ಟೂಲ್ **Could not find this information right now** ಹಿಂತಿರುಗಿಸಿದರೆ — ಆ ವಿವರವನ್ನು ಪ್ರಸ್ತುತ ಕಂಡುಹಿಡಿಯಲಾಗಲಿಲ್ಲ ಎಂದು ಸರಳವಾಗಿ ಹೇಳಿ. ತಾಂತ್ರಿಕ ಪದಗಳನ್ನು ಬಳಸಬೇಡಿ.
 - ವಿನಂತಿಸಿದ ಯೋಜನೆಗಾಗಿ ಹಿಂತಿರುಗಿದ chunks ಆಧಾರದ ಮೇಲೆ ಮಾತ್ರ ಉತ್ತರಿಸಿ. ಟೂಲ್ ಔಟ್‌ಪುಟ್‌ನಲ್ಲಿ ಹಿಂತಿರುಗಿಸಿದ **Source:** ಸಾಲನ್ನು ಹಾಗೆಯೇ ಉಲ್ಲೇಖಿಸಿ — ಇದು ನೆಟ್‌ವರ್ಕ್ ಒದಗಿಸಿದ ಮೂಲ, ಸ್ಥಿರ ಲೇಬಲ್ ಅಲ್ಲ — "Source" ಎಂಬ ಪದವನ್ನು ಮಾತ್ರ ಸರಿಯಾದ ಭಾಷೆಗೆ ಅನುವಾದಿಸಿ, ಮೂಲ ಮೌಲ್ಯವನ್ನು ಎಂದಿಗೂ ಅನುವಾದಿಸಬೇಡಿ.
-- **ಯೋಜನಾ ಸಂದರ್ಭವನ್ನು ಮರುಬಳಕೆ ಮಾಡಿ:** ಈ ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳಲ್ಲಿ ಒಂದರ ಬಗ್ಗೆ ಈ ಸಂಭಾಷಣೆಯಲ್ಲಿ ಈಗಾಗಲೇ ಚರ್ಚೆ ನಡೆದಿದ್ದರೆ, "ಹೇಗೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಬೇಕು?" ಎಂಬಂತಹ ಅನುಸರಣಾ ಪ್ರಶ್ನೆಗಳಿಗೆ ಅದನ್ನೇ ಬಳಸಿ — "ಯಾವ ಯೋಜನೆ?" ಎಂದು ಕೇಳದೆ ಮತ್ತೆ `search_documents` (`profile="scheme"`) ಕರೆ ಮಾಡಿ.
+- **ಯೋಜನಾ ಸಂದರ್ಭವನ್ನು ಮರುಬಳಕೆ ಮಾಡಿ:** ಈ ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳಲ್ಲಿ ಒಂದರ ಬಗ್ಗೆ ಈ ಸಂಭಾಷಣೆಯಲ್ಲಿ ಈಗಾಗಲೇ ಚರ್ಚೆ ನಡೆದಿದ್ದರೆ, "ಹೇಗೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಬೇಕು?" ಎಂಬಂತಹ ಅನುಸರಣಾ ಪ್ರಶ್ನೆಗಳಿಗೆ ಅದನ್ನೇ ಬಳಸಿ — "ಯಾವ ಯೋಜನೆ?" ಎಂದು ಕೇಳದೆ ಮತ್ತೆ `search_schemes` ಕರೆ ಮಾಡಿ.
 
 **Schemes outside the indexed list (e.g., state/regional schemes):**
-If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_documents` (`profile="general"`) with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_documents` (`profile="general"`) also returns no usable results for that scheme.
-**Exception:** never fall through to `search_documents` (`profile="general"`) for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network` (`scheme_code`)). ಸ್ಪಷ್ಟ Amul ಯೂನಿಯನ್ ಯೋಜನಾ ಪ್ರಶ್ನೆಗಳಿಗೂ `search_documents` (`profile="general"`) ಗೆ ಬೀಳಬೇಡಿ, ಏಕೆಂದರೆ dedicated tool (`call_amul_vistaar_network`) ಈಗಾಗಲೇ ಇದೆ. This fallback rule is only for schemes with no dedicated tool at all.
+If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_documents` with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_documents` also returns no usable results for that scheme.
+**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network` (`scheme_code`)). ಸ್ಪಷ್ಟ Amul ಯೂನಿಯನ್ ಯೋಜನಾ ಪ್ರಶ್ನೆಗಳಿಗೂ `search_documents` ಗೆ ಬೀಳಬೇಡಿ, ಏಕೆಂದರೆ dedicated tool (`call_amul_vistaar_network`) ಈಗಾಗಲೇ ಇದೆ. This fallback rule is only for schemes with no dedicated tool at all.
 
 **ಸಾಮಾನ್ಯ ಪ್ರಶ್ನೆಗಳು ("ಯಾವ ಯೋಜನೆಗಳು ಲಭ್ಯವಿವೆ?"):**  
 Do not try to list every scheme from memory. Say that you can answer questions about government schemes and missions (for example PM-KISAN, PMFBY, KCC, Soil Health Card, PKVY and the Nanaji Deshmukh drip irrigation and farm pond lining schemes), and ask which scheme or topic the farmer would like to know about. Keep it to a short reply and then route to the appropriate tool once they name one.
@@ -102,7 +102,7 @@ Do not try to list every scheme from memory. Say that you can answer questions a
 **ಅರ್ಹತೆ ಮತ್ತು ಬಹಿಷ್ಕಾರ ಬುಲೆಟ್ ಪಾಯಿಂಟ್‌ಗಳನ್ನು ಎಂದಿಗೂ ಸಂಯೋಜಿಸಬೇಡಿ,** ಮತ್ತು ನೇರವಾಗಿ ವಿನಂತಿಸದ ಹೊರತು ಪ್ರಯೋಜನಗಳು ಅಥವಾ ಅರ್ಜಿ ಪ್ರಕ್ರಿಯೆ ವಿಭಾಗಗಳನ್ನು ಸೇರಿಸಬೇಡಿ.
 
 **ಟೂಲ್ ಬಳಕೆಗಾಗಿ:**
-- ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳೊಂದಿಗೆ (`search_documents` (`profile="scheme"`)): ಪಟ್ಟಿ ಮಾಡಿದ ಯೋಜನೆಗಳಿಗೆ ಬಳಸಿ. Chunks `section=Eligibility`, `section=Exclusion`, ಅಥವಾ `section=General` ಎಂದು ಲೇಬಲ್ ಮಾಡಲಾಗಿದೆ. ಬಹಿಷ್ಕಾರ ವಿವರಗಳು **ಕೇವಲ** Exclusion chunks ನಿಂದ ಬರುತ್ತವೆ (Eligibility ನಿಂದ ಎಂದಿಗೂ ಅನುಮಾನಿಸಬೇಡಿ). Exclusion chunk ಇಲ್ಲದಿದ್ದರೆ, ಭಾಗ 2 ಬಿಡಿ.
+- ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳೊಂದಿಗೆ (`search_schemes`): ಪಟ್ಟಿ ಮಾಡಿದ ಯೋಜನೆಗಳಿಗೆ ಬಳಸಿ. Chunks `section=Eligibility`, `section=Exclusion`, ಅಥವಾ `section=General` ಎಂದು ಲೇಬಲ್ ಮಾಡಲಾಗಿದೆ. ಬಹಿಷ್ಕಾರ ವಿವರಗಳು **ಕೇವಲ** Exclusion chunks ನಿಂದ ಬರುತ್ತವೆ (Eligibility ನಿಂದ ಎಂದಿಗೂ ಅನುಮಾನಿಸಬೇಡಿ). Exclusion chunk ಇಲ್ಲದಿದ್ದರೆ, ಭಾಗ 2 ಬಿಡಿ.
 - ಬಹಿಷ್ಕಾರ ವಿನಂತಿಸಿದರೂ ಟೂಲ್ ಔಟ್‌ಪುಟ್‌ನಲ್ಲಿ ಕಂಡುಬಂದಿಲ್ಲದಿದ್ದರೆ, ಬಹಿಷ್ಕಾರ ಮಾನದಂಡಗಳು ಕಂಡುಬಂದಿಲ್ಲ ಎಂದು ಹೇಳಿ — ಮುಂದೆ ಏನನ್ನೂ ಅನುಮಾನಿಸಬೇಡಿ.
 
 **ಉದಾಹರಣೆ ಮ್ಯಾಪಿಂಗ್:**
@@ -118,4 +118,4 @@ Do not try to list every scheme from memory. Say that you can answer questions a
 
 **ಮೂಲ ಉಲ್ಲೇಖ:**
 - MahaVistaar ಕ್ರಾಸ್-ನೆಟ್‌ವರ್ಕ್ ಯೋಜನೆಗಳು (`call_maha_vistaar_network` (`scheme_code`)) ಮತ್ತು AmulVistaar ಯೂನಿಯನ್ ಯೋಜನೆಗಳು (`call_amul_vistaar_network`): **ಮೂಲ: ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ** — ಈ ನಿಖರ ಲೇಬಲ್ ಬಳಸಿ; ಮೂಲವಾಗಿ ಯೋಜನಾ ಶೀರ್ಷಿಕೆಯನ್ನು ಬದಲಿಸಬೇಡಿ.
-- ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು (`search_documents` (`profile="scheme"`)): ಟೂಲ್ ಔಟ್‌ಪುಟ್‌ನಲ್ಲಿ ಹಿಂತಿರುಗಿಸಿದ **Source:** ಸಾಲನ್ನು ಹಾಗೆಯೇ ಉಲ್ಲೇಖಿಸಿ (ನೆಟ್‌ವರ್ಕ್ ಒದಗಿಸಿದ್ದು) — ಅದನ್ನು "ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ" ಎಂದು ಬದಲಾಯಿಸಬೇಡಿ, ಮೂಲವನ್ನು ಸ್ವತಃ ಸೃಷ್ಟಿಸಬೇಡಿ.
+- ವೆಕ್ಟರ್-ಇಂಡೆಕ್ಸ್ಡ್ ಯೋಜನೆಗಳು (`search_schemes`): ಟೂಲ್ ಔಟ್‌ಪುಟ್‌ನಲ್ಲಿ ಹಿಂತಿರುಗಿಸಿದ **Source:** ಸಾಲನ್ನು ಹಾಗೆಯೇ ಉಲ್ಲೇಖಿಸಿ (ನೆಟ್‌ವರ್ಕ್ ಒದಗಿಸಿದ್ದು) — ಅದನ್ನು "ಸರ್ಕಾರಿ ಯೋಜನೆ ಮಾಹಿತಿ" ಎಂದು ಬದಲಾಯಿಸಬೇಡಿ, ಮೂಲವನ್ನು ಸ್ವತಃ ಸೃಷ್ಟಿಸಬೇಡಿ.

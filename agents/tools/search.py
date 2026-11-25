@@ -1,5 +1,5 @@
 """General documents and scheme guidelines through Knowledge Provider."""
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 from langfuse import observe
@@ -56,65 +56,67 @@ def _parse_scheme_search_response(data: Dict[str, Any]) -> tuple[List[Dict[str, 
     return results, knowledge_provider.context_strings(data.get("scheme_search"))
 
 
-@observe(name="tool:search_documents", as_type="tool")
-async def search_documents(
-    query: str,
-    profile: Literal["general", "scheme"] = "general",
-    top_k: int = 10,
-    scheme_code: Optional[str] = None,
-) -> str:
-    """Search documents in Knowledge Provider.
-
-    Use profile="scheme" for government scheme guidelines: eligibility, benefits,
-    application details, and eNAM portal instructions. Include the scheme name or
-    acronym in the English query. Pass scheme_code only for a known catalog code.
-    Use profile="general" for other documents, including regional scheme references
-    when the scheme profile finds no relevant text. Crop and livestock advice,
-    personal scheme status, and grievance follow-up have their own tools.
-
-    Args:
-        query: A short search question in English, naming the subject.
-        profile: "general" for documents or "scheme" for official scheme guidance.
-        top_k: Maximum passage count, from 1 to 50 (default 10).
-        scheme_code: Optional exact catalog code, used only with profile="scheme".
-    """
-    query = query.strip()
-    if not query:
-        raise ModelRetry("Provide a non-empty document search query.")
-    scheme_code = (scheme_code or "").strip().lower()
-    if scheme_code and profile != "scheme":
-        raise ModelRetry('Use profile="scheme" when passing a scheme code.')
-    payload = {"query": query, "top_k": min(max(top_k, 1), 50)}
-    if profile == "scheme":
-        payload["document_kind"] = "scheme"
-    if scheme_code:
-        payload["document_code"] = scheme_code
-
-    tool = "scheme.search" if profile == "scheme" else "documents.search"
-    lf_update_current_observation(
-        input=payload,
-        metadata={"tool": tool, "category": SCHEME_SEARCH_CATEGORY if profile == "scheme" else "knowledge-provider"},
-    )
+async def _fetch_documents(payload: dict, tool: str, category: str) -> tuple[dict, str]:
+    lf_update_current_observation(input=payload, metadata={"tool": tool, "category": category})
     if not knowledge_provider.search_url():
         logger.error("KNOWLEDGE_PROVIDER_URL is not set")
-        return "Document search service is not configured. Please try again later."
+        return {}, "Document search service is not configured. Please try again later."
 
     try:
-        data = await knowledge_provider.search(payload)
+        return await knowledge_provider.search(payload), ""
     except (knowledge_provider.KnowledgeProviderError, httpx.HTTPError) as exc:
         logger.warning("Knowledge Provider document search failed: %s", exc)
         lf_update_current_observation(metadata={"tool": tool, "error_type": type(exc).__name__})
-        return "Document search service is unavailable. Please try again later."
+        return {}, "Document search service is unavailable. Please try again later."
 
-    if profile == "general":
-        hits = [
-            hit for hit in data.get("hits") or []
-            if isinstance(hit, dict) and hit.get("text")
-            and (hit.get("document_kind") or hit.get("type")) != "video"
-        ]
-        lf_update_current_observation(metadata={"tool": tool, "hit_count": len(hits)})
-        return _format_documents(hits)
 
+def _search_payload(query: str, top_k: int) -> dict:
+    query = query.strip()
+    if not query:
+        raise ModelRetry("Provide a non-empty document search query.")
+    return {"query": query, "top_k": min(max(top_k, 1), 50)}
+
+
+@observe(name="tool:search_documents", as_type="tool")
+async def search_documents(query: str, top_k: int = 10) -> str:
+    """Search agricultural manuals, guides and general documents.
+
+    Args:
+        query: A short English search question naming the document or subject.
+        top_k: Maximum passage count, from 1 to 50.
+    """
+    data, error = await _fetch_documents(_search_payload(query, top_k), "documents.search", "knowledge-provider")
+    if error:
+        return error
+    hits = [
+        hit for hit in data.get("hits") or []
+        if isinstance(hit, dict) and hit.get("text")
+        and (hit.get("document_kind") or hit.get("type")) != "video"
+    ]
+    lf_update_current_observation(metadata={"tool": "documents.search", "hit_count": len(hits)})
+    return _format_documents(hits)
+
+
+@observe(name="tool:search_schemes", as_type="tool")
+async def search_schemes(query: str, top_k: int = 10, scheme_code: Optional[str] = None) -> str:
+    """Search national scheme guidelines, including eligibility, benefits and applications.
+
+    Args:
+        query: A short English search question containing the scheme name or acronym.
+        top_k: Maximum passage count, from 1 to 50.
+        scheme_code: Optional exact code when the scheme catalog code is known.
+    """
+    payload = {**_search_payload(query, top_k), "document_kind": "scheme"}
+    scheme_code = (scheme_code or "").strip().lower()
+    if scheme_code:
+        payload["document_code"] = scheme_code
+    data, error = await _fetch_documents(payload, "scheme.search", SCHEME_SEARCH_CATEGORY)
+    if error:
+        return error
+    return _format_schemes(data, payload["query"], scheme_code)
+
+
+def _format_schemes(data: dict, query: str, scheme_code: str) -> str:
     results, search_ctx = _parse_scheme_search_response(data)
     resolved_code = scheme_code or search_ctx.get("resolved_scheme_code", "").lower()
     if resolved_code:
@@ -124,7 +126,7 @@ async def search_documents(
         results = []
 
     lf_update_current_observation(metadata={
-        "tool": tool,
+        "tool": "scheme.search",
         "network_status": status or None,
         "hit_count": len(results),
         "doc_ids": list(dict.fromkeys(r["doc_id"] for r in results if r["doc_id"])),
@@ -135,7 +137,8 @@ async def search_documents(
         ],
     })
     if not results:
-        return search_ctx.get("message", "") if status == "scheme_unavailable" and search_ctx.get("message") else NO_RESULTS_MESSAGE
+        message = search_ctx.get("message") if status == "scheme_unavailable" else None
+        return message or NO_RESULTS_MESSAGE
     formatted = format_search_results(results, query)
     if resolved_code:
         formatted += format_status_check_offer(resolved_code)

@@ -696,8 +696,9 @@ def test_tool_is_registered_with_context():
     assert "advice_type" not in schema["properties"]
     assert {"crop", "season", "days_after_sowing"} <= set(schema["properties"])
     assert "answer_now" not in schema["properties"]
-    assert "search_documents" in registered
-    for merged in ("search_schemes", "search_pests_diseases", "search_video", "search_terms", "analyze_crop_image"):
+    assert {"search_documents", "search_schemes"} <= registered.keys()
+    assert "profile" not in registered["search_documents"].function_schema.json_schema["properties"]
+    for merged in ("search_pests_diseases", "search_video", "search_terms", "analyze_crop_image"):
         assert merged not in registered
 
 

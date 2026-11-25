@@ -36,7 +36,7 @@ def search(load_module, monkeypatch):
 
 
 def network_response(scheme, *, hits=True, status="success", resolved=True):
-    """A KP /search response for the scheme profile."""
+    """A KP /search response for scheme documents."""
     return {
         "effective_config": {"ranking_score_field": "_scheme_score"},
         "hits": [{"_id": "chunk-1", "chunk_id": "chunk-1", "scheme_code": scheme, "scheme_name": scheme,
@@ -53,7 +53,7 @@ def run_search(search, monkeypatch, response, query="PM-KISAN 24th installment r
     else:
         client.post.return_value = response
     monkeypatch.setattr(search.httpx, "AsyncClient", lambda: client)
-    result = asyncio.run(search.search_documents(query, profile="scheme"))
+    result = asyncio.run(search.search_schemes(query))
     return result, client.post
 
 
@@ -116,7 +116,7 @@ def test_release_announcement_skill_needs_no_business_tools(language):
     state = SkillState(enabled_skills=["pm_kisan.installments"])
     prompt = render_prompt(state, language, {"today_date": "28 October 2026"})
     assert "The 24th instalment of PM-KISAN was released on 30th October 2026." in prompt
-    assert "Do not call search_documents, load_skill or any status/OTP tool" in prompt
+    assert "Do not call search_schemes, load_skill or any status/OTP tool" in prompt
     assert not state.visible
 
 
@@ -128,7 +128,7 @@ def test_release_and_status_rules_remain_present_in_default_mode(language):
     assert "Before any PM-KISAN tool call" not in prompt
     assert "does not apply to scheme information or public release dates" in prompt
     assert "The 24th instalment of PM-KISAN was released on 30th October 2026." in prompt
-    assert "Do not call search_documents, load_skill or any status/OTP tool" in prompt
+    assert "Do not call search_schemes, load_skill or any status/OTP tool" in prompt
 
 
 def test_removed_legacy_tool_is_not_registered():
