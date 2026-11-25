@@ -27,7 +27,7 @@ v2 reads named fields out of the Grievance pack and renders them here.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import httpx
@@ -42,7 +42,7 @@ from agents.tools.pmfby_grievance import (
     _validate_registered_mobile,
     generate_transaction_id,
 )
-from agents.tools.v2.aif import _unusable
+from agents.tools.v2.aif import _unusable, pack_attributes, provider_fields
 from agents.tools.v2.pmkisan_scheme_status import (
     ACTIVE,
     DRAFT,
@@ -54,6 +54,7 @@ from agents.tools.v2.pmkisan_scheme_status import (
     commitment_attributes,
     commitment_envelope,
 )
+from agents.tools.v2.provider_openapi import From
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
@@ -172,9 +173,16 @@ async def _discover_grievance(action: str) -> Optional[Dict[str, Any]]:
 # Input handling
 # --------------------------------------------------------------------------------------
 
-def _season_label(season: str) -> str:
-    """The farmer's season as the pack's enum, or "" to ask again."""
-    return _SEASON_LABELS.get(_normalize_request_season_for_pmfby_api(season), "")
+def _season_code(season: str) -> str:
+    """The farmer's season as PMFBY's 1/2/3, or "" to ask again."""
+    code = _normalize_request_season_for_pmfby_api(season)
+    return code if code in _SEASON_LABELS else ""
+
+
+def _filed_on() -> str:
+    """Today, as PMFBY dates a filing. An Indian portal dates it in IST, so a
+    late-evening complaint is this day and not yesterday."""
+    return datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime("%Y-%m-%d")
 
 
 def _crop_year(value: str) -> str:
@@ -204,14 +212,19 @@ def _display_date(iso: str) -> str:
         return iso or ""
 
 
-def _grievance_attributes(mobile: str) -> Dict[str, Any]:
-    return {
-        "@context": GRIEVANCE_CONTEXT,
-        "@type": GRIEVANCE_TYPE,
-        "informationMode": "OnDemand",
-        "scheme": dict(SCHEME),
-        "applicantMobile": mobile,
-    }
+async def _attributes(
+    found: Dict[str, Any], action: str, held: Dict[str, Any]
+) -> Dict[str, Any]:
+    """The commitment attributes for ``action``, its fields read off the
+    contract the catalog names and filled from what the caller holds."""
+    return pack_attributes(
+        found,
+        await provider_fields(found, action, held, "PMFBY"),
+        GRIEVANCE_CONTEXT,
+        GRIEVANCE_TYPE,
+        informationMode="OnDemand",
+        scheme=dict(SCHEME),
+    )
 
 
 def _format_case(attributes: Dict[str, Any]) -> str:
@@ -294,7 +307,7 @@ async def initiate_pmfby_grievance_otp(
             "init",
             transaction_id,
             DRAFT,
-            _grievance_attributes(phone),
+            await _attributes(found, "init", {From.MOBILE: phone}),
             _GRIEVANCE_OFFER,
             found,
         )
@@ -374,13 +387,11 @@ async def check_pmfby_grievance_otp(
             logger.warning("PMFBY v2 discover found no grievance catalog for confirm")
             return _UNAVAILABLE_MSG
 
-        attributes = _grievance_attributes(phone)
-        attributes["challenge"] = {"response": {"method": "OTP", "value": otp_clean}}
         body = commitment_envelope(
             "confirm",
             transaction_id,
             ACTIVE,
-            attributes,
+            await _attributes(found, "confirm", {From.MOBILE: phone, From.OTP: otp_clean}),
             _GRIEVANCE_OFFER,
             found,
         )
@@ -443,13 +454,13 @@ async def pmfby_grievance_status(
             logger.warning("PMFBY v2 discover found no grievance catalog")
             return _UNAVAILABLE_MSG
 
-        attributes = _grievance_attributes(phone)
-        attributes["case"] = {"ticketNo": ticket}
         body = commitment_envelope(
             "status",
             transaction_id,
             ACTIVE,
-            attributes,
+            await _attributes(
+                found, "status", {From.MOBILE: phone, From.GRIEVANCE_ID: ticket}
+            ),
             _GRIEVANCE_OFFER,
             found,
         )
@@ -511,8 +522,8 @@ async def pmfby_submit_grievance(
             )
 
         raw_season = _require_nonempty(request_season, "Please share the request season.")
-        season = _season_label(raw_season)
-        if not season:
+        season_code = _season_code(raw_season)
+        if not season_code:
             raise ModelRetry(
                 "Ask which crop season the PMFBY policy is for — **Kharif**, **Rabi**, or "
                 "**Zaid / summer** (or the same in the farmer's language). Do not ask them to "
@@ -547,23 +558,31 @@ async def pmfby_submit_grievance(
             return _UNAVAILABLE_MSG
 
         # support carries its payload on channels, not on a contract. The three
-        # ticket constants v1 hardcodes are the mapping's defaults, so they are
-        # not sent from here.
+        # ticket constants v1 hardcodes are the contract's defaults, so nothing
+        # held here names them.
+        filing = await _attributes(
+            found,
+            "support",
+            {
+                From.MOBILE: phone,
+                From.APPLICATION: enrolment_id,
+                From.YEAR: year,
+                From.SEASON: season_code,
+                From.GRIEVANCE_TEXT: grievance_description.strip(),
+                From.FILED_ON: _filed_on(),
+            },
+        )
         body = {
             "context": build_context("support", transaction_id),
             "message": {
                 "support": {
                     "channels": [
                         {
-                            **_grievance_attributes(phone),
+                            **filing,
                             "provider": {
                                 "id": found["provider"].get("id"),
                                 "descriptor": {"name": PROVIDER_NAME},
                             },
-                            "enrolmentId": enrolment_id,
-                            "cropYear": year,
-                            "season": season,
-                            "grievance": {"description": grievance_description.strip()},
                         }
                     ]
                 }

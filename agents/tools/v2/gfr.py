@@ -20,9 +20,9 @@ from agents.tools.gfr import (
     format_recommendations,
 )
 from agents.tools.v2.provider_openapi import (
+    From,
     SchemaUnavailable,
-    openapi_document,
-    request_schema,
+    filled_for,
     rewritten_url,
 )
 from agents.tools.v2.sathi_seed import AGRICULTURE_RESOURCE_CONTEXT
@@ -46,11 +46,6 @@ _ADVICE = {"code": "gfr-advice", "type": _ADVISORY_TYPE, "context": AGRICULTURE_
 _SOIL = {"code": "gfr-soil-report", "type": _RESOURCE_TYPE, "context": AGRICULTURE_RESOURCE_CONTEXT}
 _SHC_CODE_SCHEME = "SHC"
 _SOIL_VALUES = ("n", "p", "k", "OC")
-
-# The values v1's provider-backend sent for the soil test.
-_SOIL_TEST_LIMIT = 1
-_SOIL_TEST_SKIP = 0
-_SOIL_TEST_LOCALE = "en"
 
 _NO_DATA = "No recommendation data found."
 _TIMED_OUT = "GFR network request timed out. Please try again."
@@ -174,16 +169,15 @@ def _registry_items(resource: dict) -> List[GfrRegistryItem]:
     return items
 
 
-async def _query_for(resource: dict, action: str) -> str:
-    """The provider's GraphQL query for one action, the const its OpenAPI fixes."""
-    for entry in (resource.get("resourceAttributes") or {}).get("actions") or []:
-        if entry.get("action") == action and entry.get("operationRef"):
-            url, _, pointer = entry["operationRef"].partition("#")
-            query = (request_schema(await openapi_document(url), pointer)["properties"].get("query") or {}).get("const")
-            if query:
-                return query
-            raise SchemaUnavailable(f"{url}: the {action} request has no const query")
-    raise SchemaUnavailable(f"{resource.get('id')} has no {action} operationRef")
+async def _request(resource: dict, held: dict) -> dict:
+    """The select request read off the contract the catalog names: GFR's own
+    GraphQL query, fixed as a const there, and the variables it declares filled
+    from what the caller holds. The limit, skip and locale v1 hardcoded are
+    defaults in the contract now, so nothing here names them."""
+    fields, unfillable = await filled_for(resource, "select", held)
+    if unfillable:
+        raise SchemaUnavailable(f"GFR select cannot be filled: {unfillable}")
+    return fields
 
 
 def _select_body(found: dict, kind: dict, fields: dict, transaction_id: str) -> dict:
@@ -226,10 +220,9 @@ def _as_v1_item(recommendations: Any) -> dict:
 
 async def _soil_values(found: dict, phone: str, cycle: str, transaction_id: str) -> Optional[dict]:
     """n, p, k and OC from the farmer's first soil report, or None when there is none."""
-    variables = {"phone": phone, "cycle": cycle, "limit": _SOIL_TEST_LIMIT, "skip": _SOIL_TEST_SKIP, "locale": _SOIL_TEST_LOCALE}
-    query = await _query_for(found["resource"], "select")
+    fields = await _request(found["resource"], {From.MOBILE: phone, From.CYCLE: cycle})
     attributes = _answer_attributes(await _post("select", _select_body(
-        found, _SOIL, {"query": query, "variables": variables}, transaction_id)))
+        found, _SOIL, fields, transaction_id)))
     if attributes.get("errors"):
         logger.error(f"GFR v2 soil test refused: {[e.get('message') for e in attributes['errors']]}")
         return None
@@ -252,12 +245,12 @@ async def _advice_and_soil_report(state_id: str, transaction_id: str) -> Optiona
     return advice[0], soil_report[0]
 
 
-async def _doses(advice: dict, variables: dict, transaction_id: str) -> str:
+async def _doses(advice: dict, held: dict, transaction_id: str) -> str:
     """The recommendation text for these soil values and crops, in v1's words."""
-    query = await _query_for(advice["resource"], "select")
-    logger.info(f"GFR v2 selecting {advice['resource'].get('id')} for crops {variables['crops']}")
+    fields = await _request(advice["resource"], held)
+    logger.info(f"GFR v2 selecting {advice['resource'].get('id')} for crops {held[From.CROP_IDS]}")
     attributes = _answer_attributes(await _post("select", _select_body(
-        advice, _ADVICE, {"query": query, "variables": variables}, transaction_id)))
+        advice, _ADVICE, fields, transaction_id)))
     recommendations = (attributes.get("data") or {}).get("getRecommendations")
     if recommendations is None:
         logger.warning(f"GFR v2 no recommendation: errors={[e.get('message') for e in attributes.get('errors') or []]}")
@@ -314,8 +307,13 @@ async def gfr_get_recommendations(
         soil = await _soil_values(soil_report, phone, cycle_y, transaction_id)
         if soil is None:
             return _NO_DATA
-        variables = {"state": state_id, "results": soil, "crops": crop_ids, "naturalFarming": bool(natural_farming)}
-        return await _doses(advice, variables, transaction_id)
+        held = {
+            From.STATE: state_id,
+            From.SOIL_RESULTS: soil,
+            From.CROP_IDS: crop_ids,
+            From.NATURAL_FARMING: bool(natural_farming),
+        }
+        return await _doses(advice, held, transaction_id)
     except SchemaUnavailable as e:
         logger.error(f"GFR v2 could not read the request schema: {e}")
         raise ModelRetry(_UNAVAILABLE)

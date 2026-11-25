@@ -15,12 +15,7 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from agents.tools.shc_scheme_status import Descriptor, Item, MediaResource, Provider, format_phone_number
 from agents.tools.v2.aif import _first_resource
-from agents.tools.v2.provider_openapi import (
-    SchemaUnavailable,
-    openapi_document,
-    request_schema,
-    select_operation_ref,
-)
+from agents.tools.v2.provider_openapi import From, SchemaUnavailable, filled_for
 from agents.tools.v2.sathi_seed import AGRICULTURE_RESOURCE_CONTEXT
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -33,11 +28,6 @@ logger = get_logger(__name__)
 _SCHEMA_TYPE = "openagrinet:AgricultureResource"
 _SHC_REPORTS_CODE = "shc-reports"
 _OFFER_ID = "offer:shc-reports"
-
-# The values v1's provider-backend sent; SHC's OpenAPI gives no defaults for them.
-_REPORT_LIMIT = 10
-_REPORT_SKIP = 0
-_REPORT_LOCALE = "en"
 
 # v1 dropped a report missing any of these, so v2 does too.
 _REQUIRED_REPORT_PATHS = (
@@ -114,19 +104,18 @@ async def _discover_reports_resource(transaction_id: str) -> Optional[Dict[str, 
     return found
 
 
-async def _report_query(resource: dict) -> str:
-    """SHC's GraphQL query, the const its OpenAPI fixes for the select request."""
-    url, _, pointer = select_operation_ref(resource).partition("#")
-    schema = request_schema(await openapi_document(url), pointer)
-    query = (schema["properties"].get("query") or {}).get("const")
-    if not query:
-        raise SchemaUnavailable(f"{url}: the select request has no const query")
-    return query
+async def _request(resource: dict, phone: str, cycle: str) -> dict:
+    """The select request read off the contract the catalog names: SHC's own
+    GraphQL query, fixed as a const there, and the variables it declares. The
+    page size and locale v1 hardcoded are defaults in the contract now."""
+    fields, unfillable = await filled_for(resource, "select", {From.MOBILE: phone, From.CYCLE: cycle})
+    if unfillable:
+        raise SchemaUnavailable(f"SHC select cannot be filled: {unfillable}")
+    return fields
 
 
-def _select_body(found: Dict[str, Any], query: str, phone: str, cycle: str, transaction_id: str) -> dict:
+def _select_body(found: Dict[str, Any], fields: dict, transaction_id: str) -> dict:
     resource_id = found["resource"].get("id")
-    variables = {"phone": phone, "cycle": cycle, "limit": _REPORT_LIMIT, "skip": _REPORT_SKIP, "locale": _REPORT_LOCALE}
     return {
         "context": _context("select", transaction_id),
         "message": {
@@ -143,8 +132,7 @@ def _select_body(found: Dict[str, Any], query: str, phone: str, cycle: str, tran
                                 "resourceAttributes": {
                                     "@context": AGRICULTURE_RESOURCE_CONTEXT,
                                     "@type": _SCHEMA_TYPE,
-                                    "query": query,
-                                    "variables": variables,
+                                    **fields,
                                 },
                             }
                         ],
@@ -245,8 +233,8 @@ async def check_shc_status(
         found = await _discover_reports_resource(transaction_id)
         if not found:
             return _UNAVAILABLE
-        query = await _report_query(found["resource"])
-        on_select = await _post("select", _select_body(found, query, phone, cycle, transaction_id))
+        fields = await _request(found["resource"], phone, cycle)
+        on_select = await _post("select", _select_body(found, fields, transaction_id))
         answer = _shc_answer(on_select)
         reports = (answer.get("data") or {}).get("getTestForAuthUser")
         if answer.get("errors") or not isinstance(reports, list):

@@ -32,10 +32,10 @@ components:
     SathiStockRequest:
       type: object
       properties:
-        cropCode: {type: [integer, string]}
+        cropCode: {type: [integer, string], x-oan-from: crop.code}
         seedClass: {const: CERTIFIED I}
-        stateCode: {type: [integer, string]}
-        districtCode: {type: [integer, string]}
+        stateCode: {type: [integer, string], x-oan-from: subject.state}
+        districtCode: {type: [integer, string], x-oan-from: subject.district}
         apiKey: {type: string, writeOnly: true}
       required: [cropCode, seedClass, stateCode, districtCode, apiKey]
 """

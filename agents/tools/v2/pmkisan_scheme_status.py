@@ -41,9 +41,12 @@ from agents.deps import FarmerContext
 from agents.tools.pmkisan_scheme_status import generate_transaction_id
 from agents.tools.v2.aif import (
     _first_resource,
+    pack_attributes,
     post_action,
+    provider_fields,
     scheme_application_context,
 )
+from agents.tools.v2.provider_openapi import From
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
 
@@ -233,23 +236,24 @@ def split_identifier(reg_no: str, phone_number: str) -> Tuple[str, str]:
     return value, ""
 
 
-def applicant_attributes(reg_no: str, phone_number: str) -> Dict[str, Any]:
-    """enrolmentId when we have a registration number, applicant.mobile otherwise.
+async def application_attributes(
+    found: Dict[str, Any], action: str, held: Dict[str, Any]
+) -> Dict[str, Any]:
+    """The commitment attributes for ``action``, its fields read off the
+    contract the catalog names and filled from what the caller holds.
 
-    The mapping branches on exactly this: enrolmentId present means a Ben_id
-    lookup, absent means a Mobile lookup.
+    Both identifiers are offered and the contract picks: it states a lookup by
+    registration number and a lookup by mobile as two shapes of the same call,
+    so whichever the farmer gave is the one that fills.
     """
-    attributes: Dict[str, Any] = {
-        "@context": scheme_application_context(),
-        "@type": SCHEME_APPLICATION_TYPE,
-        "informationMode": "OnDemand",
-        "scheme": dict(SCHEME),
-    }
-    if reg_no:
-        attributes["enrolmentId"] = reg_no
-    else:
-        attributes["applicant"] = {"mobile": phone_number}
-    return attributes
+    return pack_attributes(
+        found,
+        await provider_fields(found, action, held, "PM-KISAN"),
+        scheme_application_context(),
+        SCHEME_APPLICATION_TYPE,
+        informationMode="OnDemand",
+        scheme=dict(SCHEME),
+    )
 
 
 def clean_otp(otp: str) -> str:
@@ -361,7 +365,9 @@ async def initiate_pm_kisan_status_check(
             "init",
             transaction_id,
             DRAFT,
-            applicant_attributes(reg_no, phone_number),
+            await application_attributes(
+                found, "init", {From.ENROLMENT: reg_no, From.MOBILE: phone_number}
+            ),
             _APPLICATION_OFFER,
             found,
         )
@@ -425,8 +431,6 @@ async def check_pm_kisan_status_with_otp(
                 "beckn_version": "v2",
             }
         )
-        attributes = applicant_attributes(reg_no, phone_number)
-        attributes["challenge"] = {"response": {"method": "OTP", "value": otp_clean}}
         found = await _discover_application()
         if not found:
             logger.warning("PM-KISAN v2 discover found no application-status catalog")
@@ -435,7 +439,15 @@ async def check_pm_kisan_status_with_otp(
             "status",
             transaction_id,
             ACTIVE,
-            attributes,
+            await application_attributes(
+                found,
+                "status",
+                {
+                    From.ENROLMENT: reg_no,
+                    From.MOBILE: phone_number,
+                    From.OTP: otp_clean,
+                },
+            ),
             _APPLICATION_OFFER,
             found,
         )

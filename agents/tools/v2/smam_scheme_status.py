@@ -19,9 +19,12 @@ from agents.tools.v2.aif import (
     build_context,
     commitment_attributes,
     commitment_envelope,
+    pack_attributes,
     post_action,
+    provider_fields,
     scheme_application_context,
 )
+from agents.tools.v2.provider_openapi import From
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger
 
@@ -65,16 +68,20 @@ async def _discover(transaction_id: str) -> Optional[Dict[str, Any]]:
     return _first_resource(response.json(), usable=_unusable, who="SMAM")
 
 
-def _status_body(found: Dict[str, Any], search_value: str, transaction_id: str) -> Dict[str, Any]:
-    scheme = ((found["resource"].get("resourceAttributes") or {}).get("scheme") or {}).get("code") or _SCHEME_CODE
-    attributes = {
-        "@context": scheme_application_context(),
-        "@type": SCHEME_APPLICATION_TYPE,
-        "informationMode": "OnDemand",
-        "scheme": {"code": scheme},
-        # SMAM works out whether this is a mobile or an application number; v1 never sent the kind.
-        "searchValue": search_value,
-    }
+async def _status_body(found: Dict[str, Any], search_value: str, transaction_id: str) -> Dict[str, Any]:
+    """The status call, its fields read off the contract the catalog names.
+
+    Only the looked-up value is held: SMAM works out for itself whether it is a
+    mobile or an application number, and v1 never sent the kind either.
+    """
+    attributes = pack_attributes(
+        found,
+        await provider_fields(found, "status", {From.LOOKUP: search_value}, "SMAM"),
+        scheme_application_context(),
+        SCHEME_APPLICATION_TYPE,
+        informationMode="OnDemand",
+        scheme={"code": _SCHEME_CODE},
+    )
     return commitment_envelope("status", transaction_id, ACTIVE, attributes, found["offer"]["id"], found)
 
 
@@ -148,7 +155,7 @@ async def _lookup(search_value: str, transaction_id: str) -> str:
     found = await _discover(transaction_id)
     if not found:
         return _UNAVAILABLE
-    response = await _post("status", _status_body(found, search_value, transaction_id))
+    response = await _post("status", await _status_body(found, search_value, transaction_id))
     if response.status_code != 200:
         logger.error(f"SMAM v2 status refused: HTTP {response.status_code} {response.text[:300]}")
         return _UNAVAILABLE

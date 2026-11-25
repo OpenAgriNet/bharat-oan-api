@@ -55,8 +55,11 @@ from agents.tools.v2.aif import (
     build_context,
     commitment_attributes,
     commitment_envelope,
+    pack_attributes,
+    provider_fields,
     scheme_application_context,
 )
+from agents.tools.v2.provider_openapi import From
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
@@ -212,15 +215,19 @@ def _season_code(value: str) -> str:
     return code if code in _SEASON_NAMES else ""
 
 
-def _attributes(mobile: str, **extra: Any) -> Dict[str, Any]:
-    return {
-        "@context": scheme_application_context(),
-        "@type": SCHEME_APPLICATION_TYPE,
-        "informationMode": "OnDemand",
-        "scheme": dict(SCHEME),
-        "applicant": {"mobile": mobile},
-        **extra,
-    }
+async def _attributes(
+    found: Dict[str, Any], action: str, held: Dict[str, Any]
+) -> Dict[str, Any]:
+    """The commitment attributes for ``action``, its fields read off the
+    contract the catalog names and filled from what the caller holds."""
+    return pack_attributes(
+        found,
+        await provider_fields(found, action, held, "PMFBY"),
+        scheme_application_context(),
+        SCHEME_APPLICATION_TYPE,
+        informationMode="OnDemand",
+        scheme=dict(SCHEME),
+    )
 
 
 def _remember_farmer_id(transaction_id: str, farmer_id: str) -> None:
@@ -384,7 +391,7 @@ async def initiate_pmfby_status_check(
             "init",
             transaction_id,
             DRAFT,
-            _attributes(mobile),
+            await _attributes(found, "init", {From.MOBILE: mobile}),
             _INSURANCE_OFFER,
             found,
         )
@@ -430,10 +437,7 @@ async def _verified_farmer_id(
         "confirm",
         transaction_id,
         DRAFT,
-        _attributes(
-            mobile,
-            challenge={"response": {"method": "OTP", "value": otp}},
-        ),
+        await _attributes(found, "confirm", {From.MOBILE: mobile, From.OTP: otp}),
         _INSURANCE_OFFER,
         found,
     )
@@ -517,8 +521,15 @@ async def check_pmfby_status_with_otp(
             action,
             transaction_id,
             ACTIVE,
-            _attributes(
-                mobile, farmerId=farmer_id, season=season_code, year=crop_year
+            await _attributes(
+                found,
+                action,
+                {
+                    From.MOBILE: mobile,
+                    From.SUBJECT_ID: farmer_id,
+                    From.SEASON: season_code,
+                    From.YEAR: crop_year,
+                },
             ),
             _INSURANCE_OFFER,
             found,

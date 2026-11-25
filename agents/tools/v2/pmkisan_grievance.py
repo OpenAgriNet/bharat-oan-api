@@ -38,7 +38,7 @@ from agents.tools.pmkisan_grievance import (
     _validate_pmkisan_registration_number,
     generate_transaction_id,
 )
-from agents.tools.v2.aif import _unusable
+from agents.tools.v2.aif import _unusable, pack_attributes, provider_fields
 from agents.tools.v2.pmkisan_scheme_status import (
     ACTIVE,
     DRAFT,
@@ -54,6 +54,7 @@ from agents.tools.v2.pmkisan_scheme_status import (
     explain_failure,
     post_action,
 )
+from agents.tools.v2.provider_openapi import From
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
 
@@ -146,14 +147,19 @@ def category_for(grievance_type: str, found: Dict[str, Any]) -> Tuple[str, str]:
 
 _OTP_SENT_MSG = "An OTP has been sent to the mobile number registered with PM-KISAN."
 
-def _grievance_attributes(reg_no: str) -> Dict[str, Any]:
-    return {
-        "@context": GRIEVANCE_CONTEXT,
-        "@type": GRIEVANCE_TYPE,
-        "informationMode": "OnDemand",
-        "scheme": dict(SCHEME),
-        "enrolmentId": reg_no,
-    }
+async def _attributes(
+    found: Dict[str, Any], action: str, held: Dict[str, Any]
+) -> Dict[str, Any]:
+    """The commitment attributes for ``action``, its fields read off the
+    contract the catalog names and filled from what the caller holds."""
+    return pack_attributes(
+        found,
+        await provider_fields(found, action, held, "PM-KISAN"),
+        GRIEVANCE_CONTEXT,
+        GRIEVANCE_TYPE,
+        informationMode="OnDemand",
+        scheme=dict(SCHEME),
+    )
 
 
 def _iso_date(value: str) -> str:
@@ -229,7 +235,7 @@ async def _send_grievance_otp(ctx: RunContext[FarmerContext], reg_no: str, purpo
         "init",
         transaction_id,
         DRAFT,
-        _grievance_attributes(reg_no),
+        await _attributes(found, "init", {From.ENROLMENT: reg_no}),
         _GRIEVANCE_OFFER,
         found,
     )
@@ -376,6 +382,16 @@ async def pmkisan_submit_grievance(
         category_code, refusal = category_for(grievance_type, found)
         if refusal:
             return refusal
+        filing = await _attributes(
+            found,
+            "support",
+            {
+                From.ENROLMENT: reg_no_clean,
+                From.OTP: otp_clean,
+                From.CATEGORY: category_code,
+                From.GRIEVANCE_TEXT: grievance_description.strip(),
+            },
+        )
         # The one PM-KISAN action carrying its payload on channels, not a contract.
         body = {
             "context": build_context("support", transaction_id),
@@ -383,15 +399,8 @@ async def pmkisan_submit_grievance(
                 "support": {
                     "channels": [
                         {
-                            **_grievance_attributes(reg_no_clean),
+                            **filing,
                             "provider": found["provider"],
-                            "grievance": {
-                                "category": {"code": category_code},
-                                "description": grievance_description.strip(),
-                            },
-                            "challenge": {
-                                "response": {"method": "OTP", "value": otp_clean}
-                            },
                         }
                     ]
                 }
@@ -488,20 +497,20 @@ async def pmkisan_grievance_status(
                 "beckn_version": "v2",
             }
         )
-        attributes = _grievance_attributes(reg_no_clean)
-        # Absent, not empty: the mapping reads its absence as "the newest one".
-        if filed_on_iso:
-            attributes["case"] = {"filedOn": filed_on_iso}
-        attributes["challenge"] = {"response": {"method": "OTP", "value": otp_clean}}
         found = await _discover_grievance("status")
         if not found:
             logger.warning("PM-KISAN v2 discover found no grievance catalog")
             return _UNAVAILABLE_MSG
+        # A filing date is offered only when the farmer gave one: the contract
+        # marks it optional and the mapping reads its absence as "the newest".
+        held = {From.ENROLMENT: reg_no_clean, From.OTP: otp_clean}
+        if filed_on_iso:
+            held[From.FILED_ON] = filed_on_iso
         body = commitment_envelope(
             "status",
             transaction_id,
             ACTIVE,
-            attributes,
+            await _attributes(found, "status", held),
             _GRIEVANCE_OFFER,
             found,
         )

@@ -9,7 +9,30 @@ from pydantic_ai import ModelRetry
 
 import agents.tools
 from agents.tools import smam_scheme_status as v1
+from agents.tools.v2 import provider_openapi
 from agents.tools.v2 import smam_scheme_status as smam
+
+OPERATION_REF = "https://specs.test/smam/openapi.yaml#/paths/~1api~1BeneficiaryService~1GetApplicationStatusByAI/post"
+# The request half of SMAM's published contract: the one field it asks for.
+OPENAPI_YAML = """
+openapi: 3.1.1
+info: {title: smam, version: 0.2.0}
+paths:
+  /api/BeneficiaryService/GetApplicationStatusByAI:
+    post:
+      operationId: readSmamBenefitStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [SearchValue]
+              properties:
+                SearchValue: {type: string, minLength: 1, x-oan-from: subject.lookup}
+      responses:
+        '200': {description: ok}
+"""
 
 RESOURCE = {
     "id": "res-smam-benefits",
@@ -17,7 +40,7 @@ RESOURCE = {
     "resourceAttributes": {
         "@type": "openagrinet:SchemeApplication",
         "scheme": {"code": "SMAM", "name": "Sub-Mission on Agricultural Mechanization"},
-        "actions": [{"action": "status", "operationRef": "https://specs.test/smam/openapi.yaml#/paths/~1x/post"}],
+        "actions": [{"action": "status", "operationRef": OPERATION_REF}],
     },
 }
 PROVIDER = {"id": "smam", "descriptor": {"code": "SMAM"}}
@@ -47,9 +70,12 @@ class FakeAdapter:
     def __init__(self):
         self.discover = _catalog()
         self.status = _on_status({"success": True, "message": "Application status found successfully", "data": APPLICATIONS})
+        self.openapi = OPENAPI_YAML
         self.bodies = {}
 
     def __call__(self, request):
+        if request.method == "GET":
+            return self._serve_openapi(request)
         action = request.url.path.rsplit("/", 1)[-1]
         self.bodies[action] = json.loads(request.content)
         answer = getattr(self, action)
@@ -59,12 +85,22 @@ class FakeAdapter:
             return answer
         return httpx.Response(200, json=answer)
 
+    def _serve_openapi(self, request):
+        assert str(request.url) == OPERATION_REF.split("#")[0]
+        if isinstance(self.openapi, Exception):
+            raise self.openapi
+        if isinstance(self.openapi, httpx.Response):
+            return self.openapi
+        return httpx.Response(200, text=self.openapi)
+
 
 @pytest.fixture
 def adapter(monkeypatch):
     monkeypatch.setenv("OAN_ADAPTER_URL", "http://adapter.test/consumer")
     monkeypatch.setenv("OAN_NETWORK_ID", "oan.test")
     monkeypatch.setattr(smam, "lf_update_current_observation", lambda **kwargs: None)
+    monkeypatch.setattr(provider_openapi, "_OPENAPI_CACHE", {})
+    monkeypatch.delenv("PROVIDER_OPENAPI_URL_REWRITE", raising=False)
     fake = FakeAdapter()
     real_client = httpx.AsyncClient
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(fake), **kwargs))
@@ -123,9 +159,11 @@ def test_status_sends_only_the_cleaned_search_value_against_the_published_offer(
     _check(value="+91 99999 99999")
     commitment = adapter.bodies["status"]["message"]["contract"]["commitments"][0]
     attributes = commitment["commitmentAttributes"]
-    assert attributes["searchValue"] == "9999999999"
+    assert attributes["SearchValue"] == "9999999999"
     assert "searchType" not in attributes
-    assert attributes["@type"] == "openagrinet:SchemeApplication" and attributes["scheme"] == {"code": "SMAM"}
+    # The scheme the catalog published, not the tool's fallback: a resource that names itself wins.
+    assert attributes["@type"] == "openagrinet:SchemeApplication"
+    assert attributes["scheme"] == RESOURCE["resourceAttributes"]["scheme"]
     assert attributes["@context"].endswith("/SchemeApplication/v0.2/context.jsonld")
     assert commitment["offer"]["id"] == "off:smam:benefits" and commitment["offer"]["provider"] == PROVIDER
 
@@ -167,7 +205,7 @@ def test_invalid_mobile_is_refused_without_a_call(adapter):
 
 def test_application_number_with_letters_is_sent_as_given(adapter):
     _check(search_type="application_no", value=" MH/2024/12 ")
-    assert adapter.bodies["status"]["message"]["contract"]["commitments"][0]["commitmentAttributes"]["searchValue"] == "MH/2024/12"
+    assert adapter.bodies["status"]["message"]["contract"]["commitments"][0]["commitmentAttributes"]["SearchValue"] == "MH/2024/12"
 
 
 def test_resource_without_a_published_offer_is_not_used(adapter):

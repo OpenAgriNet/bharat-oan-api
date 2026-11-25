@@ -23,7 +23,35 @@ BARLEY = "6624d7a75dce468bfe6e1ed2"
 LAT, LON = 22.085, 79.55
 
 
-def _openapi(schema_name, query):
+# The variables each capability declares, as the published contracts do: which
+# held value fills each one, and the limit/skip/locale v1 hardcoded as defaults.
+SOIL_VARIABLES = """
+          required: [phone, cycle]
+          properties:
+            cycle: {type: string, x-oan-from: report.cycle}
+            phone: {type: string, x-oan-from: subject.mobile}
+            limit: {type: integer, default: 1}
+            skip: {type: integer, default: 0}
+            locale: {type: string, x-oan-from: subject.language, default: en}
+"""
+ADVICE_VARIABLES = """
+          required: [state, results, crops, naturalFarming]
+          properties:
+            state: {type: string, x-oan-from: subject.state}
+            results:
+              type: object
+              x-oan-from: soil.results
+              properties:
+                n: {}
+                p: {}
+                k: {}
+                OC: {}
+            crops: {type: array, items: {type: string}, x-oan-from: crop.ids}
+            naturalFarming: {type: boolean, x-oan-from: farming.natural}
+"""
+
+
+def _openapi(schema_name, query, variables):
     return f"""
 openapi: 3.1.1
 paths:
@@ -38,15 +66,18 @@ components:
   schemas:
     {schema_name}:
       type: object
+      required: [query, variables]
       properties:
         query: {{const: '{query}'}}
-        variables: {{type: object}}
+        variables:
+          type: object
+{variables}
 """
 
 
 OPENAPI = {
-    SOIL_REF.split("#")[0]: _openapi("GfrSoilRequest", SOIL_QUERY),
-    ADVICE_REF.split("#")[0]: _openapi("GfrAdviceRequest", ADVICE_QUERY),
+    SOIL_REF.split("#")[0]: _openapi("GfrSoilRequest", SOIL_QUERY, SOIL_VARIABLES),
+    ADVICE_REF.split("#")[0]: _openapi("GfrAdviceRequest", ADVICE_QUERY, ADVICE_VARIABLES),
 }
 
 

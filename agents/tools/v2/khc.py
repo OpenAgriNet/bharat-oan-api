@@ -76,13 +76,16 @@ from agents.tools.v2.aif import (
     build_context,
     commitment_attributes,
     commitment_envelope,
+    grievance_context,
+    pack_attributes,
+    post_action,
+    provider_fields,
     support_channel,
     support_envelope,
-    grievance_context,
-    post_action,
     _first_resource,
     _unusable,
 )
+from agents.tools.v2.provider_openapi import From
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.utils import get_logger, to_ascii_digits
 
@@ -326,15 +329,20 @@ def _transaction(ctx: RunContext[FarmerContext], mobile: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_URL, f"khc:{ctx.deps.session_id}:{mobile}"))
 
 
-def _attributes(found: Dict[str, Any], **extra: Any) -> Dict[str, Any]:
+async def _attributes(
+    found: Dict[str, Any], action: str, held: Dict[str, Any]
+) -> Dict[str, Any]:
+    """The commitment attributes for ``action``, its fields read off the
+    contract the catalog names and filled from what the caller holds."""
     scheme = published_scheme(found)
-    return {
-        "@context": grievance_context(),
-        "@type": GRIEVANCE_TYPE,
-        "informationMode": "OnDemand",
-        "scheme": {"code": scheme.get("code", ""), "name": scheme.get("name", "")},
-        **extra,
-    }
+    return pack_attributes(
+        found,
+        await provider_fields(found, action, held, _WHO),
+        grievance_context(),
+        GRIEVANCE_TYPE,
+        informationMode="OnDemand",
+        scheme={"code": scheme.get("code", ""), "name": scheme.get("name", "")},
+    )
 
 
 def _explain(response: httpx.Response, what: str) -> str:
@@ -375,7 +383,7 @@ async def initiate_khc_otp(ctx: RunContext[FarmerContext], mobile_number: str = 
         "init",
         _transaction(ctx, mobile),
         DRAFT,
-        _attributes(found, farmerMobileNumber=mobile),
+        await _attributes(found, "init", {From.MOBILE: mobile}),
         _OFFER,
         found,
     )
@@ -424,11 +432,7 @@ async def verify_khc_otp(
         "confirm",
         _transaction(ctx, mobile),
         ACTIVE,
-        _attributes(
-            found,
-            farmerMobileNumber=mobile,
-            challenge={"response": {"method": "OTP", "value": code}},
-        ),
+        await _attributes(found, "confirm", {From.MOBILE: mobile, From.OTP: code}),
         _OFFER,
         found,
     )
@@ -756,7 +760,7 @@ async def _send_status_otp(ctx: RunContext[FarmerContext], number: str) -> str:
         "select",
         _status_transaction(ctx, number),
         DRAFT,
-        _attributes(found, case={"ticketNo": number}),
+        await _attributes(found, "select", {From.GRIEVANCE_ID: number}),
         _OFFER,
         found,
     )
@@ -784,11 +788,7 @@ async def _read_status(ctx: RunContext[FarmerContext], number: str, code: str) -
         "status",
         _status_transaction(ctx, number),
         ACTIVE,
-        _attributes(
-            found,
-            case={"ticketNo": number},
-            challenge={"response": {"method": "OTP", "value": code}},
-        ),
+        await _attributes(found, "status", {From.GRIEVANCE_ID: number, From.OTP: code}),
         _OFFER,
         found,
     )
@@ -974,33 +974,25 @@ async def register_khc_grievance(
             {"mobile": mobile, "text": grievance_text.strip(), "ids": list(ids)}, sort_keys=True
         ),
     )
-    grievance = {
-        "description": grievance_text.strip(),
-        "language": farmer_language,
-        "division": division_id,
-        "category": {"code": str(problem_category_id)},
-        "subCategory": {"code": str(problem_subcategory_id)},
-    }
-    extra: Dict[str, Any] = {
-        "referenceNo": f"BV-{reference}",
-        "farmerMobileNumber": mobile,
-        "grievance": grievance,
-        "location": {"stateId": state_id, "villageId": village_id},
+    held: Dict[str, Any] = {
+        From.REFERENCE: f"BV-{reference}",
+        From.MOBILE: mobile,
+        From.GRIEVANCE_TEXT: grievance_text.strip(),
+        From.LANGUAGE: farmer_language,
+        From.STATE: state_id,
+        From.VILLAGE: village_id,
+        From.DIVISION: division_id,
+        From.CATEGORY: problem_category_id,
+        From.SUB_CATEGORY: problem_subcategory_id,
+        # The scheme resolved from KHC's own list, not the catalog's: a farmer
+        # may be filing against a scheme this resource advertises nothing about.
+        From.SCHEME: scheme_id,
     }
     if farmer_type == "new":
-        extra["applicantName"] = farmer_name.strip()
-        extra["applicantGender"] = gender
+        held[From.NAME] = farmer_name.strip()
+        held[From.GENDER] = gender
 
-    attributes = _attributes(found, **extra)
-    # The scheme on the filing is the one resolved from KHC's own list, not the
-    # catalog's, because a farmer may be filing against a scheme this resource
-    # advertises nothing about. The catalog's name is only carried when it is
-    # that same scheme -- otherwise it would label one scheme's code with
-    # another scheme's name.
-    advertised = published_scheme(found)
-    attributes["scheme"] = {"code": str(scheme_id)}
-    if str(advertised.get("code", "")) == str(scheme_id) and advertised.get("name"):
-        attributes["scheme"]["name"] = advertised["name"]
+    attributes = await _attributes(found, "support", held)
 
     # support carries its payload on channels, not on a contract: SupportAction
     # admits a support object and nothing else.

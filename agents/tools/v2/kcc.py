@@ -58,16 +58,18 @@ from agents.tools.v2.aif import (
     commitment_attributes,
     commitment_envelope,
     numeric,
+    pack_attributes,
     post_action,
     scheme_application_context,
     SCHEME_APPLICATION_TYPE,
 )
 from agents.tools.v2.provider_openapi import (
+    FieldSpec,
+    From,
     SchemaUnavailable,
     VALUE_SOURCE,
-    openapi_document,
-    operation_ref,
-    request_schema,
+    filled_fields,
+    request_fields,
 )
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
@@ -81,14 +83,6 @@ SOURCE_LINE = "**Source:** Kisan Rin Portal"
 # so @type alone reaches the wrong scheme -- and everything else about the
 # capability comes off the discover answer.
 _LOAN_CODE = "kcc-loan"
-
-# The three values this module has to offer, named as the spec names them.
-# A field hinted with one of these gets it; a field hinted with anything else
-# is one only a newer release can fill, and saying so is better than sending a
-# body KCC will refuse.
-_FROM_MOBILE = "subject.mobile"
-_FROM_OTP = "challenge.otp"
-_FROM_SESSION = "session"
 
 UNAVAILABLE = "The KCC system cannot be reached right now. Please try again in a few minutes."
 NEED_MOBILE = "Ask the farmer for the 10-digit mobile number they used for their KCC application."
@@ -213,19 +207,9 @@ def _otp_length(found: Dict[str, Any]) -> int:
 # The provider's own request fields
 # --------------------------------------------------------------------------------------
 
-async def _request_attributes(found: Dict[str, Any], action: str) -> Dict[str, Any]:
+async def _request_attributes(found: Dict[str, Any], action: str) -> Dict[str, FieldSpec]:
     """What this action's call has to carry, read from the contract the catalog names."""
-    resource = found["resource"]
-    url, _, pointer = operation_ref(resource, action).partition("#")
-    try:
-        schema = request_schema(await openapi_document(url), pointer)
-    except SchemaUnavailable as e:
-        raise SchemaUnavailable(f"{url}: {e}") from e
-    logger.info(
-        f"KCC v2 {action} request fields from {url}: "
-        f"{ {name: prop.get(VALUE_SOURCE) or ('fixed' if 'const' in prop else 'unhinted') for name, prop in schema['properties'].items()} }"
-    )
-    return schema
+    return await request_fields(found["resource"], action)
 
 
 async def _session_field(found: Dict[str, Any]) -> str:
@@ -235,68 +219,25 @@ async def _session_field(found: Dict[str, Any]) -> str:
     the call that spends it, and both actions are in the one document the
     catalog points at, so asking costs nothing extra.
     """
-    schema = await _request_attributes(found, "status")
-    for name, prop in schema["properties"].items():
-        if prop.get(VALUE_SOURCE) == _FROM_SESSION:
+    for name, spec in (await _request_attributes(found, "status")).items():
+        if spec.hint == From.SESSION:
             return name
     raise SchemaUnavailable(
-        f"{found['resource'].get('id')} status declares no {VALUE_SOURCE}: {_FROM_SESSION} field"
+        f"{found['resource'].get('id')} status declares no {VALUE_SOURCE}: {From.SESSION} field"
     )
 
 
-def _as_declared(value: Any, prop: Dict[str, Any]) -> Any:
-    """``value`` in the JSON type the field is declared as.
-
-    KCC's OTP is the reason this exists: the contract says integer and the
-    quoted form is refused, and the farmer reads the code out as text.
-    """
-    declared = prop.get("type")
-    types = (declared,) if isinstance(declared, str) else tuple(declared or ())
-    try:
-        if "integer" in types:
-            return int(value)
-        if "number" in types:
-            return float(value)
-    except (TypeError, ValueError):
-        logger.warning(f"KCC v2 could not read {value!r} as {types}; sending it as given")
-        return value
-    return str(value) if "string" in types else value
-
-
-def _filled(schema: Dict[str, Any], held: Dict[str, str]) -> Tuple[Dict[str, Any], List[str]]:
-    """The request fields to send, and the required ones nothing here can fill."""
-    attributes: Dict[str, Any] = {}
-    unfillable: List[str] = []
-    for name, prop in schema["properties"].items():
-        if "const" in prop:
-            attributes[name] = prop["const"]
-            continue
-        source = prop.get(VALUE_SOURCE)
-        value = held.get(source) if source else None
-        if value in (None, ""):
-            if name in schema["required"]:
-                unfillable.append(f"{name} (wants {source or 'no ' + VALUE_SOURCE + ' hint'})")
-            continue
-        attributes[name] = _as_declared(value, prop)
-    return attributes, unfillable
-
-
 def _attributes(found: Dict[str, Any], fields: Dict[str, Any]) -> Dict[str, Any]:
-    """The commitment attributes: what the pack identifies the payload as, what
-    the catalog says the resource is, and the provider's own fields filled in.
-
-    The names are KCC's own, so the mapping hands them straight to KCC rather
-    than translating a second set of names nobody else uses.
-    """
-    published = found["resource"].get("resourceAttributes") or {}
-    attributes = {
-        "@context": published.get("@context") or scheme_application_context(),
-        "@type": published.get("@type") or SCHEME_APPLICATION_TYPE,
-    }
-    for echoed in ("informationMode", "scheme"):
-        if published.get(echoed):
-            attributes[echoed] = published[echoed]
-    return {**attributes, **fields}
+    """The commitment attributes for a KCC call. The same pack shape AIF builds,
+    so one change of mind about the envelope is one change of code."""
+    return pack_attributes(
+        found,
+        fields,
+        scheme_application_context(),
+        SCHEME_APPLICATION_TYPE,
+        informationMode=None,
+        scheme=None,
+    )
 
 
 def _remember(store: Dict[str, Tuple[Any, float]], key: str, value: Any, ttl: int) -> None:
@@ -480,8 +421,8 @@ async def initiate_kcc_otp(ctx: RunContext[FarmerContext], mobile_number: str) -
             logger.warning("KCC v2 discover found no loan catalog")
             return UNAVAILABLE
 
-        fields, unfillable = _filled(
-            await _request_attributes(found, "init"), {_FROM_MOBILE: mobile}
+        fields, unfillable = filled_fields(
+            await _request_attributes(found, "init"), {From.MOBILE: mobile}
         )
         if unfillable:
             logger.error(f"KCC v2 cannot fill the init contract: {unfillable}")
@@ -581,9 +522,9 @@ async def check_kcc_application_status(
         if len(otp_clean) != length:
             return need_otp(length)
 
-        fields, unfillable = _filled(
+        fields, unfillable = filled_fields(
             await _request_attributes(found, "status"),
-            {_FROM_MOBILE: mobile, _FROM_OTP: otp_clean, _FROM_SESSION: request_id},
+            {From.MOBILE: mobile, From.OTP: otp_clean, From.SESSION: request_id},
         )
         if unfillable:
             logger.error(f"KCC v2 cannot fill the status contract: {unfillable}")

@@ -32,9 +32,20 @@ components:
   schemas:
     ShcReportRequest:
       type: object
+      required: [query, variables]
       properties:
         query: {{const: '{QUERY}'}}
-        variables: {{type: object}}
+        # The variables SHC's published contract declares: which held value fills
+        # each one, and the page size and locale v1 hardcoded as defaults.
+        variables:
+          type: object
+          required: [phone, cycle]
+          properties:
+            phone: {{type: string, x-oan-from: subject.mobile}}
+            cycle: {{type: string, x-oan-from: report.cycle}}
+            locale: {{type: string, x-oan-from: subject.language, default: en}}
+            limit: {{type: integer, default: 10}}
+            skip: {{type: integer, default: 0}}
 """
 PROVIDER = {"id": "shc", "descriptor": {"code": "SHC", "name": "Soil Health Card"}}
 RESOURCE = {

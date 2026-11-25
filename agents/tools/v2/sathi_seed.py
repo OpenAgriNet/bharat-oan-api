@@ -21,6 +21,7 @@ from agents.tools.sathi_seed import (
 )
 from agents.tools.v2.provider_openapi import (
     FieldSpec,
+    From,
     SchemaUnavailable,
     request_fields,
     rewritten_url,
@@ -58,8 +59,10 @@ _UNREACHABLE = "Could not reach seed availability service. Please try again late
 _UNEXPECTED = "Unexpected error while fetching seed availability. Please try again later."
 
 
-# What each SATHI request field means, until the spec carries x-oan-from hints.
-_FIELD_MEANINGS = {"cropCode": "crop", "stateCode": "State", "districtCode": "District"}
+# Which coverage area answers a request field, by what the contract says the
+# field is for. SATHI's own field names are never written here: the contract
+# names them, and this says only where a state and a district come from.
+_AREA_FOR = {From.STATE: "State", From.DISTRICT: "District"}
 
 _JSON_TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "object": dict, "array": list}
 
@@ -229,11 +232,13 @@ def _crop_list_text(resource: dict) -> str:
 
 
 def _what_to_put(name: str, spec: FieldSpec, resource: dict) -> str:
-    meaning = _FIELD_MEANINGS.get(name)
-    if meaning == "crop":
+    """What to tell the model to put in one request field, from the contract's
+    own hint about what the field is for."""
+    if spec.hint == From.CROP_CODE:
         return "the code from the crop list above for the farmer's crop"
-    if meaning:
-        area = _area(resource, meaning)
+    area_kind = _AREA_FOR.get(spec.hint)
+    if area_kind:
+        area = _area(resource, area_kind)
         return f"{area.get('areaCode')} ({area.get('areaName')})"
     logger.info(f"SATHI seed v2 has no hint for request field {name}; listing its type only")
     return f"a value of type {' or '.join(spec.types) or 'any'}"
@@ -287,11 +292,11 @@ def _checked_value(name: str, value: Any, spec: FieldSpec, resource: dict):
     if not _has_type(value, spec.types):
         logger.info(f"SATHI seed v2 refused {name} {value!r}: expected {spec.types}")
         return None, f"{name} must be {' or '.join(spec.types)}, not {type(value).__name__}"
-    meaning = _FIELD_MEANINGS.get(name)
-    if meaning == "crop":
+    if spec.hint == From.CROP_CODE:
         return _checked_crop(name, value, resource)
-    if meaning:
-        return _checked_area_code(name, value, _area(resource, meaning))
+    area_kind = _AREA_FOR.get(spec.hint)
+    if area_kind:
+        return _checked_area_code(name, value, _area(resource, area_kind))
     return value, None
 
 
@@ -332,9 +337,14 @@ def _fix_fields_text(problems: List[str]) -> str:
     )
 
 
-def _crop_code(request: dict) -> str:
-    crop_fields = [name for name, meaning in _FIELD_MEANINGS.items() if meaning == "crop"]
-    return next((str(request[name]) for name in crop_fields if name in request), "")
+def _crop_code(request: dict, specs: Dict[str, FieldSpec]) -> str:
+    """The crop the search was for, found by what the contract says each field
+    is for rather than by SATHI's name for it."""
+    return next(
+        (str(request[name]) for name, spec in specs.items()
+         if spec.hint == From.CROP_CODE and name in request),
+        "",
+    )
 
 
 def _select_body(found: Dict[str, Any], request_fields: dict, transaction_id: str) -> dict:
@@ -497,13 +507,14 @@ async def search_sathi_seed_availability(
             return reply
 
         resource = district["resource"]
-        request, problems = _prepare_request(fields or {}, await _field_specs(resource), resource)
+        specs = await _field_specs(resource)
+        request, problems = _prepare_request(fields or {}, specs, resource)
         if problems:
             logger.info(f"SATHI seed v2 sent no select for {resource.get('id')}: {problems}")
             return _fix_fields_text(problems)
 
         logger.info(f"SATHI seed v2 selecting {resource.get('id')} with fields {sorted(request)}")
         on_select = await _post("select", _select_body(district, request, transaction_id))
-        return _render_answer(_sathi_answer(on_select), _location_label(resource), _crop_code(request))
+        return _render_answer(_sathi_answer(on_select), _location_label(resource), _crop_code(request, specs))
     except Exception as e:
         return _transport_failure_text(e)

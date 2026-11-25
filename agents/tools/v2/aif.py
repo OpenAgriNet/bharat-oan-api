@@ -43,6 +43,7 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from agents.tools.pmkisan_scheme_status import generate_transaction_id
 from app.config import DEFAULT_HTTP_TIMEOUT
+from agents.tools.v2.provider_openapi import From, SchemaUnavailable, filled_for
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
 
@@ -391,28 +392,68 @@ def numeric(value: str) -> str:
     return cleaned if re.fullmatch(r"\d+", cleaned) else ""
 
 
-def scheme_attributes(beneficiary_id: str, **extra: Any) -> Dict[str, Any]:
-    """The SchemeApplication container. beneficiaryId is a STRING on the wire:
-    the adapter's session binding compares strings, and the mapping casts it to
-    the integer AIF wants."""
-    return {
-        "@context": scheme_application_context(),
-        "@type": SCHEME_APPLICATION_TYPE,
-        "informationMode": "OnDemand",
-        "scheme": dict(SCHEME),
-        "beneficiaryId": beneficiary_id,
-        **extra,
+def pack_attributes(
+    found: Dict[str, Any],
+    fields: Dict[str, Any],
+    context: str,
+    resource_type: str,
+    **echoed: Any,
+) -> Dict[str, Any]:
+    """The commitment attributes: what the pack identifies the payload as, what
+    the catalog says the resource is, and the provider's own fields filled in.
+
+    The field names are the provider's own, so the mapping hands them straight
+    on rather than translating a second set of names nobody else uses. Each
+    keyword in ``echoed`` is taken from the catalog where it publishes one, and
+    falls back to what is passed, so a resource that names its own scheme wins.
+    """
+    published = found["resource"].get("resourceAttributes") or {}
+    attributes = {
+        "@context": published.get("@context") or context,
+        "@type": published.get("@type") or resource_type,
     }
+    for name, fallback in echoed.items():
+        value = published.get(name) or fallback
+        if value:
+            attributes[name] = value
+    return {**attributes, **fields}
 
 
-def grievance_attributes(beneficiary_id: str) -> Dict[str, Any]:
-    return {
-        "@context": grievance_context(),
-        "@type": GRIEVANCE_TYPE,
-        "informationMode": "OnDemand",
-        "scheme": dict(SCHEME),
-        "beneficiaryId": beneficiary_id,
-    }
+async def provider_fields(
+    found: Dict[str, Any], action: str, held: Dict[str, Any], who: str
+) -> Dict[str, Any]:
+    """``action``'s request fields filled from ``held``, read off the catalog's operationRef.
+
+    Raises SchemaUnavailable naming the fields nothing held can fill, so a
+    contract this release cannot satisfy stops the call instead of sending a
+    short body for the provider to refuse.
+    """
+    fields, unfillable = await filled_for(found["resource"], action, held)
+    if unfillable:
+        raise SchemaUnavailable(f"{who} {action} cannot be filled: {unfillable}")
+    return fields
+
+
+async def scheme_attributes(found: Dict[str, Any], action: str, held: Dict[str, Any]) -> Dict[str, Any]:
+    return pack_attributes(
+        found,
+        await provider_fields(found, action, held, "AIF"),
+        scheme_application_context(),
+        SCHEME_APPLICATION_TYPE,
+        informationMode="OnDemand",
+        scheme=dict(SCHEME),
+    )
+
+
+async def grievance_attributes(found: Dict[str, Any], held: Dict[str, Any]) -> Dict[str, Any]:
+    return pack_attributes(
+        found,
+        await provider_fields(found, "status", held, "AIF"),
+        grievance_context(),
+        GRIEVANCE_TYPE,
+        informationMode="OnDemand",
+        scheme=dict(SCHEME),
+    )
 
 
 def clean_otp(otp: str) -> str:
@@ -540,7 +581,7 @@ async def initiate_aif_otp(ctx: RunContext[FarmerContext], beneficiary_id: str) 
             "init",
             transaction_id,
             DRAFT,
-            scheme_attributes(beneficiary_id),
+            await scheme_attributes(found, "init", {From.BENEFICIARY: beneficiary_id}),
             _LOAN_OFFER,
             found,
         )
@@ -615,9 +656,8 @@ async def verify_aif_otp(
             "init",
             transaction_id,
             DRAFT,
-            scheme_attributes(
-                beneficiary_id,
-                challenge={"response": {"method": "OTP", "value": otp_clean}},
+            await scheme_attributes(
+                found, "init", {From.BENEFICIARY: beneficiary_id, From.OTP: otp_clean}
             ),
             _LOAN_OFFER,
             found,
@@ -685,8 +725,10 @@ async def check_aif_loan_status(
             "status",
             transaction_id,
             ACTIVE,
-            scheme_attributes(
-                beneficiary_id, loanApplicationNumber=loan_application_number
+            await scheme_attributes(
+                found,
+                "status",
+                {From.BENEFICIARY: beneficiary_id, From.APPLICATION: loan_application_number},
             ),
             _LOAN_OFFER,
             found,
@@ -744,7 +786,7 @@ async def check_aif_grievance_status(
             "status",
             transaction_id,
             ACTIVE,
-            grievance_attributes(beneficiary_id),
+            await grievance_attributes(found, {From.BENEFICIARY: beneficiary_id}),
             _TICKETS_OFFER,
             found,
         )
