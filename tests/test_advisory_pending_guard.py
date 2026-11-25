@@ -243,6 +243,38 @@ class TestToolIgnoresInventedDetails:
         assert not deps.session_state.get("advisory")  # cleared (an empty section is not saved or shown)
 
 
+class TestQuestionsCarryNoSource:
+    """A question for the farmer is never an answer, so it must never end with a Source line."""
+
+    def test_every_question_result_ends_with_the_no_source_rule(self):
+        questions = [
+            sa.format_details_question(["Rabi"], True, True, "wheat harvest"),
+            sa.format_details_question([], False, True, "wheat harvest"),
+            sa.format_season_suggestion("Kharif", "Wheat", ["Rabi"]),
+            sa.format_location_question("wheat harvest", ', `season`="Rabi"'),
+        ]
+        for question in questions:
+            assert PENDING_MARKER in question
+            assert question.rstrip().endswith(sa.NO_SOURCE_ON_QUESTION.strip())
+            assert "must not contain the word" in question
+
+    def test_advice_results_do_not_carry_the_rule(self):
+        advice = sa.format_search_notes({"has_day_range": "false"}, None)
+        assert "must not contain the word" not in advice
+
+
+class TestQuestionsTellModelToPassAnswersAgain:
+    def test_location_and_details_questions_say_to_pass_season_and_days_again(self):
+        from agents.tools import advisory as sa
+
+        for out in (
+            sa.format_location_question("wheat aphids"),
+            sa.format_location_question("wheat aphids", ', `season`="Rabi"'),
+            sa.format_details_question(["Rabi"], True, True, "wheat aphids"),
+        ):
+            assert "keeps no memory" in out and "`days_after_sowing`" in out
+
+
 class TestPlaceGuards:
     from helpers.advisory_pending import LOCATION_MARKER  # noqa: E402
 

@@ -185,7 +185,7 @@ configured: the farmer's own season is used (see the flow's season question).
 
 `skills/crop/advice/flow.md` contains the common workflow included by all 13
 localized crop prompts. After the existing generic/personalised and crop-field
-prerequisites, search ICAR–Kisan Sarathi (`search_advisory`) **first**, then check
+prerequisites, search institute advisories such as ICAR–Kisan Sarathi (`search_advisory`) **first**, then check
 `search_documents` for the same question, including when ICAR returned an advisory.
 Prefer relevant ICAR guidance and use documents for supporting details or when ICAR
 has no relevant result. Cite whichever sources actually support the answer. The
