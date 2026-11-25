@@ -56,9 +56,7 @@ logger = get_logger(__name__)
 
 KNOWLEDGE_ADVISORY_CATEGORY = "knowledge-advisory"
 
-# Source shown to the farmer for advisories from Kisan Sarathi.
-ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
-# The provider's `origin` for an advisory PDF uploaded in docs-pipeline; those cite the PDF's name.
+# The provider's `origin` for an advisory uploaded in docs-pipeline.
 PDF_ADVISORY_ORIGIN = "docs-pipeline"
 # Crop of the coffee PDF advisories. They carry no season, sowing stage or place, so they are answered at once.
 COFFEE_CROP = "coffee"
@@ -240,7 +238,8 @@ def _advisory_result_from_hit(hit: Dict[str, Any], score: float, crop: str) -> O
     place = hit.get("advisory") if isinstance(hit.get("advisory"), dict) else {}
     crop_keys = hit.get("crop_keys") if isinstance(hit.get("crop_keys"), list) else []
     return {
-        "title": str(hit.get("title_en") or hit.get("name_en") or hit.get("title") or "").strip(),
+        "title": str(hit.get("title_en") or hit.get("name_en") or hit.get("title")
+                     or hit.get("name") or hit.get("filename") or "").strip(),
         "crop": crop or (str(crop_keys[0]) if crop_keys else ""),
         "section": str(hit.get("section") or "").strip().lower(),
         "score": score,
@@ -280,29 +279,20 @@ def _same_words(a: str, b: str) -> bool:
 _TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
 
 
-def advisory_source(result: Dict[str, Any]) -> str:
-    """Source to cite for one advisory: the PDF's name for an uploaded PDF, else ADVISORY_SOURCE."""
-    if result.get("origin") == PDF_ADVISORY_ORIGIN and result.get("title"):
-        return result["title"]
-    return ADVISORY_SOURCE
-
-
 def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
-    """Readable block per advisory for the agent.
-
-    The provider appends "Source: institute, creator" to each text. That line names the
-    institute and a user name, so it is removed here; the answer cites advisory_source instead.
-    """
+    """Format passages with document attribution from the index."""
     blocks = []
-    for r in results:
-        text = _TRAILING_SOURCE.sub("", r["text"]).rstrip()
-        blocks.append(f"**{r.get('title') or 'Advisory'}**\n```\n{text}\n```")
-    sources = list(dict.fromkeys(advisory_source(r) for r in results))
-    return (
-        "> Advisory Search Results for `" + query + "`\n\n"
-        + "\n\n----\n\n".join(blocks)
-        + f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
-    )
+    sources = {}
+    for result in results:
+        title = result.get("title", "").strip()
+        text = _TRAILING_SOURCE.sub("", result["text"]).rstrip()
+        blocks.append(f"**{title or 'Advisory'}**\n```\n{text}\n```")
+        if title:
+            sources.setdefault(title, None)
+    formatted = f"> Advisory Search Results for `{query}`\n\n" + "\n\n----\n\n".join(blocks)
+    if sources:
+        formatted += f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
+    return formatted
 
 
 def _places_of(result: Dict[str, Any]) -> str:

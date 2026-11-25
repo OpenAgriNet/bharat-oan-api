@@ -63,7 +63,8 @@ def test_prompt_has_the_search_first_advisory_flow(path):
     assert "Never take it from the browser coordinates" in flow
     assert "the very first line of your answer" in flow and "add nothing from your own knowledge" in flow
     assert "call `search_advisory` again with the same `query`" in flow
-    assert "**Source: ICAR - Kisan Sarathi**" in flow
+    assert "document title from the tool’s `Cite as` line" in flow
+    assert "ICAR" not in flow
     assert "`crop=\"Wheat\"`, `days_after_sowing=40`" in flow
     assert "never put season names in brackets" in flow
     assert "the farmer decides" in flow
