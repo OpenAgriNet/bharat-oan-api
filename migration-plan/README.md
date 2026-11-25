@@ -15,6 +15,7 @@ migration-plan/
 ├── sathi/
 ├── shc/
 ├── gfr/
+├── smam/
 ├── aif/
 └── kcc/
 ```
@@ -34,10 +35,11 @@ place -- read that first when picking a capability back up.
 | SATHI seed availability | **Built, verified end to end locally** — [plan](sathi/plan.md) · [try it](sathi/quick-try.md) · [open TODOs](sathi/plan.md#open-todos) |
 | Soil Health Card | **Built, verified end to end locally** — [plan](shc/plan.md) · [try it](shc/quick-try.md) · [open TODOs](shc/plan.md#open-todos) |
 | GFR fertilizer recommendation | **Built, verified end to end locally** — [plan](gfr/plan.md) · [try it](gfr/quick-try.md) · [open TODOs](gfr/plan.md#open-todos) |
+| SMAM application status | **Built, verified end to end locally** — [plan](smam/plan.md) · [try it](smam/quick-try.md) · [open TODOs](smam/plan.md#open-todos) |
 | AIF — loan status + grievance status | **Built, catalog published, discoverable; proven against a mock only** — [plan](aif/plan.md) · [try it](aif/quick-try.md) · [open items](aif/plan.md#open-items) |
 | KCC — credit card application status | **Built, catalog published, discoverable; proven against a mock only** — [plan](kcc/plan.md) · [try it](kcc/quick-try.md) · [open items](kcc/plan.md#open-items) |
 | KHC — grievance registration + status | **Built, proven against a mock only** — five actions on one binding, filing and status both ride the network — [plan](khc/plan.md) · [try it](khc/quick-try.md) · [open items](khc/plan.md#open-items) |
-| The other six Beckn tools | Not started — `advisory`, `agristack`, `amul_vistaar`, `maha_vistaar`, `smam_scheme_status`, `search`. All reach a provider through `BAP_ENDPOINT`, so all are migration targets |
+| The other five Beckn tools | Not started — `advisory`, `agristack`, `amul_vistaar`, `maha_vistaar`, `search`. All reach a provider through `BAP_ENDPOINT`, so all are migration targets |
 | Six tools that are not migration targets | `imd_advisory` reads its own database, `maps` calls Photon, and `chat_place`, `commodity`, `ffs` and `terms` make no provider call at all. None of them touches Beckn, so there is nothing to move |
 
 Cutting across all of them: the scheme tools used to carry the provider and
