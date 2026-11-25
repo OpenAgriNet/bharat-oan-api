@@ -20,11 +20,11 @@ from agents.tools.sathi_seed import (
     _seed_availability_data_not_available_response,
 )
 from agents.tools.v2.provider_openapi import (
+    FieldSpec,
     SchemaUnavailable,
-    openapi_document,
-    request_schema,
+    request_fields,
     rewritten_url,
-    select_operation_ref,
+    select_fields,
 )
 from app.config import DEFAULT_HTTP_TIMEOUT
 from helpers.langfuse_tracing import lf_update_current_observation
@@ -64,43 +64,8 @@ _FIELD_MEANINGS = {"cropCode": "crop", "stateCode": "State", "districtCode": "Di
 _JSON_TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "object": dict, "array": list}
 
 
-@dataclass(frozen=True)
-class FieldSpec:
-    # model: the model fills it; const: fixed by the spec; adapter: the adapter fills it, so it is never sent.
-    source: str
-    required: bool
-    types: Tuple[str, ...] = ()
-    value: Any = None
-
-
-def _field_source(prop: dict) -> str:
-    if "const" in prop:
-        return "const"
-    return "adapter" if prop.get("writeOnly") else "model"
-
-
-def _field_types(prop: dict) -> Tuple[str, ...]:
-    declared = prop.get("type")
-    return (declared,) if isinstance(declared, str) else tuple(declared or ())
-
-
-def select_fields(resource: dict, schema: dict) -> Dict[str, FieldSpec]:
-    """Who fills each request field. ``resource`` is where x-oan-from hints will read values from later."""
-    required = set(schema.get("required") or [])
-    return {
-        name: FieldSpec(_field_source(prop), name in required, _field_types(prop), prop.get("const"))
-        for name, prop in schema["properties"].items()
-    }
-
-
 async def _field_specs(resource: dict) -> Dict[str, FieldSpec]:
-    url, _, pointer = select_operation_ref(resource).partition("#")
-    try:
-        specs = select_fields(resource, request_schema(await openapi_document(url), pointer))
-    except SchemaUnavailable as e:
-        raise SchemaUnavailable(f"{url}: {e}") from e
-    logger.info(f"SATHI seed v2 request fields from {url}: { {n: f.source for n, f in specs.items()} }")
-    return specs
+    return await request_fields(resource, "select")
 
 
 def _adapter_url(action: str) -> str:

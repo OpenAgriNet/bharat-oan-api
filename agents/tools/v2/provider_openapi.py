@@ -2,6 +2,7 @@
 Shared by the v2 tools whose request follows the provider's own fields."""
 import os
 import time
+from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
 import httpx
@@ -29,6 +30,35 @@ REQUEST_ATTRIBUTES = "x-oan-request-attributes"
 
 class SchemaUnavailable(Exception):
     """The operation's request schema could not be fetched or read."""
+
+
+@dataclass(frozen=True)
+class FieldSpec:
+    # model: the model fills it; const: fixed by the spec; adapter: the adapter fills it, so it is never sent.
+    source: str
+    required: bool
+    types: Tuple[str, ...] = ()
+    value: Any = None
+
+
+def _field_source(prop: dict) -> str:
+    if "const" in prop:
+        return "const"
+    return "adapter" if prop.get("writeOnly") else "model"
+
+
+def _field_types(prop: dict) -> Tuple[str, ...]:
+    declared = prop.get("type")
+    return (declared,) if isinstance(declared, str) else tuple(declared or ())
+
+
+def select_fields(resource: dict, schema: dict) -> Dict[str, FieldSpec]:
+    """Who fills each request field. ``resource`` is where x-oan-from hints will read values from later."""
+    required = set(schema.get("required") or [])
+    return {
+        name: FieldSpec(_field_source(prop), name in required, _field_types(prop), prop.get("const"))
+        for name, prop in schema["properties"].items()
+    }
 
 
 def _cache_ttl_seconds() -> float:
@@ -117,23 +147,66 @@ def _flattened(document: dict, schema: Any) -> dict:
     return {**schema, "properties": properties, "required": required}
 
 
+# Transport the adapter fills, not a field a caller supplies.
+_TRANSPORT_PARAMETER_LOCATIONS = ("header", "cookie")
+
+
+def _parameter_fields(document: dict, operation: dict) -> dict:
+    """Query and path parameters read as request fields.
+
+    A GET states its whole input here, and so does a POST whose body is empty,
+    so a reader that looks only at requestBody finds nothing to fill.
+    """
+    properties: Dict[str, Any] = {}
+    required = []
+    for entry in operation.get("parameters") or []:
+        parameter = _resolved(document, entry)
+        if not isinstance(parameter, dict):
+            continue
+        name = parameter.get("name")
+        if not name or parameter.get("in") in _TRANSPORT_PARAMETER_LOCATIONS:
+            continue
+        schema = _resolved(document, parameter.get("schema") or {})
+        prop = dict(schema) if isinstance(schema, dict) else {}
+        if parameter.get("description"):
+            prop["description"] = parameter["description"]
+        properties[name] = prop
+        if parameter.get("required") and name not in required:
+            required.append(name)
+    return {"properties": properties, "required": required}
+
+
 def request_schema(document: dict, pointer: str) -> dict:
     """The request fields of the operation at ``pointer``, with local refs followed.
 
-    x-oan-request-attributes wins over requestBody where it is declared: a
+    x-oan-request-attributes wins over everything else where it is declared: a
     provider that seals its bodies publishes the envelope as its request body,
     and the fields a caller fills are the plaintext inside it.
     """
     operation = _resolved(document, _follow_pointer(document, pointer))
     declared = operation.get(REQUEST_ATTRIBUTES)
     if declared:
-        schema = _flattened(document, declared.get("schema") or {})
-    else:
-        body = _resolved(document, operation.get("requestBody") or {})
-        media = (body.get("content") or {}).get("application/json") or {}
-        schema = _flattened(document, media.get("schema") or {})
+        return _only_if_filled(_flattened(document, declared.get("schema") or {}), pointer)
+
+    body = _resolved(document, operation.get("requestBody") or {})
+    media = (body.get("content") or {}).get("application/json") or {}
+    schema = _flattened(document, media.get("schema") or {})
+    parameters = _parameter_fields(document, operation)
+    return _only_if_filled(
+        {
+            **schema,
+            # A field named in both is the body's -- it carries the fuller declaration.
+            "properties": {**parameters["properties"], **schema["properties"]},
+            "required": parameters["required"]
+            + [name for name in schema["required"] if name not in parameters["required"]],
+        },
+        pointer,
+    )
+
+
+def _only_if_filled(schema: dict, pointer: str) -> dict:
     if not schema["properties"]:
-        raise SchemaUnavailable(f"{pointer} has no JSON request fields")
+        raise SchemaUnavailable(f"{pointer} has no request fields")
     return schema
 
 
@@ -147,3 +220,19 @@ def operation_ref(resource: dict, action: str) -> str:
 
 def select_operation_ref(resource: dict) -> str:
     return operation_ref(resource, "select")
+
+
+async def request_fields(resource: dict, action: str) -> Dict[str, FieldSpec]:
+    """Who fills each request field for ``action``, read from the catalog's own operationRef.
+
+    A discover result and an action in, the provider's field list out. Nothing
+    here knows any provider's field names, so a provider that publishes an
+    OpenAPI needs no tool change to be callable.
+    """
+    url, _, pointer = operation_ref(resource, action).partition("#")
+    try:
+        specs = select_fields(resource, request_schema(await openapi_document(url), pointer))
+    except SchemaUnavailable as e:
+        raise SchemaUnavailable(f"{url}: {e}") from e
+    logger.info(f"{action} request fields from {url}: { {n: f.source for n, f in specs.items()} }")
+    return specs
