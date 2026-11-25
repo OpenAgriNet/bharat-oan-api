@@ -394,7 +394,7 @@ included. Nothing resolved from `mapping-files` except FFS.
 |---|---|
 | Adapter -- full newman suite | 327 assertions, 2 failures, both the SATHI `Select` that fails because SATHI was never registered ([open issue 3](../open-issues.md)). Every registered capability passed |
 | Tools -- 30 direct calls across every v2 provider | 29 returned, 1 raised. The raise was my own fixture calling the **v1** `check_smam_scheme_status` with `phone_number=`; its signature is `(ctx, search_type, search_value)`. Re-run correctly it reaches the network and fails on SMAM having no host -- open issue 3 again |
-| Agent -- 14 farmer sentences through `agrinet_agent.run` | 14/14 ran without raising. Round one used three malformed fixtures and the agent correctly refused them rather than calling a tool; re-run with real ones (`UP926337196`, `9812345670`) all five routed to the right tool |
+| Agent -- 45 multi-turn conversations through `agrinet_agent.run` | **20 of the 30 v2 tools reached**, zero raises. A single sentence only ever reaches the first tool of an OTP-gated pair, so these carry the conversation forward with `message_history` and answer the agent's own follow-ups |
 
 Working end to end through the new URLs, with real data returned: PM-KISAN
 application and grievance status, PMFBY insurance and grievance across
@@ -420,3 +420,119 @@ old mapping source:
 empty discover -- [open issue 30](../open-issues.md). That is why open issue 29
 survived 327 green assertions, and it is the reason the tool and agent layers
 are not optional here.
+
+
+## The agent layer, measured rather than sampled
+
+The first pass asked one sentence per capability and reached 10 of the 30 v2
+tools. That is a property of the harness, not the agent: every OTP-gated
+journey stops at *"please share the OTP"*, so a one-turn scenario can never
+reach the second tool. Three rounds of multi-turn conversations, answering the
+agent's own follow-ups, reach **20 of 30**.
+
+| Capability | Through the agent | Through the tool directly |
+|---|---|---|
+| PMFBY | 6/6 | 6/6 |
+| KCC | 3/3 | 3/3 |
+| AIF | 3/4 | 4/4 |
+| KHC | 2/7 | 7/7 |
+| PM-KISAN | 2/5 | 5/5 |
+| SATHI | 1/2 | 2/2 |
+| SHC, Mandi, Weather | 1/1 each | 1/1 each |
+
+**All 30 work when called directly.** The 10 the agent does not reach are
+routing, and each one is an open issue that reproduces on v1:
+
+- **PM-KISAN grievance, 3 tools.** Every grievance phrasing routes to the
+  application tools instead — [items 15 and 28](../open-issues.md).
+- **KHC filing, 5 tools.** Driven with ordinary farmer sentences the agent made
+  **no tool call at all** across five turns, walking the geography questions
+  itself and ending on *"Can you please share the name of your village?"*.
+  Same family as [item 21](../open-issues.md), which recorded the variant where
+  it invents a grievance number instead.
+- **`check_aif_loan_status`.** The agent reached `verify_aif_otp` and
+  `check_aif_grievance_status` but asked again for the beneficiary id rather
+  than reading the loan.
+- **`search_sathi_seed_availability`.** SATHI has no `.env` block --
+  [item 3](../open-issues.md).
+
+What the agent layer caught that nothing else did: [item 33](../open-issues.md),
+`lookup_khc_reference` answering for Bihar when asked for Karnataka, and the
+real shape of [item 29](../open-issues.md) below.
+
+### `OAN_PUBLIC_NETWORK_ID` has no correct value
+
+Running the same tools under both settings is what exposed this, and it
+reverses the advice this plan carried an hour earlier. The published catalogs
+sit in two audiences:
+
+| `visible_to` | catalogs |
+|---|---|
+| `{*}` | `cat-aif`, `cat-khc`, `cat-sathi` |
+| `{oan.dev, net-b.oan.dev}` | `cat-kcc-loan`, both PMFBY, both PM-KISAN, mandi, weather, pocra, knowledge |
+
+The match is literal on both sides -- neither `*` is a wildcard -- so the one
+global setting cannot serve both halves. On the default `*`, AIF answers
+`Loan application 201: Disbursed` and mandi answers `NO_DATA`. On `oan.dev`,
+mandi returns real Pune prices and AIF answers *"The AIF portal is not
+available right now"* after logging `AIF v2 discover found no loan catalog`.
+
+**Do not set it to `oan.dev`.** That trades three working capabilities for
+four. Leave the default until either `*` is made a wildcard in the visibility
+match or the three `{*}` catalogs are republished with the same audience as
+the other nine.
+
+## The two file-serving containers are gone
+
+`mapping-files` and `spec-files` were nginx containers bind-mounting a local
+directory so the stack could read mappings and provider contracts without the
+public site. Both are deleted; `mock-ffs` is deliberately left running.
+
+| Container | Served | Why it could go |
+|---|---|---|
+| `mapping-files` | `quick-start/config/mappings` | The adapter has fetched every mapping from `raw.githubusercontent.com` since the repoint. Its last real fetch was 07:30:17; after that only probes. Its only remaining consumers were six FFS rows pointing at `/ffs/`, a folder it never contained -- they 404'd from inside the network too. |
+| `spec-files` | the whole `network-specs` checkout | One consumer: `PROVIDER_OPENAPI_URL_REWRITE` in `sva_app`. Repointed at the branch. |
+
+The rewrite now reads:
+
+```
+PROVIDER_OPENAPI_URL_REWRITE=https://openagrinet.github.io/network-specs/=https://raw.githubusercontent.com/OpenAgriNet/network-specs/bv-migration/
+```
+
+A catalog still *names* the published `github.io` URL, which is correct for
+everyone reading it; only this deployment redirects it. All fourteen contracts
+the catalogs reference load from the branch. When `github.io` publishes v0.2,
+delete the line -- nothing else changes.
+
+The adapter never needed `spec-files`: `extendedSchema_contextRewrite` already
+pointed `github.io` at the branch, so its `spec-files` allowlist entry was
+vestigial and has been removed.
+
+`mock-ffs` stays. FFS is not being migrated to Beckn in this release, and it
+reaches its provider through `FFSService` directly, never through the adapter.
+
+### Recreating them
+
+Both images are still local, so this is reversible:
+
+```sh
+docker run -d --name spec-files --network oan-internal \
+  -v <repo>/network-specs:/usr/share/nginx/html:ro nginx:alpine
+docker run -d --name mapping-files --network oan-internal \
+  -v <repo>/helmcharts/quick-start/config/mappings:/usr/share/nginx/html:ro nginx:alpine
+```
+
+## PR 29 is merged into bv-migration
+
+`feat/gfr-soil-report-and-advice-openapi` targeted `bv-features`; it is merged
+into `bv-migration` at `de8603d`. It splits GFR's draft into two final
+contracts, `gfr/soil-report/v0.2/openapi.yaml` (`getGfrSoilTest`) and
+`gfr/advice/v0.2/openapi.yaml` (`getRecommendations`).
+
+The `operationId` rename only avoids a collision with SHC's
+`getTestForAuthUser`. The GraphQL query text is unchanged, so the GFR select
+mappings that read `response.data.getTestForAuthUser[0]` keep working, and the
+registered mapping URLs are untouched.
+
+`check-api-separation.py` goes from 908 checks to 922, with the same single
+pre-existing failure (`Grievance` / `PM-KISAN`, item 26).
