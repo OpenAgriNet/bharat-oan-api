@@ -86,10 +86,12 @@ def test_active_scheme_and_advisory_workflows_advertise_only_current_tools(langu
     scheme = catalog.render_skill("schemes.information", language, {})
     assert 'search_schemes(query="PM Kisan registration process")' in scheme
     assert "`search_documents` for requests for agricultural manuals" in scheme
+    assert "`call_bihar_vistaar_network`" in scheme
     assert "video_url" not in scheme and "returns related videos" not in scheme
     visible = SkillState(enabled_skills=["schemes.information", "crop.advice"]).allowed_tools
     assert visible == {
-        "search_documents", "search_schemes", "search_advisory", "call_amul_vistaar_network", "call_maha_vistaar_network",
+        "search_documents", "search_schemes", "search_advisory", "call_amul_vistaar_network",
+        "call_maha_vistaar_network", "call_bihar_vistaar_network",
     }
     for skill in ("schemes.information", "crop.advice"):
         prompt = catalog.render_skill(skill, language, {})

@@ -16,6 +16,7 @@ from pydantic_ai.tools import RunContext
 from agents.deps import FarmerContext
 from agents.tools.pmkisan_scheme_status import generate_transaction_id
 from app.config import DEFAULT_HTTP_TIMEOUT
+from app.services.session_state import register_section, remember
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.utils import get_logger, to_ascii_digits
 
@@ -30,6 +31,24 @@ UNAVAILABLE = "The AIF system cannot be reached right now. Please try again in a
 NEED_BENEFICIARY_ID = "Ask the farmer for their AIF beneficiary ID (digits only)."
 NEED_OTP = "Ask the farmer for the 6-digit OTP sent to their registered mobile."
 NEED_LOAN_NUMBER = "Ask the farmer for their AIF loan application number (digits only)."
+
+# beneficiary_id + otp_step ("sent" | "verified"; one verification covers loan and grievance status for the
+# rest of the conversation) + loan_application_number once a loan status was returned. The OTP is used
+# once (verify_aif_otp), so it is not kept.
+STATE = register_section("aif")
+
+
+def _remember_step(ctx: RunContext[FarmerContext], beneficiary_id: str, envelope: Dict[str, Any],
+                   action: str, accepted: Tuple[str, ...], **fields: Any) -> None:
+    """Record the beneficiary and workflow step when the portal accepted the call; a new beneficiary
+    starts over (its loan application number is unknown)."""
+    code = _descriptor(_outcome_tag(envelope, action))[0]
+    if code not in accepted:
+        return
+    if beneficiary_id != (getattr(ctx.deps, "session_state", None) or {}).get(STATE, {}).get("beneficiary_id"):
+        fields.setdefault("loan_application_number", None)
+    step = "sent" if code == "otp_sent" else "verified"
+    remember(ctx, STATE, beneficiary_id=beneficiary_id, otp_step=step, **fields)
 
 
 class _AifUnavailable(Exception):
@@ -326,9 +345,11 @@ def initiate_aif_otp(ctx: RunContext[FarmerContext], beneficiary_id: str) -> str
         beneficiary_id=beneficiary_id,
     )
     try:
-        return _render_init(_request("init", payload))
+        envelope = _request("init", payload)
     except _AifUnavailable as e:
         return str(e)
+    _remember_step(ctx, beneficiary_id, envelope, "init", ("otp_sent", "otp_verified"))
+    return _render_init(envelope)
 
 
 @observe(name="tool:verify_aif_otp", as_type="tool")
@@ -368,9 +389,11 @@ def verify_aif_otp(ctx: RunContext[FarmerContext], otp: str, beneficiary_id: str
         otp=otp,
     )
     try:
-        return _render_init(_request("init", payload))
+        envelope = _request("init", payload)
     except _AifUnavailable as e:
         return str(e)
+    _remember_step(ctx, beneficiary_id, envelope, "init", ("otp_verified",))
+    return _render_init(envelope)
 
 
 @observe(name="tool:check_aif_loan_status", as_type="tool")
@@ -408,9 +431,12 @@ def check_aif_loan_status(
         loan_application_number=loan_application_number,
     )
     try:
-        return _render_loan_status(_request("status", payload))
+        envelope = _request("status", payload)
     except _AifUnavailable as e:
         return str(e)
+    _remember_step(ctx, beneficiary_id, envelope, "status", ("loan_status",),
+                   loan_application_number=loan_application_number)
+    return _render_loan_status(envelope)
 
 
 @observe(name="tool:check_aif_grievance_status", as_type="tool")
@@ -440,6 +466,8 @@ def check_aif_grievance_status(ctx: RunContext[FarmerContext], beneficiary_id: s
         beneficiary_id=beneficiary_id,
     )
     try:
-        return _render_grievance_status(_request("status", payload))
+        envelope = _request("status", payload)
     except _AifUnavailable as e:
         return str(e)
+    _remember_step(ctx, beneficiary_id, envelope, "status", ("grievance_status", "no_grievances"))
+    return _render_grievance_status(envelope)

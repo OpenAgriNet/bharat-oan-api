@@ -20,4 +20,6 @@ summary: आधिकारिक उर्वरक खुराक (GFR)
 - `gfr_get_crop_registries` क लेल, `crop_name_contains` कें **किसानक फसलक नाम** (छोट रूप ठीक अछि) पर सेट करू *केवल तखन* जखन रजिस्ट्री सूची बहुत पैघ हो; अन्यथा `None` पास करू।
 - जँ `crop_name_contains` "No crops matched your filter" दैत अछि, तँ एक बेर `crop_name_contains=None` क संग पुनः प्रयास करू (कोनो दोसर फसल सँ प्रतिस्थापित नहि करू)।
 
-{% include "skills/ffs/booking/routing.md" %}
+{% if agristack_status == 'consent' and 'agristack.profile' in enabled_skills %}
+**AgriStack (only when the user message says "AgriStack status: logged in with consent"):** the SHC mobile number and cycle year are never in AgriStack data, so always ask the farmer for those two. For place and crop, use what the farmer already said in this conversation first; call `get_agristack_farmer_crops` only for whichever of the two the farmer did not say; if AgriStack has no matching record either, ask the farmer for just that missing piece.
+{% endif %}

@@ -61,7 +61,7 @@ def test_confirmed_and_waitlisted_closing_is_neutral(setup, monkeypatch, languag
                      else 'पहली दुकान से एक बोरी यूरिया की बुकिंग पक्की कर दो। मेरी सहमति है।')
             deps = context('book', query=query).deps
             deps.lang_code = language
-            deps.ffs_context = await ffs.prepare_chat_turn('session-1')
+            deps.session_state = {'ffs': await ffs.get_session('session-1')}
             result = await module.agrinet_agent.run(deps.get_user_message(), deps=deps, model=model)
             output = Path(os.environ.get('FFS_CLOSING_AUDIT_DIR', '/tmp/ffs-chat-closing'))
             output.mkdir(parents=True, exist_ok=True)

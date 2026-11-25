@@ -18,6 +18,7 @@ from agents.deps import FarmerContext
 from app.core.npss_geocodes import resolve_npss_location_ids
 from app.core.cache import cache
 from app.core.image_storage import mark_processed, cleanup_image
+from app.services.session_state import register_section, remember
 
 logger = get_logger(__name__)
 JPEG_MIMETYPE = "image/jpeg"
@@ -392,6 +393,24 @@ def _append_result_value(lines: list[str], key: str, value: Any) -> None:
     lines.append("")
 
 
+# Last diagnosis kept in session state: old tool results are not resent (HISTORY_TOOL_TURNS), so without it a
+# follow-up on the same photo got invented symptoms (combined eval 2026-11-23, unit 1010). Values are never logged.
+SESSION_SECTION = register_section("npss")
+_SUMMARY_KEYS = ("errors", "pest", "crop", "pathogenClass", "description")
+_SUMMARY_MAX_CHARS = 600
+
+
+def diagnosis_summary(result: dict[str, Any]) -> dict[str, str]:
+    summary: dict[str, str] = {}
+    for key in _SUMMARY_KEYS:
+        value = result.get(key)
+        if value in (None, "", [], {}):
+            continue
+        text = value if isinstance(value, str) else "\n".join(_format_npss_value(value)).strip()
+        summary[key] = text[:_SUMMARY_MAX_CHARS]
+    return summary
+
+
 def _format_npss_result(result: dict[str, Any]) -> str:
     preferred_order = ["errors", "pest", "crop", "pathogenClass", "description"]
     ordered_keys = [key for key in preferred_order if key in result]
@@ -483,4 +502,6 @@ async def analyze_crop_image(
         source_owner=NPSS_SOURCE_OWNER,
         source_url=NPSS_SOURCE_URL,
     )
+    # A new analysis replaces the previous diagnosis as a whole.
+    remember(ctx, SESSION_SECTION, diagnosis=diagnosis_summary(result) or None, source=NPSS_SOURCE_NAME)
     return _format_npss_result(result)

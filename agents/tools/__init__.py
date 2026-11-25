@@ -143,6 +143,7 @@ else:
         register_khc_grievance,
     )
 from agents.tools.amul_vistaar import call_amul_vistaar_network
+from agents.tools.bihar_vistaar import call_bihar_vistaar_network
 from agents.tools.maha_vistaar import call_maha_vistaar_network
 from agents.tools.search import search_documents, search_schemes
 from agents.tools.advisory import search_advisory
@@ -202,12 +203,12 @@ else:
     _SATHI_CROP_TOOLS = [
         Tool(
             get_sathi_crop_groups,
-            takes_ctx=False,
+            takes_ctx=True,
             strict=False,
         ),
         Tool(
             list_sathi_crops_in_group,
-            takes_ctx=False,
+            takes_ctx=True,
             strict=False,
         ),
     ]
@@ -366,6 +367,11 @@ TOOLS = [
     ),
     Tool(
         call_amul_vistaar_network,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        call_bihar_vistaar_network,
         takes_ctx=True,
         strict=False,
     ),

@@ -142,6 +142,20 @@ class TestToolIgnoresInventedDetails:
         out, _ = self._run(monkeypatch, _ctx(history))
         assert PENDING_MARKER not in out and "Search notes" in out
 
+    def test_the_question_asked_is_noted_in_session_state_and_cleared_by_advice(self, monkeypatch):
+        deps = SimpleNamespace(session_id="s", question_id="q", session_state={}, session_state_changed=set(),
+                                skills=SimpleNamespace(allowed_tools=set()))
+        ctx = SimpleNamespace(deps=deps, messages=[_user("wheat aphids")])
+        out, _ = self._run(monkeypatch, ctx)
+        assert PENDING_MARKER in out
+        noted = deps.session_state["advisory"]
+        assert noted == {"asked_farmer": "days since sowing", "crop": "Wheat"}
+        # The farmer gives every detail: the answer asks nothing, so the note is cleared.
+        ctx = SimpleNamespace(deps=deps, messages=[_user("Wheat aphids, Rabi, 40 days after sowing")])
+        out, _ = self._run(monkeypatch, ctx, season="Rabi", days_after_sowing=40)
+        assert PENDING_MARKER not in out
+        assert not deps.session_state.get("advisory")  # cleared (an empty section is not saved or shown)
+
 
 class TestPlaceGuards:
     from helpers.advisory_pending import LOCATION_MARKER  # noqa: E402

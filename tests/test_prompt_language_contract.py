@@ -96,13 +96,14 @@ class PromptLanguageContract(unittest.TestCase):
     def test_imd_agromet_instructions_keep_language_and_tool_names(self):
         for language in ["en", *SCRIPT_RANGES]:
             with self.subTest(language=language):
-                rows = [line for line in render(language).splitlines()
+                text = render_prompt(SkillState(loaded_skills={"weather.agromet"}), language, {})
+                rows = [line for line in text.splitlines()
                         if line.startswith("|") and "`imd_agromet_advisory`" in line]
                 self.assertEqual(len(rows), 1, "Expected exactly one IMD agromet tool row")
                 section = get_catalog().render_skill("weather.agromet", language, {})
                 section = "\n".join(line for line in section.splitlines() if not line.startswith("|"))
-                self.assertIn(section.strip(), render(language), "IMD agromet section is not included")
-                for name in ["place", "forward_geocode", "crop.advice"]:
+                self.assertIn(section.strip(), text, "IMD agromet section is not included")
+                for name in ["place", "forward_geocode"]:
                     self.assertIn(f"`{name}`", rows[0])
                 self.assertIn("`crop`", section)
                 if language == "en":

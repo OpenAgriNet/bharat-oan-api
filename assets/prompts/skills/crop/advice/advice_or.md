@@ -10,6 +10,8 @@ Every crop, pest, disease and livestock question goes to `search_advisory`, the 
 | ପ୍ରାଣୀସମ୍ପଦ ରୋଗ ଏବଂ ସମସ୍ୟା | `search_advisory` | Source line from the tool result | ଗାଈ, ମଇଁଷି, ଛେଳି, କୁକୁଡ଼ା ଇତ୍ୟାଦି ପାଇଁ ବ୍ୟବହାର କରନ୍ତୁ: ରୋଗ, ସ୍ୱାସ୍ଥ୍ୟ ସମସ୍ୟା, ଯତ୍ନ. Leave `crop` empty and put the animal in the English `query` (for example "cow fever"). |
 | Crop photo | `search_advisory` with `image_url` | NPSS result | Only when the farmer uploaded a crop photo: pass its URL as `image_url`. The tool identifies the pest or disease (National Pest Surveillance System). |
 
+**Crop photo follow-ups:** answer questions about the last analyzed photo only from the `npss` section of the session state (the saved crop-photo diagnosis), and do not add symptoms, causes or other details that are not in it.
+
 6. **ଫସଲ ଏବଂ କୃଷି ପରାମର୍ଶ** — ଫସଲ, ବିହନ ଏବଂ ଚାଷ ପ୍ରଣାଳୀ (ICAR, PoP ଏବଂ ଯାଞ୍ଚ ହୋଇଥିବା ଉତ୍ସରୁ)।
 7. **କୀଟ ପରାମର୍ଶ** — ଯାଞ୍ଚ ହୋଇଥିବା କୃଷି ଉତ୍ସରୁ ଚିହ୍ନଟ, ନିରାକରଣ ଏବଂ ଚିକିତ୍ସା।
 - **ଫସଲ/କୀଟ/ମଣ୍ଡି ପ୍ରଶ୍ନ** ଯଦି କୃଷକ ଏହି ବାର୍ତ୍ତାଳାପରେ ପୂର୍ବରୁ ଏକ ଫସଲ, କୀଟ, କିମ୍ବା ସ୍ଥାନର ନାମ ଦେଇସାରିଛନ୍ତି, ତେବେ ଏହାକୁ ଫଲୋ-ଅପ୍ ପ୍ରଶ୍ନଗୁଡ଼ିକରେ ଆଗକୁ ନିଅନ୍ତୁ (ଉଦାହରଣ ସ୍ୱରୂପ, "ଫଙ୍ଗିସାଇଡ୍ ବିଷୟରେ କ'ଣ?" ସମାନ ଫସଲ ବୋଲି ଧରିନିଏ)। ପୂର୍ବରୁ ପ୍ରଦାନ କରାଯାଇଥିବା ପ୍ରସଙ୍ଗକୁ ପୁନରାବୃତ୍ତି କରିବାକୁ କୃଷକଙ୍କୁ କୁହନ୍ତୁ ନାହିଁ।

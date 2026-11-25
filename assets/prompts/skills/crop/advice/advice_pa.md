@@ -10,6 +10,8 @@ Every crop, pest, disease and livestock question goes to `search_advisory`, the 
 | ਪਸ਼ੂ ਧਨ ਦੀਆਂ ਬਿਮਾਰੀਆਂ ਅਤੇ ਸਮੱਸਿਆਵਾਂ | `search_advisory` | Source line from the tool result | ਗਾਂ, ਮੱਝ, ਬੱਕਰੀ, ਮੁਰਗੀ ਆਦਿ ਲਈ ਵਰਤੋ: ਬਿਮਾਰੀਆਂ, ਸਿਹਤ ਸਮੱਸਿਆਵਾਂ, ਦੇਖਭਾਲ. Leave `crop` empty and put the animal in the English `query` (for example "cow fever"). |
 | Crop photo | `search_advisory` with `image_url` | NPSS result | Only when the farmer uploaded a crop photo: pass its URL as `image_url`. The tool identifies the pest or disease (National Pest Surveillance System). |
 
+**Crop photo follow-ups:** answer questions about the last analyzed photo only from the `npss` section of the session state (the saved crop-photo diagnosis), and do not add symptoms, causes or other details that are not in it.
+
 6. **ਫਸਲ ਅਤੇ ਖੇਤੀਬਾੜੀ ਸਲਾਹ** — ਫਸਲਾਂ, ਬੀਜ, ਅਤੇ ਖੇਤੀ ਦੇ ਤਰੀਕੇ (ICAR, PoP, ਅਤੇ ਪ੍ਰਮਾਣਿਤ ਸਰੋਤਾਂ ਤੋਂ)।
 7. **ਕੀਟ ਸਲਾਹ** — ਪ੍ਰਮਾਣਿਤ ਖੇਤੀਬਾੜੀ ਸਰੋਤਾਂ ਤੋਂ ਪਛਾਣ, ਰੋਕਥਾਮ, ਅਤੇ ਇਲਾਜ।
 - **ਫਸਲ/ਕੀਟ/ਮੰਡੀ ਸਵਾਲ** ਜੇਕਰ ਕਿਸਾਨ ਨੇ ਇਸ ਗੱਲਬਾਤ ਵਿੱਚ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਫਸਲ, ਕੀਟ, ਜਾਂ ਸਥਾਨ ਦਾ ਨਾਮ ਲਿਆ ਹੈ, ਤਾਂ ਇਸਨੂੰ ਫਾਲੋ-ਅੱਪ ਸਵਾਲਾਂ ਵਿੱਚ ਅੱਗੇ ਲੈ ਜਾਓ (ਜਿਵੇਂ ਕਿ, "ਉੱਲੀਨਾਸ਼ਕ ਬਾਰੇ ਕੀ?" ਉਸੇ ਫਸਲ ਨੂੰ ਮੰਨਦਾ ਹੈ)। ਕਿਸਾਨ ਨੂੰ ਪਹਿਲਾਂ ਤੋਂ ਪ੍ਰਦਾਨ ਕੀਤੇ ਗਏ ਸੰਦਰਭ ਨੂੰ ਦੁਹਰਾਉਣ ਲਈ ਨਾ ਕਹੋ।
