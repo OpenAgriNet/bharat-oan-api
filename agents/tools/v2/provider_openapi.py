@@ -125,7 +125,7 @@ def _resolved(document: dict, node: Any) -> Any:
 
 
 def _flattened(document: dict, schema: Any) -> dict:
-    """One schema's properties and required list, with allOf branches folded in.
+    """One schema's properties and required list, with composed branches folded in.
 
     A branch that adds a field states only that field, so the branches are read
     in order and the later one wins -- which is what allOf means when two
@@ -140,6 +140,13 @@ def _flattened(document: dict, schema: Any) -> dict:
         folded = _flattened(document, branch)
         properties.update(folded["properties"])
         required += [name for name in folded["required"] if name not in required]
+    variants = [_flattened(document, branch) for branch in schema.get("anyOf") or schema.get("oneOf") or []]
+    for folded in variants:
+        properties.update(folded["properties"])
+    # A field only one variant asks for is optional overall: it belongs to the call
+    # that variant describes, and the caller may be making the other one.
+    required += [name for name in (variants[0]["required"] if variants else [])
+                 if name not in required and all(name in other["required"] for other in variants[1:])]
     properties.update(
         {name: _resolved(document, prop) for name, prop in (schema.get("properties") or {}).items()}
     )
