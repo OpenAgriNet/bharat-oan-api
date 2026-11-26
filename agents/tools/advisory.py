@@ -1,5 +1,5 @@
 """
-Crop and livestock advisory search through the Knowledge Provider (POST /search, search_profile advisory).
+Crop and livestock advisory search through the Knowledge Provider (POST /search, document_kind advisory).
 
 The one advisory tool: every crop, pest, disease and livestock question goes to KP, and a crop photo goes to
 NPSS for pest/disease identification. Regional crop/pest words are mapped to their English glossary term first.
@@ -56,9 +56,7 @@ logger = get_logger(__name__)
 
 KNOWLEDGE_ADVISORY_CATEGORY = "knowledge-advisory"
 
-# Source shown to the farmer for advisories from Kisan Sarathi.
-ADVISORY_SOURCE = "ICAR - Kisan Sarathi"
-# The provider's `origin` for an advisory PDF uploaded in docs-pipeline; those cite the PDF's name.
+# The provider's `origin` for an advisory uploaded in docs-pipeline.
 PDF_ADVISORY_ORIGIN = "docs-pipeline"
 # Crop of the coffee PDF advisories. They carry no season, sowing stage or place, so they are answered at once.
 COFFEE_CROP = "coffee"
@@ -202,7 +200,7 @@ def build_advisory_search_payload(
     state_lgd_code: Optional[int] = None,
     district_lgd_code: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """KP /search body for the advisory profile.
+    """KP /search body for advisory documents.
 
     The farmer's situation travels in `advisory`: KP filters on `crop` and only boosts `season`,
     `days_after_sowing` and the place (`state_lgd_code` / `district_lgd_code`).
@@ -218,7 +216,7 @@ def build_advisory_search_payload(
         )
         if value is not None and value != ""
     }
-    body: Dict[str, Any] = {"query": query, "search_profile": "advisory"}
+    body: Dict[str, Any] = {"query": query, "document_kind": "advisory"}
     top_k = _clean_top_k(top_k)
     if top_k:
         body["top_k"] = top_k
@@ -240,7 +238,8 @@ def _advisory_result_from_hit(hit: Dict[str, Any], score: float, crop: str) -> O
     place = hit.get("advisory") if isinstance(hit.get("advisory"), dict) else {}
     crop_keys = hit.get("crop_keys") if isinstance(hit.get("crop_keys"), list) else []
     return {
-        "title": str(hit.get("title_en") or hit.get("name_en") or hit.get("title") or "").strip(),
+        "title": str(hit.get("title_en") or hit.get("name_en") or hit.get("title")
+                     or hit.get("name") or hit.get("filename") or "").strip(),
         "crop": crop or (str(crop_keys[0]) if crop_keys else ""),
         "section": str(hit.get("section") or "").strip().lower(),
         "score": score,
@@ -248,6 +247,8 @@ def _advisory_result_from_hit(hit: Dict[str, Any], score: float, crop: str) -> O
         "chunk_id": str(hit.get("chunk_id") or hit.get("_id") or "").strip(),
         "source": str(hit.get("origin") or "").strip(),
         "origin": str(hit.get("origin") or "").strip().lower(),
+        # Instance label from the provider (its display name, e.g. "ICAR - Kisan Sarathi"); shown ahead of the title.
+        "instance_name": str(hit.get("instance_name") or "").strip(),
         "text": text,
         "seasons": parse_chunk_seasons(text),
         "day_range": parse_chunk_days(text),
@@ -280,29 +281,28 @@ def _same_words(a: str, b: str) -> bool:
 _TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
 
 
-def advisory_source(result: Dict[str, Any]) -> str:
-    """Source to cite for one advisory: the PDF's name for an uploaded PDF, else ADVISORY_SOURCE."""
-    if result.get("origin") == PDF_ADVISORY_ORIGIN and result.get("title"):
-        return result["title"]
-    return ADVISORY_SOURCE
-
-
 def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
-    """Readable block per advisory for the agent.
-
-    The provider appends "Source: institute, creator" to each text. That line names the
-    institute and a user name, so it is removed here; the answer cites advisory_source instead.
-    """
+    """Format passages with document attribution from the index."""
     blocks = []
-    for r in results:
-        text = _TRAILING_SOURCE.sub("", r["text"]).rstrip()
-        blocks.append(f"**{r.get('title') or 'Advisory'}**\n```\n{text}\n```")
-    sources = list(dict.fromkeys(advisory_source(r) for r in results))
-    return (
-        "> Advisory Search Results for `" + query + "`\n\n"
-        + "\n\n----\n\n".join(blocks)
-        + f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
-    )
+    # Titles grouped under the instance that holds them, so the instance name is stated once.
+    # Documents without an instance name are cited by title alone.
+    by_instance: Dict[str, Dict[str, None]] = {}
+    for result in results:
+        title = result.get("title", "").strip()
+        instance_name = str(result.get("instance_name") or "").strip()
+        text = _TRAILING_SOURCE.sub("", result["text"]).rstrip()
+        blocks.append(f"**{title or 'Advisory'}**\n```\n{text}\n```")
+        if title:
+            by_instance.setdefault(instance_name, {}).setdefault(title, None)
+    formatted = f"> Advisory Search Results for `{query}`\n\n" + "\n\n----\n\n".join(blocks)
+    labels = [f"{name} | {'; '.join(titles)}" if name else "; ".join(titles) for name, titles in by_instance.items()]
+    if labels:
+        formatted += (
+            "\n\n> Cite as (in bold). The Source line is a fixed label: copy it character for character, "
+            "including the instance name and every abbreviation (for example ICAR), and do not apply the "
+            f"abbreviation-with-full-stops rule to it: **Source: {'; '.join(labels)}**"
+        )
+    return formatted
 
 
 def _places_of(result: Dict[str, Any]) -> str:

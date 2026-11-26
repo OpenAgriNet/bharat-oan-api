@@ -36,7 +36,7 @@ def search(load_module, monkeypatch):
 
 
 def network_response(scheme, *, hits=True, status="success", resolved=True):
-    """A KP /search response for the scheme profile."""
+    """A KP /search response for scheme documents."""
     return {
         "effective_config": {"ranking_score_field": "_scheme_score"},
         "hits": [{"_id": "chunk-1", "chunk_id": "chunk-1", "scheme_code": scheme, "scheme_name": scheme,
@@ -53,8 +53,7 @@ def run_search(search, monkeypatch, response, query="PM-KISAN 24th installment r
     else:
         client.post.return_value = response
     monkeypatch.setattr(search.httpx, "AsyncClient", lambda: client)
-    ctx = SimpleNamespace(deps=SimpleNamespace(session_id="test", question_id="test"))
-    result = asyncio.run(search.search_schemes(ctx, query))
+    result = asyncio.run(search.search_schemes(query))
     return result, client.post
 
 
@@ -70,12 +69,12 @@ def test_search_does_not_append_system_announcement(search, monkeypatch, scheme,
     assert "Scheme details" in result
     assert "PM-KISAN 24th Instalment Release" not in result
     assert "30th October" not in result
-    if scheme == "pmkisan":
+    if scheme == "pmkisan" and resolved:
         assert "Status check available" in result
     assert "23rd" not in result and "20 June 2026" not in result
     assert post.call_args.args[0] == "https://example.test/search"
     # Plain semantic search: no scheme code filter is sent.
-    assert post.call_args.kwargs["json"]["search_profile"] == "scheme"
+    assert post.call_args.kwargs["json"]["document_kind"] == "scheme"
     assert "document_code" not in post.call_args.kwargs["json"]
 
 

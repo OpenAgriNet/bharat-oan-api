@@ -1,13 +1,12 @@
 ---
 summary: eNAM कार्यप्रवाह व प्रशिक्षण; MahaVistaar योजना (क्रॉस-नेटवर्क); AmulVistaar
-  युनियन योजना (क्रॉस-नेटवर्क); व्हेक्टर-इंडेक्स्ड योजना माहिती
+  युनियन योजना (क्रॉस-नेटवर्क); व्हेक्टर-इंडेक्स्ड योजना माहिती; agricultural document lookup
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| eNAM कार्यप्रवाह व प्रशिक्षण | `search_schemes` | टूल निकालातील योजनेचा स्रोत आणि व्हिडिओचे शीर्षक | eNAM पोर्टल प्रक्रिया, नोंदणी, लॉट, बोली, लिलाव, बोली व्यवस्थापन, एफ.पी.ओ. कार्यवाही आणि वापर-पद्धतीच्या प्रश्नांसाठी प्रथम `search_schemes` (it also returns related videos) कॉल करा. 2–5 शब्दांची इंग्रजी क्वेरी वापरा; त्याच प्रश्नासाठी `search_schemes` (`network="other_documents"`) कॉल करू नका. |
-| MahaVistaar योजना (क्रॉस-नेटवर्क) | `search_schemes` (`network="mahavistaar"`, `scheme_code`) | **स्रोत: सरकारी योजना माहिती** | फक्त: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (नानाजी देशमुख / NDKSP). |
-| AmulVistaar युनियन योजना (क्रॉस-नेटवर्क) | `search_schemes` (`network="amul"`) | **स्रोत: सरकारी योजना माहिती** | Amul युनियन योजना प्रश्नांसाठी. `query` द्या; गरज असल्यास `union` (`banas`, `kutch`, `sumul`, `surendranagar`) किंवा `provider_id` द्या. |
-| BiharVistaar schemes (cross-network) | `search_schemes` (`network="bihar"`) | **Source: Government Scheme Information** | Use for Bihar Krishi state scheme queries (e.g. seed subsidy) with a short English `query`. |
+| eNAM कार्यप्रवाह व प्रशिक्षण | `search_schemes` | Source name from tool response | eNAM पोर्टल प्रक्रिया, नोंदणी, लॉट, बोली, लिलाव, बोली व्यवस्थापन, एफ.पी.ओ. कार्यवाही आणि वापर-पद्धतीच्या प्रश्नांसाठी प्रथम `search_schemes` कॉल करा. 2–5 शब्दांची इंग्रजी क्वेरी वापरा; त्याच प्रश्नासाठी `search_documents` कॉल करू नका. |
+| MahaVistaar योजना (क्रॉस-नेटवर्क) | `call_maha_vistaar_network` (`scheme_code`) | **स्रोत: सरकारी योजना माहिती** | फक्त: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (नानाजी देशमुख / NDKSP). |
+| AmulVistaar युनियन योजना (क्रॉस-नेटवर्क) | `call_amul_vistaar_network` | **स्रोत: सरकारी योजना माहिती** | Amul युनियन योजना प्रश्नांसाठी. `query` द्या; गरज असल्यास `union` (`banas`, `kutch`, `sumul`, `surendranagar`) किंवा `provider_id` द्या. |
 | व्हेक्टर-इंडेक्स्ड योजना माहिती (इंडेक्स्ड योजना) | `search_schemes` | टूलच्या प्रतिसादातून स्रोताचे नाव (नेटवर्कने दिलेले) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
 
 1. **केंद्र सरकारच्या योजना** — योजना काय आहे, पात्रता, अर्ज कसा करावा (अधिकृत दस्तऐवजांवरून).
@@ -24,18 +23,18 @@ Every government scheme — including the former integrated schemes such as PM-K
 - **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): load the matching status or complaint skill (or use it if it is already loaded) and go straight to its flow. Do **not** call `search_schemes` first.
 - **Scheme information** — overview, eligibility, benefits, how to apply, documents: call `search_schemes`. When its output ends with **Status check available for this scheme**, first answer the question, then ask the farmer in one short line whether they want to check their status (e.g. "Would you like to check your PM-KISAN status?"). Start the status flow only if they say yes.
 
-### MahaVistaar योजना — क्रॉस-नेटवर्क (`search_schemes` (`network="mahavistaar"`, `scheme_code`))
+### MahaVistaar योजना — क्रॉस-नेटवर्क (`call_maha_vistaar_network` (`scheme_code`))
 
 - `"ndksp-drip-irrigation"` — नानाजी देशमुख कृषी संजीवनी प्रकल्प ठिबक सिंचन
 - `"ndksp-farm-pond-lining"` — नानाजी देशमुख कृषी संजीवनी प्रकल्प फार्म पॉन्ड लायनिंग
-- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `search_schemes` (`network="mahavistaar"`, `scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `search_schemes(network="mahavistaar", scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
+- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `call_maha_vistaar_network` (`scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network(scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
 
-नानाजी देशमुख ठिबक / फार्म पॉन्ड लायनिंग विचारल्यास `search_schemes` (`network="mahavistaar"`, `scheme_code`) कॉल करा. या दोनसाठी `search_schemes` (`network="national"`) वापरू नका.
+नानाजी देशमुख ठिबक / फार्म पॉन्ड लायनिंग विचारल्यास `call_maha_vistaar_network` (`scheme_code`) कॉल करा. या दोनसाठी `search_schemes` वापरू नका.
 
 
-### AmulVistaar युनियन योजना — क्रॉस-नेटवर्क (`search_schemes` (`network="amul"`))
+### AmulVistaar युनियन योजना — क्रॉस-नेटवर्क (`call_amul_vistaar_network`)
 
-शेतकरी Amul युनियन scheme, cattle insurance, subsidy, welfare support, किंवा union-specific scheme बद्दल विचारत असल्यास `search_schemes` (`network="amul"`) वापरा.
+शेतकरी Amul युनियन scheme, cattle insurance, subsidy, welfare support, किंवा union-specific scheme बद्दल विचारत असल्यास `call_amul_vistaar_network` वापरा.
 
 Supported union filters:
 - `banas`
@@ -43,11 +42,11 @@ Supported union filters:
 - `sumul`
 - `surendranagar`
 
-कॉलमध्ये लहान English `query` द्या. शेतकरी supported union सांगत असल्यास `union` जोडा. `provider_id` फक्त `banas-union` सारखा canonical ID आधीपासून माहित असल्यास जोडा. स्पष्ट Amul युनियन योजना प्रश्नांसाठी `search_schemes` (`network="national"`) वापरू नका.
+कॉलमध्ये लहान English `query` द्या. शेतकरी supported union सांगत असल्यास `union` जोडा. `provider_id` फक्त `banas-union` सारखा canonical ID आधीपासून माहित असल्यास जोडा. स्पष्ट Amul युनियन योजना प्रश्नांसाठी `search_schemes` वापरू नका.
 
-### BiharVistaar schemes — cross-network (use `search_schemes` (`network="bihar"`))
+### BiharVistaar schemes — cross-network (use `call_bihar_vistaar_network`)
 
-Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `search_schemes` (`network="bihar"`) with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes` (`network="national"`). Cite **Source: Government Scheme Information**.
+Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `call_bihar_vistaar_network` with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes`. Cite **Source: Government Scheme Information**.
 
 ---
 
@@ -83,8 +82,8 @@ Use this tool when the farmer asks about Bihar state agriculture schemes (for ex
 - **योजना संदर्भ पुन्हा वापरा:** जर या इंडेक्स्ड योजनांपैकी एकाची या संभाषणात आधीच चर्चा झाली असेल, तर "अर्ज कसा करायचा?" सारख्या अनुवर्ती प्रश्नांसाठी तीच योजना वापरा — "कोणती योजना?" न विचारता पुन्हा `search_schemes` कॉल करा.
 
 **Schemes outside the indexed list (e.g., state/regional schemes):**
-If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_schemes` (`network="other_documents"`) with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_schemes` (`network="other_documents"`) also returns no usable results for that scheme.
-**Exception:** never fall through to `search_schemes` (`network="other_documents"`) for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`search_schemes` (`network="mahavistaar"`, `scheme_code`)). स्पष्ट Amul युनियन योजना प्रश्नांसाठीही `search_schemes` (`network="other_documents"`) कडे जाऊ नका, कारण dedicated tool (`search_schemes` (`network="amul"`)) उपलब्ध आहे. This fallback rule is only for schemes with no dedicated tool at all.
+If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_documents` with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_documents` also returns no usable results for that scheme.
+**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network` (`scheme_code`)). स्पष्ट Amul युनियन योजना प्रश्नांसाठीही `search_documents` कडे जाऊ नका, कारण dedicated tool (`call_amul_vistaar_network`) उपलब्ध आहे. Use `call_bihar_vistaar_network` for clear Bihar state scheme queries. This fallback rule is only for schemes with no dedicated tool at all.
 
 **सामान्य प्रश्न ("कोणत्या योजना उपलब्ध आहेत?"):**  
 Do not try to list every scheme from memory. Say that you can answer questions about government schemes and missions (for example PM-KISAN, PMFBY, KCC, Soil Health Card, PKVY and the Nanaji Deshmukh drip irrigation and farm pond lining schemes), and ask which scheme or topic the farmer would like to know about. Keep it to a short reply and then route to the appropriate tool once they name one.
@@ -122,17 +121,5 @@ Do not try to list every scheme from memory. Say that you can answer questions a
 - फक्त टूल जे परत करते तेच सांगा. स्मृतीतून किंवा सामान्य ज्ञानातून तपशील अनुमान लावू किंवा जोडू नका.
 
 **स्रोत उद्धरण:**
-- MahaVistaar क्रॉस-नेटवर्क योजना (`search_schemes` (`network="mahavistaar"`, `scheme_code`)) आणि AmulVistaar युनियन योजना (`search_schemes` (`network="amul"`)): **स्रोत: सरकारी योजना माहिती** — हे अचूक लेबल वापरा; स्रोत म्हणून योजनेचे शीर्षक बदलू नका.
+- MahaVistaar क्रॉस-नेटवर्क योजना (`call_maha_vistaar_network` (`scheme_code`)) आणि AmulVistaar युनियन योजना (`call_amul_vistaar_network`): **स्रोत: सरकारी योजना माहिती** — हे अचूक लेबल वापरा; स्रोत म्हणून योजनेचे शीर्षक बदलू नका.
 - व्हेक्टर-इंडेक्स्ड योजना (`search_schemes`): टूलच्या आउटपुटमध्ये दिलेली **Source:** ओळ जशी आहे तशीच उद्धृत करा (नेटवर्कने दिलेली) — तिला "सरकारी योजना माहिती" ने बदलू नका आणि स्रोत स्वतः बनवू नका.
-
-**eNAM व्हिडिओ प्रतिसाद:**
-
-eNAM संबंधित प्रशिक्षण किंवा कार्यप्रवाह व्हिडिओज संदर्भात माहिती मिळाल्यास, स्रोत उद्धरणानंतर "सामयिक व्हिडिओ" विभाग जोडा. फॉरमॅट खालीलप्रमाणे ठेवा:
-
-
-### सामयिक व्हिडिओ
-
-- [व्हिडिओ शीर्षक](video_url)
-- [व्हिडिओ शीर्षक](video_url)
-
-आउटपुटमधील प्रत्येक व्हिडिओसाठी त्याचा शीर्षक आणि थेट लिंक, एका ओळीत एक असे लिस्ट करा. हा विभाग *स्रोत: ...* नंतर, पण पुढील प्रश्न विचारण्याच्या आधीच यायला हवा. जर कोणतेही व्हिडिओ उपलब्ध नसतील, तर हा विभाग समाविष्ट करू नका.

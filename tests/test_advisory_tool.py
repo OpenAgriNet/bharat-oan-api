@@ -46,9 +46,9 @@ def _item(chunk_id, title="Sorghum- Harvesting Management", text=TEXT, score="0.
 
 def _on_search(items, status="success", message="", query="aphids",
                location_status="not_requested", has_day_range="true", days_matched="false"):
-    """A KP /search response for the advisory profile."""
+    """A KP /search response for advisory documents."""
     return {
-        "effective_config": {"query": query, "search_profile": "advisory", "ranking_score_field": "_advisory_score"},
+        "effective_config": {"query": query, "document_kind": "advisory", "ranking_score_field": "_advisory_score"},
         "final_count": len(items),
         "hits": items,
         "advisory_search": {
@@ -82,7 +82,7 @@ def kp(monkeypatch):
 class TestPayload:
     def test_payload_uses_the_advisory_profile(self):
         payload = sa.build_advisory_search_payload("aphids in wheat")
-        assert payload == {"query": "aphids in wheat", "search_profile": "advisory"}
+        assert payload == {"query": "aphids in wheat", "document_kind": "advisory"}
 
 
 def _params(payload):
@@ -165,7 +165,7 @@ class TestParse:
 
     def test_reads_where_each_chunk_came_from(self):
         results, _ = sa.parse_advisory_response(
-            _on_search([_item("c1", origin="docs-pipeline"), _item("c2", origin="webhook"), _item("c3")])
+            _on_search([_item("c1", origin="docs-pipeline"), _item("c2", origin="webhook"), _item("c3", origin="")])
         )
         assert [r["origin"] for r in results] == ["docs-pipeline", "webhook", ""]
 
@@ -178,9 +178,9 @@ class TestFormat:
         )
         assert "aphids" in out
         assert "**Wheat Insect Management**" in out
-        # the provider's "Source: institute, creator" line is removed, the fixed source is offered instead
+        # the provider's "Source: institute, creator" line is removed, the document title is offered instead
         assert "ICAR–DKMA" not in out
-        assert "Source: ICAR - Kisan Sarathi" in out
+        assert "Source: Wheat Insect Management" in out
 
 
 class TestSourceLine:
@@ -189,7 +189,7 @@ class TestSourceLine:
             [{"title": "T", "text": "Advisory: Harvest.\n\nSource: ICAR–DKMA, jak", "section": "full"}], "q"
         )
         assert "jak" not in out and "DKMA" not in out
-        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
+        assert out.rstrip().endswith("**Source: T**")
 
     def test_cites_the_pdf_name_for_an_advisory_uploaded_as_a_pdf(self):
         out = sa.format_advisory_results(
@@ -200,13 +200,13 @@ class TestSourceLine:
         assert out.rstrip().endswith("**Source: coffee_guide_2023_mini**")
         assert "Kisan Sarathi" not in out
 
-    def test_cites_kisan_sarathi_for_a_webhook_advisory(self):
+    def test_cites_the_document_title_for_a_webhook_advisory(self):
         out = sa.format_advisory_results(
             [{"title": "T", "text": TEXT, "section": "full", "origin": "webhook"}], "q"
         )
-        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi**")
+        assert out.rstrip().endswith("**Source: T**")
 
-    def test_cites_both_when_pdf_and_kisan_sarathi_advisories_are_returned(self):
+    def test_cites_distinct_document_titles_across_intake_channels(self):
         out = sa.format_advisory_results(
             [
                 {"title": "Wheat Insect Management", "text": TEXT, "section": "full", "origin": "webhook"},
@@ -215,7 +215,60 @@ class TestSourceLine:
             ],
             "q",
         )
-        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi; coffee_guide_2023_mini**")
+        assert out.rstrip().endswith(
+            "**Source: Wheat Insect Management; coffee_guide_2023_mini; Package of Practices for Wheat**"
+        )
+
+    def test_prefixes_the_instance_name_to_the_title(self):
+        out = sa.format_advisory_results(
+            [{"title": "Rice \u2014 Time of Harvesting", "instance_name": "ICAR - Kisan Sarathi",
+              "text": TEXT, "section": "full"}],
+            "q",
+        )
+        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi | Rice \u2014 Time of Harvesting**")
+
+    def test_keeps_instance_name_when_parsing_a_hit(self):
+        hit = {"name": "Rice", "instance_name": " ICAR - Kisan Sarathi ", "text": TEXT, "origin": "webhook"}
+        results, _ = sa.parse_advisory_response(_on_search([hit]))
+        assert results[0]["instance_name"] == "ICAR - Kisan Sarathi"
+        assert sa.format_advisory_results(results, "q").endswith("**Source: ICAR - Kisan Sarathi | Rice**")
+
+    def test_tells_the_model_to_copy_the_source_names_exactly(self):
+        out = sa.format_advisory_results(
+            [{"title": "Rice", "instance_name": "ICAR - Kisan Sarathi", "text": TEXT, "section": "full"}], "q"
+        )
+        assert "copy it character for character" in out and "do not apply the abbreviation-with-full-stops rule" in out
+        assert "**Source: ICAR - Kisan Sarathi | Rice**" in out
+
+    def test_states_the_instance_name_once_for_several_titles(self):
+        icar = "ICAR - Kisan Sarathi"
+        out = sa.format_advisory_results(
+            [
+                {"title": "Wheat Insect Management", "instance_name": icar, "text": TEXT, "section": "full"},
+                {"title": "Package of Practices for Wheat", "instance_name": icar, "text": TEXT, "section": "full"},
+                {"title": "coffee_guide_2023", "instance_name": "Bharat Vistaar", "text": TEXT, "section": "full"},
+                {"title": "Untagged", "text": TEXT, "section": "full"},
+            ],
+            "q",
+        )
+        assert out.rstrip().endswith(
+            "**Source: ICAR - Kisan Sarathi | Wheat Insect Management; Package of Practices for Wheat; "
+            "Bharat Vistaar | coffee_guide_2023; Untagged**"
+        )
+        assert out.count("ICAR - Kisan Sarathi") == 1
+
+    def test_cites_the_title_alone_without_an_instance_name(self):
+        out = sa.format_advisory_results([{"title": "T", "instance_name": "", "text": TEXT, "section": "full"}], "q")
+        assert out.rstrip().endswith("**Source: T**")
+
+    def test_omits_citation_when_document_has_no_title(self):
+        out = sa.format_advisory_results([{"text": TEXT, "origin": "webhook"}], "q")
+        assert "Cite as" not in out
+
+    def test_reads_canonical_document_name(self):
+        hit = {"name": "Crop practice reference", "text": TEXT, "origin": "webhook"}
+        results, _ = sa.parse_advisory_response(_on_search([hit]))
+        assert sa.format_advisory_results(results, "q").endswith("**Source: Crop practice reference**")
 
     def test_leaves_text_without_a_source_line_alone(self):
         out = sa.format_advisory_results([{"title": "T", "text": "Advisory: Harvest.", "section": "full"}], "q")
@@ -345,8 +398,8 @@ class TestSearchFirst:
         assert str(request.url) == "http://kp.test/kp-api/search"
         assert request.headers["Authorization"] == "Bearer tok"
         body = json.loads(request.read())
-        assert body["search_profile"] == "advisory" and body["query"] == "aphids in wheat"
-        assert "Harvest AKJ-1" in out and "ICAR" in out
+        assert body["document_kind"] == "advisory" and body["query"] == "aphids in wheat"
+        assert "Harvest AKJ-1" in out and "**Source: Sorghum- Harvesting Management**" in out
 
     def test_the_first_search_sends_no_crop_filter(self, kp):
         kp.response = _respond([_chunk("c1")], **NO_DAYS)
@@ -696,8 +749,9 @@ def test_tool_is_registered_with_context():
     assert "advice_type" not in schema["properties"]
     assert {"crop", "season", "days_after_sowing"} <= set(schema["properties"])
     assert "answer_now" not in schema["properties"]
-    assert "search_schemes" in registered
-    for merged in ("search_documents", "search_pests_diseases", "search_terms", "analyze_crop_image"):
+    assert {"search_documents", "search_schemes"} <= registered.keys()
+    assert "profile" not in registered["search_documents"].function_schema.json_schema["properties"]
+    for merged in ("search_pests_diseases", "search_video", "search_terms", "analyze_crop_image"):
         assert merged not in registered
 
 

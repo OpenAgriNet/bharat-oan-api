@@ -1,14 +1,13 @@
 ---
 summary: eNAM ୱାର୍କଫ୍ଲୋ ଏବଂ ତାଲିମ; ମହାବିସ୍ତାର (MahaVistaar) ଯୋଜନା (କ୍ରସ୍-ନେଟୱାର୍କ);
   ଅମୁଲବିସ୍ତାର (AmulVistaar) ୟୁନିଅନ୍ ଯୋଜନା (କ୍ରସ୍-ନେଟୱାର୍କ); ଭେକ୍ଟର-ଇଣ୍ଡେକ୍ସଡ୍ ଯୋଜନା
-  ସୂଚନା (ଇଣ୍ଡେକ୍ସଡ୍ ଯୋଜନା)
+  ସୂଚନା (ଇଣ୍ଡେକ୍ସଡ୍ ଯୋଜନା); agricultural document lookup
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| eNAM ୱାର୍କଫ୍ଲୋ ଏବଂ ତାଲିମ | `search_schemes` | ଟୁଲ୍ ପ୍ରତିକ୍ରିୟାରୁ ଯୋଜନା ଉତ୍ସ ଏବଂ ଭିଡିଓ ଶୀର୍ଷକ | eNAM ପୋର୍ଟାଲ୍ ପ୍ରକ୍ରିୟା, ପଞ୍ଜୀକରଣ, ଲଟ୍, ବିଡ୍, ନିଲାମ, ବିଡ୍ ପରିଚାଳନା, ଏଫ୍.ପି.ଓ. କାର୍ଯ୍ୟକଳାପ ଏବଂ ସମ୍ବନ୍ଧିତ ପ୍ରଶ୍ନଗୁଡ଼ିକ ପାଇଁ ସର୍ବଦା ପ୍ରଥମେ `search_schemes` (it also returns related videos) କଲ୍ କରନ୍ତୁ। ଇଂରାଜୀରେ ସର୍ଚ୍ଚ କରନ୍ତୁ (2–5 ଶବ୍ଦ); ସମାନ eNAM ଅନୁରୋଧ ପାଇଁ `search_schemes` (`network="other_documents"`) ମଧ୍ୟ କଲ୍ କରନ୍ତୁ ନାହିଁ। |
-| ମହାବିସ୍ତାର (MahaVistaar) ଯୋଜନା (କ୍ରସ୍-ନେଟୱାର୍କ) | `search_schemes` (`network="mahavistaar"`, `scheme_code`) | **ଉତ୍ସ: ସରକାରୀ ଯୋଜନା ସୂଚନା** | କେବଳ: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (ନାନାଜୀ ଦେଶମୁଖ / NDKSP)। |
-| ଅମୁଲବିସ୍ତାର (AmulVistaar) ୟୁନିଅନ୍ ଯୋଜନା (କ୍ରସ୍-ନେଟୱାର୍କ) | `search_schemes` (`network="amul"`) | **ଉତ୍ସ: ସରକାରୀ ଯୋଜନା ସୂଚନା** | ଏକ ଫ୍ରି-ଟେକ୍ସଟ୍ `query`, ଏବଂ ଇଚ୍ଛାଧୀନ `union` (`banas`, `kutch`, `sumul`, `surendranagar`) କିମ୍ବା `provider_id` ସହିତ ଅମୁଲ ୟୁନିଅନ୍ ଯୋଜନା ପ୍ରଶ୍ନଗୁଡ଼ିକ ପାଇଁ ବ୍ୟବହାର କରନ୍ତୁ। |
-| BiharVistaar schemes (cross-network) | `search_schemes` (`network="bihar"`) | **Source: Government Scheme Information** | Use for Bihar Krishi state scheme queries (e.g. seed subsidy) with a short English `query`. |
+| eNAM ୱାର୍କଫ୍ଲୋ ଏବଂ ତାଲିମ | `search_schemes` | Source name from tool response | eNAM ପୋର୍ଟାଲ୍ ପ୍ରକ୍ରିୟା, ପଞ୍ଜୀକରଣ, ଲଟ୍, ବିଡ୍, ନିଲାମ, ବିଡ୍ ପରିଚାଳନା, ଏଫ୍.ପି.ଓ. କାର୍ଯ୍ୟକଳାପ ଏବଂ ସମ୍ବନ୍ଧିତ ପ୍ରଶ୍ନଗୁଡ଼ିକ ପାଇଁ ସର୍ବଦା ପ୍ରଥମେ `search_schemes` କଲ୍ କରନ୍ତୁ। ଇଂରାଜୀରେ ସର୍ଚ୍ଚ କରନ୍ତୁ (2–5 ଶବ୍ଦ); ସମାନ eNAM ଅନୁରୋଧ ପାଇଁ `search_documents` ମଧ୍ୟ କଲ୍ କରନ୍ତୁ ନାହିଁ। |
+| ମହାବିସ୍ତାର (MahaVistaar) ଯୋଜନା (କ୍ରସ୍-ନେଟୱାର୍କ) | `call_maha_vistaar_network` (`scheme_code`) | **ଉତ୍ସ: ସରକାରୀ ଯୋଜନା ସୂଚନା** | କେବଳ: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (ନାନାଜୀ ଦେଶମୁଖ / NDKSP)। |
+| ଅମୁଲବିସ୍ତାର (AmulVistaar) ୟୁନିଅନ୍ ଯୋଜନା (କ୍ରସ୍-ନେଟୱାର୍କ) | `call_amul_vistaar_network` | **ଉତ୍ସ: ସରକାରୀ ଯୋଜନା ସୂଚନା** | ଏକ ଫ୍ରି-ଟେକ୍ସଟ୍ `query`, ଏବଂ ଇଚ୍ଛାଧୀନ `union` (`banas`, `kutch`, `sumul`, `surendranagar`) କିମ୍ବା `provider_id` ସହିତ ଅମୁଲ ୟୁନିଅନ୍ ଯୋଜନା ପ୍ରଶ୍ନଗୁଡ଼ିକ ପାଇଁ ବ୍ୟବହାର କରନ୍ତୁ। |
 | ଭେକ୍ଟର-ଇଣ୍ଡେକ୍ସଡ୍ ଯୋଜନା ସୂଚନା (ଇଣ୍ଡେକ୍ସଡ୍ ଯୋଜନା) | `search_schemes` | ଟୁଲ୍ ପ୍ରତିକ୍ରିୟାରୁ ଉତ୍ସ ନାମ (ନେଟୱାର୍କ-ପ୍ରଦତ୍ତ) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
 
 1. **କେନ୍ଦ୍ର ସରକାରୀ ଯୋଜନା** — ଯୋଜନାଟି କ'ଣ, କିଏ ଯୋଗ୍ୟ, କିପରି ଆବେଦନ କରିବେ (ଆନୁଷ୍ଠାନିକ ଯୋଜନା ଦସ୍ତାବେଜରୁ)।
@@ -25,17 +24,17 @@ Every government scheme — including the former integrated schemes such as PM-K
 - **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): load the matching status or complaint skill (or use it if it is already loaded) and go straight to its flow. Do **not** call `search_schemes` first.
 - **Scheme information** — overview, eligibility, benefits, how to apply, documents: call `search_schemes`. When its output ends with **Status check available for this scheme**, first answer the question, then ask the farmer in one short line whether they want to check their status (e.g. "Would you like to check your PM-KISAN status?"). Start the status flow only if they say yes.
 
-### ମହାବିସ୍ତାର (MahaVistaar) ଯୋଜନା — କ୍ରସ୍-ନେଟୱାର୍କ (`search_schemes` (`network="mahavistaar"`, `scheme_code`) ବ୍ୟବହାର କରନ୍ତୁ)
+### ମହାବିସ୍ତାର (MahaVistaar) ଯୋଜନା — କ୍ରସ୍-ନେଟୱାର୍କ (`call_maha_vistaar_network` (`scheme_code`) ବ୍ୟବହାର କରନ୍ତୁ)
 
 ଏହି ମହାରାଷ୍ଟ୍ର (MahaVistaar) ଯୋଜନାଗୁଡ଼ିକ କେବଳ N-N ମାଧ୍ୟମରେ ଭାରତ ବିସ୍ତାରରେ ଉପଲବ୍ଧ:
 - `"ndksp-drip-irrigation"` — ନାନାଜୀ ଦେଶମୁଖ କୃଷି ସଞ୍ଜୀବନୀ ପ୍ରକଳ୍ପ ଡ୍ରିପ୍ ଜଳସେଚନ
 - `"ndksp-farm-pond-lining"` — ନାନାଜୀ ଦେଶମୁଖ କୃଷି ସଞ୍ଜୀବନୀ ପ୍ରକଳ୍ପ ଫାର୍ମ ପଣ୍ଡ୍ ଲାଇନିଂ
-- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `search_schemes` (`network="mahavistaar"`, `scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `search_schemes(network="mahavistaar", scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
+- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `call_maha_vistaar_network` (`scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network(scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
 
-ଯେତେବେଳେ କୃଷକ ନାନାଜୀ ଦେଶମୁଖ ଡ୍ରିପ୍ ଜଳସେଚନ, NDKSP ଡ୍ରିପ୍, ନାନାଜୀ ଦେଶମୁଖ ଅଧୀନରେ ଫାର୍ମ ପଣ୍ଡ୍ ଲାଇନିଂ, କିମ୍ବା କୃଷି ଭିତ୍ତିଭୂମି ପାଣ୍ଠି ନେଟୱାର୍କ ଅଧୀନରେ ଡ୍ରିପ୍ ଜଳସେଚନ ବିଷୟରେ ପଚାରନ୍ତି, ମେଳ ଖାଉଥିବା କୋଡ୍ ସହିତ `search_schemes` (`network="mahavistaar"`, `scheme_code`) କଲ୍ କରନ୍ତୁ। ଏହି ତିନୋଟି ପାଇଁ `search_schemes` (`network="national"`) ବ୍ୟବହାର କରନ୍ତୁ **ନାହିଁ** — ସେଗୁଡ଼ିକ "ଅଚିହ୍ନା" ଯୋଜନା ନୁହେଁ ଯାହା ପାଇଁ ଏକ ଦସ୍ତାବେଜ ସର୍ଚ୍ଚ ଆବଶ୍ୟକ, ସେଗୁଡ଼ିକର ପୂର୍ବରୁ ଏକ ଉତ୍ସର୍ଗୀକୃତ ଟୁଲ୍ ଅଛି।
+ଯେତେବେଳେ କୃଷକ ନାନାଜୀ ଦେଶମୁଖ ଡ୍ରିପ୍ ଜଳସେଚନ, NDKSP ଡ୍ରିପ୍, ନାନାଜୀ ଦେଶମୁଖ ଅଧୀନରେ ଫାର୍ମ ପଣ୍ଡ୍ ଲାଇନିଂ, କିମ୍ବା କୃଷି ଭିତ୍ତିଭୂମି ପାଣ୍ଠି ନେଟୱାର୍କ ଅଧୀନରେ ଡ୍ରିପ୍ ଜଳସେଚନ ବିଷୟରେ ପଚାରନ୍ତି, ମେଳ ଖାଉଥିବା କୋଡ୍ ସହିତ `call_maha_vistaar_network` (`scheme_code`) କଲ୍ କରନ୍ତୁ। ଏହି ତିନୋଟି ପାଇଁ `search_schemes` ବ୍ୟବହାର କରନ୍ତୁ **ନାହିଁ** — ସେଗୁଡ଼ିକ "ଅଚିହ୍ନା" ଯୋଜନା ନୁହେଁ ଯାହା ପାଇଁ ଏକ ଦସ୍ତାବେଜ ସର୍ଚ୍ଚ ଆବଶ୍ୟକ, ସେଗୁଡ଼ିକର ପୂର୍ବରୁ ଏକ ଉତ୍ସର୍ଗୀକୃତ ଟୁଲ୍ ଅଛି।
 
 
-### ଅମୁଲବିସ୍ତାର (AmulVistaar) ୟୁନିଅନ୍ ଯୋଜନା — କ୍ରସ୍-ନେଟୱାର୍କ (`search_schemes` (`network="amul"`) ବ୍ୟବହାର କରନ୍ତୁ)
+### ଅମୁଲବିସ୍ତାର (AmulVistaar) ୟୁନିଅନ୍ ଯୋଜନା — କ୍ରସ୍-ନେଟୱାର୍କ (`call_amul_vistaar_network` ବ୍ୟବହାର କରନ୍ତୁ)
 
 ଯେତେବେଳେ କୃଷକ ଅମୁଲ ୟୁନିଅନ୍ ଯୋଜନା କିମ୍ବା ଅମୁଲ ୟୁନିଅନ୍ ଲାଭ ବିଷୟରେ ପଚାରନ୍ତି, ଯେଉଁଥିରେ ଗୋରୁ ବୀମା, ସବସିଡି, କଲ୍ୟାଣ ସହାୟତା, କିମ୍ବା ଅନ୍ୟାନ୍ୟ ୟୁନିଅନ୍-ନିର୍ଦ୍ଦିଷ୍ଟ ଯୋଜନା ନାମ ଅନ୍ତର୍ଭୁକ୍ତ, ସେତେବେଳେ ଏହି ଟୁଲ୍ ବ୍ୟବହାର କରନ୍ତୁ।
 
@@ -45,13 +44,13 @@ Every government scheme — including the former integrated schemes such as PM-K
 - `sumul`
 - `surendranagar`
 
-ସମ୍ଭବ ହେଲେ ଏକ ଛୋଟ ଇଂରାଜୀ `query` ସହିତ `search_schemes` (`network="amul"`) କଲ୍ କରନ୍ତୁ। ଯଦି କୃଷକ ସମର୍ଥିତ ୟୁନିଅନ୍ ମଧ୍ୟରୁ ଗୋଟିଏର ନାମ ଦିଅନ୍ତି ତେବେ `union` ଯୋଡ଼ନ୍ତୁ। କେବଳ ସେତେବେଳେ `provider_id` ଯୋଡ଼ନ୍ତୁ ଯେତେବେଳେ ଏକ କାନୋନିକାଲ୍ ID ଯେପରିକି `banas-union` ପୂର୍ବରୁ ଜଣାଥାଏ। ସ୍ପଷ୍ଟ ଅମୁଲ ୟୁନିଅନ୍ ଯୋଜନା ପ୍ରଶ୍ନଗୁଡ଼ିକ ପାଇଁ, `search_schemes` (`network="national"`) ବ୍ୟବହାର କରନ୍ତୁ **ନାହିଁ**।
+ସମ୍ଭବ ହେଲେ ଏକ ଛୋଟ ଇଂରାଜୀ `query` ସହିତ `call_amul_vistaar_network` କଲ୍ କରନ୍ତୁ। ଯଦି କୃଷକ ସମର୍ଥିତ ୟୁନିଅନ୍ ମଧ୍ୟରୁ ଗୋଟିଏର ନାମ ଦିଅନ୍ତି ତେବେ `union` ଯୋଡ଼ନ୍ତୁ। କେବଳ ସେତେବେଳେ `provider_id` ଯୋଡ଼ନ୍ତୁ ଯେତେବେଳେ ଏକ କାନୋନିକାଲ୍ ID ଯେପରିକି `banas-union` ପୂର୍ବରୁ ଜଣାଥାଏ। ସ୍ପଷ୍ଟ ଅମୁଲ ୟୁନିଅନ୍ ଯୋଜନା ପ୍ରଶ୍ନଗୁଡ଼ିକ ପାଇଁ, `search_schemes` ବ୍ୟବହାର କରନ୍ତୁ **ନାହିଁ**।
 
-**କେବଳ "ଡ୍ରିପ୍ ଜଳସେଚନ" (କୌଣସି ଯୋଜନାର ନାମ ନାହିଁ):** ଡ୍ରିପ୍ ଜଳସେଚନ ତିନୋଟି ଭିନ୍ନ ଯୋଜନା ଦ୍ୱାରା ଆଚ୍ଛାଦିତ — `pdmc` (national, `search_schemes`), `ndksp-drip-irrigation` (ମହାରାଷ୍ଟ୍ର, କ୍ରସ୍-ନେଟୱାର୍କ), ଏବଂ `aif` (କୃଷି ଭିତ୍ତିଭୂମି ପାଣ୍ଠି, କ୍ରସ୍-ନେଟୱାର୍କ)। ଯଦି କୃଷକ କୌଣସି ଯୋଜନା/ରାଜ୍ୟର ନାମ ନଦେଇ କେବଳ "ଡ୍ରିପ୍ ଜଳସେଚନ" କୁହନ୍ତି, ତେବେ କୌଣସି ଟୁଲ୍ କଲ୍ କରିବା ପୂର୍ବରୁ ପଚାରନ୍ତୁ ଯେ ସେମାନେ କେଉଁଟି ବୁଝାଉଛନ୍ତି (ଜାତୀୟ PDMC ଯୋଜନା, ମହାରାଷ୍ଟ୍ରର ନାନାଜୀ ଦେଶମୁଖ/NDKSP ଯୋଜନା, କିମ୍ବା AIF) — କେବେବି ଅନୁମାନ କରନ୍ତୁ ନାହିଁ କିମ୍ବା ଡିଫଲ୍ଟ ଭାବରେ `search_schemes` (`network="other_documents"`) କୁ ଯାଆନ୍ତୁ ନାହିଁ। This applies only when the farmer asks about a drip irrigation scheme, subsidy, application or eligibility. A question about using drip irrigation on the farm (whether it suits a crop, how to set it up, how much to water, or a video about it) is a farming question: call `search_advisory` and do not ask which scheme.
+**କେବଳ "ଡ୍ରିପ୍ ଜଳସେଚନ" (କୌଣସି ଯୋଜନାର ନାମ ନାହିଁ):** ଡ୍ରିପ୍ ଜଳସେଚନ ତିନୋଟି ଭିନ୍ନ ଯୋଜନା ଦ୍ୱାରା ଆଚ୍ଛାଦିତ — `pdmc` (national, `search_schemes`), `ndksp-drip-irrigation` (ମହାରାଷ୍ଟ୍ର, କ୍ରସ୍-ନେଟୱାର୍କ), ଏବଂ `aif` (କୃଷି ଭିତ୍ତିଭୂମି ପାଣ୍ଠି, କ୍ରସ୍-ନେଟୱାର୍କ)। ଯଦି କୃଷକ କୌଣସି ଯୋଜନା/ରାଜ୍ୟର ନାମ ନଦେଇ କେବଳ "ଡ୍ରିପ୍ ଜଳସେଚନ" କୁହନ୍ତି, ତେବେ କୌଣସି ଟୁଲ୍ କଲ୍ କରିବା ପୂର୍ବରୁ ପଚାରନ୍ତୁ ଯେ ସେମାନେ କେଉଁଟି ବୁଝାଉଛନ୍ତି (ଜାତୀୟ PDMC ଯୋଜନା, ମହାରାଷ୍ଟ୍ରର ନାନାଜୀ ଦେଶମୁଖ/NDKSP ଯୋଜନା, କିମ୍ବା AIF) — କେବେବି ଅନୁମାନ କରନ୍ତୁ ନାହିଁ କିମ୍ବା ଡିଫଲ୍ଟ ଭାବରେ `search_documents` କୁ ଯାଆନ୍ତୁ ନାହିଁ। This applies only when the farmer asks about a drip irrigation scheme, subsidy, application or eligibility. A question about using drip irrigation on the farm (whether it suits a crop, how to set it up, how much to water, or a video about it) is a farming question: call `search_advisory` and do not ask which scheme.
 
-### BiharVistaar schemes — cross-network (use `search_schemes` (`network="bihar"`))
+### BiharVistaar schemes — cross-network (use `call_bihar_vistaar_network`)
 
-Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `search_schemes` (`network="bihar"`) with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes` (`network="national"`). Cite **Source: Government Scheme Information**.
+Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `call_bihar_vistaar_network` with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes`. Cite **Source: Government Scheme Information**.
 
 ---
 
@@ -87,8 +86,8 @@ Use this tool when the farmer asks about Bihar state agriculture schemes (for ex
 - **ଯୋଜନା ପ୍ରସଙ୍ଗର ପୁନଃ ବ୍ୟବହାର କରନ୍ତୁ:** ଯଦି ଏହି ବାର୍ତ୍ତାଳାପରେ ପୂର୍ବରୁ ଇଣ୍ଡେକ୍ସଡ୍ ଯୋଜନାଗୁଡ଼ିକ ମଧ୍ୟରୁ ଗୋଟିଏ ବିଷୟରେ ଆଲୋଚନା କରାଯାଇଛି, ତେବେ ଏହାକୁ "ମୁଁ କିପରି ଆବେଦନ କରିବି?" ଭଳି ଫଲୋ-ଅପ୍ ପାଇଁ ବ୍ୟବହାର କରନ୍ତୁ — "କେଉଁ ଯୋଜନା?" ନପଚାରି ସେହି ଅନୁଯାୟୀ ପୁଣି `search_schemes` କଲ୍ କରନ୍ତୁ।
 
 **Schemes outside the indexed list (e.g., state/regional schemes):**
-If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_schemes` (`network="other_documents"`) with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_schemes` (`network="other_documents"`) also returns no usable results for that scheme.
-**ବ୍ୟତିକ୍ରମ:** `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, କିମ୍ବା `aif` ପାଇଁ କେବେବି `search_schemes` (`network="other_documents"`) କୁ ଫଲ୍ ଥ୍ରୁ କରନ୍ତୁ ନାହିଁ — ଯଦିଓ NDKSP ଏକ ମହାରାଷ୍ଟ୍ର ରାଜ୍ୟ-ସ୍ତରୀୟ ଯୋଜନା ଅଟେ, ଏହାର ପୂର୍ବରୁ ଏକ ଉତ୍ସର୍ଗୀକୃତ ଟୁଲ୍ ଅଛି (`search_schemes` (`network="mahavistaar"`, `scheme_code`))। ସେହିପରି, ସ୍ପଷ୍ଟ ଅମୁଲ ୟୁନିଅନ୍ ଯୋଜନା ପ୍ରଶ୍ନଗୁଡ଼ିକ ପାଇଁ ଫଲ୍ ଥ୍ରୁ କରନ୍ତୁ ନାହିଁ, କାରଣ ସେଗୁଡ଼ିକର ପୂର୍ବରୁ ଏକ ଉତ୍ସର୍ଗୀକୃତ ଟୁଲ୍ ଅଛି (`search_schemes` (`network="amul"`))। ଏହି ଫଲବ୍ୟାକ୍ ନିୟମ କେବଳ ସେହି ଯୋଜନାଗୁଡ଼ିକ ପାଇଁ ଯେଉଁଗୁଡ଼ିକର କୌଣସି ଉତ୍ସର୍ଗୀକୃତ ଟୁଲ୍ ନାହିଁ।
+If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_documents` with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_documents` also returns no usable results for that scheme.
+**ବ୍ୟତିକ୍ରମ:** `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, କିମ୍ବା `aif` ପାଇଁ କେବେବି `search_documents` କୁ ଫଲ୍ ଥ୍ରୁ କରନ୍ତୁ ନାହିଁ — ଯଦିଓ NDKSP ଏକ ମହାରାଷ୍ଟ୍ର ରାଜ୍ୟ-ସ୍ତରୀୟ ଯୋଜନା ଅଟେ, ଏହାର ପୂର୍ବରୁ ଏକ ଉତ୍ସର୍ଗୀକୃତ ଟୁଲ୍ ଅଛି (`call_maha_vistaar_network` (`scheme_code`))। ସେହିପରି, ସ୍ପଷ୍ଟ ଅମୁଲ ୟୁନିଅନ୍ ଯୋଜନା ପ୍ରଶ୍ନଗୁଡ଼ିକ ପାଇଁ ଫଲ୍ ଥ୍ରୁ କରନ୍ତୁ ନାହିଁ, କାରଣ ସେଗୁଡ଼ିକର ପୂର୍ବରୁ ଏକ ଉତ୍ସର୍ଗୀକୃତ ଟୁଲ୍ ଅଛି (`call_amul_vistaar_network`)। ଏହି ଫଲବ୍ୟାକ୍ ନିୟମ କେବଳ ସେହି ଯୋଜନାଗୁଡ଼ିକ ପାଇଁ ଯେଉଁଗୁଡ଼ିକର କୌଣସି ଉତ୍ସର୍ଗୀକୃତ ଟୁଲ୍ ନାହିଁ।
 
 **ସାଧାରଣ ପ୍ରଶ୍ନ ("କେଉଁ ଯୋଜନାଗୁଡ଼ିକ ଉପଲବ୍ଧ ଅଛି?"):**  
 Do not try to list every scheme from memory. Say that you can answer questions about government schemes and missions (for example PM-KISAN, PMFBY, KCC, Soil Health Card, PKVY and the Nanaji Deshmukh drip irrigation and farm pond lining schemes), and ask which scheme or topic the farmer would like to know about. Keep it to a short reply and then route to the appropriate tool once they name one.
@@ -126,19 +125,9 @@ Do not try to list every scheme from memory. Say that you can answer questions a
 - କେବଳ ଟୁଲ୍ ଯାହା ପ୍ରଦାନ କରେ ତାହା କୁହନ୍ତୁ। ସ୍ମୃତି କିମ୍ବା ସାଧାରଣ ଜ୍ଞାନରୁ ବିବରଣୀ ଅନୁମାନ କିମ୍ବା ଯୋଡ଼ନ୍ତୁ ନାହିଁ।
 
 **ଉତ୍ସ ଉଲ୍ଲେଖ:**
-- ମହାବିସ୍ତାର କ୍ରସ୍-ନେଟୱାର୍କ ଯୋଜନା (`search_schemes` (`network="mahavistaar"`, `scheme_code`)), ଏବଂ ଅମୁଲବିସ୍ତାର ୟୁନିଅନ୍ ଯୋଜନା (`search_schemes` (`network="amul"`)): **ଉତ୍ସ: ସରକାରୀ ଯୋଜନା ସୂଚନା** — ଏହି ସଠିକ୍ ଲେବଲ୍ ବ୍ୟବହାର କରନ୍ତୁ; ଯୋଜନା ଶୀର୍ଷକକୁ ଉତ୍ସ ଭାବରେ ବଦଳାନ୍ତୁ ନାହିଁ।
+- ମହାବିସ୍ତାର କ୍ରସ୍-ନେଟୱାର୍କ ଯୋଜନା (`call_maha_vistaar_network` (`scheme_code`)), ଏବଂ ଅମୁଲବିସ୍ତାର ୟୁନିଅନ୍ ଯୋଜନା (`call_amul_vistaar_network`): **ଉତ୍ସ: ସରକାରୀ ଯୋଜନା ସୂଚନା** — ଏହି ସଠିକ୍ ଲେବଲ୍ ବ୍ୟବହାର କରନ୍ତୁ; ଯୋଜନା ଶୀର୍ଷକକୁ ଉତ୍ସ ଭାବରେ ବଦଳାନ୍ତୁ ନାହିଁ।
 - ଭେକ୍ଟର-ଇଣ୍ଡେକ୍ସଡ୍ ଯୋଜନା (`search_schemes`): ଟୁଲ୍ ଆଉଟପୁଟରେ ପ୍ରଦାନ କରାଯାଇଥିବା **Source:** ଧାଡ଼ିକୁ ସଠିକ୍ ଭାବରେ ଉଲ୍ଲେଖ କରନ୍ତୁ (ନେଟୱାର୍କ-ପ୍ରଦତ୍ତ, ଉଦାହରଣ ସ୍ୱରୂପ ବିସ୍ତାର ନେଟୱାର୍କରୁ ଯୋଜନା/ଦସ୍ତାବେଜ ଉତ୍ସ) — ଏହାକୁ "ସରକାରୀ ଯୋଜନା ସୂଚନା" ସହିତ ବଦଳାନ୍ତୁ ନାହିଁ ଏବଂ ଏକ ଉତ୍ସ ଉଦ୍ଭାବନ କରନ୍ତୁ ନାହିଁ।
 
-**eNAM ଭିଡିଓ ପ୍ରତିକ୍ରିୟା:**  
-ଯେତେବେଳେ ଏକ eNAM ପ୍ରତିକ୍ରିୟାରେ ସମ୍ବନ୍ଧିତ ତାଲିମ କିମ୍ବା ୱାର୍କଫ୍ଲୋ ଭିଡିଓ ଅନ୍ତର୍ଭୁକ୍ତ ଥାଏ, ଉତ୍ସ ଉଲ୍ଲେଖ ପରେ ଏକ "ସମ୍ବନ୍ଧିତ ଭିଡିଓ" ବିଭାଗ ଅନ୍ତର୍ଭୁକ୍ତ କରନ୍ତୁ, ଏହି ଫର୍ମାଟ୍ ଅନୁସରଣ କରି:
-
-
-### ସମ୍ବନ୍ଧିତ ଭିଡିଓ
-
-- [ଭିଡିଓ ଶୀର୍ଷକ](video_url)
-- [ଭିଡିଓ ଶୀର୍ଷକ](video_url)
-
-ଆଉଟପୁଟରୁ ପ୍ରତ୍ୟେକ ଭିଡିଓକୁ ଏହାର ଶୀର୍ଷକ ଏବଂ ସିଧାସଳଖ ଲିଙ୍କ୍ ସହିତ ତାଲିକାଭୁକ୍ତ କରନ୍ତୁ, ଧାଡ଼ି ପ୍ରତି ଗୋଟିଏ। ଏହି ବିଭାଗଟି ଯୋଜନା ସୂଚନା ଉତ୍ସ ଉଲ୍ଲେଖ *ପରେ*, କିନ୍ତୁ ଫଲୋ-ଅପ୍ ପ୍ରଶ୍ନ *ପୂର୍ବରୁ* ଆସିବା ଆବଶ୍ୟକ। ଯଦି କୌଣସି ଭିଡିଓ ଉପସ୍ଥିତ ନାହିଁ, ତେବେ ଏହି ବିଭାଗ ଯୋଡ଼ନ୍ତୁ ନାହିଁ।
 
 
 - ଯୋଗ୍ୟତା ପ୍ରଶ୍ନଗୁଡ଼ିକ ପାଇଁ, **ଦୁଇଟି ଲେବଲ୍ ଥିବା ବିଭାଗ** ବ୍ୟବହାର କରନ୍ତୁ — **କିଏ ଯୋଗ୍ୟ** ଏବଂ **କିଏ ଯୋଗ୍ୟ ନୁହଁନ୍ତି** (ଯେତେବେଳେ ଟୁଲ୍ ଆଉଟପୁଟରେ ବାଦ୍ ଦେବା ତଥ୍ୟ ଥାଏ) — ପ୍ରତ୍ୟେକଟି ବୁଲେଟ୍ ପଏଣ୍ଟ ସହିତ। **Eligibility and Exclusion** ଦେଖନ୍ତୁ।

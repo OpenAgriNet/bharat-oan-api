@@ -1,13 +1,12 @@
 ---
 summary: eNAM কাৰ্যপ্ৰবাহ আৰু প্ৰশিক্ষণ; MahaVistaar আঁচনি (ক্ৰছ-নেটৱৰ্ক); AmulVistaar
-  ইউনিয়ন আঁচনি (ক্ৰছ-নেটৱৰ্ক); ভেক্টৰ-ইনডেক্স আঁচনি তথ্য
+  ইউনিয়ন আঁচনি (ক্ৰছ-নেটৱৰ্ক); ভেক্টৰ-ইনডেক্স আঁচনি তথ্য; agricultural document lookup
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| eNAM কাৰ্যপ্ৰবাহ আৰু প্ৰশিক্ষণ | `search_schemes` | সঁজুলিৰ ফলাফলৰ আঁচনিৰ উৎস আৰু ভিডিঅ' শিৰোনাম | eNAM প'ৰ্টেল প্ৰক্ৰিয়া, পঞ্জীয়ন, লট, বিড, নিলাম, বিড ব্যৱস্থাপনা, এফ.পি.অ'. পৰিচালনা আৰু ব্যৱহাৰ-পদ্ধতিৰ প্ৰশ্নৰ বাবে প্ৰথমে `search_schemes` (it also returns related videos) কল কৰক। 2–5 শব্দৰ ইংৰাজী কুৱেৰী ব্যৱহাৰ কৰক; একেটা প্ৰশ্নত `search_schemes` (`network="other_documents"`) কল নকৰিব। |
-| MahaVistaar আঁচনি (ক্ৰছ-নেটৱৰ্ক) | `search_schemes` (`network="mahavistaar"`, `scheme_code`) | **উৎস: চৰকাৰী আঁচনি তথ্য** | কেৱল: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (নানাজী দেশমুখ / NDKSP)। |
-| AmulVistaar ইউনিয়ন আঁচনি (ক্ৰছ-নেটৱৰ্ক) | `search_schemes` (`network="amul"`) | **উৎস: চৰকাৰী আঁচনি তথ্য** | Amul ইউনিয়ন আঁচনি প্ৰশ্নৰ বাবে। `query` দিয়ক; প্ৰয়োজন হ'লে `union` (`banas`, `kutch`, `sumul`, `surendranagar`) বা `provider_id` দিয়ক। |
-| BiharVistaar schemes (cross-network) | `search_schemes` (`network="bihar"`) | **Source: Government Scheme Information** | Use for Bihar Krishi state scheme queries (e.g. seed subsidy) with a short English `query`. |
+| eNAM কাৰ্যপ্ৰবাহ আৰু প্ৰশিক্ষণ | `search_schemes` | Source name from tool response | eNAM প'ৰ্টেল প্ৰক্ৰিয়া, পঞ্জীয়ন, লট, বিড, নিলাম, বিড ব্যৱস্থাপনা, এফ.পি.অ'. পৰিচালনা আৰু ব্যৱহাৰ-পদ্ধতিৰ প্ৰশ্নৰ বাবে প্ৰথমে `search_schemes` কল কৰক। 2–5 শব্দৰ ইংৰাজী কুৱেৰী ব্যৱহাৰ কৰক; একেটা প্ৰশ্নত `search_documents` কল নকৰিব। |
+| MahaVistaar আঁচনি (ক্ৰছ-নেটৱৰ্ক) | `call_maha_vistaar_network` (`scheme_code`) | **উৎস: চৰকাৰী আঁচনি তথ্য** | কেৱল: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (নানাজী দেশমুখ / NDKSP)। |
+| AmulVistaar ইউনিয়ন আঁচনি (ক্ৰছ-নেটৱৰ্ক) | `call_amul_vistaar_network` | **উৎস: চৰকাৰী আঁচনি তথ্য** | Amul ইউনিয়ন আঁচনি প্ৰশ্নৰ বাবে। `query` দিয়ক; প্ৰয়োজন হ'লে `union` (`banas`, `kutch`, `sumul`, `surendranagar`) বা `provider_id` দিয়ক। |
 | ভেক্টৰ-ইনডেক্স আঁচনি তথ্য (ইনডেক্স আঁচনি) | `search_schemes` | টুলৰ প্ৰতিক্ৰিয়াৰ পৰা উৎসৰ নাম (নেটৱৰ্কে দিয়া) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
 
 1. **কেন্দ্ৰীয় চৰকাৰৰ আঁচনিসমূহ** — আঁচনি কি, কোন যোগ্য, কেনেকৈ আবেদন কৰিব (চৰকাৰী নথিপত্ৰৰ পৰা)।
@@ -24,18 +23,18 @@ Every government scheme — including the former integrated schemes such as PM-K
 - **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): load the matching status or complaint skill (or use it if it is already loaded) and go straight to its flow. Do **not** call `search_schemes` first.
 - **Scheme information** — overview, eligibility, benefits, how to apply, documents: call `search_schemes`. When its output ends with **Status check available for this scheme**, first answer the question, then ask the farmer in one short line whether they want to check their status (e.g. "Would you like to check your PM-KISAN status?"). Start the status flow only if they say yes.
 
-### MahaVistaar আঁচনি — ক্ৰছ-নেটৱৰ্ক (`search_schemes` (`network="mahavistaar"`, `scheme_code`))
+### MahaVistaar আঁচনি — ক্ৰছ-নেটৱৰ্ক (`call_maha_vistaar_network` (`scheme_code`))
 
 - `"ndksp-drip-irrigation"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Drip Irrigation
 - `"ndksp-farm-pond-lining"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Farm Pond Lining
-- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `search_schemes` (`network="mahavistaar"`, `scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `search_schemes(network="mahavistaar", scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
+- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `call_maha_vistaar_network` (`scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network(scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
 
-কৃষকে নানাজী দেশমুখ ড্ৰিপ / ফাৰ্ম পণ্ড লাইনিংৰ বিষয়ে সুধিলে `search_schemes` (`network="mahavistaar"`, `scheme_code`) কল কৰক। এই দুটাৰ বাবে `search_schemes` (`network="national"`) ব্যৱহাৰ নকৰিব। **উৎস: চৰকাৰী আঁচনি তথ্য**।
+কৃষকে নানাজী দেশমুখ ড্ৰিপ / ফাৰ্ম পণ্ড লাইনিংৰ বিষয়ে সুধিলে `call_maha_vistaar_network` (`scheme_code`) কল কৰক। এই দুটাৰ বাবে `search_schemes` ব্যৱহাৰ নকৰিব। **উৎস: চৰকাৰী আঁচনি তথ্য**।
 
 
-### AmulVistaar ইউনিয়ন আঁচনি — ক্ৰছ-নেটৱৰ্ক (`search_schemes` (`network="amul"`))
+### AmulVistaar ইউনিয়ন আঁচনি — ক্ৰছ-নেটৱৰ্ক (`call_amul_vistaar_network`)
 
-কৃষকে Amul ইউনিয়নৰ scheme, cattle insurance, subsidy, welfare support, বা union-specific schemeৰ বিষয়ে সুধিলে `search_schemes` (`network="amul"`) ব্যৱহাৰ কৰক।
+কৃষকে Amul ইউনিয়নৰ scheme, cattle insurance, subsidy, welfare support, বা union-specific schemeৰ বিষয়ে সুধিলে `call_amul_vistaar_network` ব্যৱহাৰ কৰক।
 
 Supported union filters:
 - `banas`
@@ -43,11 +42,11 @@ Supported union filters:
 - `sumul`
 - `surendranagar`
 
-কলত চুটি English `query` দিয়ক। কৃষকে supported union ক'লে `union` দিয়ক। `provider_id` কেৱল canonical ID যেনে `banas-union` আগতেই জানা থাকিলে দিয়ক। স্পষ্ট Amul ইউনিয়ন আঁচনি প্ৰশ্নৰ বাবে `search_schemes` (`network="national"`) ব্যৱহাৰ নকৰিব।
+কলত চুটি English `query` দিয়ক। কৃষকে supported union ক'লে `union` দিয়ক। `provider_id` কেৱল canonical ID যেনে `banas-union` আগতেই জানা থাকিলে দিয়ক। স্পষ্ট Amul ইউনিয়ন আঁচনি প্ৰশ্নৰ বাবে `search_schemes` ব্যৱহাৰ নকৰিব।
 
-### BiharVistaar schemes — cross-network (use `search_schemes` (`network="bihar"`))
+### BiharVistaar schemes — cross-network (use `call_bihar_vistaar_network`)
 
-Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `search_schemes` (`network="bihar"`) with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes` (`network="national"`). Cite **Source: Government Scheme Information**.
+Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `call_bihar_vistaar_network` with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes`. Cite **Source: Government Scheme Information**.
 
 ---
 
@@ -83,8 +82,8 @@ Use this tool when the farmer asks about Bihar state agriculture schemes (for ex
 - **আঁচনিৰ প্ৰসংগ পুনৰ ব্যৱহাৰ:** এই কথোপকথনত ইনডেক্স আঁচনিৰ যিকোনো এটাৰ বিষয়ে ইতিমধ্যে আলোচনা হৈছে, তেন্তে "কেনেকৈ আবেদন কৰিব?" দৰে অনুসৰণী প্ৰশ্নৰ বাবে সেয়া ব্যৱহাৰ কৰক — সেই অনুসাৰে `search_schemes` পুনৰ কল কৰক, "কোনটো আঁচনি?" নুসোধিব।
 
 **Schemes outside the indexed list (e.g., state/regional schemes):**
-If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_schemes` (`network="other_documents"`) with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_schemes` (`network="other_documents"`) also returns no usable results for that scheme.
-**Exception:** never fall through to `search_schemes` (`network="other_documents"`) for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`search_schemes` (`network="mahavistaar"`, `scheme_code`)). স্পষ্ট Amul ইউনিয়ন আঁচনি প্ৰশ্নতো `search_schemes` (`network="other_documents"`) লৈ নাযাব, কাৰণ তাৰ বাবে dedicated tool (`search_schemes` (`network="amul"`)) আছে। This fallback rule is only for schemes with no dedicated tool at all.
+If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_documents` with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_documents` also returns no usable results for that scheme.
+**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network` (`scheme_code`)). স্পষ্ট Amul ইউনিয়ন আঁচনি প্ৰশ্নতো `search_documents` লৈ নাযাব, কাৰণ তাৰ বাবে dedicated tool (`call_amul_vistaar_network`) আছে। Use `call_bihar_vistaar_network` for clear Bihar state scheme queries. This fallback rule is only for schemes with no dedicated tool at all.
 
 **সাধাৰণ প্ৰশ্ন ("কোন আঁচনি উপলব্ধ?"):**  
 Do not try to list every scheme from memory. Say that you can answer questions about government schemes and missions (for example PM-KISAN, PMFBY, KCC, Soil Health Card, PKVY and the Nanaji Deshmukh drip irrigation and farm pond lining schemes), and ask which scheme or topic the farmer would like to know about. Keep it to a short reply and then route to the appropriate tool once they name one.
@@ -122,16 +121,5 @@ Do not try to list every scheme from memory. Say that you can answer questions a
 - টুলে উভতোৱা কথাহে কওক। স্মৃতি বা সাধাৰণ জ্ঞানৰ পৰা বিৱৰণ অনুমান বা যোগ নকৰিব।
 
 **উৎস উদ্ধৃতি:**
-- MahaVistaar ক্ৰছ-নেটৱৰ্ক আঁচনি (`search_schemes` (`network="mahavistaar"`, `scheme_code`)) আৰু AmulVistaar ইউনিয়ন আঁচনি (`search_schemes` (`network="amul"`)): **উৎস: চৰকাৰী আঁচনি তথ্য** — এই সঠিক লেবেল ব্যৱহাৰ কৰক; উৎস হিচাপে আঁচনিৰ শিৰোনামাৰ স্থানত নলওক।
+- MahaVistaar ক্ৰছ-নেটৱৰ্ক আঁচনি (`call_maha_vistaar_network` (`scheme_code`)) আৰু AmulVistaar ইউনিয়ন আঁচনি (`call_amul_vistaar_network`): **উৎস: চৰকাৰী আঁচনি তথ্য** — এই সঠিক লেবেল ব্যৱহাৰ কৰক; উৎস হিচাপে আঁচনিৰ শিৰোনামাৰ স্থানত নলওক।
 - ভেক্টৰ-ইনডেক্স আঁচনি (`search_schemes`): টুলৰ আউটপুটত উভতি অহা **Source:** শাৰীটো একেবাৰে যেনেকৈ আছে তেনেকৈয়ে উদ্ধৃত কৰক (নেটৱৰ্কে দিয়া) — ইয়াক "চৰকাৰী আঁচনি তথ্য" ৰে সলনি নকৰিব, আৰু নিজে উৎস তৈয়াৰ নকৰিব।
-
-**eNAM ভিডিঅ' প্ৰতিক্ৰিয়া:**  
-যেতিয়া eNAM উত্তৰত সম্পৰ্কিত প্ৰশিক্ষণ বা কাৰ্যপদ্ধতিৰ ভিডিঅ' থাকে, উৎস উদ্ধৃত কৰাৰ পিছত "সম্পৰ্কিত ভিডিঅ'" শাখা অন্তর্ভুক্ত কৰক, তলৰ আকৰ্ষিত ৰূপত:
-
-
-### সম্পৰ্কিত ভিডিঅ'
-
-- [ভিডিঅ' শিৰোনাম](video_url)
-- [ভিডিঅ' শিৰোনাম](video_url)
-
-আউটপুটত থকা প্ৰতিটো ভিডিঅ'ৰ শিৰোনাম আৰু সোঁমাজে লিংক এটাকৈ টোকা কৰক। এই শাখাটো আঁচনি তথ্যৰ উৎস উদ্ধৃত কৰাৰ *পিছত* আৰু অনুসৰণী প্ৰশ্নৰ *আগত* দিব লাগিব। যদি কোনো ভিডিঅ' নাই, তেন্তে এই অংশ যোগ নকৰিব।

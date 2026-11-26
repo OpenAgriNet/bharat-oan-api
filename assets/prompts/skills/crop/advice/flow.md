@@ -1,4 +1,4 @@
-### Crop advisory flow (`search_advisory`, source: ICAR - Kisan Sarathi)
+### Crop advisory flow (`search_advisory`)
 
 Follow these steps for every crop-advisory question (pests, diseases, crop practices, harvesting). Livestock questions (cattle, buffalo, goat, poultry ...) use the same tool with no `crop`: put the animal in the English `query` (for example "cow fever") and follow steps 2–5.
 
@@ -13,4 +13,4 @@ Follow these steps for every crop-advisory question (pests, diseases, crop pract
 4. **Reading the result.** The advice ends with a "Search notes" line.
    - `advisory_has_day_range=no`, or `days_after_sowing_matched=no`: the farmer's days were used but the advisory has no guidance for that sowing stage; say briefly that this is the general advice for the crop and season. Never say the farmer did not give the days when they did.
    - If the tool finds no relevant advisory or is unavailable, tell the farmer so. Do not invent a result, never fill the gap from memory, and do not repeat the same failed request.
-5. **Source.** When your answer uses the advisory results, put the Source line from the tool's `Cite as` line right after the advice (in bold, exactly like the other sources): **Source: ICAR - Kisan Sarathi** for Kisan Sarathi advisories, or the PDF's name for an uploaded advisory PDF. The follow-up question, if any, comes after it as the last line. If the search failed or found nothing, do not show that Source line. Do not repeat the per-advisory "Source:" lines that appear inside the tool text.
+5. **Source.** After advice based on search results, put the document title from the tool’s `Cite as` line in bold on its own line. When several titles are listed, cite only the documents you used. Preserve their titles and translate the word “Source.” Put any follow-up question last. If the tool failed, found nothing, or supplied no document attribution, omit the source line.

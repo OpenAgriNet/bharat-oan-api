@@ -142,7 +142,10 @@ else:
         check_khc_grievance_status,
         register_khc_grievance,
     )
-from agents.tools.search import search_schemes
+from agents.tools.amul_vistaar import call_amul_vistaar_network
+from agents.tools.bihar_vistaar import call_bihar_vistaar_network
+from agents.tools.maha_vistaar import call_maha_vistaar_network
+from agents.tools.search import search_documents, search_schemes
 from agents.tools.advisory import search_advisory
 # Unlike mandi, weather's v2 output differs: the provider mapping drops fields
 # the v0.1 pack cannot hold. See migration-plan/weather/plan.md.
@@ -353,7 +356,27 @@ TOOLS = [
         strict=False,
     ),
     Tool(
+        search_documents,
+        takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
         search_schemes,
+        takes_ctx=False,
+        strict=False,
+    ),
+    Tool(
+        call_amul_vistaar_network,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        call_bihar_vistaar_network,
+        takes_ctx=True,
+        strict=False,
+    ),
+    Tool(
+        call_maha_vistaar_network,
         takes_ctx=True,
         strict=False,
     ),
