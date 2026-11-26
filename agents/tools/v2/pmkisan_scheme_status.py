@@ -332,7 +332,11 @@ async def initiate_pm_kisan_status_check(
 ) -> str:
     """Initiate PM Kisan status check by sending OTP to farmer's mobile.
 
-    Use this tool to initiate the process to check the status of a farmer's scheme benefit by sending an OTP to their registered mobile number.
+    PM-KISAN only. Use it when the farmer asks about PM-KISAN itself: its instalments,
+    its payment status or its eKYC. Do not use it for any other scheme. PMFBY, AIF, KCC,
+    KHC, SMAM and Soil Health Card each have their own skill, and a request about one of
+    those needs load_skill first -- answering it with this tool sends the wrong OTP and
+    reads the wrong scheme. The OTP this tool sends is 4 digits; the other schemes use 6.
     The farmer can provide either their PM Kisan registration number OR their registered phone number.
 
     Args:
