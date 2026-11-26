@@ -237,8 +237,25 @@ class TestSourceLine:
         out = sa.format_advisory_results(
             [{"title": "Rice", "instance_name": "ICAR - Kisan Sarathi", "text": TEXT, "section": "full"}], "q"
         )
-        assert "copying the names exactly as written" in out
+        assert "copy it character for character" in out and "do not apply the abbreviation-with-full-stops rule" in out
         assert "**Source: ICAR - Kisan Sarathi | Rice**" in out
+
+    def test_states_the_instance_name_once_for_several_titles(self):
+        icar = "ICAR - Kisan Sarathi"
+        out = sa.format_advisory_results(
+            [
+                {"title": "Wheat Insect Management", "instance_name": icar, "text": TEXT, "section": "full"},
+                {"title": "Package of Practices for Wheat", "instance_name": icar, "text": TEXT, "section": "full"},
+                {"title": "coffee_guide_2023", "instance_name": "Bharat Vistaar", "text": TEXT, "section": "full"},
+                {"title": "Untagged", "text": TEXT, "section": "full"},
+            ],
+            "q",
+        )
+        assert out.rstrip().endswith(
+            "**Source: ICAR - Kisan Sarathi | Wheat Insect Management; Package of Practices for Wheat; "
+            "Bharat Vistaar | coffee_guide_2023; Untagged**"
+        )
+        assert out.count("ICAR - Kisan Sarathi") == 1
 
     def test_cites_the_title_alone_without_an_instance_name(self):
         out = sa.format_advisory_results([{"title": "T", "instance_name": "", "text": TEXT, "section": "full"}], "q")

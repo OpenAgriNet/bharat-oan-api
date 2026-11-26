@@ -284,19 +284,23 @@ _TRAILING_SOURCE = re.compile(r"\n+Source:[^\n]*\s*$")
 def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
     """Format passages with document attribution from the index."""
     blocks = []
-    sources = {}
+    # Titles grouped under the instance that holds them, so the instance name is stated once.
+    # Documents without an instance name are cited by title alone.
+    by_instance: Dict[str, Dict[str, None]] = {}
     for result in results:
         title = result.get("title", "").strip()
         instance_name = str(result.get("instance_name") or "").strip()
         text = _TRAILING_SOURCE.sub("", result["text"]).rstrip()
         blocks.append(f"**{title or 'Advisory'}**\n```\n{text}\n```")
         if title:
-            sources.setdefault(f"{instance_name} | {title}" if instance_name else title, None)
+            by_instance.setdefault(instance_name, {}).setdefault(title, None)
     formatted = f"> Advisory Search Results for `{query}`\n\n" + "\n\n----\n\n".join(blocks)
-    if sources:
+    labels = [f"{name} | {'; '.join(titles)}" if name else "; ".join(titles) for name, titles in by_instance.items()]
+    if labels:
         formatted += (
-            "\n\n> Cite as (in bold), copying the names exactly as written (do not respell, expand or add dots to "
-            f"abbreviations such as ICAR): **Source: {'; '.join(sources)}**"
+            "\n\n> Cite as (in bold). The Source line is a fixed label: copy it character for character, "
+            "including the instance name and every abbreviation (for example ICAR), and do not apply the "
+            f"abbreviation-with-full-stops rule to it: **Source: {'; '.join(labels)}**"
         )
     return formatted
 
