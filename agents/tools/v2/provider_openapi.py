@@ -193,25 +193,6 @@ def _cache_ttl_seconds() -> float:
     return float(os.getenv("PROVIDER_OPENAPI_CACHE_TTL_SECONDS", _OPENAPI_CACHE_TTL_SECONDS_DEFAULT))
 
 
-def rewritten_url(url: str) -> str:
-    """The URL to actually fetch.
-
-    A catalog names the published spec, which is right for everyone reading it
-    and wrong for a deployment that cannot reach the public site -- an offline
-    stack, or one testing a spec change before it is published. The pairs in
-    PROVIDER_OPENAPI_URL_REWRITE ("from=to,from=to") redirect it to the same
-    file served somewhere else. Deployment wiring, like the provider base URL:
-    nothing in the catalog or the tool changes.
-    """
-    for pair in os.getenv("PROVIDER_OPENAPI_URL_REWRITE", "").split(","):
-        prefix, _, replacement = pair.strip().partition("=")
-        if prefix and url.startswith(prefix):
-            rewritten = replacement + url[len(prefix):]
-            logger.info(f"Reading {url} from {rewritten}")
-            return rewritten
-    return url
-
-
 async def openapi_document(url: str) -> dict:
     cached = _OPENAPI_CACHE.get(url)
     if cached and cached[0] > time.monotonic():
@@ -220,7 +201,7 @@ async def openapi_document(url: str) -> dict:
     logger.info(f"Fetching provider OpenAPI {url}")
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-            response = await client.get(rewritten_url(url))
+            response = await client.get(url)
         response.raise_for_status()
         document = yaml.safe_load(response.text)
     except (httpx.HTTPError, yaml.YAMLError) as e:

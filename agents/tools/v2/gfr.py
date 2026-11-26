@@ -23,7 +23,6 @@ from agents.tools.v2.provider_openapi import (
     From,
     SchemaUnavailable,
     filled_for,
-    rewritten_url,
 )
 from agents.tools.v2.sathi_seed import AGRICULTURE_RESOURCE_CONTEXT
 from app.config import DEFAULT_HTTP_TIMEOUT
@@ -34,8 +33,8 @@ load_dotenv()
 
 logger = get_logger(__name__)
 
-# Named as published, then redirected by PROVIDER_OPENAPI_URL_REWRITE while v0.2 is unpublished.
-AGRICULTURE_ADVISORY_CONTEXT = rewritten_url(
+# Named as published. OAN_SCHEMA_BASE moves the fetch for a stack that cannot reach the site.
+AGRICULTURE_ADVISORY_CONTEXT = (
     os.getenv("OAN_SCHEMA_BASE", "https://openagrinet.github.io/network-specs/schema").rstrip("/")
     + "/AgricultureAdvisory/v0.2/context.jsonld"
 )

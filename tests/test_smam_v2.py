@@ -100,7 +100,6 @@ def adapter(monkeypatch):
     monkeypatch.setenv("OAN_NETWORK_ID", "oan.test")
     monkeypatch.setattr(smam, "lf_update_current_observation", lambda **kwargs: None)
     monkeypatch.setattr(provider_openapi, "_OPENAPI_CACHE", {})
-    monkeypatch.delenv("PROVIDER_OPENAPI_URL_REWRITE", raising=False)
     fake = FakeAdapter()
     real_client = httpx.AsyncClient
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(fake), **kwargs))
