@@ -294,7 +294,10 @@ def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
             sources.setdefault(f"{instance_name} | {title}" if instance_name else title, None)
     formatted = f"> Advisory Search Results for `{query}`\n\n" + "\n\n----\n\n".join(blocks)
     if sources:
-        formatted += f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
+        formatted += (
+            "\n\n> Cite as (in bold), copying the names exactly as written (do not respell, expand or add dots to "
+            f"abbreviations such as ICAR): **Source: {'; '.join(sources)}**"
+        )
     return formatted
 
 

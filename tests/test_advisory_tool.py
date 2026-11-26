@@ -233,6 +233,13 @@ class TestSourceLine:
         assert results[0]["instance_name"] == "ICAR - Kisan Sarathi"
         assert sa.format_advisory_results(results, "q").endswith("**Source: ICAR - Kisan Sarathi | Rice**")
 
+    def test_tells_the_model_to_copy_the_source_names_exactly(self):
+        out = sa.format_advisory_results(
+            [{"title": "Rice", "instance_name": "ICAR - Kisan Sarathi", "text": TEXT, "section": "full"}], "q"
+        )
+        assert "copying the names exactly as written" in out
+        assert "**Source: ICAR - Kisan Sarathi | Rice**" in out
+
     def test_cites_the_title_alone_without_an_instance_name(self):
         out = sa.format_advisory_results([{"title": "T", "instance_name": "", "text": TEXT, "section": "full"}], "q")
         assert out.rstrip().endswith("**Source: T**")
