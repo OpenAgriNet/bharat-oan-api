@@ -219,6 +219,24 @@ class TestSourceLine:
             "**Source: Wheat Insect Management; coffee_guide_2023_mini; Package of Practices for Wheat**"
         )
 
+    def test_prefixes_the_instance_name_to_the_title(self):
+        out = sa.format_advisory_results(
+            [{"title": "Rice \u2014 Time of Harvesting", "instance_name": "ICAR - Kisan Sarathi",
+              "text": TEXT, "section": "full"}],
+            "q",
+        )
+        assert out.rstrip().endswith("**Source: ICAR - Kisan Sarathi | Rice \u2014 Time of Harvesting**")
+
+    def test_keeps_instance_name_when_parsing_a_hit(self):
+        hit = {"name": "Rice", "instance_name": " ICAR - Kisan Sarathi ", "text": TEXT, "origin": "webhook"}
+        results, _ = sa.parse_advisory_response(_on_search([hit]))
+        assert results[0]["instance_name"] == "ICAR - Kisan Sarathi"
+        assert sa.format_advisory_results(results, "q").endswith("**Source: ICAR - Kisan Sarathi | Rice**")
+
+    def test_cites_the_title_alone_without_an_instance_name(self):
+        out = sa.format_advisory_results([{"title": "T", "instance_name": "", "text": TEXT, "section": "full"}], "q")
+        assert out.rstrip().endswith("**Source: T**")
+
     def test_omits_citation_when_document_has_no_title(self):
         out = sa.format_advisory_results([{"text": TEXT, "origin": "webhook"}], "q")
         assert "Cite as" not in out

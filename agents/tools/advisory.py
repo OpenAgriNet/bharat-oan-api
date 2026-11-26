@@ -247,6 +247,8 @@ def _advisory_result_from_hit(hit: Dict[str, Any], score: float, crop: str) -> O
         "chunk_id": str(hit.get("chunk_id") or hit.get("_id") or "").strip(),
         "source": str(hit.get("origin") or "").strip(),
         "origin": str(hit.get("origin") or "").strip().lower(),
+        # Instance label from the provider (its display name, e.g. "ICAR - Kisan Sarathi"); shown ahead of the title.
+        "instance_name": str(hit.get("instance_name") or "").strip(),
         "text": text,
         "seasons": parse_chunk_seasons(text),
         "day_range": parse_chunk_days(text),
@@ -285,10 +287,11 @@ def format_advisory_results(results: List[Dict[str, Any]], query: str) -> str:
     sources = {}
     for result in results:
         title = result.get("title", "").strip()
+        instance_name = str(result.get("instance_name") or "").strip()
         text = _TRAILING_SOURCE.sub("", result["text"]).rstrip()
         blocks.append(f"**{title or 'Advisory'}**\n```\n{text}\n```")
         if title:
-            sources.setdefault(title, None)
+            sources.setdefault(f"{instance_name} | {title}" if instance_name else title, None)
     formatted = f"> Advisory Search Results for `{query}`\n\n" + "\n\n----\n\n".join(blocks)
     if sources:
         formatted += f"\n\n> Cite as (in bold): **Source: {'; '.join(sources)}**"
