@@ -1,6 +1,5 @@
 """Skill policies, assets, and real Pydantic tool-loop integration; no services needed."""
 import asyncio
-import ast
 import copy
 from pathlib import Path
 from types import SimpleNamespace
@@ -27,10 +26,8 @@ RENDER = {**CONTEXT, 'enabled_skills': ENABLED}
 
 
 def test_registry_covers_all_tools_with_shared_bindings():
-    tree = ast.parse((PROMPT_DIR.parents[1] / 'agents/tools/__init__.py').read_text())
-    assignment = next(n for n in tree.body if isinstance(n, ast.Assign)
-                      and any(isinstance(t, ast.Name) and t.id == 'TOOLS' for t in n.targets))
-    names = [call.args[0].id for call in assignment.value.elts]
+    from agents.tools import TOOLS
+    names = [tool.name for tool in TOOLS]
     CAT.validate_tools([SimpleNamespace(name=name) for name in names])
     assert names
     assert 'forward_geocode' in CAT.tools_for({'mandi.prices'})

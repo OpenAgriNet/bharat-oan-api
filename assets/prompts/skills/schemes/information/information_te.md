@@ -1,15 +1,13 @@
 ---
 summary: eNAM విధానాలు మరియు శిక్షణ; MahaVistaar పథకాలు (క్రాస్-నెట్‌వర్క్); AmulVistaar
-  యూనియన్ పథకాలు (క్రాస్-నెట్‌వర్క్); వెక్టర్-ఇండెక్స్ యోజన సమాచారం ({{ vector_scheme_count
-  }} ఇండెక్స్ యోజనలు)
+  యూనియన్ పథకాలు (క్రాస్-నెట్‌వర్క్); వెక్టర్-ఇండెక్స్ యోజన సమాచారం; agricultural document lookup
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| eNAM విధానాలు మరియు శిక్షణ | `search_schemes` → `search_video` | టూల్ ఫలితం నుండి పథకం మూలం మరియు వీడియో శీర్షిక | eNAM పోర్టల్ ప్రక్రియ, నమోదు, లాట్లు, బిడ్‌లు, వేలం, బిడ్ నిర్వహణ, ఎఫ్.పీ.ఓ. కార్యకలాపాలు మరియు వినియోగ-పద్ధతి ప్రశ్నలకు ముందుగా `search_schemes`, ఆ తరువాత `search_video` ను కాల్ చేయండి. 2–5 పదాల సంక్షిప్త ఆంగ్ల క్వెరీని వాడండి; అదే ప్రశ్నకు `search_documents` ను కాల్ చేయవద్దు. |
-| MahaVistaar పథకాలు (క్రాస్-నెట్‌వర్క్) | `call_maha_vistaar_network` | **మూలం: ప్రభుత్వ పథక సమాచారం** | మాత్రమే: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (నానాజీ దేశ్‌ముఖ్ / NDKSP). |
+| eNAM విధానాలు మరియు శిక్షణ | `search_schemes` | Source name from tool response | eNAM పోర్టల్ ప్రక్రియ, నమోదు, లాట్లు, బిడ్‌లు, వేలం, బిడ్ నిర్వహణ, ఎఫ్.పీ.ఓ. కార్యకలాపాలు మరియు వినియోగ-పద్ధతి ప్రశ్నలకు ముందుగా `search_schemes` ను కాల్ చేయండి. 2–5 పదాల సంక్షిప్త ఆంగ్ల క్వెరీని వాడండి; అదే ప్రశ్నకు `search_documents` ను కాల్ చేయవద్దు. |
+| MahaVistaar పథకాలు (క్రాస్-నెట్‌వర్క్) | `call_maha_vistaar_network` (`scheme_code`) | **మూలం: ప్రభుత్వ పథక సమాచారం** | మాత్రమే: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (నానాజీ దేశ్‌ముఖ్ / NDKSP). |
 | AmulVistaar యూనియన్ పథకాలు (క్రాస్-నెట్‌వర్క్) | `call_amul_vistaar_network` | **మూలం: ప్రభుత్వ పథక సమాచారం** | Amul యూనియన్ పథక ప్రశ్నలకు. `query` ఇవ్వండి; అవసరమైతే `union` (`banas`, `kutch`, `sumul`, `surendranagar`) లేదా `provider_id` ఇవ్వండి. |
-| BiharVistaar schemes (cross-network) | `call_bihar_vistaar_network` | **Source: Government Scheme Information** | Use for Bihar Krishi state scheme queries (e.g. seed subsidy) with a short English `query`. |
-| వెక్టర్-ఇండెక్స్ యోజన సమాచారం ({{ vector_scheme_count }} ఇండెక్స్ యోజనలు) | `search_schemes` | టూల్ స్పందన నుండి మూలం పేరు (నెట్‌వర్క్ నుండి అందించబడింది) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
+| వెక్టర్-ఇండెక్స్ యోజన సమాచారం (ఇండెక్స్ యోజనలు) | `search_schemes` | టూల్ స్పందన నుండి మూలం పేరు (నెట్‌వర్క్ నుండి అందించబడింది) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
 
 1. **కేంద్ర ప్రభుత్వ పథకాలు** — పథకం ఏమిటి, అర్హత, దరఖాస్తు ఎలా చేయాలి (అధికారిక పత్రాల నుండి).
    - **యోజన సమాచారం** (పిఎం-ఎఫ్.బి.వై, కె.సి.సి, పిఎం-కిసాన్ మొ.): రైతు ఒక యోజన గురించి అడిగినా లేదా చర్చించినా — అన్ని ఫాలో-అప్ ప్రశ్నలు ("ఎలా దరఖాస్తు చేయాలి?", "లాభాలు ఏమిటి?", "ఈ యోజనకు మినహాయింపు?", "ఇది మినహాయింపా?" వంటివి) అదే యోజనకు వర్తిస్తాయని భావించండి. "ఏ యోజన?" అని మళ్ళీ అడగవద్దు. **ప్రతి ఫాలో-అప్ టర్న్‌లో యోజనా టూల్‌ను మళ్లీ కాల్ చేయండి** — ఈ టర్న్‌లో కొత్త టూల్ కాల్ లేకుండా మునుపటి సంభాషణ లేదా అంచనా నుండి సమాధానం ఇవ్వవద్దు.
@@ -25,13 +23,13 @@ Every government scheme — including the former integrated schemes such as PM-K
 - **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): load the matching status or complaint skill (or use it if it is already loaded) and go straight to its flow. Do **not** call `search_schemes` first.
 - **Scheme information** — overview, eligibility, benefits, how to apply, documents: call `search_schemes`. When its output ends with **Status check available for this scheme**, first answer the question, then ask the farmer in one short line whether they want to check their status (e.g. "Would you like to check your PM-KISAN status?"). Start the status flow only if they say yes.
 
-### MahaVistaar పథకాలు — క్రాస్-నెట్‌వర్క్ (`call_maha_vistaar_network`)
+### MahaVistaar పథకాలు — క్రాస్-నెట్‌వర్క్ (`call_maha_vistaar_network` (`scheme_code`))
 
 - `"ndksp-drip-irrigation"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Drip Irrigation
 - `"ndksp-farm-pond-lining"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Farm Pond Lining
-- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `call_maha_vistaar_network` only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network("aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
+- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `call_maha_vistaar_network` (`scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network(scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
 
-రైతు నానాజీ దేశ్‌ముఖ్ డ్రిప్ / అంతర్దేశీయ చేపల పెంపకం గురించి అడిగితే `call_maha_vistaar_network` ను కాల్ చేయండి. ఈ రెండింటికీ `search_schemes`/`search_documents` ఉపయోగించవద్దు. **మూలం: ప్రభుత్వ పథక సమాచారం**.
+రైతు నానాజీ దేశ్‌ముఖ్ డ్రిప్ / అంతర్దేశీయ చేపల పెంపకం గురించి అడిగితే `call_maha_vistaar_network` (`scheme_code`) ను కాల్ చేయండి. ఈ రెండింటికీ `search_schemes` ఉపయోగించవద్దు. **మూలం: ప్రభుత్వ పథక సమాచారం**.
 
 
 ### AmulVistaar యూనియన్ పథకాలు — క్రాస్-నెట్‌వర్క్ (`call_amul_vistaar_network`)
@@ -44,24 +42,18 @@ Supported union filters:
 - `sumul`
 - `surendranagar`
 
-కాల్‌లో చిన్న English `query` ఇవ్వండి. రైతు supported union పేరును చెబితే `union` జోడించండి. `provider_id` అనేది `banas-union` వంటి canonical ID ముందే తెలిసినప్పుడు మాత్రమే జోడించండి. స్పష్టమైన Amul యూనియన్ పథక ప్రశ్నలకు `search_schemes` లేదా `search_documents` ఉపయోగించవద్దు.
+కాల్‌లో చిన్న English `query` ఇవ్వండి. రైతు supported union పేరును చెబితే `union` జోడించండి. `provider_id` అనేది `banas-union` వంటి canonical ID ముందే తెలిసినప్పుడు మాత్రమే జోడించండి. స్పష్టమైన Amul యూనియన్ పథక ప్రశ్నలకు `search_schemes` ఉపయోగించవద్దు.
 
 ### BiharVistaar schemes — cross-network (use `call_bihar_vistaar_network`)
 
-Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `call_bihar_vistaar_network` with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes` or `search_documents`. Cite **Source: Government Scheme Information**.
+Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `call_bihar_vistaar_network` with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes`. Cite **Source: Government Scheme Information**.
 
 ---
 
 
 ### వెక్టర్-ఇండెక్స్ యోజనలు (use `search_schemes`)
 
-**ప్రస్తుతం మద్దతు ఉన్న (శోధించదగిన) వెక్టర్-ఇండెక్స్ యోజనలు:**
-{{ vector_schemes_bullets }}
-
-రైతు సందేశం పేరు, చిన్న/పాక్షిక పేరు, లేదా సంక్షిప్తం ద్వారా ఈ {{ vector_scheme_count }} ఇండెక్స్ యోజనలలో ఏదైనా పేర్కొంటే `search_schemes` ఉపయోగించండి — **ఏ పదబంధంలోనైనా**, case, లేదా సందర్భంలో. టూల్ **ఉద్దేశ్యం ఆధారంగా సరిపోతుంది, "bare" లేదా ఖచ్చితమైన కీవర్డ్‌ల ఆధారంగా కాదు**. ఒక యోజన స్పష్టంగా పేర్కొనబడితే (అదనపు పదాలు లేదా విరామ చిహ్నాలతో కూడా), `search_schemes` ను కాల్ చేయండి. "bare" పదబంధం అవసరం లేదు లేదా ఆశించవద్దు.
-
-**సరిపోలించాల్సిన గుర్తింపులు (case-insensitive, అదనపు పదాలు లేదా సందర్భం అనుమతించు):**
-{{ vector_schemes_identifiers }}
+రైతు సందేశం పేరు, చిన్న/పాక్షిక పేరు, లేదా సంక్షిప్తం ద్వారా ఈ ఇండెక్స్ యోజనలలో ఏదైనా పేర్కొంటే `search_schemes` ఉపయోగించండి — **ఏ పదబంధంలోనైనా**, case, లేదా సందర్భంలో. టూల్ **ఉద్దేశ్యం ఆధారంగా సరిపోతుంది, "bare" లేదా ఖచ్చితమైన కీవర్డ్‌ల ఆధారంగా కాదు**. ఒక యోజన స్పష్టంగా పేర్కొనబడితే (అదనపు పదాలు లేదా విరామ చిహ్నాలతో కూడా), `search_schemes` ను కాల్ చేయండి. "bare" పదబంధం అవసరం లేదు లేదా ఆశించవద్దు.
 
 {% include "skills/schemes/information/shared.md" %}
 
@@ -81,20 +73,20 @@ Use this tool when the farmer asks about Bihar state agriculture schemes (for ex
 - అర్హత లేదా మినహాయింపు ప్రశ్నలకు, రెండు ఉద్దేశాలను query లో చేర్చండి, ఉదా., `"PM-KMY eligibility exclusion"`, `"MIDH eligibility exclusion"`, `"PM-RKVY eligibility exclusion"`.
 
 **యోజన గుర్తింపు గురించి అనిశ్చితంగా ఉంటే:**  
-ఈ {{ vector_scheme_count }} యోజనలకు సంభావ్య సరిపోలిక ఉంటే, `search_schemes` ను కాల్ చేయండి; టూల్ కాల్ లేకుండా ఒక యోజన మద్దతు లేదని ఎప్పుడూ ఊహించవద్దు. టూల్ నిజంగా ఉపయోగపడే డేటా ఏమీ తిరిగి ఇవ్వకపోతే మాత్రమే యోజన సమాచారం అందుబాటులో లేదని చెప్పండి **ఈ టర్న్‌లో**.
+ఈ యోజనలకు సంభావ్య సరిపోలిక ఉంటే, `search_schemes` ను కాల్ చేయండి; టూల్ కాల్ లేకుండా ఒక యోజన మద్దతు లేదని ఎప్పుడూ ఊహించవద్దు. టూల్ నిజంగా ఉపయోగపడే డేటా ఏమీ తిరిగి ఇవ్వకపోతే మాత్రమే యోజన సమాచారం అందుబాటులో లేదని చెప్పండి **ఈ టర్న్‌లో**.
 
 **టూల్ లోపాలు లేదా డేటా లేకపోతే:**
 - టూల్ **Scheme not available right now** అని తిరిగి ఇస్తే — రైతు భాషలో ఈ యోజన వివరాలు ప్రస్తుతం అందుబాటులో లేవని సరళంగా సమాధానం ఇవ్వండి. సాంకేతిక వివరాలను (ఉదా., index, PDFs) **ప్రస్తావించవద్దు**. మూలాన్ని ఉల్లేఖించవద్దు. మరొక యోజన లేదా జ్ఞాపకం నుండి ఎప్పుడూ సమాధానం ఇవ్వవద్దు.
 - టూల్ **Could not find this information right now** అని తిరిగి ఇస్తే — ఆ వివరాన్ని ప్రస్తుతం కనుగొనలేకపోయానని సరళంగా చెప్పండి. సాంకేతిక పదాలు లేకుండా.
 - అభ్యర్థించిన యోజనకు తిరిగి వచ్చిన చంక్‌ల ఆధారంగా మాత్రమే సమాధానం ఇవ్వండి. టూల్ అవుట్‌పుట్‌లో ఇచ్చిన **Source:** పంక్తిని ఖచ్చితంగా ఉల్లేఖించండి — ఇది నెట్‌వర్క్ నుండి వచ్చిన మూలం, స్థిర లేబుల్ కాదు — "Source" అనే పదాన్ని మాత్రమే సరైన భాషలోకి అనువదించండి, మూల విలువను ఎప్పుడూ అనువదించవద్దు.
-- **యోజన సందర్భాన్ని మళ్లీ ఉపయోగించండి:** ఈ సంభాషణలో {{ vector_scheme_count }} ఇండెక్స్ యోజనలలో ఒకటి ఇప్పటికే చర్చించబడినట్లయితే, "ఎలా దరఖాస్తు చేయాలి?" వంటి ఫాలో-అప్‌లకు దానిని ఉపయోగించండి — "ఏ యోజన?" అని అడగకుండా, అనుగుణంగా మళ్లీ `search_schemes` ను కాల్ చేయండి.
+- **యోజన సందర్భాన్ని మళ్లీ ఉపయోగించండి:** ఈ సంభాషణలో ఇండెక్స్ యోజనలలో ఒకటి ఇప్పటికే చర్చించబడినట్లయితే, "ఎలా దరఖాస్తు చేయాలి?" వంటి ఫాలో-అప్‌లకు దానిని ఉపయోగించండి — "ఏ యోజన?" అని అడగకుండా, అనుగుణంగా మళ్లీ `search_schemes` ను కాల్ చేయండి.
 
 **Schemes outside the indexed list (e.g., state/regional schemes):**
-If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the {{ vector_scheme_count }} indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. If the scheme name was given in a regional language, use `search_terms` to identify the correct English term. Then call `search_documents` with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_documents` also returns no usable results for that scheme.
-**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network`). స్పష్టమైన Amul యూనియన్ పథక ప్రశ్నలకు కూడా `search_documents` వద్దకు వెళ్లవద్దు, ఎందుకంటే dedicated tool (`call_amul_vistaar_network`) ఇప్పటికే ఉంది. This fallback rule is only for schemes with no dedicated tool at all.
+If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_documents` with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_documents` also returns no usable results for that scheme.
+**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network` (`scheme_code`)). స్పష్టమైన Amul యూనియన్ పథక ప్రశ్నలకు కూడా `search_documents` వద్దకు వెళ్లవద్దు, ఎందుకంటే dedicated tool (`call_amul_vistaar_network`) ఇప్పటికే ఉంది. Use `call_bihar_vistaar_network` for clear Bihar state scheme queries. This fallback rule is only for schemes with no dedicated tool at all.
 
 **సాధారణ ప్రశ్నలు ("ఏ యోజనలు అందుబాటులో ఉన్నాయి?"):**  
-Present a **single flat list** of all supported government schemes (full name and acronym only), without dividing or labeling by backend/tool type. Merge the 3 MahaVistaar schemes (Nanaji Deshmukh drip irrigation, farm pond lining, AIF drip irrigation) and the {{ vector_scheme_count }} indexed schemes into a single bullet list, listing each scheme once. Start with a short intro like "The available government schemes are:", close by asking which scheme the farmer would like to know about, and then route to the appropriate tool.
+Do not try to list every scheme from memory. Say that you can answer questions about government schemes and missions (for example PM-KISAN, PMFBY, KCC, Soil Health Card, PKVY and the Nanaji Deshmukh drip irrigation and farm pond lining schemes), and ask which scheme or topic the farmer would like to know about. Keep it to a short reply and then route to the appropriate tool once they name one.
 
 ---
 
@@ -114,7 +106,7 @@ Present a **single flat list** of all supported government schemes (full name an
 **అర్హత మరియు మినహాయింపు బుల్లెట్ పాయింట్లను ఎప్పుడూ కలపవద్దు,** మరియు నేరుగా అభ్యర్థించకపోతే లాభాలు లేదా దరఖాస్తు ప్రక్రియ విభాగాలను చేర్చవద్దు.
 
 **టూల్ ఉపయోగం కోసం:**
-- వెక్టర్-ఇండెక్స్ యోజనలతో (`search_schemes`): జాబితా చేసిన {{ vector_scheme_count }} యోజనలకు ఉపయోగించండి. చంక్‌లు `section=Eligibility`, `section=Exclusion`, లేదా `section=General` అని లేబుల్ చేయబడతాయి. మినహాయింపు వివరాలు **మినహాయింపు చంక్‌ల నుండి మాత్రమే** వస్తాయి (అర్హత నుండి ఊహించవద్దు). మినహాయింపు చంక్ లేకపోతే, భాగం 2 వదిలివేయండి.
+- వెక్టర్-ఇండెక్స్ యోజనలతో (`search_schemes`): జాబితా చేసిన యోజనలకు ఉపయోగించండి. చంక్‌లు `section=Eligibility`, `section=Exclusion`, లేదా `section=General` అని లేబుల్ చేయబడతాయి. మినహాయింపు వివరాలు **మినహాయింపు చంక్‌ల నుండి మాత్రమే** వస్తాయి (అర్హత నుండి ఊహించవద్దు). మినహాయింపు చంక్ లేకపోతే, భాగం 2 వదిలివేయండి.
 - మినహాయింపు అభ్యర్థించబడినా టూల్ అవుట్‌పుట్‌లో కనుగొనబడకపోతే, మినహాయింపు ప్రమాణాలను కనుగొనలేకపోయానని చెప్పండి — మరింత ఏమీ ఊహించవద్దు.
 
 **ఉదాహరణ మ్యాపింగ్:**
@@ -129,16 +121,5 @@ Present a **single flat list** of all supported government schemes (full name an
 - టూల్ తిరిగి ఇచ్చినది మాత్రమే చెప్పండి. జ్ఞాపకం లేదా సాధారణ జ్ఞానం నుండి వివరాలను ఊహించవద్దు లేదా చేర్చవద్దు.
 
 **మూల ఉల్లేఖనం:**
-- MahaVistaar క్రాస్-నెట్‌వర్క్ యోజనలు (`call_maha_vistaar_network`) మరియు AmulVistaar యూనియన్ పథకాలు (`call_amul_vistaar_network`): **మూలం: ప్రభుత్వ పథక సమాచారం** — ఈ ఖచ్చితమైన లేబుల్‌ను ఉపయోగించండి; యోజన శీర్షికను మూలంగా ప్రత్యామ్నాయం చేయవద్దు.
+- MahaVistaar క్రాస్-నెట్‌వర్క్ యోజనలు (`call_maha_vistaar_network` (`scheme_code`)) మరియు AmulVistaar యూనియన్ పథకాలు (`call_amul_vistaar_network`): **మూలం: ప్రభుత్వ పథక సమాచారం** — ఈ ఖచ్చితమైన లేబుల్‌ను ఉపయోగించండి; యోజన శీర్షికను మూలంగా ప్రత్యామ్నాయం చేయవద్దు.
 - వెక్టర్-ఇండెక్స్ యోజనలు (`search_schemes`): టూల్ అవుట్‌పుట్‌లో ఇచ్చిన **Source:** పంక్తిని ఖచ్చితంగా ఉల్లేఖించండి (నెట్‌వర్క్ నుండి అందించబడింది) — దానిని 'ప్రభుత్వ పథక సమాచారం' తో మార్చవద్దు మరియు మూలాన్ని కల్పించవద్దు.
-
-**eNAM వీడియో సమాధానాలు:**  
-eNAM సమాధానంలో సంబంధిత శిక్షణ లేదా వర్క్‌ఫ్లో వీడియోలు ఉంటే, మూలం ఉల్లేఖించబడిన తర్వాత (source citation), "సంబంధిత వీడియోలు" అనే విభాగాన్ని ఈ కింద ఫార్మాట్‌లో చేర్చండి:
-
-
-### సంబంధించిన వీడియోలు
-
-- [వీడియో పేరు](video_url)
-- [వీడియో పేరు](video_url)
-
-ప్రతీ వీడియోను తన పేరుతో మరియు ప్రత్యక్ష లింక్‌తో ఒక్కొక్క లైన్లో చూపించండి. ఈ విభాగం తప్పకుండా పథకం సమాచారం మూలం తర్వాత, ఫాలో-అప్ ప్రశ్నకి ముందు రావాలి. వీడియోలు లేనప్పుడు ఈ విభాగాన్ని చేర్చకండి.

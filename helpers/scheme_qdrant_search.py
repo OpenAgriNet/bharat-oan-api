@@ -7,131 +7,19 @@ import logging
 import os
 import re
 import time
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-from langfuse import observe
-from qdrant_client import QdrantClient
-from qdrant_client.models import FieldCondition, Filter, MatchValue
-from sentence_transformers import SentenceTransformer
+if TYPE_CHECKING:
+    from qdrant_client import QdrantClient
+    from sentence_transformers import SentenceTransformer
 
-from helpers.langfuse_tracing import lf_update_current_observation
-from helpers.master_catalog import _tier_for_environment, get_master_catalog_snapshot, get_vector_scheme_entries
 
 DEFAULT_EMBEDDING_MODEL = "intfloat/multilingual-e5-large"
 SCHEME_SEARCH_SOURCE = "Government Scheme Information"
 _embedder_cache: dict[str, SentenceTransformer] = {}
 _qdrant_client_cache: dict[tuple[str, Optional[str]], QdrantClient] = {}
-
-# Public scheme names outlive catalog codes. Only attach aliases to live entries.
-SCHEME_ALIASES: dict[str, tuple[str, ...]] = {
-    "pk": ("PMKISAN", "PM-KISAN", "Pradhan Mantri Kisan Samman Nidhi",
-           "Pradhanmantri Kisan Samman Nidhi", "पीएम किसान", "प्रधानमंत्री किसान सम्मान निधि"),
-    "pksy": ("PMKSY", "Pradhan Mantri Krishi Sinchayee Yojana"),
-    "pa": ("PMASHA", "PM ASHA", "Pradhan Mantri Annadata Aay Sanrakshan Abhiyan"),
-    "af": ("AIF", "Agriculture Infrastructure Fund"),
-    "aea": ("AIF activities", "AIF eligible activities", "Agriculture Infrastructure Fund eligible activities"),
-    "kcc": ("KCC", "Kisan Credit Card"),
-    "pmfby": ("PMFBY", "Pradhan Mantri Fasal Bima Yojana"),
-    "sathi": ("SATHI", "Seed Authentication Traceability and Holistic Inventory"),
-    "smam": ("SMAM", "Sub Mission on Agricultural Mechanization"),
-    "pkvy-3": ("PKVY", "Paramparagat Krishi Vikas Yojana"),
-    "nfsm": ("NFSM", "National Food Security Mission"),
-    "rad": ("RAD", "Rainfed Area Development"),
-    "ffs-2": ("FFS", "Framework for Fertilizer Sales"),
-    "nbm": ("NBM", "National Bamboo Mission"),
-    "nbhm": ("NBHM", "National Beekeeping and Honey Mission"),
-}
-
-def get_builtin_scheme_list() -> list[dict[str, Any]]:
-    """Scheme registry used for query → scheme_code resolution (search_schemes routing).
-
-    Sourced entirely from docs-pipeline's live master_catalog Redis snapshot
-    (Postgres is the source of truth) — a scheme promoted in docs-pipeline
-    appears here on the next call, no redeploy needed. Returns an empty list
-    if Redis is unreachable or the snapshot hasn't been written yet; callers
-    must tolerate that (see get_vector_scheme_entries / get_master_catalog_snapshot
-    docstrings for the fails-open contract).
-
-    Only schemes published in this environment's catalog are advertised.
-    """
-    scheme_list: list[dict[str, Any]] = []
-    for entry in get_vector_scheme_entries():
-        code = str(entry.get("code") or "").strip().lower()
-        name = str(entry.get("name") or "").strip()
-        if not code or not name:
-            continue
-        scheme_list.append({
-            "scheme_code": code,
-            "scheme_name": name,
-            "scheme_aliases": list(dict.fromkeys([
-                *[str(a).strip() for a in (entry.get("aliases") or []) if str(a).strip()],
-                *SCHEME_ALIASES.get(code, ()),
-            ])),
-            "prompt_visible": True,
-        })
-    return scheme_list
-
-
-@observe(name="prompt:master_catalog_redis_check", as_type="span", capture_input=False, capture_output=False)
-def format_vector_schemes_prompt_block() -> dict[str, Any]:
-    """Render the system prompt's dynamic "vector-indexed schemes" section
-    (bullets + match-identifiers) from get_builtin_scheme_list() — the SAME
-    list search_schemes() uses to resolve a query to a scheme_code.
-
-    Deliberately not read from docs-pipeline's Redis `prompt` field directly:
-    rendering from get_builtin_scheme_list() keeps what the farmer is told is
-    available always consistent with what the resolver actually accepts, even
-    though today both ultimately read the same Redis snapshot.
-
-    @observe-wrapped as a preparation span for Langfuse visibility: this
-    runs once every turn as part of system-prompt construction, not as an
-    LLM-invoked tool, but it's the single call site that triggers the actual
-    Redis read (get_master_catalog_snapshot, via get_builtin_scheme_list) —
-    logging it as a span is what makes "what did we just pull from Redis"
-    inspectable per-turn in the trace, instead of only in server logs.
-    """
-    tier = _tier_for_environment()
-    snapshot = get_master_catalog_snapshot(tier)
-    scheme_list = sorted(
-        (item for item in get_builtin_scheme_list() if item.get("prompt_visible", True)),
-        key=lambda item: item["scheme_code"],
-    )
-    bullets = [f'- **{item["scheme_name"]}** ({item["scheme_code"]})' for item in scheme_list]
-    identifiers = []
-    for item in scheme_list:
-        alias_suffix = "".join(f" / {a}" for a in item.get("scheme_aliases", []))
-        identifiers.append(f'- `{item["scheme_code"]}`{alias_suffix}')
-    result = {
-        "vector_schemes_bullets": "\n".join(bullets),
-        "vector_schemes_identifiers": "\n".join(identifiers),
-        "vector_scheme_count": len(scheme_list),
-    }
-    lf_update_current_observation(
-        input={"tier": tier},
-        output={
-            "redis_snapshot_found": snapshot is not None,
-            "redis_snapshot_version": (snapshot or {}).get("version"),
-            "redis_snapshot_updated_at": (snapshot or {}).get("updated_at"),
-            "redis_entry_count": len((snapshot or {}).get("entries", [])) if snapshot else 0,
-            "merged_scheme_count": len(scheme_list),
-        },
-    )
-    return result
-
-
-ALIAS_STOPWORDS = {
-    "scheme", "schemes", "mission", "national", "programme", "program",
-    "yojana", "yojna", "development", "fund", "for", "the", "and", "under",
-    "government", "india", "ministry", "guidelines", "operational",
-}
-
-_SCHEME_FOCUS_STOPWORDS = ALIAS_STOPWORDS | frozenset({
-    "what", "who", "how", "when", "where", "why", "which", "about",
-    "farmer", "farmers", "criteria", "details", "information", "available",
-    "tell", "explain", "know", "need", "want", "there", "this", "that",
-})
 
 FARMER_TERMS = (
     "farmer", "farmers", "farmer's", "farmers'", "farmers' groups",
@@ -237,69 +125,6 @@ APP_UI_NOISE_TERMS = (
 )
 
 
-def _normalize_scheme_name(value: str) -> str:
-    # Treat dotted acronyms and hyphenated names like their spoken forms.
-    value = re.sub(r"(?<=\w)\.(?=\w)", "", value.casefold())
-    return re.sub(r"[\W_]+", " ", value).strip()
-
-
-def _alias_in_query(alias: str, query: str) -> bool:
-    alias = _normalize_scheme_name(alias)
-    if not alias:
-        return False
-    return bool(re.search(rf"(?<!\w){re.escape(alias)}(?!\w)", query))
-
-
-def resolve_scheme_code(query: str, scheme_list: list[dict[str, Any]]) -> Optional[str]:
-    q = _normalize_scheme_name(query)
-    best_len = 0
-    best_code: Optional[str] = None
-
-    for item in scheme_list:
-        code = item["scheme_code"]
-        candidates = [code, item.get("scheme_name", "")]
-        candidates.extend(item.get("scheme_aliases", []))
-        candidates.extend(SCHEME_ALIASES.get(code, ()))
-
-        for candidate in candidates:
-            alias = _normalize_scheme_name(str(candidate))
-            if not alias or alias in ALIAS_STOPWORDS:
-                continue
-            if not _alias_in_query(alias, q):
-                continue
-            if len(alias) > best_len:
-                best_len = len(alias)
-                best_code = code
-
-    # AIF's FAQ and eligible-activities list are separate published documents.
-    if best_code == "af" and re.search(r"\b(?:eligible activit(?:y|ies)|activit(?:y|ies) eligible)\b", q):
-        if any(item["scheme_code"] == "aea" for item in scheme_list):
-            return "aea"
-    return best_code
-
-
-def _strip_intent_terms(query: str) -> str:
-    cleaned = query.lower()
-    for terms in INTENT_TERMS.values():
-        for term in sorted(terms, key=len, reverse=True):
-            cleaned = cleaned.replace(term, " ")
-    for term in EXCLUSION_TERMS:
-        cleaned = cleaned.replace(term, " ")
-    return re.sub(r"\s+", " ", cleaned).strip()
-
-
-def query_names_unindexed_scheme(query: str, scheme_list: list[dict[str, Any]]) -> bool:
-    """True when the query names a scheme acronym/title not in the Qdrant registry."""
-    if resolve_scheme_code(query, scheme_list):
-        return False
-    tokens = [
-        token
-        for token in re.split(r"[\s?,]+", _strip_intent_terms(query))
-        if len(token) >= 3 and token not in _SCHEME_FOCUS_STOPWORDS
-    ]
-    return bool(tokens)
-
-
 def classify_query_intent(query: str) -> Optional[str]:
     q = query.lower()
     scores = {intent: sum(1 for term in terms if term in q) for intent, terms in INTENT_TERMS.items()}
@@ -308,7 +133,7 @@ def classify_query_intent(query: str) -> Optional[str]:
 
 
 def classify_scheme_section_focus(query: str) -> Optional[str]:
-    """Eligibility/exclusion section focus for a scheme query."""
+    """Mirrors legacy get_scheme_info eligibility/exclusion routing."""
     q = query.lower()
     has_eligibility = any(term in q for term in INTENT_TERMS["eligibility"])
     has_exclusion = any(term in q for term in EXCLUSION_TERMS)
@@ -603,6 +428,8 @@ def rerank_results(query: str, results: list[dict[str, Any]]) -> list[dict[str, 
 
 
 def get_embedder(model_name: str = DEFAULT_EMBEDDING_MODEL) -> SentenceTransformer:
+    from sentence_transformers import SentenceTransformer
+
     if model_name not in _embedder_cache:
         logger.info("Loading SentenceTransformer model %s", model_name)
         _embedder_cache[model_name] = SentenceTransformer(model_name)
@@ -653,12 +480,23 @@ def get_qdrant_client(
     is_local = any(host in qdrant_url for host in ("localhost", "127.0.0.1"))
     if not qdrant_key and not is_local:
         raise ValueError("QDRANT_API_KEY is required for remote Qdrant")
+    from qdrant_client import QdrantClient
+
     if qdrant_key:
         client = QdrantClient(url=qdrant_url, api_key=qdrant_key, check_compatibility=False)
     else:
         client = QdrantClient(url=qdrant_url, check_compatibility=False)
     _qdrant_client_cache[cache_key] = client
     return client
+
+
+def _format_page(start: Any, end: Any) -> str:
+    """Render a page or page range for chunk labels; empty when unknown."""
+    if start in (None, ""):
+        return ""
+    if end in (None, "", start):
+        return str(start)
+    return f"{start}-{end}"
 
 
 def _hit_to_result(hit: Any) -> dict[str, Any]:
@@ -671,6 +509,8 @@ def _hit_to_result(hit: Any) -> dict[str, Any]:
         "text": text,
         "doc_id": payload.get("doc_id"),
         "chunk_id": payload.get("chunk_id"),
+        "doc_title": payload.get("title_en") or payload.get("name_en") or payload.get("filename"),
+        "page": _format_page(payload.get("page_start"), payload.get("page_end")),
         "section": classify_chunk_section(text),
     }
 
@@ -684,17 +524,13 @@ def _run_scheme_search(
     collection_name: str,
     query_vector: list[float],
     fetch_k: int,
-    code: Optional[str] = None,
-    vector: Optional[list[float]] = None,
 ) -> list:
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+
     query_filter = Filter(must=[FieldCondition(key="type", match=MatchValue(value="scheme"))])
-    if code:
-        query_filter.must.append(
-            FieldCondition(key="scheme_code", match=MatchValue(value=code))
-        )
     return client.query_points(
         collection_name=collection_name,
-        query=vector if vector is not None else query_vector,
+        query=query_vector,
         query_filter=query_filter,
         limit=fetch_k,
         with_payload=True,
@@ -716,7 +552,6 @@ def _merge_supplemental_results(
     query: str,
     results: list[dict[str, Any]],
     supplemental: tuple[str, str],
-    scheme_code: Optional[str],
     client: QdrantClient,
     collection_name: str,
     fetch_k: int,
@@ -726,63 +561,39 @@ def _merge_supplemental_results(
     if any(r.get("section") == needed_section for r in results):
         return results
     extra_vector = embed_query(f"{query} {QUERY_EXPANSIONS[expansion_key]}", model)
-    extra_hits = _run_scheme_search(
-        client, collection_name, extra_vector, fetch_k, scheme_code, extra_vector
-    )
+    extra_hits = _run_scheme_search(client, collection_name, extra_vector, fetch_k)
     return _dedupe_results(results + _hits_to_results(extra_hits))
-
-
-def _filter_results_by_scheme(
-    results: list[dict[str, Any]],
-    scheme_code: Optional[str],
-    known_scheme_codes: frozenset[str],
-) -> list[dict[str, Any]]:
-    if scheme_code:
-        return [r for r in results if r.get("scheme_code") == scheme_code]
-    return [r for r in results if r.get("scheme_code") in known_scheme_codes]
 
 
 def search_schemes(
     query: str,
     collection_name: str,
-    scheme_code: Optional[str] = None,
     top_k: int = 5,
     model: Optional[SentenceTransformer] = None,
     client: Optional[QdrantClient] = None,
-    scheme_list: Optional[list[dict[str, Any]]] = None,
 ) -> list[dict[str, Any]]:
     """
-    Dense vector search on schemes-index.
+    Dense vector search on schemes-index across all schemes (no scheme filter).
     Payload fields: type, scheme_code, scheme_name, scheme_aliases, doc_id, chunk_id, chunk_index, text
     """
     client = client or get_qdrant_client()
     model = model or get_embedder()
-    scheme_list = scheme_list if scheme_list is not None else get_builtin_scheme_list()
-    known_scheme_codes = frozenset(item["scheme_code"] for item in scheme_list)
-
-    if scheme_code is None:
-        scheme_code = resolve_scheme_code(query, scheme_list)
-
-    if scheme_code is None and query_names_unindexed_scheme(query, scheme_list):
-        logger.info("Query names a scheme outside the Qdrant index: %r", query)
-        return []
 
     intent = classify_query_intent(query)
     section_focus = classify_scheme_section_focus(query)
     query_vector = embed_query(expand_query_for_search(query, intent, section_focus), model)
     fetch_k = max(top_k * 8, 40)
 
-    hits = _run_scheme_search(client, collection_name, query_vector, fetch_k, scheme_code)
+    hits = _run_scheme_search(client, collection_name, query_vector, fetch_k)
     results = _hits_to_results(hits)
 
     supplemental = _supplemental_search_config(section_focus, intent)
     if supplemental:
         results = _merge_supplemental_results(
-            query, results, supplemental, scheme_code,
+            query, results, supplemental,
             client, collection_name, fetch_k, model,
         )
 
-    results = _filter_results_by_scheme(results, scheme_code, known_scheme_codes)
     results = rerank_results(query, results)
     return _finalize_results(results, section_focus, intent, top_k)
 
@@ -795,28 +606,23 @@ def _process_chunk_text(text: str) -> str:
     return normalize_text_with_glossary(cleaned)
 
 
-def format_scheme_unavailable(_query: str) -> str:
-    return "**Scheme not available right now.**\n\n"
-
-
-def _empty_search_message(query: str, scheme_list: list[dict[str, Any]]) -> str:
-    if query_names_unindexed_scheme(query, scheme_list):
-        return format_scheme_unavailable(query)
-    if resolve_scheme_code(query, scheme_list):
-        return "**Could not find this information right now.**\n\n"
-    return format_scheme_unavailable(query)
+NO_RESULTS_MESSAGE = "**No scheme information found for this query.**\n\n"
 
 
 def _format_result_block(item: dict[str, Any]) -> str:
-    scheme_name = str(item.get("scheme_name") or "")
+    scheme_name = str(item.get("scheme_name") or "") or "Unknown scheme"
     scheme_code = str(item.get("scheme_code") or "")
+    doc_title = str(item.get("doc_title") or "") or "Unknown document"
+    page = str(item.get("page") or "")
+    page_label = f"p.{page}" if page else "page n/a"
     text_value = str(item.get("text") or "")
     section = str(item.get("section") or classify_chunk_section(text_value))
     text = _process_chunk_text(text_value)
     score = float(item.get("score") or 0.0)
     section_label = section.title() if section in LABELED_SECTIONS else "General"
     return (
-        f"**{scheme_name}** ({scheme_code}, section={section_label}, score={score:.4f})\n"
+        f"**[{scheme_name} | {doc_title} | {page_label}]** "
+        f"({scheme_code}, section={section_label}, score={score:.4f})\n"
         f"```\n{text}\n```"
     )
 
@@ -838,11 +644,9 @@ def _distinct_network_sources(results: list[dict[str, Any]]) -> list[str]:
 def format_search_results(
     results: list[dict[str, Any]],
     query: str,
-    scheme_list: Optional[list[dict[str, Any]]] = None,
 ) -> str:
     if not results:
-        active_scheme_list = scheme_list if scheme_list is not None else get_builtin_scheme_list()
-        return _empty_search_message(query, active_scheme_list)
+        return NO_RESULTS_MESSAGE
 
     blocks = [_format_result_block(item) for item in results]
     network_sources = _distinct_network_sources(results)

@@ -65,10 +65,6 @@ class Settings(BaseSettings):
     redis_max_connections: int = int(os.getenv("REDIS_MAX_CONNECTIONS", "100"))
     redis_retry_on_timeout: bool = os.getenv("REDIS_RETRY_ON_TIMEOUT", "true").strip().lower() in ("1", "true", "yes", "on")
 
-    # Master Catalog snapshot key (unprefixed, written by docs-pipeline). When set,
-    # this exact Redis key is read; otherwise it defaults to master-catalog:<tier>:snapshot.
-    master_catalog_redis_key: str = os.getenv("MASTER_CATALOG_REDIS_KEY", "")
-
     # Turns whose tool calls/results are resent to the model. Empty = all kept turns (bh-dev behaviour);
     # 0 = none (question/answer text + session state only).
     history_tool_turns: Optional[int] = (

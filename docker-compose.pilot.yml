@@ -1,0 +1,92 @@
+# Mandi v1 -> v2 pilot. Runs this API next to the quick-start stack so the tool
+# can reach the adapter by name instead of through the host.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.pilot.yml up -d
+#
+# Brings up the Redis the app needs (app/core/cache.py) and joins oan-internal,
+# the network helmcharts/quick-start already created -- hence `external: true`:
+# this file attaches to that stack, it does not own it. Start quick-start first.
+services:
+  app:
+    # amd64 only. requirements.lock pins torch as an explicit x86_64 wheel
+    # (torch-2.14.0+cpu-...-manylinux_2_28_x86_64.whl) under --require-hashes
+    # and --only-binary, so there is no arm64 wheel for pip to fall back to and
+    # the build fails outright on Apple Silicon. Rosetta builds and runs it.
+    platform: linux/amd64
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      # REDIS_HOST is deliberately not set here. .env already says sva_redis,
+      # and anything listed here would win over it -- two names for one
+      # container, with the .env one silently dead.
+      #
+      # The adapter, by container name on oan-internal. Both v2 actions are the
+      # same endpoint -- the consumer adapter branches on the action inside the
+      # payload, so discover and select share this base.
+      OAN_ADAPTER_URL: http://network-adapter:9201/consumer
+      # The whole point of this file. agents/tools/__init__.py reads it at
+      # import time and binds get_mandi_prices to the v2 module; unset, the
+      # stack runs exactly as production does today.
+      MANDI_BECKN_VERSION: v2
+      # Same switch for weather. Unlike mandi the rendered answer differs
+      # between v1 and v2 -- the v2 provider mapping drops fields the v0.1
+      # schema pack has nowhere to put -- so this is not a transparent swap.
+      # See migration-plan/weather/plan.md.
+      WEATHER_BECKN_VERSION: v2
+      # KCC's three tools move together on this one flag -- they share an OTP,
+      # so a farmer cannot start on v1 and finish on v2. Points at mockkcc
+      # until KCC credentials arrive; see migration-plan/kcc/plan.md.
+      KCC_BECKN_VERSION: v2
+      # The rest of what is built. Each is read at import time like the others,
+      # so flipping one back to v1 means editing this file and restarting.
+      # Status and known gaps per capability: migration-plan/README.md.
+      AIF_BECKN_VERSION: v2
+      PMKISAN_BECKN_VERSION: v2
+      PMFBY_BECKN_VERSION: v2
+      SATHI_BECKN_VERSION: v2
+      SHC_BECKN_VERSION: v2
+      # KHC's seven tools move together on this one flag -- they share an OTP
+      # and a transaction, so a farmer cannot start on v1 and finish on v2.
+      # Four operations ride the network; the seven reference lists are read
+      # straight from KHC, which is why the app needs KHC_BASE_URL and
+      # KHC_AUTH_HEADER of its own in .env beside the adapter's copy.
+      # See migration-plan/khc/plan.md.
+      KHC_BECKN_VERSION: v2
+
+  redis:
+    image: redis:7-alpine
+    container_name: sva_redis
+    # No port published. Only the app talks to it, and it holds chat sessions.
+    networks:
+      svanetwork:
+        # .env dials sva_redis, which is the container name, not the service
+        # name -- Compose only guarantees the service name resolves. Spelled
+        # out so the lookup does not depend on which it happens to register.
+        aliases: [sva_redis]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Geocoding for the full chat path: forward_geocode turns the farmer's place
+  # name into the coordinates get_mandi_prices needs. See docker/photon-proxy.conf
+  # for why this is a proxy rather than Photon itself, and why it is local-only.
+  photon_proxy:
+    image: nginx:alpine
+    container_name: photon_proxy
+    volumes:
+      - ./docker/photon-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [svanetwork]
+    restart: unless-stopped
+
+networks:
+  # The base file puts `app` on `svanetwork`, which nothing on this machine
+  # creates. Compose merges top-level networks by key and an override cannot
+  # delete one, so instead of fighting that, svanetwork is pointed at the
+  # network quick-start already made. Same network, two names for it.
+  svanetwork:
+    external: true
+    name: oan-internal

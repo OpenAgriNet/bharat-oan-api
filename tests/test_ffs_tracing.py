@@ -162,22 +162,6 @@ def test_booking_summary_logging_omits_reference_codes(setup, tracing, caplog):
     assert 'PRC-TEST-001' not in serialized
 
 
-def test_catalogue_span_keeps_summary_instead_of_returned_prompt(monkeypatch, tracing):
-    client, exporter = tracing
-    from helpers import scheme_qdrant_search as catalog
-    monkeypatch.setattr(importlib.import_module('langfuse._client.observe'), 'get_client', lambda **kw: client)
-    monkeypatch.setattr(catalog, 'lf_update_current_observation', lambda **kw: client.update_current_span(**kw))
-    monkeypatch.setattr(catalog, 'get_master_catalog_snapshot', lambda tier: {'version': 7, 'entries': []})
-    monkeypatch.setattr(catalog, 'get_builtin_scheme_list', lambda: [{'scheme_code': 'test', 'scheme_name': 'FULL-CATALOGUE-TEXT'}])
-    prompt = catalog.format_vector_schemes_prompt_block()
-    assert 'FULL-CATALOGUE-TEXT' in prompt['vector_schemes_bullets']
-    client.flush()
-    span = exporter.get_finished_spans()[-1]
-    assert span.name == 'prompt:master_catalog_redis_check'
-    assert output(span)['merged_scheme_count'] == 1
-    assert 'FULL-CATALOGUE-TEXT' not in json.dumps(dict(span.attributes))
-
-
 def test_chat_agent_span_keeps_final_answer_not_internal_run(monkeypatch, tracing):
     from types import SimpleNamespace
     from pydantic_ai import Agent

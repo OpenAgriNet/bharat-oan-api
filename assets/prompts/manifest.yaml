@@ -11,14 +11,11 @@ skills:
   schemes.information:
     prompt_dir: skills/schemes/information
     tools:
+    - search_documents
+    - search_schemes
     - call_amul_vistaar_network
     - call_bihar_vistaar_network
     - call_maha_vistaar_network
-    - search_schemes
-    - search_terms
-    - search_video
-    requires:
-    - documents.search
   pm_kisan.status:
     prompt_dir: skills/pm_kisan/status
     tools:
@@ -76,17 +73,7 @@ skills:
   crop.advice:
     prompt_dir: skills/crop/advice
     tools:
-    - analyze_crop_image
-    - search_pests_diseases
-    - search_terms
-    requires:
-    - documents.search
-  crop.icar:
-    prompt_dir: skills/crop/icar
-    tools:
     - search_advisory
-    requires:
-    - crop.advice
   weather.forecast:
     prompt_dir: skills/weather/forecast
     tools:
@@ -120,6 +107,16 @@ skills:
     - search_sathi_seed_availability
     requires:
     - location.resolve
+  # Stands in for seeds.availability on Beckn v2; never listed in enabled_skills.
+  seeds.availability_v2:
+    prompt_dir: skills/seeds/availability_v2
+    tools:
+    - list_sathi_crops
+    - search_sathi_seed_availability
+    requires:
+    - location.resolve
+    replaces: seeds.availability
+    enabled_by: SATHI_BECKN_VERSION=v2
   agristack.profile:
     prompt_dir: skills/agristack/profile
     tools:
@@ -133,10 +130,6 @@ skills:
   pm_kisan.installments:
     prompt_dir: skills/pm_kisan/installments
     tools: []
-  documents.search:
-    prompt_dir: skills/documents/search
-    tools:
-    - search_documents
 agents:
   chat:
     prompt_dir: chat
@@ -154,7 +147,7 @@ agents:
     - pa
     - ta
     - te
-    # bh-main comments out: ffs.booking, agristack.profile, khc.grievances, crop.icar
+    # bh-main comments out: ffs.booking, agristack.profile, khc.grievances
     enabled_skills:
     - ffs.booking
     - schemes.information
@@ -168,7 +161,6 @@ agents:
     - kcc.status
     - khc.grievances
     - crop.advice
-    - crop.icar
     - weather.forecast
     - location.resolve
     - mandi.prices
@@ -177,18 +169,15 @@ agents:
     - agristack.profile
     - weather.agromet
     - pm_kisan.installments
-    - documents.search
     # Loaded from the first turn; every other enabled skill loads on demand with load_skill, picked from
     # the skill descriptions that stay in the prompt. Product decision (2026-11-23): PM-KISAN, schemes,
-    # crop advice with ICAR, mandi, weather and AgriStack. A preloaded skill loads only where it is enabled.
+    # crop advice, mandi, weather and AgriStack. A preloaded skill loads only where it is enabled.
     preloaded_skills:
     - pm_kisan.status
     - pm_kisan.grievances
     - pm_kisan.installments
     - schemes.information
-    - documents.search      # required by schemes.information and crop.advice
     - crop.advice
-    - crop.icar             # always with crop.advice, so ICAR is tried first for crop questions
     - mandi.prices
     - weather.forecast
     - location.resolve      # required by mandi.prices and weather.forecast

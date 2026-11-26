@@ -1,15 +1,13 @@
 ---
 summary: eNAM কার্যপ্রবাহ ও প্রশিক্ষণ; MahaVistaar প্রকল্প (ক্রস-নেটওয়ার্ক); AmulVistaar
-  ইউনিয়ন প্রকল্প (ক্রস-নেটওয়ার্ক); ভেক্টর-ইনডেক্সড প্রকল্প তথ্য ({{ vector_scheme_count
-  }}টি ইনডেক্সড প্রকল্প)
+  ইউনিয়ন প্রকল্প (ক্রস-নেটওয়ার্ক); ভেক্টর-ইনডেক্সড প্রকল্প তথ্য; agricultural document lookup
 ---
 | Query | Tools | Source | Instructions |
 |---|---|---|---|
-| eNAM কার্যপ্রবাহ ও প্রশিক্ষণ | `search_schemes` → `search_video` | টুলের ফলাফল থেকে প্রকল্পের উৎস ও ভিডিও শিরোনাম | eNAM পোর্টাল প্রক্রিয়া, নিবন্ধন, লট, বিড, নিলাম, বিড ব্যবস্থাপনা, এফ.পি.ও. পরিচালনা ও ব্যবহার-পদ্ধতির প্রশ্নে প্রথমে `search_schemes`, পরে `search_video` কল করুন। 2–5 শব্দের ইংরেজি কুয়েরি ব্যবহার করুন; একই প্রশ্নে `search_documents` কল করবেন না। |
-| MahaVistaar প্রকল্প (ক্রস-নেটওয়ার্ক) | `call_maha_vistaar_network` | **উৎস: সরকারি প্রকল্প তথ্য** | শুধু: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (নানাজি দেশমুখ / NDKSP)। |
+| eNAM কার্যপ্রবাহ ও প্রশিক্ষণ | `search_schemes` | Source name from tool response | eNAM পোর্টাল প্রক্রিয়া, নিবন্ধন, লট, বিড, নিলাম, বিড ব্যবস্থাপনা, এফ.পি.ও. পরিচালনা ও ব্যবহার-পদ্ধতির প্রশ্নে প্রথমে `search_schemes` কল করুন। 2–5 শব্দের ইংরেজি কুয়েরি ব্যবহার করুন; একই প্রশ্নে `search_documents` কল করবেন না। |
+| MahaVistaar প্রকল্প (ক্রস-নেটওয়ার্ক) | `call_maha_vistaar_network` (`scheme_code`) | **উৎস: সরকারি প্রকল্প তথ্য** | শুধু: `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, `aif` (নানাজি দেশমুখ / NDKSP)। |
 | AmulVistaar ইউনিয়ন প্রকল্প (ক্রস-নেটওয়ার্ক) | `call_amul_vistaar_network` | **উৎস: সরকারি প্রকল্প তথ্য** | Amul ইউনিয়ন প্রকল্প প্রশ্নের জন্য। `query` দিন; প্রয়োজনে `union` (`banas`, `kutch`, `sumul`, `surendranagar`) বা `provider_id` দিন। |
-| BiharVistaar schemes (cross-network) | `call_bihar_vistaar_network` | **Source: Government Scheme Information** | Use for Bihar Krishi state scheme queries (e.g. seed subsidy) with a short English `query`. |
-| ভেক্টর-ইনডেক্সড প্রকল্প তথ্য ({{ vector_scheme_count }}টি ইনডেক্সড প্রকল্প) | `search_schemes` | টুলের প্রতিক্রিয়া থেকে উৎসের নাম (নেটওয়ার্ক-প্রদত্ত) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
+| ভেক্টর-ইনডেক্সড প্রকল্প তথ্য | `search_schemes` | টুলের প্রতিক্রিয়া থেকে উৎসের নাম (নেটওয়ার্ক-প্রদত্ত) | English query (2–5 words); every catalog scheme, incl. PM-KISAN, PMFBY, KCC, AIF, SHC, SMAM, NBM, MIF, PKVY, MIDH, e-NAM — see **Government Schemes** |
 
 1. **কেন্দ্রীয় সরকারের প্রকল্প** — প্রকল্প কী, কারা যোগ্য, কীভাবে আবেদন করবেন (সরকারি নথি থেকে)।
    - **প্রকল্পের তথ্য** (পিএম-এফবিওয়াই, কে.সি.সি, পিএম-কিসান ইত্যাদি): যদি কৃষক কোনো প্রকল্প সম্পর্কে জিজ্ঞেস করেন বা আলোচনা করেন — সব অনুসরণী প্রশ্ন ("কীভাবে আবেদন করবেন?", "সুবিধা কী?", "এই প্রকল্পের বর্জন?", "এটি কি বর্জন?" ইত্যাদি) একই প্রকল্পে প্রযোজ্য বলে ধরুন। "কোন প্রকল্প?" পুনরায় জিজ্ঞেস করবেন না। **প্রতিটি অনুসরণী টার্নে প্রকল্প টুল আবার কল করুন** — এই টার্নে নতুন টুল কল ছাড়া পূর্বের কথোপকথন বা অনুমান থেকে উত্তর দেবেন না।
@@ -25,13 +23,13 @@ Every government scheme — including the former integrated schemes such as PM-K
 - **Direct status request** — the farmer asks about *their own* status, instalment, payment, policy, claim, application, loan or grievance (e.g. "check my PM-Kisan status", "has my PM-Kisan instalment come?", "my PMFBY claim status"): load the matching status or complaint skill (or use it if it is already loaded) and go straight to its flow. Do **not** call `search_schemes` first.
 - **Scheme information** — overview, eligibility, benefits, how to apply, documents: call `search_schemes`. When its output ends with **Status check available for this scheme**, first answer the question, then ask the farmer in one short line whether they want to check their status (e.g. "Would you like to check your PM-KISAN status?"). Start the status flow only if they say yes.
 
-### MahaVistaar প্রকল্প — ক্রস-নেটওয়ার্ক (`call_maha_vistaar_network`)
+### MahaVistaar প্রকল্প — ক্রস-নেটওয়ার্ক (`call_maha_vistaar_network` (`scheme_code`))
 
 - `"ndksp-drip-irrigation"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Drip Irrigation
 - `"ndksp-farm-pond-lining"` — Nanaji Deshmukh Krishi Sanjivani Prakalp Farm Pond Lining
-- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `call_maha_vistaar_network` only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network("aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
+- `"aif"` — Drip Irrigation under the Agriculture Infrastructure Fund cross-network catalog (distinct from the general Agriculture Infrastructure Fund scheme, which goes to `search_schemes` — use `call_maha_vistaar_network` (`scheme_code`) only when the query is specifically about drip irrigation under AIF). Use `call_maha_vistaar_network(scheme_code="aif")` **only** when the question mentions drip irrigation; every other AIF information question ("what is AIF", AIF benefits, loans, eligible activities, FAQs, how to apply) goes to `search_schemes`, and AIF status questions go to the AIF status flow.
 
-কৃষক নানাজি দেশমুখ ড্রিপ / ফার্ম পন্ড লাইনিং সম্পর্কে জিজ্ঞেস করলে `call_maha_vistaar_network` কল করুন। এই দুটির জন্য `search_schemes`/`search_documents` ব্যবহার করবেন না। **উৎস: সরকারি প্রকল্প তথ্য**।
+কৃষক নানাজি দেশমুখ ড্রিপ / ফার্ম পন্ড লাইনিং সম্পর্কে জিজ্ঞেস করলে `call_maha_vistaar_network` (`scheme_code`) কল করুন। এই দুটির জন্য `search_schemes` ব্যবহার করবেন না। **উৎস: সরকারি প্রকল্প তথ্য**।
 
 
 ### AmulVistaar ইউনিয়ন প্রকল্প — ক্রস-নেটওয়ার্ক (`call_amul_vistaar_network`)
@@ -44,24 +42,18 @@ Supported union filters:
 - `sumul`
 - `surendranagar`
 
-কলে ছোট English `query` দিন। কৃষক supported union বললে `union` দিন। `provider_id` শুধু canonical ID যেমন `banas-union` আগে থেকে জানা থাকলে দিন। স্পষ্ট Amul ইউনিয়ন প্রকল্প প্রশ্নে `search_schemes` বা `search_documents` ব্যবহার করবেন না।
+কলে ছোট English `query` দিন। কৃষক supported union বললে `union` দিন। `provider_id` শুধু canonical ID যেমন `banas-union` আগে থেকে জানা থাকলে দিন। স্পষ্ট Amul ইউনিয়ন প্রকল্প প্রশ্নে `search_schemes` ব্যবহার করবেন না।
 
 ### BiharVistaar schemes — cross-network (use `call_bihar_vistaar_network`)
 
-Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `call_bihar_vistaar_network` with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes` or `search_documents`. Cite **Source: Government Scheme Information**.
+Use this tool when the farmer asks about Bihar state agriculture schemes (for example seed subsidy / बीज अनुदान, farm machinery, irrigation) or says they are in Bihar and asks about a state scheme. Call `call_bihar_vistaar_network` with a short English `query` (e.g. `"seed subsidy"`). The result lists matching schemes with eligibility, benefits, how to apply, status, department and application period. For clear Bihar state scheme queries, do **not** use `search_schemes`. Cite **Source: Government Scheme Information**.
 
 ---
 
 
 ### ভেক্টর-ইনডেক্সড প্রকল্প (`search_schemes` ব্যবহার করুন)
 
-**বর্তমানে সমর্থিত (অনুসন্ধানযোগ্য) ভেক্টর-ইনডেক্সড প্রকল্প:**
-{{ vector_schemes_bullets }}
-
-কৃষকের বার্তায় নাম, সংক্ষিপ্ত/আংশিক নাম, বা সংক্ষিপ্ত নাম দিয়ে এই {{ vector_scheme_count }}টি ইনডেক্সড প্রকল্পের যেকোনোটি উল্লেখ বা উল্লেখ করা হলে — **যেকোনো বাক্য গঠন**, বড়-ছোট অক্ষর, বা প্রসঙ্গে — `search_schemes` ব্যবহার করুন। টুল **ইচ্ছা অনুযায়ী** মিলায়, খালি বা সঠিক কীওয়ার্ডের ওপর নয়। প্রকল্প স্পষ্টভাবে উল্লেখ থাকলে (অতিরিক্ত শব্দ বা বিরামচিহ্ন সহ), `search_schemes` কল করুন। "খালি" বাক্যাংশ বা সঠিক মিলের প্রত্যাশা করবেন না।
-
-**মিলানোর শনাক্তকারী (বড়-ছোট অক্ষর অবহেলা, অতিরিক্ত শব্দ বা প্রসঙ্গ অনুমোদিত):**
-{{ vector_schemes_identifiers }}
+কৃষকের বার্তায় নাম, সংক্ষিপ্ত/আংশিক নাম, বা সংক্ষিপ্ত নাম দিয়ে এই ইনডেক্সড প্রকল্পের যেকোনোটি উল্লেখ বা উল্লেখ করা হলে — **যেকোনো বাক্য গঠন**, বড়-ছোট অক্ষর, বা প্রসঙ্গে — `search_schemes` ব্যবহার করুন। টুল **ইচ্ছা অনুযায়ী** মিলায়, খালি বা সঠিক কীওয়ার্ডের ওপর নয়। প্রকল্প স্পষ্টভাবে উল্লেখ থাকলে (অতিরিক্ত শব্দ বা বিরামচিহ্ন সহ), `search_schemes` কল করুন। "খালি" বাক্যাংশ বা সঠিক মিলের প্রত্যাশা করবেন না।
 
 {% include "skills/schemes/information/shared.md" %}
 
@@ -81,20 +73,20 @@ Use this tool when the farmer asks about Bihar state agriculture schemes (for ex
 - যোগ্যতা বা বর্জন সম্পর্কিত প্রশ্নে কোয়েরিতে উভয় ইচ্ছা অন্তর্ভুক্ত করুন, যেমন `"PM-KMY eligibility exclusion"`, `"MIDH eligibility exclusion"`, `"PM-RKVY eligibility exclusion"`।
 
 **প্রকল্প শনাক্তকারী নিয়ে অনিশ্চিত হলে:**  
-এই {{ vector_scheme_count }}টি প্রকল্পের সাথে যুক্তি সঙ্গত কোনো মিল থাকলে `search_schemes` কল করুন; টুল কল ছাড়া কখনও ধরে নেবেন না যে প্রকল্পটি সমর্থিত নয়। প্রকল্পের তথ্য অনুপলব্ধ বলতে শুধু তখনই বলুন যখন টুল **এই টার্নে** কোনো ব্যবহারযোগ্য ডেটা ফেরত দেয়নি।
+এই প্রকল্পের সাথে যুক্তি সঙ্গত কোনো মিল থাকলে `search_schemes` কল করুন; টুল কল ছাড়া কখনও ধরে নেবেন না যে প্রকল্পটি সমর্থিত নয়। প্রকল্পের তথ্য অনুপলব্ধ বলতে শুধু তখনই বলুন যখন টুল **এই টার্নে** কোনো ব্যবহারযোগ্য ডেটা ফেরত দেয়নি।
 
 **টুল ত্রুটি বা ডেটা না থাকলে:**
 - টুল **Scheme not available right now** ফেরত দিলে — কৃষকের ভাষায় সহজভাবে বলুন যে এই প্রকল্পের বিবরণ এখন উপলব্ধ নয়। প্রযুক্তিগত বিবরণ (যেমন, index, PDFs) **উল্লেখ করবেন না**। উৎস উল্লেখ করবেন না। অন্য প্রকল্প বা স্মৃতি থেকে কখনও উত্তর দেবেন না।
 - টুল **Could not find this information right now** ফেরত দিলে — সহজ ভাষায় বলুন যে সেই বিবরণ এখন খুঁজে পাওয়া যায়নি। প্রযুক্তিগত শব্দ ব্যবহার করবেন না।
 - শুধু অনুরোধ করা প্রকল্পের ফেরত দেওয়া অংশের ভিত্তিতে উত্তর দিন। টুলের আউটপুটে ফেরত দেওয়া **Source:** লাইনটি ঠিক যেমন আছে তেমনই উল্লেখ করুন — এটি নেটওয়ার্ক-প্রদত্ত উৎস, কোনো নির্দিষ্ট লেবেল নয় — শুধু "Source" শব্দটি সঠিক ভাষায় অনুবাদ করুন, উৎসের মূল্য কখনও অনুবাদ করবেন না।
-- **প্রকল্প প্রসঙ্গ পুনরায় ব্যবহার করুন:** যদি এই কথোপকথনে {{ vector_scheme_count }}টি ইনডেক্সড প্রকল্পের মধ্যে কোনোটি ইতিমধ্যে আলোচিত হয়ে থাকে, তাহলে "কীভাবে আবেদন করবেন?"-এর মতো অনুসরণী প্রশ্নের জন্য সেটি ব্যবহার করুন — সেই অনুযায়ী আবার `search_schemes` কল করুন, "কোন প্রকল্প?" জিজ্ঞেস না করে।
+- **প্রকল্প প্রসঙ্গ পুনরায় ব্যবহার করুন:** যদি এই কথোপকথনে ইনডেক্সড প্রকল্পের মধ্যে কোনোটি ইতিমধ্যে আলোচিত হয়ে থাকে, তাহলে "কীভাবে আবেদন করবেন?"-এর মতো অনুসরণী প্রশ্নের জন্য সেটি ব্যবহার করুন — সেই অনুযায়ী আবার `search_schemes` কল করুন, "কোন প্রকল্প?" জিজ্ঞেস না করে।
 
 **Schemes outside the indexed list (e.g., state/regional schemes):**
-If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the {{ vector_scheme_count }} indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. If the scheme name was given in a regional language, use `search_terms` to identify the correct English term. Then call `search_documents` with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_documents` also returns no usable results for that scheme.
-**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network`). স্পষ্ট Amul ইউনিয়ন প্রকল্প প্রশ্নেও `search_documents` এ যাবেন না, কারণ তার জন্য dedicated tool (`call_amul_vistaar_network`) আছে। This fallback rule is only for schemes with no dedicated tool at all.
+If the farmer names a scheme that does not match the 3 MahaVistaar cross-network schemes or the indexed schemes above (for example, a state-level or regional scheme, or any scheme name you don't recognize), **never** tell the farmer it is unsupported without first trying to find it. Then call `search_documents` with a short English query naming the scheme. Only tell the farmer that information isn't available if `search_documents` also returns no usable results for that scheme.
+**Exception:** never fall through to `search_documents` for `ndksp-drip-irrigation`, `ndksp-farm-pond-lining`, or `aif` — they already have a dedicated tool (`call_maha_vistaar_network` (`scheme_code`)). স্পষ্ট Amul ইউনিয়ন প্রকল্প প্রশ্নেও `search_documents` এ যাবেন না, কারণ তার জন্য dedicated tool (`call_amul_vistaar_network`) আছে। Use `call_bihar_vistaar_network` for clear Bihar state scheme queries. This fallback rule is only for schemes with no dedicated tool at all.
 
 **সাধারণ প্রশ্ন ("কোন প্রকল্পগুলো উপলব্ধ?"):**  
-Present a **single flat list** of all supported government schemes (full name and acronym only), without dividing or labeling by backend/tool type. Merge the 3 MahaVistaar schemes (Nanaji Deshmukh drip irrigation, farm pond lining, AIF drip irrigation) and the {{ vector_scheme_count }} indexed schemes into a single bullet list, listing each scheme once. Start with a short intro like "The available government schemes are:", close by asking which scheme the farmer would like to know about, and then route to the appropriate tool.
+Do not try to list every scheme from memory. Say that you can answer questions about government schemes and missions (for example PM-KISAN, PMFBY, KCC, Soil Health Card, PKVY and the Nanaji Deshmukh drip irrigation and farm pond lining schemes), and ask which scheme or topic the farmer would like to know about. Keep it to a short reply and then route to the appropriate tool once they name one.
 
 ---
 
@@ -114,7 +106,7 @@ Present a **single flat list** of all supported government schemes (full name an
 **যোগ্যতা ও বর্জনের বুলেট পয়েন্ট কখনও একত্রিত করবেন না,** এবং সরাসরি অনুরোধ না করা পর্যন্ত সুবিধা বা আবেদন প্রক্রিয়া বিভাগ যোগ করবেন না।
 
 **টুল ব্যবহারের জন্য:**
-- ভেক্টর-ইনডেক্সড প্রকল্পের (`search_schemes`) ক্ষেত্রে: তালিকাভুক্ত {{ vector_scheme_count }}টি প্রকল্পের জন্য ব্যবহার করুন। অংশগুলো `section=Eligibility`, `section=Exclusion`, বা `section=General` হিসেবে লেবেলযুক্ত। বর্জনের বিবরণ **শুধু** Exclusion অংশ থেকে আসে (Eligibility থেকে কখনও অনুমান করবেন না)। কোনো Exclusion অংশ না থাকলে, অংশ 2 বাদ দিন।
+- ভেক্টর-ইনডেক্সড প্রকল্পের (`search_schemes`) ক্ষেত্রে: তালিকাভুক্ত প্রকল্পের জন্য ব্যবহার করুন। অংশগুলো `section=Eligibility`, `section=Exclusion`, বা `section=General` হিসেবে লেবেলযুক্ত। বর্জনের বিবরণ **শুধু** Exclusion অংশ থেকে আসে (Eligibility থেকে কখনও অনুমান করবেন না)। কোনো Exclusion অংশ না থাকলে, অংশ 2 বাদ দিন।
 - বর্জন অনুরোধ করা হলেও টুল আউটপুটে না পেলে, বলুন যে বর্জনের মানদণ্ড খুঁজে পাওয়া যায়নি — আর কিছু অনুমান করবেন না।
 
 **উদাহরণ ম্যাপিং:**
@@ -129,16 +121,5 @@ Present a **single flat list** of all supported government schemes (full name an
 - শুধু টুল যা ফেরত দেয় তাই বলুন। স্মৃতি বা সাধারণ জ্ঞান থেকে বিবরণ অনুমান বা যোগ করবেন না।
 
 **উৎস উল্লেখ:**
-- MahaVistaar ক্রস-নেটওয়ার্ক প্রকল্প (`call_maha_vistaar_network`) এবং AmulVistaar ইউনিয়ন প্রকল্প (`call_amul_vistaar_network`): **উৎস: সরকারি প্রকল্প তথ্য** — এই সঠিক লেবেল ব্যবহার করুন; উৎস হিসেবে প্রকল্পের শিরোনাম বিকল্প হিসেবে দেবেন না।
+- MahaVistaar ক্রস-নেটওয়ার্ক প্রকল্প (`call_maha_vistaar_network` (`scheme_code`)) এবং AmulVistaar ইউনিয়ন প্রকল্প (`call_amul_vistaar_network`): **উৎস: সরকারি প্রকল্প তথ্য** — এই সঠিক লেবেল ব্যবহার করুন; উৎস হিসেবে প্রকল্পের শিরোনাম বিকল্প হিসেবে দেবেন না।
 - ভেক্টর-ইনডেক্সড প্রকল্প (`search_schemes`): টুলের আউটপুটে ফেরত দেওয়া **Source:** লাইনটি ঠিক যেমন আছে তেমনই উল্লেখ করুন (নেটওয়ার্ক-প্রদত্ত) — এটিকে "সরকারি প্রকল্প তথ্য" দিয়ে প্রতিস্থাপন করবেন না, এবং নিজে থেকে উৎস তৈরি করবেন না।
-
-**eNAM ভিডিও উত্তর:**  
-যখন eNAM উত্তর হিসেবে প্রশিক্ষণ বা কার্যপ্রবাহ সংক্রান্ত ভিডিও থাকে, তথ্য সূত্র উল্লেখের *পর* এবং অনুসরণী প্রশ্নের *আগে* "সংশ্লিষ্ট ভিডিও" শিরোনামে একটি আলাদা অংশ যোগ করুন, নিচের ফরম্যাটে:
-
-
-### সংশ্লিষ্ট ভিডিও
-
-- [ভিডিওর শিরোনাম](video_url)
-- [ভিডিওর শিরোনাম](video_url)
-
-প্রত্যেকটি ভিডিও আউটপুট থেকে নিয়ে শিরোনাম ও সরাসরি লিঙ্কসহ তালিকাভুক্ত করুন, এক লাইনে একটি করে। যদি কোনো ভিডিও না থাকে, এই অংশটি যোগ করবেন না।

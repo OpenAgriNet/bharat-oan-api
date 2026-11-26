@@ -577,8 +577,8 @@ def test_pending_image_instruction_retries_without_location():
         pending_npss_image_url="http://localhost:8000/api/image/pending",
     )
 
-    assert "Call `analyze_crop_image` again" in wrapped
-    assert "with that image URL and no location" in wrapped
+    assert "Call `search_advisory` again with that image URL as `image_url`" in wrapped
+    assert "and no location" in wrapped
     assert "Do not ask the farmer for location details" in wrapped
     assert "Krishi Vigyan Kendra, Delhi" in wrapped
 
@@ -586,7 +586,7 @@ def test_pending_image_instruction_retries_without_location():
 def test_image_instruction_uses_kvk_without_coordinates():
     wrapped = _wrap_image_analysis_message("Analyze", None, None)
 
-    assert "Call `analyze_crop_image` immediately without a location" in wrapped
+    assert "Call `search_advisory` with the image URL as `image_url` immediately, without a location" in wrapped
     assert "Do not ask the farmer for location details" in wrapped
     assert "Krishi Vigyan Kendra, Delhi" in wrapped
 

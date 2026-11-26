@@ -1,621 +1,158 @@
-"""
-Marqo client implementation for vector search + network scheme document search.
-"""
-import asyncio
-import os
-import re
-import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Optional
+"""General documents and scheme guidelines through Knowledge Provider."""
+from typing import Any, Dict, List, Optional
 
 import httpx
-import marqo
 from langfuse import observe
-from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
-from pydantic_ai.tools import RunContext
 
-from agents.deps import FarmerContext
-from agents.tools.imd_advisory import agromet_note
-from app.config import DEFAULT_HTTP_TIMEOUT
-from helpers.advisory_pending import ADVISORY_FIRST_RETRY, PENDING_RETRY, advisory_not_searched, advisory_question_pending
+from helpers import knowledge_provider
 from helpers.langfuse_tracing import lf_update_current_observation
 from helpers.scheme_qdrant_search import (
-    format_scheme_unavailable,
+    NO_RESULTS_MESSAGE,
+    _format_page,
     format_search_results,
     format_status_check_offer,
-    get_builtin_scheme_list,
-    query_names_unindexed_scheme,
-    resolve_scheme_code,
 )
 from helpers.utils import get_logger
-from agents.tools.terms import normalize_text_with_glossary
 
 logger = get_logger(__name__)
 
-DocumentType = Literal["video", "document"]
-
-SCHEME_AGRI_QDRANT_CATEGORY = "scheme-agri-qdrant"
-
-
-class SearchHit(BaseModel):
-    """Individual search hit from elasticsearch"""
-    name: str
-    text: str
-    doc_id: str
-    type: str
-    source: str
-    score: float = Field(alias="_score")
-    id: str = Field(alias="_id")
-
-    @property
-    def processed_text(self) -> str:
-        """Returns the text with cleaned up whitespace and newlines"""
-        # Replace multiple newlines with a single line
-        cleaned = re.sub(r"\n{2,}", "\n\n", self.text)
-        cleaned = re.sub(r"\t+", "\t", cleaned)
-        cleaned = normalize_text_with_glossary(cleaned)
-        return cleaned
-
-    def __str__(self) -> str:
-        if self.type == "document":
-            return f"**{self.name}**\n" + "```\n" + self.processed_text + "\n```\n"
-        else:
-            return f"**[{self.name}]({self.source})**\n" + "```\n" + self.processed_text + "\n```\n"
+# Langfuse category label for KP scheme searches.
+SCHEME_SEARCH_CATEGORY = "knowledge-provider-scheme"
 
 
-def _tag_list_to_map(entries: Any) -> Dict[str, str]:
-    """Flatten Beckn tag list entries to {descriptor.code: value}."""
-    out: Dict[str, str] = {}
-    if not isinstance(entries, list):
-        return out
-    for ent in entries:
-        if not isinstance(ent, dict):
-            continue
-        desc = ent.get("descriptor") if isinstance(ent.get("descriptor"), dict) else {}
-        code = str(desc.get("code") or "").strip().lower().replace("-", "_")
-        if not code:
-            continue
-        value = ent.get("value")
-        if value is None:
-            continue
-        out[code] = str(value)
-    return out
-
-
-def _catalog_search_context_map(catalog: Dict[str, Any]) -> Dict[str, str]:
-    """Parse catalog.tags search-context group (status, resolved-scheme-code, source, …)."""
-    tags = catalog.get("tags")
-    if not isinstance(tags, list):
-        return {}
-    for tag in tags:
-        if not isinstance(tag, dict):
-            continue
-        desc = tag.get("descriptor") if isinstance(tag.get("descriptor"), dict) else {}
-        code = str(desc.get("code") or "").strip().lower().replace("-", "_")
-        name = str(desc.get("name") or "").strip().lower()
-        if code != "search_context" and name != "search context":
-            continue
-        return _tag_list_to_map(tag.get("list"))
-    return {}
-
-
-def _item_chunk_details_map(item: Dict[str, Any]) -> Dict[str, str]:
-    """Parse item.tags chunk-details group into a flat map."""
-    tags = item.get("tags")
-    if not isinstance(tags, list):
-        return {}
-    for tag in tags:
-        if not isinstance(tag, dict):
-            continue
-        desc = tag.get("descriptor") if isinstance(tag.get("descriptor"), dict) else {}
-        code = str(desc.get("code") or "").strip().lower().replace("-", "_")
-        name = str(desc.get("name") or "").strip().lower()
-        if code != "chunk_details" and name != "chunk details":
-            continue
-        return _tag_list_to_map(tag.get("list"))
-    return {}
-
-
-def _chunk_result_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Map one Beckn catalog item to the format expected by format_search_results."""
-    if not isinstance(item, dict):
+def _scheme_result_from_hit(hit: Dict[str, Any], score: float) -> Optional[Dict[str, Any]]:
+    """Map one KP scheme hit to the format expected by format_search_results."""
+    if not isinstance(hit, dict):
         return None
-    details = _item_chunk_details_map(item)
-    desc = item.get("descriptor") if isinstance(item.get("descriptor"), dict) else {}
-
-    text = (details.get("text") or desc.get("long_desc") or "").strip()
+    text = str(hit.get("text") or "").strip()
     if not text:
         return None
-
-    scheme_code = (
-        details.get("scheme_code")
-        or desc.get("code")
-        or ""
-    ).strip()
-    scheme_name = (
-        details.get("scheme_name")
-        or desc.get("name")
-        or ""
-    ).strip()
-    section = (details.get("section") or "").strip().lower() or "other"
-    doc_id = (details.get("doc_id") or "").strip()
-    chunk_id = (details.get("chunk_id") or item.get("id") or "").strip()
-    source = (details.get("source") or "").strip()
-
-    score_raw = details.get("score") or "0"
-    try:
-        score = float(score_raw)
-    except (TypeError, ValueError):
-        score = 0.0
-
     return {
         "score": score,
-        "scheme_code": scheme_code,
-        "scheme_name": scheme_name,
+        "scheme_code": str(hit.get("scheme_code") or hit.get("code") or "").strip().lower(),
+        "scheme_name": str(hit.get("scheme_name") or hit.get("name_en") or hit.get("name") or "").strip(),
         "text": text,
-        "doc_id": doc_id,
-        "chunk_id": chunk_id,
-        "section": section,
-        "source": source,
+        "doc_id": str(hit.get("doc_id") or "").strip(),
+        "chunk_id": str(hit.get("chunk_id") or hit.get("_id") or "").strip(),
+        # KP's section_type (eligibility, exclusion, application, support, other) is the old network "section".
+        "section": str(hit.get("section_type") or "").strip().lower() or "other",
+        # KP's origin is the intake channel, not a citation; format_search_results falls back to its label.
+        "source": "",
+        "doc_title": str(hit.get("title_en") or hit.get("name_en") or hit.get("name") or hit.get("filename") or "").strip(),
+        "page": _format_page(hit.get("page_start"), hit.get("page_end")),
     }
 
 
-def _parse_scheme_network_response(data: Dict[str, Any]) -> tuple[List[Dict[str, Any]], Dict[str, str]]:
-    """
-    Parse BAP client /search response for scheme-agri-qdrant.
-
-    Returns (chunk_results, search_context) from the first successful catalog
-    (or the first catalog when status is absent).
-    """
-    responses = data.get("responses") if isinstance(data, dict) else None
-    if not isinstance(responses, list) or not responses:
+def _parse_scheme_search_response(data: Dict[str, Any]) -> tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """Parse the KP /search response (scheme profile) into (chunk results, search context)."""
+    if not isinstance(data, dict):
         return [], {}
-
-    selected_ctx: Dict[str, str] = {}
-    selected_results: List[Dict[str, Any]] = []
-
-    for rsp in responses:
-        if not isinstance(rsp, dict):
-            continue
-        message = rsp.get("message") if isinstance(rsp.get("message"), dict) else {}
-        catalog = message.get("catalog") if isinstance(message.get("catalog"), dict) else {}
-        if not catalog:
-            continue
-
-        ctx = _catalog_search_context_map(catalog)
-        status = str(ctx.get("status") or "").strip().lower()
-        # Prefer a successful catalog when multiple responses exist.
-        if status and status != "success" and selected_results:
-            continue
-
-        results: List[Dict[str, Any]] = []
-        providers = catalog.get("providers")
-        if isinstance(providers, list):
-            for prov in providers:
-                if not isinstance(prov, dict):
-                    continue
-                items = prov.get("items")
-                if not isinstance(items, list):
-                    continue
-                for item in items:
-                    parsed = _chunk_result_from_item(item)
-                    if parsed:
-                        results.append(parsed)
-
-        if status == "success" or (not status and results):
-            return results, ctx
-
-        # Keep first non-empty / first catalog as fallback.
-        if not selected_ctx:
-            selected_ctx = ctx
-            selected_results = results
-        elif results and not selected_results:
-            selected_ctx = ctx
-            selected_results = results
-
-    return selected_results, selected_ctx
+    results = []
+    for hit in data.get("hits") or []:
+        parsed = _scheme_result_from_hit(hit, knowledge_provider.hit_score(hit, data) if isinstance(hit, dict) else 0.0)
+        if parsed:
+            results.append(parsed)
+    return results, knowledge_provider.context_strings(data.get("scheme_search"))
 
 
-def _build_scheme_qdrant_search_payload(
-    query: str,
-    scheme_code: Optional[str] = None,
-    session_id: str = "",
-    question_id: str = "",
-) -> Dict[str, Any]:
-    """Beckn /search body for scheme guideline document search (scheme-agri-qdrant)."""
-    now = datetime.now(timezone.utc)
-    item_descriptor: Dict[str, str] = {"name": query}
-    if scheme_code:
-        item_descriptor["code"] = scheme_code
-
-    return {
-        "context": {
-            "domain": "schemes:vistaar",
-            "action": "search",
-            "version": "1.1.0",
-            "bap_id": os.getenv("BAP_ID"),
-            "bap_uri": os.getenv("BAP_URI"),
-            "bpp_id": os.getenv("BPP_ID"),
-            "bpp_uri": os.getenv("BPP_URI"),
-            "transaction_id": str(uuid.uuid4()),
-            "message_id": str(uuid.uuid4()),
-            "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
-            "ttl": "PT10M",
-            "location": {
-                "country": {"code": "IND"},
-                "city": {"code": "*"},
-            },
-            "tags": {
-                "session_id": session_id,
-                "question_id": question_id,
-            },
-        },
-        "message": {
-            "intent": {
-                "category": {
-                    "descriptor": {
-                        "code": SCHEME_AGRI_QDRANT_CATEGORY,
-                        "name": SCHEME_AGRI_QDRANT_CATEGORY,
-                    }
-                },
-                "item": {
-                    "descriptor": item_descriptor,
-                },
-            }
-        },
-    }
-
-
-@observe(name="tool:search_schemes", as_type="tool")
-async def search_schemes(
-    ctx: RunContext[FarmerContext],
-    query: str,
-    top_k: int = 10,
-) -> str:
-    """
-    Semantic search for Bharat Vistaar scheme guideline PDFs via the Vistaar network layer
-    (BAP /search, category scheme-agri-qdrant).
-
-    Use for scheme information, including PM-KISAN, PMFBY, KCC and other schemes
-    in the current system prompt's live catalog. Recognize the farmer's intended
-    scheme and search using its English name or catalog code; preserve the topic
-    on follow-up questions. Availability is checked against the live catalog on
-    each call. Personal status, OTP and grievances use their dedicated tools.
-
-    Args:
-        query: Natural-language question in English (eligibility, benefits, application process)
-        top_k: Maximum number of chunks to return (default: 10)
-
-    Returns:
-        Formatted scheme document chunks with scheme names and relevance scores
-    """
-    scheme_list = get_builtin_scheme_list()
-    logger.info(
-        "TOOL CALL: search_schemes(query=%r, top_k=%d) — %d schemes known this turn (live-synced from Redis)",
-        query, top_k, len(scheme_list),
-    )
-    if query_names_unindexed_scheme(query, scheme_list):
-        logger.info("TOOL RESULT: search_schemes — query names a scheme outside the known list, returning unavailable")
-        return format_scheme_unavailable(query)
-
-    scheme_code = resolve_scheme_code(query, scheme_list)
-    logger.info("search_schemes: resolved scheme_code=%s for query=%r", scheme_code, query)
-    payload = _build_scheme_qdrant_search_payload(
-        query=query,
-        scheme_code=scheme_code,
-        session_id=ctx.deps.session_id,
-        question_id=ctx.deps.question_id,
-    )
-    transaction_id = payload.get("context", {}).get("transaction_id")
-    lf_update_current_observation(
-        input={"query": query, "top_k": top_k, "scheme_code": scheme_code},
-        metadata={
-            "tool": "scheme.search",
-            "category": SCHEME_AGRI_QDRANT_CATEGORY,
-            "transaction_id": transaction_id,
-            "resolved_scheme_code": scheme_code,
-        },
-    )
-
-    bap_endpoint = os.getenv("BAP_ENDPOINT")
-    if not bap_endpoint:
-        logger.error("BAP_ENDPOINT is not set")
-        return "Scheme search service is not configured. Please try again later."
-
-    search_url = bap_endpoint.rstrip("/") + "/search"
-    logger.info(
-        "Scheme network search: query=%r scheme_code=%s url=%s",
-        query,
-        scheme_code,
-        search_url,
-    )
+async def _fetch_documents(payload: dict, tool: str, category: str) -> tuple[dict, str]:
+    lf_update_current_observation(input=payload, metadata={"tool": tool, "category": category})
+    if not knowledge_provider.search_url():
+        logger.error("KNOWLEDGE_PROVIDER_URL is not set")
+        return {}, "Document search service is not configured. Please try again later."
 
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                search_url,
-                json=payload,
-                timeout=DEFAULT_HTTP_TIMEOUT,
-            )
+        return await knowledge_provider.search(payload), ""
+    except (knowledge_provider.KnowledgeProviderError, httpx.HTTPError) as exc:
+        logger.warning("Knowledge Provider document search failed: %s", exc)
+        lf_update_current_observation(metadata={"tool": tool, "error_type": type(exc).__name__})
+        return {}, "Document search service is unavailable. Please try again later."
 
-        if response.status_code != 200:
-            logger.error(
-                "Scheme network search returned status %s — %s",
-                response.status_code,
-                (response.text or "")[:500],
-            )
-            lf_update_current_observation(
-                metadata={
-                    "tool": "scheme.search",
-                    "http_status": int(response.status_code),
-                }
-            )
-            return "Scheme search service is unavailable. Please try again later."
 
-        data = response.json()
-        if not isinstance(data, dict):
-            logger.error("Scheme network search returned non-object JSON: %s", type(data))
-            return "Scheme search returned an unexpected response. Please try again later."
-
-        results, search_ctx = _parse_scheme_network_response(data)
-        status = str(search_ctx.get("status") or "").strip().lower()
-        message = str(search_ctx.get("message") or "").strip()
-        resolved = str(search_ctx.get("resolved_scheme_code") or "").strip()
-
-        if status and status != "success" and not results:
-            logger.info(
-                "TOOL RESULT: search_schemes — network non-success status=%s message=%r hits=%s",
-                status,
-                message,
-                len(results),
-            )
-            lf_update_current_observation(
-                metadata={
-                    "tool": "scheme.search",
-                    "category": SCHEME_AGRI_QDRANT_CATEGORY,
-                    "transaction_id": transaction_id,
-                    "network_status": status or None,
-                    "resolved_scheme_code": resolved or scheme_code,
-                    "hit_count": 0,
-                    "doc_ids": [],
-                    "chunk_ids": [],
-                    "providers_source": search_ctx.get("source"),
-                    "search_backend": search_ctx.get("search_backend"),
-                }
-            )
-            return message or format_scheme_unavailable(query)
-
-        if top_k and top_k > 0:
-            results = results[:top_k]
-
-        # From network chunk-details tags — shown in Langfuse tool metadata.
-        doc_ids = list(
-            dict.fromkeys(str(r.get("doc_id") or "") for r in results if r.get("doc_id"))
-        )
-        chunk_ids = [str(r.get("chunk_id") or "") for r in results if r.get("chunk_id")]
-
-        lf_update_current_observation(
-            metadata={
-                "tool": "scheme.search",
-                "category": SCHEME_AGRI_QDRANT_CATEGORY,
-                "transaction_id": transaction_id,
-                "network_status": status or None,
-                "resolved_scheme_code": resolved or scheme_code,
-                "hit_count": len(results),
-                "doc_ids": doc_ids,
-                "chunk_ids": chunk_ids,
-                "chunks": [
-                    {
-                        "doc_id": r.get("doc_id") or "",
-                        "chunk_id": r.get("chunk_id") or "",
-                        "scheme_code": r.get("scheme_code") or "",
-                        "section": r.get("section") or "",
-                        "score": r.get("score"),
-                        "source": r.get("source") or "",
-                    }
-                    for r in results
-                ],
-                "providers_source": search_ctx.get("source"),
-                "search_backend": search_ctx.get("search_backend"),
-            }
-        )
-        logger.info(
-            "TOOL RESULT: search_schemes — resolved_scheme_code=%s hit_count=%d doc_ids=%s",
-            resolved or scheme_code, len(results), doc_ids,
-        )
-
-        formatted = format_search_results(results, query, scheme_list)
-        if results:
-            formatted += format_status_check_offer(resolved or scheme_code)
-        return formatted
-
-    except httpx.TimeoutException as e:
-        logger.error("Scheme network search timed out: %s", e)
-        lf_update_current_observation(
-            metadata={"tool": "scheme.search", "error_type": "timeout"}
-        )
-        return "Scheme search request timed out. Please try again later."
-
-    except httpx.RequestError as e:
-        logger.error("Scheme network search request failed: %s", e)
-        lf_update_current_observation(
-            metadata={"tool": "scheme.search", "error_type": "request_error"}
-        )
-        return f"Scheme search request failed: {e!s}"
-
-    except Exception as e:
-        logger.error("Error searching schemes: %s for query: %s", e, query)
-        lf_update_current_observation(
-            metadata={"tool": "scheme.search", "error_type": "exception"}
-        )
-        raise ModelRetry("Error searching schemes, please try again") from e
+def _search_payload(query: str, top_k: int) -> dict:
+    query = query.strip()
+    if not query:
+        raise ModelRetry("Provide a non-empty document search query.")
+    return {"query": query, "top_k": min(max(top_k, 1), 50)}
 
 
 @observe(name="tool:search_documents", as_type="tool")
-async def search_documents(
-    ctx: RunContext[FarmerContext],
-    query: str, 
-    top_k: int = 10, 
-) -> str:
-    """
-    Semantic search for documents. Use this tool to search for relevant documents.
-    
+async def search_documents(query: str, top_k: int = 10) -> str:
+    """Search agricultural manuals, guides and general documents.
+
     Args:
-        query: The search query in *English* (required)
-        top_k: Maximum number of results to return (default: 10)
-        
-    Returns:
-        search_results: Formatted list of documents
+        query: A short English search question naming the document or subject.
+        top_k: Maximum passage count, from 1 to 50.
     """
-    if advisory_question_pending(ctx):
-        raise ModelRetry(PENDING_RETRY)
-    try:
-        # Initialize Marqo client
-        endpoint_url = os.getenv('MARQO_ENDPOINT_URL')
-        if not endpoint_url:
-            raise ValueError("Marqo endpoint URL is required")
-        
-        index_name = os.getenv('MARQO_INDEX_NAME', 'sunbird-va-index')
-        if not index_name:
-            raise ValueError("Marqo index name is required")
-        
-        client = marqo.Client(url=endpoint_url)
-        client.config.timeout = 10
-        logger.info(f"Searching for '{query}' in index '{index_name}'")
-
-        filter_string = f"type:document"
-            
-        # Perform search
-        search_params = {
-            "q": query,
-            "limit": top_k,
-            "filter_string": "type:document",
-            "search_method": "hybrid",
-            "hybrid_parameters": {
-                "retrievalMethod": "disjunction",
-                "rankingMethod": "rrf",
-                "alpha": 0.5,
-                "rrfK": 60,
-            },        
-        }
-        
-        results = client.index(index_name).search(**search_params)['hits']
-        
-        if len(results) == 0:
-            return f"No results found for `{query}`"
-        else:            
-            search_hits = [SearchHit(**hit) for hit in results]            
-            # Convert back to dict format for compatibility
-            document_string = '\n\n----\n\n'.join([str(document) for document in search_hits])
-            return "> Search Results for `" + query + "`\n\n" + document_string + await agromet_note(ctx, query=query)
-    except Exception as e:
-        logger.error(f"Error searching documents: {e} for query: {query}")
-        raise ModelRetry(f"Error searching documents, please try again")
+    data, error = await _fetch_documents(_search_payload(query, top_k), "documents.search", "knowledge-provider")
+    if error:
+        return error
+    hits = [
+        hit for hit in data.get("hits") or []
+        if isinstance(hit, dict) and hit.get("text")
+        and (hit.get("document_kind") or hit.get("type")) != "video"
+    ]
+    lf_update_current_observation(metadata={"tool": "documents.search", "hit_count": len(hits)})
+    return _format_documents(hits)
 
 
+@observe(name="tool:search_schemes", as_type="tool")
+async def search_schemes(query: str, top_k: int = 10, scheme_code: Optional[str] = None) -> str:
+    """Search national scheme guidelines, including eligibility, benefits and applications.
 
-@observe(name="tool:search_video", as_type="tool")
-async def search_video(
-    query: str, 
-    top_k: int = 10, 
-) -> str:
-    """
-    Semantic search for videos. Use this tool when recommending videos to the farmer.
-    
     Args:
-        query: The search query in *English* (required)
-        top_k: Maximum number of results to return (default: 3)
-        
-    Returns:
-        search_results: Formatted list of videos
+        query: A short English search question containing the scheme name or acronym.
+        top_k: Maximum passage count, from 1 to 50.
+        scheme_code: Optional exact code when the scheme catalog code is known.
     """
-    try:
-        from helpers.video_qdrant_search import (
-            format_video_search_results,
-            search_videos as qdrant_search_videos,
-        )
+    payload = {**_search_payload(query, top_k), "document_kind": "scheme"}
+    scheme_code = (scheme_code or "").strip().lower()
+    if scheme_code:
+        payload["document_code"] = scheme_code
+    data, error = await _fetch_documents(payload, "scheme.search", SCHEME_SEARCH_CATEGORY)
+    if error:
+        return error
+    return _format_schemes(data, payload["query"], scheme_code)
 
-        collection_name = os.getenv("QDRANT_VIDEO_COLLECTION_NAME", "video_data_collection")
-        if not os.getenv("QDRANT_URL"):
-            raise ValueError("QDRANT_URL is required")
 
-        logger.info("Searching videos for %r in Qdrant collection %r", query, collection_name)
-        results = await asyncio.to_thread(
-            qdrant_search_videos, query, collection_name, top_k
-        )
-        return format_video_search_results(results, query)
-        
-    except Exception as e:
-        logger.error(f"Error searching videos: {e} for query: {query}")
-        raise ModelRetry(f"Error searching videos, please try again")
+def _format_schemes(data: dict, query: str, scheme_code: str) -> str:
+    results, search_ctx = _parse_scheme_search_response(data)
+    resolved_code = scheme_code or search_ctx.get("resolved_scheme_code", "").lower()
+    if resolved_code:
+        results = [hit for hit in results if hit["scheme_code"] == resolved_code]
+    status = search_ctx.get("status", "").lower()
+    if status and status != "success":
+        results = []
 
-@observe(name="tool:search_pests_diseases", as_type="tool")
-async def search_pests_diseases(
-    ctx: RunContext[FarmerContext],
-    query: str,
-    crop: str,
-    top_k: int = 10,
-) -> str:
-    """
-    Semantic search for **crop** pests and diseases only (e.g. crop insects, fungal/bacterial diseases of plants).
-    Do NOT use for livestock/animal diseases (cattle, buffalo, goat, poultry, etc.) — use search_documents for those.
-    
-    Args:
-        query: The search query in *English* (required)
-        crop: The crop in English, for example "Wheat" (required). If the farmer has not said which crop,
-            do not call this tool: ask which crop first.
-        top_k: Maximum number of results to return (default: 10)
-        
-    Returns:
-        search_results: Formatted list of pests and diseases information
-    """
-    if not " ".join(str(crop or "").split()):
-        raise ModelRetry(
-            "The crop is required. If the farmer named a crop, call search_pests_diseases again with `crop`. "
-            "If they did not, ask them which crop in one short question, wait for the answer, then search."
-        )
-    if advisory_not_searched(ctx):
-        raise ModelRetry(ADVISORY_FIRST_RETRY)
-    if advisory_question_pending(ctx):
-        raise ModelRetry(PENDING_RETRY)
-    try:
-        # Initialize Marqo client
-        endpoint_url = os.getenv('MARQO_ENDPOINT_URL')
-        if not endpoint_url:
-            raise ValueError("Marqo endpoint URL is required")
-        
-        # Use separate index for pests and diseases
-        index_name = os.getenv('MARQO_PESTS_DISEASES_INDEX_NAME')
-        if not index_name:
-            raise ValueError("Marqo pests and diseases index name is required.")
-        
-        client = marqo.Client(url=endpoint_url)
-        client.config.timeout = 10
-        logger.info(f"Searching for pests/diseases '{query}' in index '{index_name}'")
+    lf_update_current_observation(metadata={
+        "tool": "scheme.search",
+        "network_status": status or None,
+        "hit_count": len(results),
+        "doc_ids": list(dict.fromkeys(r["doc_id"] for r in results if r["doc_id"])),
+        "chunk_ids": [r["chunk_id"] for r in results if r["chunk_id"]],
+        "chunks": [
+            {key: result[key] for key in ("doc_id", "chunk_id", "scheme_code", "section", "score", "source")}
+            for result in results
+        ],
+    })
+    if not results:
+        message = search_ctx.get("message") if status == "scheme_unavailable" else None
+        return message or NO_RESULTS_MESSAGE
+    formatted = format_search_results(results, query)
+    if resolved_code:
+        formatted += format_status_check_offer(resolved_code)
+    return formatted
 
-        # Perform search
-        search_params = {
-            "q": query,
-            "limit": top_k,
-            "search_method": "hybrid",
-            "hybrid_parameters": {
-                "retrievalMethod": "disjunction",
-                "rankingMethod": "rrf",
-                "alpha": 0.5,
-                "rrfK": 60,
-            },        
-        }
-        
-        results = client.index(index_name).search(**search_params)['hits']
-        
-        if len(results) == 0:
-            return f"No pests or diseases information found for `{query}`"
-        else:            
-            search_hits = [SearchHit(**hit) for hit in results]            
-            # Convert back to dict format for compatibility
-            document_string = '\n\n----\n\n'.join([str(document) for document in search_hits])
-            return "> Pests & Diseases Search Results for `" + query + "`\n\n" + document_string + await agromet_note(ctx, query=query)
-    except Exception as e:
-        logger.error(f"Error searching pests and diseases: {e} for query: {query}")
-        raise ModelRetry(f"Error searching pests and diseases, please try again")
+
+def _format_documents(hits: List[Dict[str, Any]]) -> str:
+    if not hits:
+        return "No relevant documents found for this query."
+    blocks = []
+    for hit in hits:
+        title = str(hit.get("title_en") or hit.get("name_en") or hit.get("name") or hit.get("filename") or "Document")
+        section = hit.get("section")
+        page = _format_page(hit.get("page_start"), hit.get("page_end"))
+        reference = " | ".join(str(part) for part in (title, section, f"p. {page}" if page else "") if part)
+        blocks.append(f"**Source: {reference}**\n\n{hit['text']}")
+    return "\n\n----\n\n".join(blocks)
