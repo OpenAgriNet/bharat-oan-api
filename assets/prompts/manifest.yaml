@@ -153,7 +153,7 @@ agents:
     - pa
     - ta
     - te
-    # bh-main comments out: agristack.profile, crop.icar
+    # bh-main comments out: crop.icar
     enabled_skills:
     - ffs.booking
     - schemes.information
@@ -173,7 +173,7 @@ agents:
     - mandi.prices
     - fertilizer.recommendations
     - seeds.availability
-    # - agristack.profile
+    - agristack.profile
     - weather.agromet
     - pm_kisan.installments
     - documents.search
